@@ -6,6 +6,7 @@ import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { Player } from './components/Player';
+import { HUD } from './components/HUD';
 import './App.css';
 
 interface CityProps {
@@ -159,22 +160,7 @@ export default function App() {
         />
       </Canvas>
 
-      <header className="hud">
-        <div className="brand">
-          AYE<span> WORLD</span>
-        </div>
-        <div className="status">EARLY WORLD BUILD · 001</div>
-      </header>
-
-      <div className="intro">
-        <span className="eyebrow">YOUR WORLD. YOUR STORY.</span>
-        <h1>
-          Life begins<br />
-          here.
-        </h1>
-        <p>A new world is taking shape.</p>
-        <div className="hint">WASD TO MOVE · DRAG TO ORBIT · SCROLL TO ZOOM</div>
-      </div>
+      <HUD controller={controller} />
     </main>
   );
 }
