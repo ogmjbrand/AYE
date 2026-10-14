@@ -1,0 +1,131 @@
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font-family: 'DM Sans', sans-serif;
+  background: #a9c8dc;
+}
+
+.game {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  overflow: hidden;
+}
+
+.game canvas {
+  display: block;
+  touch-action: none;
+}
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 25px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  color: white;
+  background: linear-gradient(
+    to bottom,
+    rgba(14, 23, 29, 0.48),
+    transparent
+  );
+}
+
+.brand {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 3px;
+}
+
+.brand span {
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.status {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  font-weight: 700;
+}
+
+.intro {
+  position: absolute;
+  left: 32px;
+  bottom: 38px;
+  color: white;
+  pointer-events: none;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+}
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  font-weight: 700;
+}
+
+.intro h1 {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(42px, 7vw, 78px);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -3px;
+  margin: 15px 0;
+}
+
+.intro p {
+  font-size: 14px;
+  color: #f1f3f2;
+}
+
+.hint {
+  margin-top: 28px;
+  font-size: 9px;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .hud {
+    padding: 20px 16px;
+  }
+
+  .brand {
+    font-size: 18px;
+  }
+
+  .status {
+    max-width: 130px;
+    text-align: right;
+    font-size: 8px;
+  }
+
+  .intro {
+    left: 18px;
+    bottom: 24px;
+  }
+
+  .intro h1 {
+    letter-spacing: -2px;
+  }
+}
