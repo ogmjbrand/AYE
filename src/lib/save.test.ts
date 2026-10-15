@@ -43,9 +43,21 @@ describe('character save', () => {
 describe('progress save', () => {
   it('restores balance and clock for the same character', () => {
     const s = new MemoryStorage();
-    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3 } };
+    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12 };
     saveProgress('abc', state, s);
     expect(loadProgress(character, s)).toEqual(state);
+  });
+
+  it('loads progress saved before work shifts existed', () => {
+    const s = new MemoryStorage();
+    s.setItem('aye_progress', JSON.stringify({
+      characterId: 'abc', balance: 100, today: { income: 1, expenses: 2 },
+      time: { hour: 10, minute: 0, totalMinutes: 600, dayOfWeek: 1 },
+    }));
+    const p = loadProgress(character, s);
+    expect(p.balance).toBe(100);
+    expect(p.today.minutesWorked).toBe(0);
+    expect(p.minutesWorkedThisHour).toBe(0);
   });
 
   it('starts fresh for a different character or corrupted data', () => {

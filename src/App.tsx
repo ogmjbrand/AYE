@@ -13,7 +13,7 @@ import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
-import { getCareerLocation } from './lib/careers';
+import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
 
 interface CityProps {
@@ -190,7 +190,10 @@ interface GameProps {
 function Game({ character, onChangeCharacter }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary } = useGameState(character);
+  const { state, rest, dismissSummary } = useGameState(
+    character,
+    () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
+  );
   const controlsRef = useRef<OrbitControls | null>(null);
 
   return (
@@ -200,6 +203,7 @@ function Game({ character, onChangeCharacter }: GameProps) {
           income={state.summary.income}
           expenses={state.summary.expenses}
           netChange={state.summary.netChange}
+          minutesWorked={state.summary.minutesWorked}
           wakeDayOfWeek={state.summary.wakeDayOfWeek}
           onContinue={dismissSummary}
         />

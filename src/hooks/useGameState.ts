@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
 import { gameReducer, type GameAction, type GameState } from '../lib/gameState';
 import { loadProgress, saveProgress } from '../lib/save';
@@ -9,8 +9,15 @@ export const MS_PER_GAME_MINUTE = 3000;
 /**
  * The single source of truth for the game clock, balance and daily ledger.
  * Mount it once per character (key the component by character id).
+ *
+ * `isAtWorkplace` is read on every tick to decide whether that minute is paid.
  */
-export function useGameState(character: Character) {
+export function useGameState(character: Character, isAtWorkplace: () => boolean) {
+  const atWorkRef = useRef(isAtWorkplace);
+  useEffect(() => {
+    atWorkRef.current = isAtWorkplace;
+  });
+
   const reducer = useCallback(
     (state: GameState, action: GameAction) =>
       gameReducer(state, action, character.career, character.lifestyle),
@@ -19,7 +26,10 @@ export function useGameState(character: Character) {
   const [state, dispatch] = useReducer(reducer, character, (c) => loadProgress(c));
 
   useEffect(() => {
-    const interval = setInterval(() => dispatch({ type: 'tick' }), MS_PER_GAME_MINUTE);
+    const interval = setInterval(
+      () => dispatch({ type: 'tick', atWorkplace: atWorkRef.current() }),
+      MS_PER_GAME_MINUTE,
+    );
     return () => clearInterval(interval);
   }, []);
 

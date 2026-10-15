@@ -4,9 +4,9 @@
  *
  * Rules (tunable):
  *   - The clock advances one game minute per tick.
- *   - Each time a game hour ends, the player is paid their career's hourly wage
- *     if that hour was within working hours, and pays their lifestyle's hourly
- *     living cost.
+ *   - Wages are earned per minute spent at the player's workplace during
+ *     working hours, and paid out when the game hour ends. Every hour also
+ *     charges the lifestyle's hourly living cost.
  *   - The balance never goes below zero.
  *   - Resting sleeps until the next 07:00, closes the day's ledger and reports it.
  */
@@ -26,6 +26,8 @@ export interface GameTime {
 export interface DayLedger {
   income: number;
   expenses: number;
+  /** Game minutes spent at the workplace during working hours. */
+  minutesWorked: number;
 }
 
 export interface DaySummary extends DayLedger {
@@ -39,11 +41,16 @@ export interface GameState {
   balance: number;
   /** Money in and out since the player last woke up. */
   today: DayLedger;
+  /** Minutes worked in the current, not yet paid, hour. */
+  minutesWorkedThisHour: number;
   /** Set after resting; the clock is paused until it is dismissed. */
   summary: DaySummary | null;
 }
 
-export type GameAction = { type: 'tick' } | { type: 'sleep' } | { type: 'dismissSummary' };
+export type GameAction =
+  | { type: 'tick'; atWorkplace: boolean }
+  | { type: 'sleep' }
+  | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const WAKE_HOUR = 7;
@@ -106,7 +113,11 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: { income: 0, expenses: 0 }, summary: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, summary: null };
+}
+
+export function emptyLedger(): DayLedger {
+  return { income: 0, expenses: 0, minutesWorked: 0 };
 }
 
 function advanceMinute(time: GameTime): GameTime {
@@ -123,13 +134,19 @@ function advanceMinute(time: GameTime): GameTime {
   return { hour, minute, totalMinutes: time.totalMinutes + 1, dayOfWeek, period: getPeriod(hour) };
 }
 
-/** Advance one minute; when an hour ends, settle its wage and living cost. */
-function tick(state: GameState, career: Career, lifestyle: Lifestyle): GameState {
+/**
+ * Advance one minute. A minute counts as worked if it falls in working hours
+ * and the player is at their workplace. When an hour ends, pay the wage for
+ * the minutes worked in it and charge the hour's living cost.
+ */
+function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean): GameState {
+  const worked = atWorkplace && career !== 'none' && isWorkingHours(state.time) ? 1 : 0;
+  const minutesWorkedThisHour = state.minutesWorkedThisHour + worked;
   const time = advanceMinute(state.time);
-  if (time.minute !== 0) return { ...state, time };
+  const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
+  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour };
 
-  const endedHour = state.time.hour;
-  const income = isWorkingHours({ hour: endedHour }) ? HOURLY_WAGE[career] : 0;
+  const income = Math.round((HOURLY_WAGE[career] * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
   const expenses = Math.min(HOURLY_LIVING_COST[lifestyle], afterIncome);
 
@@ -137,21 +154,28 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle): GameState
     ...state,
     time,
     balance: afterIncome - expenses,
-    today: { income: state.today.income + income, expenses: state.today.expenses + expenses },
+    today: { ...today, income: today.income + income, expenses: today.expenses + expenses },
+    minutesWorkedThisHour: 0,
   };
 }
 
 /** Sleep until the next 07:00 (strictly in the future), then report the day. */
 function sleep(state: GameState, career: Career, lifestyle: Lifestyle): GameState {
-  let next = tick(state, career, lifestyle);
+  let next = tick(state, career, lifestyle, false);
   while (!(next.time.hour === WAKE_HOUR && next.time.minute === 0)) {
-    next = tick(next, career, lifestyle);
+    next = tick(next, career, lifestyle, false);
   }
-  const { income, expenses } = next.today;
+  const { income, expenses, minutesWorked } = next.today;
   return {
     ...next,
-    today: { income: 0, expenses: 0 },
-    summary: { income, expenses, netChange: income - expenses, wakeDayOfWeek: next.time.dayOfWeek },
+    today: emptyLedger(),
+    summary: {
+      income,
+      expenses,
+      minutesWorked,
+      netChange: income - expenses,
+      wakeDayOfWeek: next.time.dayOfWeek,
+    },
   };
 }
 
@@ -163,7 +187,7 @@ export function gameReducer(
 ): GameState {
   switch (action.type) {
     case 'tick':
-      return state.summary ? state : tick(state, career, lifestyle);
+      return state.summary ? state : tick(state, career, lifestyle, action.atWorkplace);
     case 'sleep':
       return state.summary ? state : sleep(state, career, lifestyle);
     case 'dismissSummary':

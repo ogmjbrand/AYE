@@ -32,6 +32,12 @@ export function HUD({
   }, []);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
+  const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
+  const status = !shiftHours
+    ? { label: 'Off Duty', className: 'text-gray-500' }
+    : workplaceStatus.isAtWorkplace
+      ? { label: 'Working', className: 'text-aye-green' }
+      : { label: 'Not at work', className: 'text-aye-red' };
 
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
@@ -125,9 +131,7 @@ export function HUD({
                 )}
                 <div className="flex justify-between">
                   <span className="text-gray-400">Status</span>
-                  <span className={isWorkingHours(gameTime) ? 'text-aye-green' : 'text-gray-500'}>
-                    {isWorkingHours(gameTime) ? 'Working' : 'Off Duty'}
-                  </span>
+                  <span className={status.className}>{status.label}</span>
                 </div>
               </>
             )}

@@ -81,12 +81,18 @@ export function loadProgress(character: Character, storage: Storage = localStora
       period: getPeriod(time.hour),
     },
     balance: p.balance,
-    today: { income: today.income, expenses: today.expenses },
+    today: {
+      income: today.income,
+      expenses: today.expenses,
+      // Saves from before work shifts have no minutes recorded
+      minutesWorked: isInt(today.minutesWorked, 0, 24 * 60) ? today.minutesWorked : 0,
+    },
+    minutesWorkedThisHour: isInt(p.minutesWorkedThisHour, 0, 60) ? p.minutesWorkedThisHour : 0,
     summary: null,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today }));
+  const { time, balance, today, minutesWorkedThisHour } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour }));
 }

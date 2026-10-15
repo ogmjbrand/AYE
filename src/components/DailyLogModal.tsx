@@ -4,13 +4,15 @@ interface DailyLogModalProps {
   income: number;
   expenses: number;
   netChange: number;
+  minutesWorked: number;
   /** The day the player woke up on (0 = Monday). */
   wakeDayOfWeek: number;
   onContinue: () => void;
 }
 
-export function DailyLogModal({ income, expenses, netChange, wakeDayOfWeek, onContinue }: DailyLogModalProps) {
+export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, onContinue }: DailyLogModalProps) {
   const nextDay = DAY_NAMES[wakeDayOfWeek];
+  const hoursWorked = `${Math.floor(minutesWorked / 60)}h ${String(minutesWorked % 60).padStart(2, '0')}m`;
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center pointer-events-auto z-50">
@@ -24,6 +26,10 @@ export function DailyLogModal({ income, expenses, netChange, wakeDayOfWeek, onCo
 
         <div className="space-y-4 font-mono text-sm mb-8">
           <div className="bg-gray-800 rounded p-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Hours worked</span>
+              <span className="text-gray-200">{hoursWorked}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Income</span>
               <span className="text-aye-green">+{income.toLocaleString()} ⓒ</span>
