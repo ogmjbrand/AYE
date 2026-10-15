@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import {
+  FULLNESS_LOSS_PER_MINUTE,
+  HUNGRY_THRESHOLD,
   HOURLY_LIVING_COST,
   HOURLY_WAGE,
   createGameState,
@@ -110,5 +112,34 @@ describe('rest', () => {
     expect(paused.time).toEqual(s.time);
     s = gameReducer(s, { type: 'dismissSummary' }, 'none', 'student');
     expect(run(s, 1).time.minute).toBe(1);
+  });
+});
+
+describe('hunger and eating', () => {
+  it('fullness falls over time and empties in 16 game hours', () => {
+    const s = run(createGameState(5000, createTime(20, 0)), 60);
+    expect(s.fullness).toBeCloseTo(100 - 60 * FULLNESS_LOSS_PER_MINUTE);
+    expect(run(createGameState(5000, createTime(20, 0)), 16 * 60 + 5).fullness).toBe(0);
+  });
+
+  it('eating costs money, counts as an expense and raises fullness (capped at 100)', () => {
+    let s = { ...createGameState(100), fullness: 30 };
+    s = gameReducer(s, { type: 'eat', price: 25, fullness: 45 }, 'doctor', 'ordinary');
+    expect(s.balance).toBe(75);
+    expect(s.fullness).toBe(75);
+    expect(s.today.expenses).toBe(25);
+    s = gameReducer(s, { type: 'eat', price: 25, fullness: 45 }, 'doctor', 'ordinary');
+    expect(s.fullness).toBe(100);
+  });
+
+  it("can't buy a meal you can't afford", () => {
+    const s = { ...createGameState(10), fullness: 30 };
+    expect(gameReducer(s, { type: 'eat', price: 25, fullness: 45 }, 'doctor', 'ordinary')).toBe(s);
+  });
+
+  it('very hungry workers are paid half', () => {
+    const s = run({ ...createGameState(5000, createTime(9, 0)), fullness: HUNGRY_THRESHOLD - 10 }, 60);
+    expect(s.today.minutesWorked).toBe(60);
+    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.doctor / 2));
   });
 });

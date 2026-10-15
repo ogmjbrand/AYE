@@ -189,11 +189,9 @@ function Signs() {
         const side = streetSide(b);
         const isShop = b.style === 'shop';
         const width = Math.min(b.size[2] * 0.7, 7);
-        const tex = signTexture(
-          b.name!,
-          isShop ? '#14532d' : b.name === 'General Hospital' ? '#b91c1c' : '#1f2937',
-          '#fdf6e3',
-        );
+        // Muted, realistic signboard colours (brand colours are reserved for the logo)
+        const SIGN_BG = ['#24323f', '#4a3226', '#2f3b34', '#3a3340', '#463d2c'];
+        const tex = signTexture(b.name!, SIGN_BG[b.name!.length % SIGN_BG.length], '#f1ede6');
         return {
           key: b.name!,
           tex,

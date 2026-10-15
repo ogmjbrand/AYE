@@ -14,7 +14,7 @@ class MemoryStorage implements Storage {
 }
 
 const character: Character = {
-  id: 'abc', name: 'Ada', lifestyle: 'ordinary', career: 'doctor',
+  id: 'abc', name: 'Ada', lifestyle: 'ordinary', career: 'doctor', diet: 'vegan',
   colorR: 1, colorG: 2, colorB: 3, balance: 5000, createdAt: 1, lastBalanceUpdate: 1,
 };
 
@@ -38,6 +38,16 @@ describe('character save', () => {
   });
 
   it('rejects null', () => expect(parseCharacter(null)).toBeNull());
+
+  it('characters saved before diets existed default to eating everything', () => {
+    const { diet: _omit, ...old } = character;
+    void _omit;
+    expect(parseCharacter(old)?.diet).toBe('everything');
+  });
+
+  it('rejects an unknown diet', () => {
+    expect(parseCharacter({ ...character, diet: 'carnivore-only' })).toBeNull();
+  });
 });
 
 describe('progress save', () => {
@@ -58,6 +68,7 @@ describe('progress save', () => {
     expect(p.balance).toBe(100);
     expect(p.today.minutesWorked).toBe(0);
     expect(p.minutesWorkedThisHour).toBe(0);
+    expect(p.fullness).toBe(100);
   });
 
   it('starts fresh for a different character or corrupted data', () => {

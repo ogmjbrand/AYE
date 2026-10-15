@@ -32,15 +32,15 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Income</span>
-              <span className="text-aye-green">+{income.toLocaleString()} ⓒ</span>
+              <span className="text-ui-accent">+{income.toLocaleString()} ⓒ</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Expenses</span>
-              <span className="text-aye-red">-{expenses.toLocaleString()} ⓒ</span>
+              <span className="text-ui-danger">-{expenses.toLocaleString()} ⓒ</span>
             </div>
             <div className="border-t border-gray-700 pt-2 flex justify-between font-bold">
-              <span className={netChange >= 0 ? 'text-aye-green' : 'text-aye-red'}>Net Change</span>
-              <span className={netChange >= 0 ? 'text-aye-green' : 'text-aye-red'}>
+              <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>Net Change</span>
+              <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>
                 {netChange >= 0 ? '+' : ''}{netChange.toLocaleString()} ⓒ
               </span>
             </div>
@@ -54,7 +54,7 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
         <button
           autoFocus
           onClick={onContinue}
-          className="w-full bg-aye-green hover:bg-green-600 text-black font-bold py-3 rounded transition"
+          className="w-full bg-ui-accent hover:bg-ui-accent-strong text-black font-bold py-3 rounded transition"
         >
           Continue to {nextDay}
         </button>

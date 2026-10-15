@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { usePlayerController } from './hooks/usePlayerController';
+import { setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
 import type { GameTime } from './lib/gameState';
@@ -20,6 +20,8 @@ import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
+import { FoodMenu } from './components/FoodMenu';
+import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
 
@@ -74,7 +76,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   return (
     <mesh position={[position[0], groundHeightAt(position[0], position[2]) + 0.03, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[1.5, 2, 48]} />
-      <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} transparent opacity={0.75} depthWrite={false} />
+      <meshStandardMaterial color="#8ab4d8" emissive="#8ab4d8" emissiveIntensity={0.7} transparent opacity={0.7} depthWrite={false} />
     </mesh>
   );
 }
@@ -120,11 +122,28 @@ interface GameProps {
 function Game({ character, onChangeCharacter }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary } = useGameState(
+  const { state, rest, dismissSummary, eat } = useGameState(
     character,
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
   const controlsRef = useRef<OrbitControls | null>(null);
+  const [vendor, setVendor] = useState<FoodVendor | null>(null);
+
+  // E opens the menu of the vendor you're standing at
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      const near = nearestVendor(controller.position.x, controller.position.z);
+      if (near) setVendor(near);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [controller]);
+
+  useEffect(() => {
+    setMovementBlocked(vendor !== null);
+    return () => setMovementBlocked(false);
+  }, [vendor]);
   // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
   const [qualityMode, setQualityMode] = useState<'auto' | Quality>('auto');
   const [autoQuality, setAutoQuality] = useState<Quality>('high');
@@ -132,6 +151,18 @@ function Game({ character, onChangeCharacter }: GameProps) {
 
   return (
     <main className="game">
+      {vendor && (
+        <FoodMenu
+          vendor={vendor}
+          diet={character.diet}
+          balance={state.balance}
+          fullness={state.fullness}
+          onEat={(dish) => {
+            if (suitsDiet(dish, character.diet)) eat(dish.price, dish.fullness);
+          }}
+          onClose={() => setVendor(null)}
+        />
+      )}
       {state.summary && (
         <DailyLogModal
           income={state.summary.income}
@@ -176,6 +207,8 @@ function Game({ character, onChangeCharacter }: GameProps) {
         neighborhood={neighborhood}
         onChangeCharacter={onChangeCharacter}
         onRest={rest}
+        fullness={state.fullness}
+        onOpenVendor={setVendor}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
         onCycleQuality={() => setQualityMode((m) => (m === 'auto' ? 'high' : m === 'high' ? 'low' : 'auto'))}
       />

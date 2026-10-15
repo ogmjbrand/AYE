@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { STARTING_BALANCE } from '../lib/gameState';
 import { loadCharacter, saveCharacter } from '../lib/save';
+import { DIETS, type Diet } from '../lib/food';
 
 export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
 export type Career =
@@ -18,6 +19,7 @@ export interface Character {
   name: string;
   lifestyle: Lifestyle;
   career: Career;
+  diet: Diet;
   colorR: number;
   colorG: number;
   colorB: number;
@@ -39,6 +41,7 @@ export function CharacterCreation({
   const [name, setName] = useState('');
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
   const [career, setCareer] = useState<Character['career']>('none');
+  const [diet, setDiet] = useState<Diet>('everything');
   const [colorR, setColorR] = useState(139);
   const [colorG, setColorG] = useState(93);
   const [colorB, setColorB] = useState(62);
@@ -56,6 +59,7 @@ export function CharacterCreation({
       name: name.trim(),
       lifestyle,
       career,
+      diet,
       colorR,
       colorG,
       colorB,
@@ -103,7 +107,7 @@ export function CharacterCreation({
           <div className="space-y-3">
             <button
               onClick={handleLoad}
-              className="w-full bg-aye-green hover:bg-green-600 text-black font-bold py-3 rounded transition"
+              className="w-full bg-ui-accent hover:bg-ui-accent-strong text-black font-bold py-3 rounded transition"
             >
               CONTINUE
             </button>
@@ -139,7 +143,7 @@ export function CharacterCreation({
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
               maxLength={32}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:border-aye-green focus:outline-none"
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:border-ui-accent focus:outline-none"
             />
           </div>
 
@@ -153,7 +157,7 @@ export function CharacterCreation({
               onChange={(e) =>
                 setLifestyle(e.target.value as Character['lifestyle'])
               }
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-aye-green focus:outline-none"
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-ui-accent focus:outline-none"
             >
               <option value="student">Student</option>
               <option value="ordinary">Ordinary</option>
@@ -172,7 +176,7 @@ export function CharacterCreation({
               onChange={(e) =>
                 setCareer(e.target.value as Character['career'])
               }
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-aye-green focus:outline-none"
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-ui-accent focus:outline-none"
             >
               <option value="none">Undecided</option>
               <option value="artist">Artist</option>
@@ -183,6 +187,24 @@ export function CharacterCreation({
               <option value="pilot">Pilot</option>
               <option value="student">Student</option>
             </select>
+          </div>
+
+          {/* Diet */}
+          <div>
+            <label htmlFor="diet" className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+              Diet
+            </label>
+            <select
+              id="diet"
+              value={diet}
+              onChange={(e) => setDiet(e.target.value as Diet)}
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-ui-accent focus:outline-none"
+            >
+              {DIETS.map((d) => (
+                <option key={d.id} value={d.id}>{d.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{DIETS.find((d) => d.id === diet)!.hint} Menus show what suits you.</p>
           </div>
 
           {/* Color Picker */}
@@ -202,7 +224,7 @@ export function CharacterCreation({
                   max="255"
                   value={colorR}
                   onChange={(e) => setColorR(parseInt(e.target.value))}
-                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-aye-red"
+                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-ui-accent"
                 />
               </div>
               <div>
@@ -216,7 +238,7 @@ export function CharacterCreation({
                   max="255"
                   value={colorG}
                   onChange={(e) => setColorG(parseInt(e.target.value))}
-                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-aye-green"
+                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-ui-accent"
                 />
               </div>
               <div>
@@ -230,7 +252,7 @@ export function CharacterCreation({
                   max="255"
                   value={colorB}
                   onChange={(e) => setColorB(parseInt(e.target.value))}
-                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-aye-gold"
+                  className="w-full h-1 bg-gray-700 rounded cursor-pointer accent-ui-accent"
                 />
               </div>
             </div>
@@ -251,7 +273,7 @@ export function CharacterCreation({
           <button
             type="submit"
             disabled={!name.trim()}
-            className="w-full bg-aye-green hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 rounded transition mt-6"
+            className="w-full bg-ui-accent hover:bg-ui-accent-strong disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 rounded transition mt-6"
           >
             CREATE & PLAY
           </button>

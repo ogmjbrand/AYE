@@ -2,7 +2,8 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useState } from 'react';
-import { formatGameTime, isWorkingHours, type GameTime } from '../lib/gameState';
+import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
+import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { perfStats } from '../world/quality';
 
@@ -16,6 +17,8 @@ interface HUDProps {
   onRest?: () => void;
   qualityLabel?: string;
   onCycleQuality?: () => void;
+  fullness: number;
+  onOpenVendor?: (vendor: FoodVendor) => void;
 }
 
 export function HUD({
@@ -28,6 +31,8 @@ export function HUD({
   onRest,
   qualityLabel,
   onCycleQuality,
+  fullness,
+  onOpenVendor,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -37,12 +42,13 @@ export function HUD({
   }, []);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
+  const vendor = nearestVendor(controller.position.x, controller.position.z);
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off Duty', className: 'text-gray-500' }
     : workplaceStatus.isAtWorkplace
-      ? { label: 'Working', className: 'text-aye-green' }
-      : { label: 'Not at work', className: 'text-aye-red' };
+      ? { label: 'Working', className: 'text-ui-accent' }
+      : { label: 'Not at work', className: 'text-ui-warn' };
 
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
@@ -57,11 +63,11 @@ export function HUD({
       <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/48 to-transparent text-white">
         <div className="flex justify-between items-start max-w-full">
           <div>
-            <h1 className="font-display font-bold text-2xl tracking-wider">
-              AYE<span className="font-normal text-xs ml-2">WORLD</span>
+            <h1 className="m-0">
+              <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="AYE" className="h-14 w-auto drop-shadow-lg" />
             </h1>
             {character && (
-              <p className="text-xs tracking-wide font-semibold mt-2 text-aye-gold">
+              <p className="text-xs tracking-wide font-semibold mt-2 text-ui-ink">
                 {character.name}
               </p>
             )}
@@ -105,11 +111,21 @@ export function HUD({
         </div>
       </div>
 
+      {/* Food prompt when standing at a vendor */}
+      {vendor && onOpenVendor && (
+        <button
+          onClick={() => onOpenVendor(vendor)}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 pointer-events-auto px-4 py-2 rounded-md bg-ui-panel/90 border border-ui-line text-ui-ink text-sm shadow-lg hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+        >
+          <span className="font-mono text-ui-accent mr-2">E</span>Order food at <span className="font-semibold">{vendor.name}</span>
+        </button>
+      )}
+
       {/* Location indicator - center bottom */}
       {neighborhood && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 border border-gray-700 rounded text-white text-xs tracking-widest font-bold pointer-events-none">
           <div className="text-center">
-            <p className="text-aye-gold">{neighborhood.name.toUpperCase()}</p>
+            <p className="text-ui-ink">{neighborhood.name.toUpperCase()}</p>
             <p className="text-gray-500 text-xs mt-1">{neighborhood.description}</p>
           </div>
         </div>
@@ -124,24 +140,40 @@ export function HUD({
               <>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Lifestyle</span>
-                  <span className="capitalize text-aye-green">
+                  <span className="capitalize text-ui-ink">
                     {character.lifestyle.replace('-', ' ')}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Career</span>
-                  <span className="capitalize text-aye-red">
+                  <span className="capitalize text-ui-ink">
                     {character.career === 'none' ? 'Undecided' : character.career}
                   </span>
                 </div>
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-gray-400">Hunger</span>
+                  <span className="flex items-center gap-2">
+                    <span className="block w-20 h-1.5 rounded-full bg-ui-line overflow-hidden" aria-hidden>
+                      <span
+                        className={`block h-full ${fullness < HUNGRY_THRESHOLD ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-ui-accent'}`}
+                        style={{ width: `${Math.round(fullness)}%` }}
+                      />
+                    </span>
+                    <span className={fullness < HUNGRY_THRESHOLD ? 'text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Diet</span>
+                  <span className="text-ui-ink">{DIETS.find((d) => d.id === character.diet)?.label}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Balance</span>
-                  <span className="text-aye-gold">{balance.toLocaleString()} ⓒ</span>
+                  <span className="text-ui-ink">{balance.toLocaleString()} ⓒ</span>
                 </div>
                 {character.career !== 'none' && (
                   <div className="flex justify-between">
                     <span className="text-gray-400">Workplace</span>
-                    <span className={workplaceStatus.isAtWorkplace ? 'text-aye-green' : 'text-gray-500'}>
+                    <span className={workplaceStatus.isAtWorkplace ? 'text-ui-accent' : 'text-gray-500'}>
                       {workplaceStatus.isAtWorkplace ? 'Here' : `${workplaceStatus.distanceToWorkplace}u`}
                     </span>
                   </div>
@@ -159,17 +191,17 @@ export function HUD({
             <div className="flex justify-between">
               <span className="text-gray-400">Position</span>
               <span>
-                X: <span className="text-aye-green">{x}</span> Z:{' '}
-                <span className="text-aye-green">{z}</span>
+                X: <span className="text-ui-muted">{x}</span> Z:{' '}
+                <span className="text-ui-muted">{z}</span>
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Direction</span>
-              <span className="text-aye-gold">{direction}°</span>
+              <span className="text-ui-muted">{direction}°</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Speed</span>
-              <span className="text-aye-red">{speed} u/s</span>
+              <span className="text-ui-muted">{speed} m/s</span>
             </div>
           </div>
         </div>

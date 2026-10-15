@@ -9,6 +9,8 @@
  *     charges the lifestyle's hourly living cost.
  *   - The balance never goes below zero.
  *   - Resting sleeps until the next 07:00, closes the day's ledger and reports it.
+ *   - Fullness (0–100) falls steadily, sleep included; eating raises it. While
+ *     very hungry (below HUNGRY_THRESHOLD) work is paid at half rate.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 
@@ -41,8 +43,10 @@ export interface GameState {
   balance: number;
   /** Money in and out since the player last woke up. */
   today: DayLedger;
-  /** Minutes worked in the current, not yet paid, hour. */
+  /** Paid work minutes in the current, not yet paid, hour (hungry minutes count half). */
   minutesWorkedThisHour: number;
+  /** 0 = starving, 100 = just ate a big meal. */
+  fullness: number;
   /** Set after resting; the clock is paused until it is dismissed. */
   summary: DaySummary | null;
 }
@@ -50,6 +54,7 @@ export interface GameState {
 export type GameAction =
   | { type: 'tick'; atWorkplace: boolean }
   | { type: 'sleep' }
+  | { type: 'eat'; price: number; fullness: number }
   | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -84,6 +89,29 @@ export const STARTING_BALANCE: Record<Lifestyle, number> = {
   luxury: 25000,
 };
 
+/** Fullness lost per game minute: a full meter empties in 16 game hours. */
+export const FULLNESS_LOSS_PER_MINUTE = 100 / (16 * 60);
+export const HUNGRY_THRESHOLD = 20;
+
+export function hungerLabel(fullness: number): 'Full' | 'Fed' | 'Peckish' | 'Hungry' | 'Starving' {
+  if (fullness >= 80) return 'Full';
+  if (fullness >= 50) return 'Fed';
+  if (fullness >= HUNGRY_THRESHOLD) return 'Peckish';
+  if (fullness > 0) return 'Hungry';
+  return 'Starving';
+}
+
+/** Pay for a meal and raise fullness. Refused if the player can't afford it. */
+function eat(state: GameState, price: number, gain: number): GameState {
+  if (!(price > 0) || !(gain > 0) || state.balance < price || state.summary) return state;
+  return {
+    ...state,
+    balance: state.balance - price,
+    fullness: Math.min(100, state.fullness + gain),
+    today: { ...state.today, expenses: state.today.expenses + price },
+  };
+}
+
 export function getPeriod(hour: number): Period {
   if (hour >= 6 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 18) return 'afternoon';
@@ -113,7 +141,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, summary: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null };
 }
 
 export function emptyLedger(): DayLedger {
@@ -141,10 +169,12 @@ function advanceMinute(time: GameTime): GameTime {
  */
 function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean): GameState {
   const worked = atWorkplace && career !== 'none' && isWorkingHours(state.time) ? 1 : 0;
-  const minutesWorkedThisHour = state.minutesWorkedThisHour + worked;
+  const pay = worked * (state.fullness < HUNGRY_THRESHOLD ? 0.5 : 1);
+  const minutesWorkedThisHour = state.minutesWorkedThisHour + pay;
+  const fullness = Math.max(0, state.fullness - FULLNESS_LOSS_PER_MINUTE);
   const time = advanceMinute(state.time);
   const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
-  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour };
+  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness };
 
   const income = Math.round((HOURLY_WAGE[career] * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
@@ -156,6 +186,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
     balance: afterIncome - expenses,
     today: { ...today, income: today.income + income, expenses: today.expenses + expenses },
     minutesWorkedThisHour: 0,
+    fullness,
   };
 }
 
@@ -192,5 +223,7 @@ export function gameReducer(
       return state.summary ? state : sleep(state, career, lifestyle);
     case 'dismissSummary':
       return { ...state, summary: null };
+    case 'eat':
+      return eat(state, action.price, action.fullness);
   }
 }

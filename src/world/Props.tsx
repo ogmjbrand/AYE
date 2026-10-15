@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
+import { useTexture } from '@react-three/drei';
 import {
-  Color, DoubleSide, Euler, MeshStandardMaterial, PlaneGeometry, Vector3,
+  Color, DoubleSide, Euler, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3,
 } from 'three';
 import {
   DANFO_SIZE, DANFOS, MARKET_STALLS, PALMS, POWER_POLES, STREET_LAMPS, seeded, type Vehicle,
 } from '../lib/world';
 import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
-import { frondTexture, signTexture } from './textures';
+import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
 
@@ -228,23 +229,26 @@ function MarketStalls() {
 
 // ---------------------------------------------------------------- billboard
 
+/** Roadside billboard carrying the real AYE logo artwork. */
 function Billboard() {
-  const tex = useMemo(() => signTexture('AYE · Your life. Your choices.', '#0b0b0b', '#f5c518', 1024, 256), []);
+  const logo = useTexture(`${import.meta.env.BASE_URL}assets/brand/aye-logo.webp`);
+  // eslint-disable-next-line react-hooks/immutability
+  logo.colorSpace = SRGBColorSpace;
   return (
     <group position={[-14, 0, -28.6]}>
-      {[-2.4, 2.4].map((x) => (
-        <mesh key={x} position={[x, 3, 0]} castShadow>
-          <cylinderGeometry args={[0.12, 0.12, 6, 8]} />
+      {[-1.6, 1.6].map((x) => (
+        <mesh key={x} position={[x, 2.6, 0]} castShadow>
+          <cylinderGeometry args={[0.12, 0.12, 5.2, 8]} />
           <meshStandardMaterial color="#3a3d40" metalness={0.7} roughness={0.4} />
         </mesh>
       ))}
-      <mesh position={[0, 6.6, 0.05]} castShadow>
-        <boxGeometry args={[7.2, 2.1, 0.12]} />
-        <meshStandardMaterial color="#222" />
+      <mesh position={[0, 6.9, 0.04]} castShadow>
+        <boxGeometry args={[4.4, 4.4, 0.12]} />
+        <meshStandardMaterial color="#1b1c1e" roughness={0.6} />
       </mesh>
-      <mesh position={[0, 6.6, 0.12]}>
-        <planeGeometry args={[7, 1.85]} />
-        <meshStandardMaterial map={tex} emissiveMap={tex} emissive="#ffffff" emissiveIntensity={0.35} roughness={0.5} />
+      <mesh position={[0, 6.9, 0.11]}>
+        <planeGeometry args={[4.1, 4.1]} />
+        <meshStandardMaterial map={logo} emissiveMap={logo} emissive="#ffffff" emissiveIntensity={0.25} roughness={0.5} />
       </mesh>
     </group>
   );
@@ -260,7 +264,9 @@ export function Props({ night }: { night: number }) {
         <Danfo key={i} vehicle={v} />
       ))}
       <MarketStalls />
-      <Billboard />
+      <Suspense fallback={null}>
+        <Billboard />
+      </Suspense>
     </group>
   );
 }

@@ -1,13 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
-/* AYE brand tokens: generates bg-aye-green, text-aye-gold, font-display, etc. */
+/*
+ * Game UI palette. The brand colours (green, red, white, black, yellow) belong
+ * to the AYE logo only and are deliberately not used for interface chrome.
+ */
 @theme {
-  --color-aye-green: #22c55e;
-  --color-aye-red: #ef4444;
-  --color-aye-white: #ffffff;
-  --color-aye-gold: #fbbf24;
-  --color-aye-black: #1f2937;
+  --color-ui-ink: #f1ede6;
+  --color-ui-muted: #a4a7ad;
+  --color-ui-faint: #6f737a;
+  --color-ui-panel: #15181c;
+  --color-ui-line: #353a42;
+  --color-ui-accent: #8ab4d8;
+  --color-ui-accent-strong: #b5d2ea;
+  --color-ui-warn: #f0a35e;
+  --color-ui-danger: #ec8b7f;
 
   --font-sans: 'DM Sans', sans-serif;
   --font-display: 'Manrope', sans-serif;

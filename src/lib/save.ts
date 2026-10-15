@@ -4,6 +4,7 @@
  */
 import type { Career, Character, Lifestyle } from '../components/CharacterCreation';
 import { createGameState, getPeriod, type GameState } from './gameState';
+import { DIETS, type Diet } from './food';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -35,11 +36,13 @@ export function parseCharacter(data: unknown): Character | null {
     !LIFESTYLES.includes(c.lifestyle as Lifestyle) ||
     !CAREERS.includes(c.career as Career) ||
     !isInt(c.colorR, 0, 255) || !isInt(c.colorG, 0, 255) || !isInt(c.colorB, 0, 255) ||
-    !isNum(c.balance, 0) || !isNum(c.createdAt) || !isNum(c.lastBalanceUpdate)
+    !isNum(c.balance, 0) || !isNum(c.createdAt) || !isNum(c.lastBalanceUpdate) ||
+    (c.diet !== undefined && !DIETS.some((d) => d.id === c.diet))
   ) {
     return null;
   }
-  return c as unknown as Character;
+  // Characters saved before diets existed eat everything
+  return { ...(c as unknown as Character), diet: (c.diet as Diet | undefined) ?? 'everything' };
 }
 
 export function loadCharacter(storage: Storage = localStorage): Character | null {
@@ -87,12 +90,14 @@ export function loadProgress(character: Character, storage: Storage = localStora
       // Saves from before work shifts have no minutes recorded
       minutesWorked: isInt(today.minutesWorked, 0, 24 * 60) ? today.minutesWorked : 0,
     },
-    minutesWorkedThisHour: isInt(p.minutesWorkedThisHour, 0, 60) ? p.minutesWorkedThisHour : 0,
+    minutesWorkedThisHour: isNum(p.minutesWorkedThisHour, 0, 60) ? p.minutesWorkedThisHour : 0,
+    // Saves from before hunger existed start fed
+    fullness: isNum(p.fullness, 0, 100) ? p.fullness : 100,
     summary: null,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour }));
+  const { time, balance, today, minutesWorkedThisHour, fullness } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness }));
 }

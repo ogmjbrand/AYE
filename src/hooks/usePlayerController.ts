@@ -83,11 +83,18 @@ function releaseAllKeys() {
   for (const key of MOVE_KEYS) keysPressed[key] = false;
 }
 
+let inputBlocked = false;
+/** Stops movement keys while a menu is open, so the player doesn't walk off mid-order. */
+export function setMovementBlocked(blocked: boolean) {
+  inputBlocked = blocked;
+  if (blocked) releaseAllKeys();
+}
+
 export function usePlayerController(): PlayerHandle {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't steer the character while typing in a form field
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (inputBlocked || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key.toLowerCase();
       if (MOVE_KEYS.includes(key)) {
         keysPressed[key] = true;
