@@ -7,6 +7,7 @@ import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useBalanceProgression } from './hooks/useBalanceProgression';
+import { useTimeProgression } from './hooks/useTimeProgression';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -149,6 +150,7 @@ export default function App() {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
   const balance = useBalanceProgression(character);
+  const gameTime = useTimeProgression();
   const controlsRef = useRef<OrbitControls | null>(null);
 
   // Load character from localStorage on mount
@@ -199,6 +201,7 @@ export default function App() {
         controller={controller}
         character={character}
         balance={balance}
+        gameTime={gameTime}
         neighborhood={neighborhood}
         onChangeCharacter={handleChangeCharacter}
       />

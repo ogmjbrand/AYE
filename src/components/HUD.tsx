@@ -1,11 +1,14 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
+import type { GameTime } from '../hooks/useTimeProgression';
+import { formatGameTime } from '../hooks/useTimeProgression';
 
 interface HUDProps {
   controller: PlayerHandle;
   character?: Character;
   balance: number;
+  gameTime: GameTime;
   neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
 }
@@ -14,6 +17,7 @@ export function HUD({
   controller,
   character,
   balance,
+  gameTime,
   neighborhood,
   onChangeCharacter,
 }: HUDProps) {
@@ -40,6 +44,9 @@ export function HUD({
             )}
             <p className="text-xs tracking-widest font-bold mt-1 text-gray-400">
               EARLY WORLD BUILD · 001
+            </p>
+            <p className="text-xs tracking-widest font-bold mt-2 text-gray-500">
+              {formatGameTime(gameTime)} • {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][gameTime.dayOfWeek]}
             </p>
           </div>
           {onChangeCharacter && (
@@ -88,6 +95,10 @@ export function HUD({
                 </div>
               </>
             )}
+            <div className="flex justify-between">
+              <span className="text-gray-400">Period</span>
+              <span className="capitalize text-gray-300">{gameTime.period}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Position</span>
               <span>
