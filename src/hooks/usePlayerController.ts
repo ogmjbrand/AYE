@@ -12,9 +12,10 @@ export interface PlayerHandle {
 
 const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
 
-/** Metres per second. W jogs; holding Shift walks. */
-export const RUN_SPEED = 5.5;
-export const WALK_SPEED = 1.7;
+/** Metres per second. W jogs; holding Shift walks. Chosen so the motion-captured
+ * strides play at about 1.4x their recorded rate rather than sliding. */
+export const RUN_SPEED = 4.2;
+export const WALK_SPEED = 1.4;
 const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 

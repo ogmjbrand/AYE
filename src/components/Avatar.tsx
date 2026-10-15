@@ -4,18 +4,39 @@ import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, Color, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 
-import { assetManifest, assetUrl } from '../lib/assetManifest';
+import { assetManifest, assetUrl, type AvatarFile, type OutfitKey } from '../lib/assetManifest';
 
-const DEFAULT_AVATAR = { url: 'models/aye-avatar.glb', height: 1.72 };
+/**
+ * Built-in character: Microsoft Rocketbox "Male_Adult_12" (MIT licence) with its
+ * own neutral idle, walk and run motion capture. Clip speeds are the ground
+ * speeds the walk and run were captured at (1.2 m per 1.17 s cycle, 2.0 m per
+ * 0.71 s cycle). See public/assets/CREDITS.md.
+ */
+const DEFAULT_AVATAR: AvatarFile = {
+  url: 'models/characters/rocketbox-male-adult-12.glb',
+  height: 1.78,
+  walkSpeed: 1.03,
+  runSpeed: 2.8,
+  outfit: 'blue',
+};
+
+/** How strongly a texel counts as outfit fabric, per avatar. */
+const FABRIC_MASK: Record<Exclude<OutfitKey, 'none'>, string> = {
+  // The old built-in model's saturated yellow trousers
+  yellow: 'smoothstep(0.12, 0.3, min(c.r, c.g) - c.b)',
+  // Denim: clearly bluer than it is red; skin and white trainers stay untouched
+  // (faded denim is only slightly blue, so the threshold is low to recolour it evenly)
+  blue: 'smoothstep(0.0, 0.035, c.b - c.r)',
+};
 
 type Clip = 'Idle' | 'Walk' | 'Run';
 
 /**
- * Recolours the outfit fabric without touching skin or hair: texels that are
- * clearly saturated yellow (the built-in model's trousers) take on the chosen
- * colour, keeping the fabric's shading. Installed once per material.
+ * Recolours the outfit fabric without touching skin or hair: texels that match
+ * the avatar's fabric mask take on the chosen colour, keeping the fabric's
+ * shading and texture. Installed once per material.
  */
-function outfitTint(material: Material): { value: Color } {
+function outfitTint(material: Material, key: Exclude<OutfitKey, 'none'>): { value: Color } {
   const m = material as MeshStandardMaterial & { userData: { outfit?: { value: Color } } };
   if (m.userData.outfit) return m.userData.outfit;
   const uniform = { value: new Color('#ffffff') };
@@ -29,13 +50,13 @@ function outfitTint(material: Material): { value: Color } {
         `#include <map_fragment>
         {
           vec3 c = diffuseColor.rgb;
-          float fabric = smoothstep(0.12, 0.3, min(c.r, c.g) - c.b);
+          float fabric = ${FABRIC_MASK[key]};
           float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
           diffuseColor.rgb = mix(c, uOutfit * clamp(lum * 2.2, 0.0, 1.2), fabric);
         }`,
       );
   };
-  m.customProgramCacheKey = () => 'aye-outfit-tint';
+  m.customProgramCacheKey = () => `aye-outfit-tint-${key}`;
   m.needsUpdate = true;
   return uniform;
 }
@@ -46,6 +67,7 @@ function updateLocomotion(
   clips: Record<Clip, string | undefined>,
   current: { current: Clip | null },
   speed: number,
+  avatar: AvatarFile,
 ) {
   const next: Clip = speed < 0.35 ? 'Idle' : speed < 3.2 ? 'Walk' : 'Run';
   if (next !== current.current) {
@@ -63,11 +85,9 @@ function updateLocomotion(
   const name = clips[next];
   const action = name ? actions[name] : undefined;
   if (action) {
-    // Keep feet roughly in sync with ground speed
-    action.timeScale =
-      next === 'Walk' ? Math.min(1.6, Math.max(0.6, speed / 1.5))
-        : next === 'Run' ? Math.min(1.4, Math.max(0.8, speed / 5.2))
-          : 1;
+    // Play the stride at the rate that matches ground speed, so feet don't slide
+    const clipSpeed = next === 'Walk' ? avatar.walkSpeed : next === 'Run' ? avatar.runSpeed : 0;
+    action.timeScale = clipSpeed > 0 ? Math.min(2, Math.max(0.5, speed / clipSpeed)) : 1;
   }
 }
 
@@ -109,16 +129,16 @@ export function Avatar({ controller, outfitColor }: { controller: PlayerHandle; 
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false; // skinned bounds don't follow the animation
-        if (outfitColor) {
+        if (outfitColor && avatarFile.outfit !== 'none') {
           for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-            outfitTint(mat).value.set(outfitColor);
+            outfitTint(mat, avatarFile.outfit).value.set(outfitColor);
           }
         }
       }
     });
-  }, [scene, outfitColor]);
+  }, [scene, outfitColor, avatarFile.outfit]);
 
-  useFrame(() => updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z)));
+  useFrame(() => updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile));
 
   return (
     <group ref={group} dispose={null}>

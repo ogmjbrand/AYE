@@ -9,7 +9,7 @@ describe('asset manifest', () => {
     });
     expect(problems).toEqual([]);
     expect(manifest.surfaces.road?.tileMeters).toBe(4);
-    expect(manifest.avatar).toEqual({ url: 'models/me.glb', height: 1.82 });
+    expect(manifest.avatar).toEqual({ url: 'models/me.glb', height: 1.82, walkSpeed: 1.4, runSpeed: 3.5, outfit: 'none' });
   });
 
   it('an empty manifest means use built-in assets', () => {
@@ -57,5 +57,13 @@ describe('asset manifest', () => {
     const oddTurn = parseManifest({ vehicles: { danfo: { url: 'd.glb', length: 5, rotateY: 45 } } });
     expect(oddTurn.manifest.vehicles.danfo?.rotateY).toBe(0);
     expect(oddTurn.problems.length).toBe(1);
+  });
+
+  it('reads clip speeds and the outfit colour key for avatars', () => {
+    const { manifest } = parseManifest({ avatar: { url: 'a.glb', height: 1.8, walkSpeed: 1.03, runSpeed: 2.8, outfit: 'blue' } });
+    expect(manifest.avatar).toEqual({ url: 'a.glb', height: 1.8, walkSpeed: 1.03, runSpeed: 2.8, outfit: 'blue' });
+    const bad = parseManifest({ avatar: { url: 'a.glb', height: 1.8, walkSpeed: -1, outfit: 'tartan' } });
+    expect(bad.manifest.avatar?.walkSpeed).toBe(1.4);
+    expect(bad.manifest.avatar?.outfit).toBe('none');
   });
 });

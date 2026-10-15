@@ -1,9 +1,10 @@
 # AYE asset acquisition checklist
 
-**Status (October 2026): none of the assets below have been downloaded.**
+**Status (October 2026): section 1 (player character with Idle/Walk/Run) is installed from Microsoft Rocketbox. Nothing from sections 3–4 has been downloaded yet.**
 The game currently runs on procedural textures, procedural buildings and
-vehicles, and a placeholder avatar (Mixamo "Michelle" mesh with retargeted
-clips; see `public/assets/CREDITS.md`). Every slot in
+vehicles. The player character is a Microsoft Rocketbox avatar (MIT, realistic
+proportions and photo-sourced textures, but a ~6.7k-triangle mesh from the 2010s;
+see `public/assets/CREDITS.md`). Every slot in
 `public/assets/manifest.json` is `null`.
 
 The development container that wrote this cannot reach ambientCG, Poly Haven,

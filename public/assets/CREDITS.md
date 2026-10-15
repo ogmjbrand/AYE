@@ -5,7 +5,7 @@
 | `hdri/potsdamer_platz_1k.hdr` | Poly Haven, "Potsdamer Platz" (via the pmndrs/drei-assets mirror) | CC0 | Daytime image-based lighting and reflections. |
 | `hdri/venice_sunset_1k.hdr` | Poly Haven, "Venice Sunset" (via pmndrs/drei-assets) | CC0 | Golden-hour lighting. |
 | `hdri/dikhololo_night_1k.hdr` | Poly Haven, "Dikhololo Night" (via pmndrs/drei-assets) | CC0 | Night lighting. |
-| `models/aye-avatar.glb` | Built from the three.js example models `Michelle.glb` (mesh, rig) and `Xbot.glb` (Idle/Walk/Run clips). Both originate from Adobe Mixamo. | Mixamo terms: free to use in games and other projects, **may not be redistributed or resold as standalone assets**. | Placeholder avatar. Replace with an original or properly licensed character (e.g. MetaHuman for the Unreal client) before commercial release. Rebuilt with `@gltf-transform`: clips retargeted by bone name, hips locked in place, meshopt-compressed. |
+| `models/characters/rocketbox-male-adult-12.glb` | Microsoft Rocketbox Avatar Library (github.com/microsoft/Microsoft-Rocketbox): avatar `Assets/Avatars/Adults/Male_Adult_12` (textures `m007_*`) with animations `m_idle_neutral_01` (motextr_static), `m_walk_neutral_01` and `m_run_neutral_01` (motextr_xy). | MIT, Copyright (c) 2020 Microsoft. Full notice in `models/characters/ROCKETBOX-LICENSE.md`. | Converted with FBX2glTF, assembled by `scripts/rocketbox/build-avatar.mjs` (walk/run made in-place, specular converted to roughness), then meshopt + WebP via `npm run assets:optimize`. |
 
 All other textures (asphalt, pavers, soil, kerbs, facades, roofs, palm fronds, signage) are generated procedurally in `src/world/textures.ts` and are original to this project.
 
