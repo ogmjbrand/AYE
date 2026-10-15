@@ -1,7 +1,7 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
 import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
@@ -19,6 +19,37 @@ interface HUDProps {
   onCycleQuality?: () => void;
   fullness: number;
   onOpenVendor?: (vendor: FoodVendor) => void;
+}
+
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Opaque enough to stay readable over a bright midday sky, without a costly backdrop blur. */
+const PANEL = 'rounded-xl border border-ui-line/70 bg-ui-panel/85 shadow-[0_8px_24px_rgba(0,0,0,0.35)]';
+const BUTTON =
+  'pointer-events-auto rounded-lg border border-ui-line bg-ui-panel/85 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] sm:px-3 sm:tracking-[0.14em] text-ui-ink transition hover:border-ui-accent hover:text-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent';
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="text-ui-muted">{label}</dt>
+      <dd className="m-0 text-right text-ui-ink">{children}</dd>
+    </div>
+  );
+}
+
+function VendorPrompt({ vendor, onOpen }: { vendor: FoodVendor; onOpen: (vendor: FoodVendor) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(vendor)}
+      className={`${PANEL} pointer-events-auto flex items-center gap-3 whitespace-nowrap px-4 py-2.5 text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
+    >
+      <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
+      <span>
+        Order food at <span className="font-semibold">{vendor.name}</span>
+      </span>
+    </button>
+  );
 }
 
 export function HUD({
@@ -40,180 +71,192 @@ export function HUD({
     const id = setInterval(() => setFrame((n) => n + 1), 100);
     return () => clearInterval(id);
   }, []);
+  const [showDetails, setShowDetails] = useState(false);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
   const vendor = nearestVendor(controller.position.x, controller.position.z);
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
-    ? { label: 'Off Duty', className: 'text-gray-500' }
+    ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
     : workplaceStatus.isAtWorkplace
-      ? { label: 'Working', className: 'text-ui-accent' }
-      : { label: 'Not at work', className: 'text-ui-warn' };
+      ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
+      : { label: 'Not at work', dot: 'bg-ui-warn', text: 'text-ui-warn' };
+
+  const hungry = fullness < HUNGRY_THRESHOLD;
+  const hungerBar = hungry ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-ui-accent';
 
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
-  const speed = Math.sqrt(
-    controller.velocity.x ** 2 + controller.velocity.z ** 2
-  ).toFixed(1);
+  const speed = Math.sqrt(controller.velocity.x ** 2 + controller.velocity.z ** 2).toFixed(1);
 
   return (
-    <div className="fixed inset-0 pointer-events-none">
-      {/* Status bar - top */}
-      <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/48 to-transparent text-white">
-        <div className="flex justify-between items-start max-w-full">
-          <div>
-            <h1 className="m-0">
-              <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="AYE" className="h-14 w-auto drop-shadow-lg" />
-            </h1>
-            {character && (
-              <p className="text-xs tracking-wide font-semibold mt-2 text-ui-ink">
-                {character.name}
-              </p>
-            )}
-            <p className="text-xs tracking-widest font-bold mt-1 text-gray-400">
-              EARLY WORLD BUILD · 001
+    <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
+      {/* Top bar: identity and clock on the left, system actions on the right */}
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-5">
+        <div className={`${PANEL} flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3`}>
+          <h1 className="m-0 shrink-0">
+            <img
+              src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`}
+              alt="AYE"
+              className="h-8 w-auto sm:h-11"
+            />
+          </h1>
+          <div className="min-w-0">
+            <p className="m-0 font-display text-xl font-semibold leading-none tabular-nums sm:text-2xl">
+              {formatGameTime(gameTime)}
             </p>
-            <p className="text-xs tracking-widest font-bold mt-2 text-gray-500">
-              {formatGameTime(gameTime)} • {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][gameTime.dayOfWeek]}
+            <p className="m-0 mt-1 whitespace-nowrap text-[11px] uppercase tracking-[0.14em] text-ui-muted">
+              {DAY_SHORT[gameTime.dayOfWeek]} · <span className="capitalize">{gameTime.period}</span>
             </p>
           </div>
-          <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            {onCycleQuality && (
-              <button
-                onClick={onCycleQuality}
-                title="Graphics quality: Auto lowers detail if the frame rate drops"
-                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
-              >
-                Quality: {qualityLabel}
-              </button>
-            )}
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
             {onRest && (
-              <button
-                onClick={onRest}
-                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
-              >
+              <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00">
                 Rest
               </button>
             )}
-            {onChangeCharacter && (
+            {onCycleQuality && (
               <button
-                onClick={onChangeCharacter}
-                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
+                type="button"
+                onClick={onCycleQuality}
+                title="Graphics quality: Auto lowers detail if the frame rate drops"
+                className={BUTTON}
               >
+                <span className="hidden sm:inline">Quality: </span>
+                <span className="capitalize">{qualityLabel}</span>
+              </button>
+            )}
+            {onChangeCharacter && (
+              <button type="button" onClick={onChangeCharacter} className={BUTTON}>
                 Change
               </button>
             )}
           </div>
-          <p className="text-xs font-mono text-gray-400" aria-label="Frames per second">{perfStats.fps} FPS</p>
-          </div>
+          <p className="m-0 rounded-md bg-ui-panel/70 px-2 py-0.5 font-mono text-[11px] text-ui-muted" aria-label="Frames per second">
+            {perfStats.fps} FPS
+          </p>
         </div>
       </div>
 
-      {/* Food prompt when standing at a vendor */}
-      {vendor && onOpenVendor && (
-        <button
-          onClick={() => onOpenVendor(vendor)}
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 pointer-events-auto px-4 py-2 rounded-md bg-ui-panel/90 border border-ui-line text-ui-ink text-sm shadow-lg hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-        >
-          <span className="font-mono text-ui-accent mr-2">E</span>Order food at <span className="font-semibold">{vendor.name}</span>
-        </button>
-      )}
-
-      {/* Location indicator - center bottom */}
+      {/* Where you are: under the top bar, centred */}
       {neighborhood && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 border border-gray-700 rounded text-white text-xs tracking-widest font-bold pointer-events-none">
-          <div className="text-center">
-            <p className="text-ui-ink">{neighborhood.name.toUpperCase()}</p>
-            <p className="text-gray-500 text-xs mt-1">{neighborhood.description}</p>
-          </div>
+        <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
+          <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
+            {neighborhood.name}
+          </p>
+          <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
+            {neighborhood.description}
+          </p>
         </div>
       )}
 
-      {/* Player state panel - bottom left */}
-      <div className="absolute bottom-0 left-0 p-6 bg-gradient-to-t from-black/60 to-transparent text-white max-w-80">
-        <div className="space-y-3">
-          {/* Stats */}
-          <div className="space-y-1 font-mono text-sm">
-            {character && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Lifestyle</span>
-                  <span className="capitalize text-ui-ink">
-                    {character.lifestyle.replace('-', ' ')}
-                  </span>
+      {/* Food prompt when standing at a vendor (desktop: bottom centre) */}
+      {vendor && onOpenVendor && (
+        <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
+          <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
+        </div>
+      )}
+
+      {/* Player panel: the numbers that drive decisions first, profile second, telemetry on request */}
+      <div className="absolute bottom-0 left-0 flex w-full flex-col items-center gap-2 p-3 sm:w-auto sm:p-5">
+        {/* On phones the prompt sits just above the panel so they never overlap */}
+        {vendor && onOpenVendor && (
+          <div className="sm:hidden">
+            <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
+          </div>
+        )}
+        <section className={`${PANEL} w-full px-4 py-3.5 sm:w-72`} aria-label="Player status">
+          {character && (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
+                  <p className="m-0 mt-0.5 truncate text-xs capitalize text-ui-muted">
+                    {character.career === 'none' ? 'Undecided' : character.career} · {character.lifestyle.replace('-', ' ')}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Career</span>
-                  <span className="capitalize text-ui-ink">
-                    {character.career === 'none' ? 'Undecided' : character.career}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center gap-3">
-                  <span className="text-gray-400">Hunger</span>
-                  <span className="flex items-center gap-2">
-                    <span className="block w-20 h-1.5 rounded-full bg-ui-line overflow-hidden" aria-hidden>
-                      <span
-                        className={`block h-full ${fullness < HUNGRY_THRESHOLD ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-ui-accent'}`}
-                        style={{ width: `${Math.round(fullness)}%` }}
-                      />
-                    </span>
-                    <span className={fullness < HUNGRY_THRESHOLD ? 'text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Diet</span>
-                  <span className="text-ui-ink">{DIETS.find((d) => d.id === character.diet)?.label}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Balance</span>
-                  <span className="text-ui-ink">{balance.toLocaleString()} ⓒ</span>
+                <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
+                  <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
+                  {status.label}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div>
+                  <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
+                  <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
+                    {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
+                  </p>
                 </div>
                 {character.career !== 'none' && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Workplace</span>
-                    <span className={workplaceStatus.isAtWorkplace ? 'text-ui-accent' : 'text-gray-500'}>
-                      {workplaceStatus.isAtWorkplace ? 'Here' : `${workplaceStatus.distanceToWorkplace}u`}
+                  <p className="m-0 text-right text-xs text-ui-muted">
+                    Workplace
+                    <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
+                      {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
                     </span>
-                  </div>
+                  </p>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Status</span>
-                  <span className={status.className}>{status.label}</span>
+              </div>
+
+              <div className="mt-3">
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-ui-muted">Hunger</span>
+                  <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
                 </div>
-              </>
-            )}
-            <div className="flex justify-between">
-              <span className="text-gray-400">Period</span>
-              <span className="capitalize text-gray-300">{gameTime.period}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Position</span>
-              <span>
-                X: <span className="text-ui-muted">{x}</span> Z:{' '}
-                <span className="text-ui-muted">{z}</span>
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Direction</span>
-              <span className="text-ui-muted">{direction}°</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Speed</span>
-              <span className="text-ui-muted">{speed} m/s</span>
-            </div>
-          </div>
-        </div>
+                <div
+                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line"
+                  role="meter"
+                  aria-label="Fullness"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(fullness)}
+                >
+                  <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
+                </div>
+                {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
+              </div>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            aria-expanded={showDetails}
+            className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+          >
+            Details
+            <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+          {showDetails && (
+            <dl className="m-0 mt-2 space-y-1 text-xs">
+              {character && <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>}
+              <Row label="Period">
+                <span className="capitalize">{gameTime.period}</span>
+              </Row>
+              <Row label="Position">
+                <span className="font-mono text-ui-muted">
+                  {x}, {z}
+                </span>
+              </Row>
+              <Row label="Direction">
+                <span className="font-mono text-ui-muted">{direction}°</span>
+              </Row>
+              <Row label="Speed">
+                <span className="font-mono text-ui-muted">{speed} m/s</span>
+              </Row>
+            </dl>
+          )}
+        </section>
       </div>
 
-      {/* Controls hint - bottom right */}
-      <div className="absolute bottom-0 right-0 p-6 text-right text-white text-xs tracking-widest font-bold pointer-events-auto">
-        <div className="space-y-1">
-          <p className="text-gray-400">W/A/S/D • MOVE</p>
-          <p className="text-gray-400">DRAG • ORBIT</p>
-          <p className="text-gray-400">SCROLL • ZOOM</p>
-        </div>
+      {/* Keyboard hint: desktop only, phones have no keyboard */}
+      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block">
+        <p className="m-0"><span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
+        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
       </div>
     </div>
   );
