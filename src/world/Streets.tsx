@@ -7,6 +7,8 @@ import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
 
 const HALF = STREET_LENGTH / 2;
+/** How far the (visual-only) boulevard extends, matching the skyline and ground. */
+const FAR = 150;
 const PAVE_OUT = ROAD_HALF_WIDTH + PAVEMENT_WIDTH;
 const KERB_LEN = 2;
 
@@ -113,6 +115,18 @@ export function Streets() {
       <Strip x0={-ROAD_HALF_WIDTH} x1={ROAD_HALF_WIDTH} z0={-HALF} z1={HALF} y={0} material={m.road} tile={ROAD_HALF_WIDTH * 2} />
       <Strip x0={-HALF} x1={-ROAD_HALF_WIDTH} z0={CROSS_STREET.minZ} z1={CROSS_STREET.maxZ} y={0.001} material={m.road} tile={8} alongX />
       <Strip x0={ROAD_HALF_WIDTH} x1={HALF} z0={CROSS_STREET.minZ} z1={CROSS_STREET.maxZ} y={0.001} material={m.road} tile={8} alongX />
+
+      {/* The boulevard carries on past the walkable block towards the skyline (flat, no kerbs: only seen from afar) */}
+      {[-1, 1].map((dir) => {
+        const [za, zb] = dir > 0 ? [HALF, FAR] : [-FAR, -HALF];
+        return (
+          <group key={dir}>
+            <Strip x0={-ROAD_HALF_WIDTH} x1={ROAD_HALF_WIDTH} z0={za} z1={zb} y={0} material={m.road} tile={ROAD_HALF_WIDTH * 2} />
+            <Strip x0={-PAVE_OUT} x1={-ROAD_HALF_WIDTH} z0={za} z1={zb} y={0.002} material={m.pavement} tile={2} />
+            <Strip x0={ROAD_HALF_WIDTH} x1={PAVE_OUT} z0={za} z1={zb} y={0.002} material={m.pavement} tile={2} />
+          </group>
+        );
+      })}
 
       {/* Pavements */}
       {[-1, 1].map((side) => {

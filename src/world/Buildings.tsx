@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { BufferAttribute, BufferGeometry, Color, Vector3 } from 'three';
 import { Instances, type Placement } from './Instances';
-import { BUILDINGS, seeded, type Building, type BuildingStyle } from '../lib/world';
+import { BUILDINGS, SKYLINE, seeded, type Building, type BuildingStyle } from '../lib/world';
 import { BAY_WIDTH, FACADE_TILE, FLOOR_HEIGHT, signTexture } from './textures';
 import { materials } from './materials';
 
@@ -72,37 +72,36 @@ function bounds(b: Building) {
 /** Which way the building faces the boulevard: +1 = towards +X, -1 = towards -X. */
 const streetSide = (b: Building) => (b.position[0] < 0 ? 1 : -1);
 
-function useFacadeGeometries() {
-  return useMemo(() => {
-    const rand = seeded(7);
-    const facades = Object.fromEntries(STYLES.map((s) => [s, new QuadBuilder()])) as Record<BuildingStyle, QuadBuilder>;
-    const roofs = new QuadBuilder();
-    for (const b of BUILDINGS) {
-      const { min, max } = bounds(b);
-      const tileW = BAY_WIDTH[b.style] * FACADE_TILE.bays;
-      const tileH = FLOOR_HEIGHT[b.style] * FACADE_TILE.floors;
-      const color = tint(b);
-      facades[b.style].box(min, max, tileW, tileH, color, Math.floor(rand() * 4) / 4);
-      // Parapet wall around the roof, in the facade's plain band, plus the roof slab
-      const pMin = new Vector3(min.x, max.y, min.z);
-      const pMax = new Vector3(max.x, max.y + PARAPET, max.z);
-      roofs.box(pMin, pMax, 6, 6, new Color(color).multiplyScalar(0.9));
-      roofs.quad(new Vector3(min.x, max.y + 0.05, max.z), new Vector3(max.x - min.x, 0, 0), new Vector3(0, 0, min.z - max.z), [0, 0], [(max.x - min.x) / 6, (max.z - min.z) / 6], new Color('#ffffff'));
-      if (b.style === 'tower') {
-        // Set-back crown on top of towers
-        const inset = 1.2;
-        roofs.box(
-          new Vector3(min.x + inset, max.y, min.z + inset),
-          new Vector3(max.x - inset, max.y + 3.5, max.z - inset),
-          6, 6, new Color('#6b7780'), 0, true,
-        );
-      }
+/** Merged facade and roof geometry, one mesh per facade style, for any list of buildings. */
+function facadeGeometries(buildings: readonly Building[], seed: number) {
+  const rand = seeded(seed);
+  const facades = Object.fromEntries(STYLES.map((s) => [s, new QuadBuilder()])) as Record<BuildingStyle, QuadBuilder>;
+  const roofs = new QuadBuilder();
+  for (const b of buildings) {
+    const { min, max } = bounds(b);
+    const tileW = BAY_WIDTH[b.style] * FACADE_TILE.bays;
+    const tileH = FLOOR_HEIGHT[b.style] * FACADE_TILE.floors;
+    const color = tint(b);
+    facades[b.style].box(min, max, tileW, tileH, color, Math.floor(rand() * 4) / 4);
+    // Parapet wall around the roof, in the facade's plain band, plus the roof slab
+    const pMin = new Vector3(min.x, max.y, min.z);
+    const pMax = new Vector3(max.x, max.y + PARAPET, max.z);
+    roofs.box(pMin, pMax, 6, 6, new Color(color).multiplyScalar(0.9));
+    roofs.quad(new Vector3(min.x, max.y + 0.05, max.z), new Vector3(max.x - min.x, 0, 0), new Vector3(0, 0, min.z - max.z), [0, 0], [(max.x - min.x) / 6, (max.z - min.z) / 6], new Color('#ffffff'));
+    if (b.style === 'tower') {
+      // Set-back crown on top of towers
+      const inset = 1.2;
+      roofs.box(
+        new Vector3(min.x + inset, max.y, min.z + inset),
+        new Vector3(max.x - inset, max.y + 3.5, max.z - inset),
+        6, 6, new Color('#6b7780'), 0, true,
+      );
     }
-    return {
-      facades: STYLES.map((s) => [s, facades[s].geometry()] as const),
-      roof: roofs.geometry(),
-    };
-  }, []);
+  }
+  return {
+    facades: STYLES.map((s) => [s, facades[s].geometry()] as const),
+    roof: roofs.geometry(),
+  };
 }
 
 function useDetails() {
@@ -216,7 +215,7 @@ function Signs() {
 
 export function Buildings() {
   const m = materials();
-  const geo = useFacadeGeometries();
+  const geo = useMemo(() => facadeGeometries(BUILDINGS, 7), []);
   const details = useDetails();
   return (
     <group>
@@ -231,6 +230,25 @@ export function Buildings() {
       <Instances items={details.railings} material={m.darkMetal} geometry={<boxGeometry args={[1, 1, 1]} />} />
       <Instances items={details.awnings} material={m.canvas} geometry={<AwningGeometry />} />
       <Signs />
+    </group>
+  );
+}
+
+/**
+ * The wider city beyond the playable block: plain massing with the same
+ * facade textures (so windows light up at night), fading into the fog. No
+ * collision, no shadows and no detail props, so it costs a handful of draw
+ * calls and a few thousand triangles.
+ */
+export function Skyline() {
+  const m = materials();
+  const geo = useMemo(() => facadeGeometries(SKYLINE, 23), []);
+  return (
+    <group>
+      {geo.facades.map(([style, g]) => (
+        <mesh key={style} geometry={g} material={m.facade[style]} />
+      ))}
+      <mesh geometry={geo.roof} material={m.roof} />
     </group>
   );
 }

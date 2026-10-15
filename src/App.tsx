@@ -9,7 +9,7 @@ import { useGameState } from './hooks/useGameState';
 import type { GameTime } from './lib/gameState';
 import { clearSave } from './lib/save';
 import { groundHeightAt } from './lib/world';
-import { Buildings } from './world/Buildings';
+import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
 import { Streets } from './world/Streets';
@@ -46,11 +46,17 @@ const followShift = new Vector3();
  * Keeps the player in view: the orbit target eases toward the player and the
  * camera moves by the same amount, so the player's chosen angle and zoom are kept.
  */
+/**
+ * Third-person framing: the camera looks at chest height from about 4.5 m
+ * behind and 1.5 m above, so the player fills a good part of the frame.
+ */
+const CAMERA_TARGET_HEIGHT = 1.25;
+
 function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
   useFrame(({ camera }) => {
     const controls = controlsRef.current;
     if (!controls) return;
-    followTarget.set(controller.position.x, 1.4, controller.position.z);
+    followTarget.set(controller.position.x, CAMERA_TARGET_HEIGHT, controller.position.z);
     followShift.copy(followTarget).sub(controls.target).multiplyScalar(0.1);
     controls.target.add(followShift);
     camera.position.add(followShift);
@@ -92,6 +98,7 @@ function City({ controller, character, gameTime }: CityProps) {
       <SceneLighting gameTime={gameTime} player={controller} />
       <Streets />
       <Buildings />
+      <Skyline />
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(character.career).position} />}
       {quality.contactShadows && <FootShadow controller={controller} />}
@@ -180,7 +187,7 @@ function Game({ character, onChangeCharacter }: GameProps) {
       <QualityContext.Provider value={settings}>
         <Canvas
           shadows
-          camera={{ position: [1.5, 3.4, -5.5], fov: 50, near: 0.1, far: 2500 }}
+          camera={{ position: [1.5, CAMERA_TARGET_HEIGHT + 1.5, 2 - 4.2], fov: 50, near: 0.1, far: 2500 }}
           dpr={[1, settings.maxDpr]}
           gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
           fallback={<div className="p-8 text-white">AYE needs WebGL. Please enable hardware acceleration or try another browser.</div>}
@@ -198,7 +205,7 @@ function Game({ character, onChangeCharacter }: GameProps) {
           <OrbitControlsImpl
             ref={controlsRef}
             makeDefault
-            target={[1.5, 1.4, 2]}
+            target={[1.5, CAMERA_TARGET_HEIGHT, 2]}
             enableDamping
             maxPolarAngle={Math.PI / 2 - 0.08}
             minDistance={2.5}

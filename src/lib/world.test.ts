@@ -3,6 +3,8 @@ import type { Career } from '../components/CharacterCreation';
 import { getCareerLocation } from './careers';
 import {
   BUILDINGS,
+  OBSTACLES,
+  SKYLINE,
   CROSS_STREET,
   PAVEMENT_WIDTH,
   PLAYER_RADIUS,
@@ -72,5 +74,23 @@ describe('city layout', () => {
       expect(resolveCollisions(x, z), `spot ${x},${z}`).toEqual({ x, z });
       expect(Math.abs(x) <= WORLD_BOUND && Math.abs(z) <= WORLD_BOUND).toBe(true);
     }
+  });
+});
+
+describe('skyline', () => {
+  it('stays out of reach of the player and away from the street buildings', () => {
+    expect(SKYLINE.length).toBeGreaterThan(100);
+    for (const s of SKYLINE) {
+      const minX = s.position[0] - s.size[0] / 2;
+      const maxX = s.position[0] + s.size[0] / 2;
+      const minZ = s.position[2] - s.size[2] / 2;
+      const maxZ = s.position[2] + s.size[2] / 2;
+      const clearOfWalkable = minX > WORLD_BOUND + 3 || maxX < -WORLD_BOUND - 3 || minZ > WORLD_BOUND + 3 || maxZ < -WORLD_BOUND - 3;
+      expect(clearOfWalkable).toBe(true);
+    }
+  });
+
+  it('is not solid', () => {
+    for (const s of SKYLINE) expect(OBSTACLES).not.toContain(s);
   });
 });

@@ -192,3 +192,38 @@ export function resolveCollisions(
   z = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, z));
   return { x, z };
 }
+
+/**
+ * The wider city seen beyond the walkable block: massing only, not solid
+ * (the player can never reach it), deterministic so it never changes.
+ * Taller towers sit further out, like a business district behind the street.
+ */
+export const SKYLINE: readonly Building[] = (() => {
+  const rand = seeded(311);
+  const out: Building[] = [];
+  const CELL = 20;
+  const EXTENT = 150;
+  const warm = ['#d8c4a2', '#e3d2b4', '#c9b08c', '#d9a982', '#e8dcc6', '#bfb6a6'];
+  const glass = ['#4f6f82', '#5d7d8c', '#3f5f73', '#6a8796'];
+  for (let cx = -EXTENT + CELL / 2; cx < EXTENT; cx += CELL) {
+    for (let cz = -EXTENT + CELL / 2; cz < EXTENT; cz += CELL) {
+      // Keep clear of the playable block and its buildings
+      if (Math.abs(cx) < 60 && Math.abs(cz) < 64) continue;
+      // Leave the boulevard's corridor open so the street recedes into the distance
+      if (Math.abs(cx) < 20) continue;
+      if (rand() < 0.12) continue; // the odd gap reads as a real city
+      const w = 10 + rand() * 6;
+      const d = 10 + rand() * 6;
+      const x = cx + (rand() - 0.5) * 4;
+      const z = cz + (rand() - 0.5) * 4;
+      const dist = Math.hypot(cx, cz);
+      const towerChance = Math.min(0.55, 0.1 + (dist - 60) / 200);
+      const isTower = rand() < towerChance;
+      const h = isTower ? 38 + rand() * (40 + dist / 3) : 10 + rand() * 18;
+      const style: BuildingStyle = isTower ? 'tower' : rand() < 0.5 ? 'office' : 'residential';
+      const palette = isTower ? glass : warm;
+      out.push(b(x, z, w, d, h, style, palette[Math.floor(rand() * palette.length)]));
+    }
+  }
+  return out;
+})();
