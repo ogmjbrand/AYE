@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
@@ -24,6 +24,9 @@ import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
+
+// High tier only; the post-processing libraries are fetched on first use
+const PostEffects = lazy(() => import('./world/PostEffects'));
 
 interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
@@ -182,11 +185,16 @@ function Game({ character, onChangeCharacter }: GameProps) {
           gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
           fallback={<div className="p-8 text-white">AYE needs WebGL. Please enable hardware acceleration or try another browser.</div>}
         >
-          {/* Drop to the low tier (no contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
+          {/* Drop to the low tier (no AO or contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
           <City controller={controller} character={character} gameTime={state.time} />
+          {settings.ambientOcclusion && (
+            <Suspense fallback={null}>
+              <PostEffects />
+            </Suspense>
+          )}
           <OrbitControlsImpl
             ref={controlsRef}
             makeDefault
