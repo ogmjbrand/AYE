@@ -73,6 +73,8 @@ export function HUD({
     return () => clearInterval(id);
   }, []);
   const [showDetails, setShowDetails] = useState(false);
+  // Phones start with a slim one-row panel so the street stays visible
+  const [expanded, setExpanded] = useState(false);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
   const vendor = nearestVendor(controller.position.x, controller.position.z);
@@ -173,87 +175,117 @@ export function HUD({
             </div>
           )}
         </div>
-        <section className={`${PANEL} w-full px-4 py-3.5 sm:w-72`} aria-label="Player status">
-          {character && (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
-                  <p className="m-0 mt-0.5 truncate text-xs capitalize text-ui-muted">
-                    {character.career === 'none' ? 'Undecided' : character.career} · {character.lifestyle.replace('-', ' ')}
-                  </p>
-                </div>
-                <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
-                  <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
-                  {status.label}
+        <section className={`${PANEL} w-full sm:w-72`} aria-label="Player status">
+          {character && !expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              aria-expanded={false}
+              aria-label="Show player details"
+              className="pointer-events-auto flex w-full items-center gap-3 px-3.5 py-2.5 text-left sm:hidden"
+            >
+              <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} aria-hidden />
+              <span className="font-display text-lg font-semibold tabular-nums leading-none">
+                {balance.toLocaleString()} <span className="text-sm text-ui-muted">ⓒ</span>
+              </span>
+              <span className="ml-auto flex min-w-0 items-center gap-2 text-xs">
+                <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-muted'}>{hungerLabel(fullness)}</span>
+                <span className="block h-1.5 w-12 overflow-hidden rounded-full bg-ui-line" aria-hidden>
+                  <span className={`block h-full rounded-full ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
                 </span>
-              </div>
-
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <div>
-                  <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
-                  <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
-                    {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
-                  </p>
-                </div>
-                {character.career !== 'none' && (
-                  <p className="m-0 text-right text-xs text-ui-muted">
-                    Workplace
-                    <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
-                      {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
-                    </span>
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-3">
-                <div className="flex items-baseline justify-between text-xs">
-                  <span className="text-ui-muted">Hunger</span>
-                  <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
-                </div>
-                <div
-                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line"
-                  role="meter"
-                  aria-label="Fullness"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(fullness)}
-                >
-                  <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                </div>
-                {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
-              </div>
-            </>
+              </span>
+              <span aria-hidden className="text-xs text-ui-faint">▴</span>
+            </button>
           )}
+          <div className={`${expanded ? 'block' : 'hidden'} px-4 py-3.5 sm:block`}>
+            {character && (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
+                    <p className="m-0 mt-0.5 truncate text-xs capitalize text-ui-muted">
+                      {character.career === 'none' ? 'Undecided' : character.career} · {character.lifestyle.replace('-', ' ')}
+                    </p>
+                  </div>
+                  <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
+                    <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
+                    {status.label}
+                  </span>
+                </div>
 
-          <button
-            type="button"
-            onClick={() => setShowDetails((v) => !v)}
-            aria-expanded={showDetails}
-            className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-          >
-            Details
-            <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
-          </button>
-          {showDetails && (
-            <dl className="m-0 mt-2 space-y-1 text-xs">
-              {character && <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>}
-              <Row label="Period">
-                <span className="capitalize">{gameTime.period}</span>
-              </Row>
-              <Row label="Position">
-                <span className="font-mono text-ui-muted">
-                  {x}, {z}
-                </span>
-              </Row>
-              <Row label="Direction">
-                <span className="font-mono text-ui-muted">{direction}°</span>
-              </Row>
-              <Row label="Speed">
-                <span className="font-mono text-ui-muted">{speed} m/s</span>
-              </Row>
-            </dl>
-          )}
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
+                    <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
+                      {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
+                    </p>
+                  </div>
+                  {character.career !== 'none' && (
+                    <p className="m-0 text-right text-xs text-ui-muted">
+                      Workplace
+                      <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
+                        {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
+                      </span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-ui-muted">Hunger</span>
+                    <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
+                  </div>
+                  <div
+                    className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line"
+                    role="meter"
+                    aria-label="Fullness"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(fullness)}
+                  >
+                    <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
+                  </div>
+                  {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
+                </div>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              aria-expanded={showDetails}
+              className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+            >
+              Details
+              <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+            {showDetails && (
+              <dl className="m-0 mt-2 space-y-1 text-xs">
+                {character && <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>}
+                <Row label="Period">
+                  <span className="capitalize">{gameTime.period}</span>
+                </Row>
+                <Row label="Position">
+                  <span className="font-mono text-ui-muted">
+                    {x}, {z}
+                  </span>
+                </Row>
+                <Row label="Direction">
+                  <span className="font-mono text-ui-muted">{direction}°</span>
+                </Row>
+                <Row label="Speed">
+                  <span className="font-mono text-ui-muted">{speed} m/s</span>
+                </Row>
+              </dl>
+            )}
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="pointer-events-auto mt-3 w-full rounded-lg border border-ui-line/70 py-1.5 text-[11px] uppercase tracking-[0.14em] text-ui-muted sm:hidden"
+            >
+              Show less
+            </button>
+          </div>
         </section>
       </div>
 
