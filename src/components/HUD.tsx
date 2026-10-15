@@ -4,9 +4,10 @@ import type { Character } from './CharacterCreation';
 interface HUDProps {
   controller: PlayerHandle;
   character?: Character;
+  onChangeCharacter?: () => void;
 }
 
-export function HUD({ controller, character }: HUDProps) {
+export function HUD({ controller, character, onChangeCharacter }: HUDProps) {
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
@@ -16,7 +17,7 @@ export function HUD({ controller, character }: HUDProps) {
 
   return (
     <div className="fixed inset-0 pointer-events-none">
-      {/* Status bar - top left */}
+      {/* Status bar - top */}
       <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/48 to-transparent text-white">
         <div className="flex justify-between items-start max-w-full">
           <div>
@@ -32,6 +33,14 @@ export function HUD({ controller, character }: HUDProps) {
               EARLY WORLD BUILD · 001
             </p>
           </div>
+          {onChangeCharacter && (
+            <button
+              onClick={onChangeCharacter}
+              className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
+            >
+              CHANGE
+            </button>
+          )}
         </div>
       </div>
 

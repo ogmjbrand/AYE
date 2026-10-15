@@ -155,6 +155,11 @@ export default function App() {
     }
   });
 
+  const handleChangeCharacter = () => {
+    localStorage.removeItem('aye_character');
+    setCharacter(null);
+  };
+
   if (!character) {
     return <CharacterCreation onCharacterCreate={setCharacter} />;
   }
@@ -180,7 +185,11 @@ export default function App() {
         />
       </Canvas>
 
-      <HUD controller={controller} character={character} />
+      <HUD
+        controller={controller}
+        character={character}
+        onChangeCharacter={handleChangeCharacter}
+      />
     </main>
   );
 }
