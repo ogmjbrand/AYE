@@ -75,6 +75,12 @@ export function HUD({
                   </span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-gray-400">Career</span>
+                  <span className="capitalize text-aye-red">
+                    {character.career === 'none' ? 'Undecided' : character.career}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-gray-400">Balance</span>
                   <span className="text-aye-gold">0 ⓒ</span>
                 </div>

@@ -1,9 +1,21 @@
 import { useState } from 'react';
 
+export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
+export type Career =
+  | 'none'
+  | 'student'
+  | 'artist'
+  | 'entrepreneur'
+  | 'athlete'
+  | 'engineer'
+  | 'doctor'
+  | 'pilot';
+
 export interface Character {
   id: string;
   name: string;
-  lifestyle: 'student' | 'ordinary' | 'middle-class' | 'luxury';
+  lifestyle: Lifestyle;
+  career: Career;
   colorR: number;
   colorG: number;
   colorB: number;
@@ -22,6 +34,7 @@ export function CharacterCreation({
   const [mode, setMode] = useState<'menu' | 'create'>('menu');
   const [name, setName] = useState('');
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
+  const [career, setCareer] = useState<Character['career']>('none');
   const [colorR, setColorR] = useState(139);
   const [colorG, setColorG] = useState(93);
   const [colorB, setColorB] = useState(62);
@@ -37,6 +50,7 @@ export function CharacterCreation({
       id: Math.random().toString(36).substring(7),
       name: name.trim(),
       lifestyle,
+      career,
       colorR,
       colorG,
       colorB,
@@ -139,6 +153,29 @@ export function CharacterCreation({
               <option value="ordinary">Ordinary</option>
               <option value="middle-class">Middle Class</option>
               <option value="luxury">Luxury</option>
+            </select>
+          </div>
+
+          {/* Career */}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+              Career
+            </label>
+            <select
+              value={career}
+              onChange={(e) =>
+                setCareer(e.target.value as Character['career'])
+              }
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-aye-green focus:outline-none"
+            >
+              <option value="none">Undecided</option>
+              <option value="artist">Artist</option>
+              <option value="entrepreneur">Entrepreneur</option>
+              <option value="athlete">Athlete</option>
+              <option value="engineer">Engineer</option>
+              <option value="doctor">Doctor</option>
+              <option value="pilot">Pilot</option>
+              <option value="student">Student</option>
             </select>
           </div>
 
