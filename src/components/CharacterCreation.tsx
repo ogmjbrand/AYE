@@ -19,7 +19,9 @@ export interface Character {
   colorR: number;
   colorG: number;
   colorB: number;
+  balance: number;
   createdAt: number;
+  lastBalanceUpdate: number;
 }
 
 interface CharacterCreationProps {
@@ -42,10 +44,21 @@ export function CharacterCreation({
   const savedCharacter = localStorage.getItem('aye_character');
   const hasSavedCharacter = !!savedCharacter;
 
+  const getInitialBalance = (lifestyleType: Lifestyle): number => {
+    const balances: Record<Lifestyle, number> = {
+      'student': 2500,
+      'ordinary': 5000,
+      'middle-class': 12500,
+      'luxury': 25000,
+    };
+    return balances[lifestyleType];
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const now = Date.now();
     const character: Character = {
       id: Math.random().toString(36).substring(7),
       name: name.trim(),
@@ -54,7 +67,9 @@ export function CharacterCreation({
       colorR,
       colorG,
       colorB,
-      createdAt: Date.now(),
+      balance: getInitialBalance(lifestyle),
+      createdAt: now,
+      lastBalanceUpdate: now,
     };
 
     localStorage.setItem('aye_character', JSON.stringify(character));

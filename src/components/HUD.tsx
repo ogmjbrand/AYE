@@ -5,6 +5,7 @@ import type { Neighborhood } from '../lib/neighborhoods';
 interface HUDProps {
   controller: PlayerHandle;
   character?: Character;
+  balance: number;
   neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
 }
@@ -12,6 +13,7 @@ interface HUDProps {
 export function HUD({
   controller,
   character,
+  balance,
   neighborhood,
   onChangeCharacter,
 }: HUDProps) {
@@ -82,7 +84,7 @@ export function HUD({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Balance</span>
-                  <span className="text-aye-gold">0 ⓒ</span>
+                  <span className="text-aye-gold">{balance.toLocaleString()} ⓒ</span>
                 </div>
               </>
             )}

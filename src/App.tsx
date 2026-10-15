@@ -6,6 +6,7 @@ import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
+import { useBalanceProgression } from './hooks/useBalanceProgression';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -147,6 +148,7 @@ export default function App() {
   const [character, setCharacter] = useState<Character | null>(null);
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
+  const balance = useBalanceProgression(character);
   const controlsRef = useRef<OrbitControls | null>(null);
 
   // Load character from localStorage on mount
@@ -196,6 +198,7 @@ export default function App() {
       <HUD
         controller={controller}
         character={character}
+        balance={balance}
         neighborhood={neighborhood}
         onChangeCharacter={handleChangeCharacter}
       />
