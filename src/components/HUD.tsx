@@ -1,10 +1,12 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
+import type { Character } from './CharacterCreation';
 
 interface HUDProps {
   controller: PlayerHandle;
+  character?: Character;
 }
 
-export function HUD({ controller }: HUDProps) {
+export function HUD({ controller, character }: HUDProps) {
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
@@ -21,7 +23,12 @@ export function HUD({ controller }: HUDProps) {
             <h1 className="font-display font-bold text-2xl tracking-wider">
               AYE<span className="font-normal text-xs ml-2">WORLD</span>
             </h1>
-            <p className="text-xs tracking-widest font-bold mt-2 text-gray-300">
+            {character && (
+              <p className="text-xs tracking-wide font-semibold mt-2 text-aye-gold">
+                {character.name}
+              </p>
+            )}
+            <p className="text-xs tracking-widest font-bold mt-1 text-gray-400">
               EARLY WORLD BUILD · 001
             </p>
           </div>

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls as OrbitControlsImpl } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
@@ -7,6 +7,7 @@ import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
+import { CharacterCreation, type Character } from './components/CharacterCreation';
 import './App.css';
 
 interface CityProps {
@@ -121,8 +122,22 @@ function City({ controller }: CityProps) {
 }
 
 export default function App() {
+  const [character, setCharacter] = useState<Character | null>(null);
   const controller = usePlayerController();
   const controlsRef = useRef<OrbitControls>(null);
+
+  // Load character from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('aye_character');
+    if (saved) {
+      try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setCharacter(JSON.parse(saved));
+      } catch {
+        // Invalid saved data, ignore
+      }
+    }
+  }, []);
 
   // Update OrbitControls target to follow player
   useFrame(() => {
@@ -138,6 +153,10 @@ export default function App() {
       controlsRef.current.update();
     }
   });
+
+  if (!character) {
+    return <CharacterCreation onCharacterCreate={setCharacter} />;
+  }
 
   return (
     <main className="game">
@@ -160,7 +179,7 @@ export default function App() {
         />
       </Canvas>
 
-      <HUD controller={controller} />
+      <HUD controller={controller} character={character} />
     </main>
   );
 }
