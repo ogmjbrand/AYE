@@ -1,14 +1,14 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls as OrbitControlsImpl } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
-import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
-import { useBalanceProgression } from './hooks/useBalanceProgression';
-import { useTimeProgression } from './hooks/useTimeProgression';
-import { useDailyTracking } from './hooks/useDailyTracking';
+import { useGameState } from './hooks/useGameState';
+import { getAmbiance, type GameTime } from './lib/gameState';
+import { clearSave } from './lib/save';
+import { BUILDINGS } from './lib/world';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -18,6 +18,7 @@ import './App.css';
 interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
   character?: Character;
+  gameTime: GameTime;
 }
 
 interface CameraFollowProps {
@@ -25,47 +26,52 @@ interface CameraFollowProps {
   controlsRef: React.RefObject<OrbitControls | null>;
 }
 
+const followTarget = new Vector3();
+const followShift = new Vector3();
+
+/**
+ * Keeps the player in view: the orbit target eases toward the player and the
+ * camera moves by the same amount, so the player's chosen angle and zoom are kept.
+ */
 function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
-  useFrame(() => {
-    if (controlsRef.current) {
-      const targetPos = new Vector3(
-        controller.position.x,
-        1,
-        controller.position.z
-      );
-      controlsRef.current.target.lerp(targetPos, 0.1);
-      controlsRef.current.update();
-    }
+  useFrame(({ camera }) => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    followTarget.set(controller.position.x, 1, controller.position.z);
+    followShift.copy(followTarget).sub(controls.target).multiplyScalar(0.1);
+    controls.target.add(followShift);
+    camera.position.add(followShift);
+    controls.update();
   });
   return null;
 }
 
-function City({ controller, character }: CityProps) {
-  const buildings = [
-    { position: [-7, 2, -5], size: [3, 4, 3], color: '#c7a17a' },
-    { position: [-3, 3, -7], size: [3, 6, 3], color: '#aab5b7' },
-    { position: [4, 2, -7], size: [4, 4, 3], color: '#d8c8ad' },
-    { position: [8, 3, -4], size: [3, 6, 4], color: '#b9a18d' },
-    { position: [-8, 2, 4], size: [3, 4, 4], color: '#c8b49b' },
-    { position: [8, 2, 5], size: [3, 4, 4], color: '#d0c5b3' },
-  ] as const;
+const NIGHT_SKY = '#16192b';
+const DAY_SKY = '#a9c8dc';
+
+function City({ controller, character, gameTime }: CityProps) {
+  // Day/night: sky, fog and light follow the game clock
+  const ambiance = getAmbiance(gameTime);
+  const isNight = ambiance.intensity < 0.5;
+  const sky = isNight ? NIGHT_SKY : DAY_SKY;
 
   return (
     <>
-      <color attach="background" args={['#a9c8dc']} />
-      <fog attach="fog" args={['#a9c8dc', 24, 65]} />
+      <color attach="background" args={[sky]} />
+      <fog attach="fog" args={[sky, 24, 65]} />
 
-      <ambientLight intensity={1.2} />
-      <directionalLight position={[8, 15, 8]} intensity={2.2} />
+      <ambientLight intensity={1.2 * ambiance.intensity} />
+      <directionalLight
+        position={[8, 15, 8]}
+        intensity={2.2 * ambiance.intensity}
+        color={isNight ? '#8fa3ff' : ambiance.color}
+      />
 
       {/* Ground */}
-      <RigidBody type="fixed">
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
-          <planeGeometry args={[200, 200]} />
-          <meshStandardMaterial color="#65765b" />
-        </mesh>
-        <CuboidCollider args={[100, 0.1, 100]} position={[0, -0.08, 0]} />
-      </RigidBody>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
+        <planeGeometry args={[200, 200]} />
+        <meshStandardMaterial color="#65765b" />
+      </mesh>
 
       {/* Main road */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
@@ -97,21 +103,13 @@ function City({ controller, character }: CityProps) {
         </mesh>
       ))}
 
-      {/* Buildings with collision */}
-      {buildings.map((building, i) => (
-        <RigidBody key={i} type="fixed" position={building.position}>
+      {/* Buildings (collision is handled in usePlayerController via lib/world) */}
+      {BUILDINGS.map((building, i) => (
+        <group key={i} position={building.position}>
           <mesh position={[0, building.size[1] / 2, 0]} castShadow>
             <boxGeometry args={building.size} />
             <meshStandardMaterial color={building.color} roughness={0.85} />
           </mesh>
-          <CuboidCollider
-            args={[
-              building.size[0] / 2,
-              building.size[1] / 2,
-              building.size[2] / 2,
-            ]}
-            position={[0, building.size[1] / 2, 0]}
-          />
 
           {/* Simple windows */}
           {Array.from(
@@ -131,14 +129,16 @@ function City({ controller, character }: CityProps) {
                   args={[building.size[0] * 0.65, 0.45, 0.025]}
                 />
                 <meshStandardMaterial
-                  color="#41677b"
+                  color={isNight ? '#f3c66b' : '#41677b'}
+                  emissive={isNight ? '#f3c66b' : '#000000'}
+                  emissiveIntensity={isNight ? 0.6 : 0}
                   roughness={0.3}
                   metalness={0.15}
                 />
               </mesh>
             )
           )}
-        </RigidBody>
+        </group>
       ))}
 
       {/* Controllable Player */}
@@ -148,30 +148,11 @@ function City({ controller, character }: CityProps) {
 }
 
 export default function App() {
+  // Null until the player picks Continue or creates a character on the start screen
   const [character, setCharacter] = useState<Character | null>(null);
-  const [showDailyLog, setShowDailyLog] = useState(false);
-  const controller = usePlayerController();
-  const neighborhood = useCurrentNeighborhood(controller);
-  const balance = useBalanceProgression(character);
-  const gameTime = useTimeProgression();
-  const dailyStats = useDailyTracking();
-  const controlsRef = useRef<OrbitControls | null>(null);
-
-  // Load character from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('aye_character');
-    if (saved) {
-      try {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCharacter(JSON.parse(saved));
-      } catch {
-        // Invalid saved data, ignore
-      }
-    }
-  }, []);
 
   const handleChangeCharacter = () => {
-    localStorage.removeItem('aye_character');
+    clearSave();
     setCharacter(null);
   };
 
@@ -179,23 +160,30 @@ export default function App() {
     return <CharacterCreation onCharacterCreate={setCharacter} />;
   }
 
-  const handleRest = () => {
-    setShowDailyLog(true);
-  };
+  // Keyed by id so a new character starts with a fresh clock and ledger
+  return <Game key={character.id} character={character} onChangeCharacter={handleChangeCharacter} />;
+}
 
-  const handleContinueDay = () => {
-    setShowDailyLog(false);
-  };
+interface GameProps {
+  character: Character;
+  onChangeCharacter: () => void;
+}
+
+function Game({ character, onChangeCharacter }: GameProps) {
+  const controller = usePlayerController();
+  const neighborhood = useCurrentNeighborhood(controller);
+  const { state, rest, dismissSummary } = useGameState(character);
+  const controlsRef = useRef<OrbitControls | null>(null);
 
   return (
     <main className="game">
-      {showDailyLog && (
+      {state.summary && (
         <DailyLogModal
-          income={dailyStats.income}
-          expenses={dailyStats.expenses}
-          netChange={dailyStats.netChange}
-          dayOfWeek={gameTime.dayOfWeek}
-          onContinue={handleContinueDay}
+          income={state.summary.income}
+          expenses={state.summary.expenses}
+          netChange={state.summary.netChange}
+          wakeDayOfWeek={state.summary.wakeDayOfWeek}
+          onContinue={dismissSummary}
         />
       )}
 
@@ -205,9 +193,7 @@ export default function App() {
         gl={{ antialias: true, powerPreference: 'default' }}
       >
         <CameraFollow controller={controller} controlsRef={controlsRef} />
-        <Physics gravity={[0, 0, 0]}>
-          <City controller={controller} character={character} />
-        </Physics>
+        <City controller={controller} character={character} gameTime={state.time} />
         <OrbitControlsImpl
           ref={controlsRef}
           makeDefault
@@ -222,11 +208,11 @@ export default function App() {
       <HUD
         controller={controller}
         character={character}
-        balance={balance}
-        gameTime={gameTime}
+        balance={state.balance}
+        gameTime={state.time}
         neighborhood={neighborhood}
-        onChangeCharacter={handleChangeCharacter}
-        onRest={handleRest}
+        onChangeCharacter={onChangeCharacter}
+        onRest={rest}
       />
     </main>
   );
