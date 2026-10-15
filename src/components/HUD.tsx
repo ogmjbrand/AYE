@@ -1,13 +1,20 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
+import type { Neighborhood } from '../lib/neighborhoods';
 
 interface HUDProps {
   controller: PlayerHandle;
   character?: Character;
+  neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
 }
 
-export function HUD({ controller, character, onChangeCharacter }: HUDProps) {
+export function HUD({
+  controller,
+  character,
+  neighborhood,
+  onChangeCharacter,
+}: HUDProps) {
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
@@ -43,6 +50,16 @@ export function HUD({ controller, character, onChangeCharacter }: HUDProps) {
           )}
         </div>
       </div>
+
+      {/* Location indicator - center bottom */}
+      {neighborhood && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 border border-gray-700 rounded text-white text-xs tracking-widest font-bold pointer-events-none">
+          <div className="text-center">
+            <p className="text-aye-gold">{neighborhood.name.toUpperCase()}</p>
+            <p className="text-gray-500 text-xs mt-1">{neighborhood.description}</p>
+          </div>
+        </div>
+      )}
 
       {/* Player state panel - bottom left */}
       <div className="absolute bottom-0 left-0 p-6 bg-gradient-to-t from-black/60 to-transparent text-white max-w-80">

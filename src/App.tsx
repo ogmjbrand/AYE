@@ -5,6 +5,7 @@ import type { OrbitControls } from 'three-stdlib';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { Vector3 } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
+import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -125,6 +126,7 @@ function City({ controller, character }: CityProps) {
 export default function App() {
   const [character, setCharacter] = useState<Character | null>(null);
   const controller = usePlayerController();
+  const neighborhood = useCurrentNeighborhood(controller);
   const controlsRef = useRef<OrbitControls>(null);
 
   // Load character from localStorage on mount
@@ -188,6 +190,7 @@ export default function App() {
       <HUD
         controller={controller}
         character={character}
+        neighborhood={neighborhood}
         onChangeCharacter={handleChangeCharacter}
       />
     </main>
