@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Stars } from '@react-three/drei';
-import { Vector3, type DirectionalLight, Object3D } from 'three';
+import { Vector3, type DirectionalLight, Object3D, type PointLight } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { GameTime } from '../lib/gameState';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -18,6 +18,16 @@ const HDRI: Record<HdriKey, string> = {
 
 const SHADOW_EXTENT = 32;
 const sunOffset = new Vector3();
+const toCamera = new Vector3();
+
+/**
+ * Soft warm light on the camera side of the player, fading in after sunset so
+ * the character stays readable in dark streets (the "character light" most
+ * third-person games use). Always mounted (intensity 0 by day) so the light
+ * count never changes and shaders never recompile at dusk.
+ */
+const CHARACTER_LIGHT_MAX = 14;
+const characterLightFor = (sunIntensity: number) => CHARACTER_LIGHT_MAX * Math.min(1, Math.max(0, (1 - sunIntensity) / 0.6));
 
 /**
  * Sky, sun, ambient and image-based lighting for the current game time.
@@ -29,10 +39,16 @@ export function SceneLighting({ gameTime, player }: { gameTime: GameTime; player
   const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
   const sun = useRef<DirectionalLight>(null);
   const target = useMemo(() => new Object3D(), []);
+  const fill = useRef<PointLight>(null);
 
   useEffect(() => setNightGlow(l.night), [l.night]);
 
-  useFrame(() => {
+  useFrame(({ camera }) => {
+    if (fill.current) {
+      // 1.6 m from the player towards the camera, at head height
+      toCamera.set(camera.position.x - player.position.x, 0, camera.position.z - player.position.z).normalize();
+      fill.current.position.set(player.position.x + toCamera.x * 1.6, player.position.y + 2.1, player.position.z + toCamera.z * 1.6);
+    }
     const light = sun.current;
     if (!light) return;
     // Follow the player in whole metres to stop shadow edges shimmering
@@ -51,6 +67,7 @@ export function SceneLighting({ gameTime, player }: { gameTime: GameTime; player
       {l.night > 0.3 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
 
       <hemisphereLight args={[l.skyColor, l.groundColor, l.hemiIntensity]} />
+      <pointLight ref={fill} color="#ffd9b0" intensity={characterLightFor(l.sunIntensity)} distance={7} decay={2} />
       <primitive object={target} />
       <directionalLight
         ref={sun}
