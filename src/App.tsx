@@ -15,6 +15,7 @@ import { SceneLighting } from './world/SceneLighting';
 import { Streets } from './world/Streets';
 import { QualityContext, settingsFor, useQuality, type Quality } from './world/quality';
 import { lightingAt } from './world/timeOfDay';
+import { FpsMeter } from './world/FpsMeter';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -124,8 +125,10 @@ function Game({ character, onChangeCharacter }: GameProps) {
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
   const controlsRef = useRef<OrbitControls | null>(null);
-  const [quality, setQuality] = useState<Quality>('high');
-  const settings = settingsFor(quality);
+  // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
+  const [qualityMode, setQualityMode] = useState<'auto' | Quality>('auto');
+  const [autoQuality, setAutoQuality] = useState<Quality>('high');
+  const settings = settingsFor(qualityMode === 'auto' ? autoQuality : qualityMode);
 
   return (
     <main className="game">
@@ -149,7 +152,8 @@ function Game({ character, onChangeCharacter }: GameProps) {
           fallback={<div className="p-8 text-white">AYE needs WebGL. Please enable hardware acceleration or try another browser.</div>}
         >
           {/* Drop to the low tier (no contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
-          <PerformanceMonitor onDecline={() => setQuality('low')} flipflops={1} />
+          <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
+          <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
           <City controller={controller} character={character} gameTime={state.time} />
           <OrbitControlsImpl
@@ -172,6 +176,8 @@ function Game({ character, onChangeCharacter }: GameProps) {
         neighborhood={neighborhood}
         onChangeCharacter={onChangeCharacter}
         onRest={rest}
+        qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
+        onCycleQuality={() => setQualityMode((m) => (m === 'auto' ? 'high' : m === 'high' ? 'low' : 'auto'))}
       />
     </main>
   );

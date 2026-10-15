@@ -21,3 +21,6 @@ export function settingsFor(quality: Quality): QualitySettings {
 
 export const QualityContext = createContext<QualitySettings>(settingsFor('high'));
 export const useQuality = () => useContext(QualityContext);
+
+/** Live render stats written by FpsMeter (inside the canvas) and read by the HUD. */
+export const perfStats = { fps: 0 };

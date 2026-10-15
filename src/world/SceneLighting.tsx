@@ -11,9 +11,9 @@ import { SkyDome } from './SkyDome';
 import { lightingAt, type HdriKey } from './timeOfDay';
 
 const HDRI: Record<HdriKey, string> = {
-  day: '/assets/hdri/potsdamer_platz_1k.hdr',
-  golden: '/assets/hdri/venice_sunset_1k.hdr',
-  night: '/assets/hdri/dikhololo_night_1k.hdr',
+  day: `${import.meta.env.BASE_URL}assets/hdri/potsdamer_platz_1k.hdr`,
+  golden: `${import.meta.env.BASE_URL}assets/hdri/venice_sunset_1k.hdr`,
+  night: `${import.meta.env.BASE_URL}assets/hdri/dikhololo_night_1k.hdr`,
 };
 
 const SHADOW_EXTENT = 32;

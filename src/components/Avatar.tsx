@@ -4,7 +4,7 @@ import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, type AnimationAction, type Group, type Mesh } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 
-export const AVATAR_URL = '/assets/models/aye-avatar.glb';
+export const AVATAR_URL = `${import.meta.env.BASE_URL}assets/models/aye-avatar.glb`;
 /** Target standing height in metres. */
 const HEIGHT = 1.72;
 

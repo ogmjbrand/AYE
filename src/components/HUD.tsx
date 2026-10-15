@@ -4,6 +4,7 @@ import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useState } from 'react';
 import { formatGameTime, isWorkingHours, type GameTime } from '../lib/gameState';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
+import { perfStats } from '../world/quality';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -13,6 +14,8 @@ interface HUDProps {
   neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
   onRest?: () => void;
+  qualityLabel?: string;
+  onCycleQuality?: () => void;
 }
 
 export function HUD({
@@ -23,6 +26,8 @@ export function HUD({
   neighborhood,
   onChangeCharacter,
   onRest,
+  qualityLabel,
+  onCycleQuality,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -67,7 +72,17 @@ export function HUD({
               {formatGameTime(gameTime)} • {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][gameTime.dayOfWeek]}
             </p>
           </div>
+          <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
+            {onCycleQuality && (
+              <button
+                onClick={onCycleQuality}
+                title="Graphics quality: Auto lowers detail if the frame rate drops"
+                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
+              >
+                Quality: {qualityLabel}
+              </button>
+            )}
             {onRest && (
               <button
                 onClick={onRest}
@@ -84,6 +99,8 @@ export function HUD({
                 Change
               </button>
             )}
+          </div>
+          <p className="text-xs font-mono text-gray-400" aria-label="Frames per second">{perfStats.fps} FPS</p>
           </div>
         </div>
       </div>
