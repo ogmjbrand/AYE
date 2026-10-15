@@ -12,9 +12,10 @@ import './App.css';
 
 interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
+  character?: Character;
 }
 
-function City({ controller }: CityProps) {
+function City({ controller, character }: CityProps) {
   const buildings = [
     { position: [-7, 2, -5], size: [3, 4, 3], color: '#c7a17a' },
     { position: [-3, 3, -7], size: [3, 6, 3], color: '#aab5b7' },
@@ -116,7 +117,7 @@ function City({ controller }: CityProps) {
       ))}
 
       {/* Controllable Player */}
-      <Player controller={controller} />
+      <Player controller={controller} character={character} />
     </>
   );
 }
@@ -166,7 +167,7 @@ export default function App() {
         gl={{ antialias: true, powerPreference: 'default' }}
       >
         <Physics gravity={[0, 0, 0]}>
-          <City controller={controller} />
+          <City controller={controller} character={character} />
         </Physics>
         <OrbitControlsImpl
           ref={controlsRef}

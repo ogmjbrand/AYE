@@ -3,13 +3,19 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, CapsuleCollider } from '@react-three/rapier';
 import { Group } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
+import type { Character } from './CharacterCreation';
 
 interface PlayerProps {
   controller: PlayerHandle;
+  character?: Character;
 }
 
-export function Player({ controller }: PlayerProps) {
+export function Player({ controller, character }: PlayerProps) {
   const groupRef = useRef<Group>(null);
+
+  const bodyColor = character
+    ? `rgb(${character.colorR}, ${character.colorG}, ${character.colorB})`
+    : '#252a33';
 
   useFrame((_, delta) => {
     // Update controller with frame delta
@@ -33,7 +39,7 @@ export function Player({ controller }: PlayerProps) {
         {/* Body */}
         <mesh position={[0, 0.9, 0]} castShadow>
           <capsuleGeometry args={[0.28, 0.65, 4, 8]} />
-          <meshStandardMaterial color="#252a33" roughness={0.8} />
+          <meshStandardMaterial color={bodyColor} roughness={0.8} />
         </mesh>
 
         {/* Head */}
