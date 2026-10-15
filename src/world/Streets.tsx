@@ -12,12 +12,14 @@ const KERB_LEN = 2;
 
 /** A flat textured strip lying on the ground, with texture tiling in metres. */
 function Strip({
-  x0, x1, z0, z1, y, material, tile, alongX = false,
+  x0, x1, z0, z1, y, material, tile: tileDefault, alongX = false,
 }: {
   x0: number; x1: number; z0: number; z1: number; y: number;
   material: import('three').MeshStandardMaterial; tile: number; alongX?: boolean;
 }) {
   const w = x1 - x0, d = z1 - z0;
+  // Real textures from the asset manifest declare their own size in metres
+  const tile = (material.userData.tileMeters as number | undefined) ?? tileDefault;
   // Clone the material per strip so each gets its own texture repeat
   const mat = useMemo(() => {
     const m = material.clone();

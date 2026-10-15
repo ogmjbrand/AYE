@@ -2,7 +2,11 @@
  * Shared PBR materials. Created once and reused by every mesh so the whole
  * city renders with a handful of materials (and draw calls).
  */
-import { AdditiveBlending, Color, DoubleSide, MeshStandardMaterial, type Texture } from 'three';
+import {
+  AdditiveBlending, Color, DoubleSide, LinearSRGBColorSpace, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace,
+  TextureLoader, type Texture,
+} from 'three';
+import { assetManifest, assetUrl, type SurfaceFiles, type SurfaceKey } from '../lib/assetManifest';
 import { asphalt, facadeFor, ground, kerb, lightPoolTexture, pavers, roof, type SurfaceSet } from './textures';
 
 const glowing = new Set<MeshStandardMaterial>();
@@ -33,6 +37,34 @@ function surface(set: SurfaceSet, opts: { repeat?: [number, number]; vertexColor
   return m;
 }
 
+const loader = new TextureLoader();
+function fileTexture(path: string, srgb: boolean): Texture {
+  const t = loader.load(assetUrl(path), undefined, undefined, () => console.warn(`[AYE assets] could not load ${path}`));
+  t.colorSpace = srgb ? SRGBColorSpace : LinearSRGBColorSpace;
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+/** Material from real image files listed in public/assets/manifest.json. */
+function surfaceFromFiles(f: SurfaceFiles) {
+  const m = new MeshStandardMaterial({
+    map: fileTexture(f.color, true),
+    normalMap: f.normal ? fileTexture(f.normal, false) : null,
+    roughnessMap: f.roughness ? fileTexture(f.roughness, false) : null,
+    roughness: f.roughness ? 1 : 0.9,
+    metalness: 0,
+  });
+  m.userData.tileMeters = f.tileMeters; // overrides the procedural texture's tile size
+  return m;
+}
+
+/** A listed real surface if there is one, otherwise the built-in procedural one. */
+function groundSurface(key: SurfaceKey, fallback: () => SurfaceSet, opts?: Parameters<typeof surface>[1]) {
+  const files = assetManifest().surfaces[key];
+  return files ? surfaceFromFiles(files) : surface(fallback(), opts);
+}
+
 let cache: ReturnType<typeof build> | null = null;
 
 function build() {
@@ -44,10 +76,10 @@ function build() {
   };
   return {
     facade,
-    roof: surface(roof(), { vertexColors: true }),
-    road: surface(asphalt()),
-    pavement: surface(pavers()),
-    ground: surface(ground()),
+    roof: groundSurface('roof', roof, { vertexColors: true }),
+    road: groundSurface('road', asphalt),
+    pavement: groundSurface('pavement', pavers),
+    ground: groundSurface('ground', ground),
     kerb: surface(kerb()),
     marking: new MeshStandardMaterial({ color: '#e9e4d3', roughness: 0.75 }),
     yellowMarking: new MeshStandardMaterial({ color: '#e0b425', roughness: 0.75 }),
