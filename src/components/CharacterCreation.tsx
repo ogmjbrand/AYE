@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { STARTING_BALANCE } from '../lib/gameState';
+import { loadCharacter, saveCharacter } from '../lib/save';
 
 export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
 export type Career =
@@ -41,18 +43,8 @@ export function CharacterCreation({
   const [colorG, setColorG] = useState(93);
   const [colorB, setColorB] = useState(62);
 
-  const savedCharacter = localStorage.getItem('aye_character');
-  const hasSavedCharacter = !!savedCharacter;
-
-  const getInitialBalance = (lifestyleType: Lifestyle): number => {
-    const balances: Record<Lifestyle, number> = {
-      'student': 2500,
-      'ordinary': 5000,
-      'middle-class': 12500,
-      'luxury': 25000,
-    };
-    return balances[lifestyleType];
-  };
+  const [savedCharacter] = useState(() => loadCharacter());
+  const hasSavedCharacter = savedCharacter !== null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,27 +52,26 @@ export function CharacterCreation({
 
     const now = Date.now();
     const character: Character = {
-      id: Math.random().toString(36).substring(7),
+      id: crypto.randomUUID(),
       name: name.trim(),
       lifestyle,
       career,
       colorR,
       colorG,
       colorB,
-      balance: getInitialBalance(lifestyle),
+      balance: STARTING_BALANCE[lifestyle],
       createdAt: now,
       lastBalanceUpdate: now,
     };
 
-    localStorage.setItem('aye_character', JSON.stringify(character));
+    saveCharacter(character);
     onCharacterCreate(character);
   };
 
   const handleLoad = () => {
     if (!savedCharacter) return;
-    const character = JSON.parse(savedCharacter) as Character;
-    onLoadCharacter?.(character);
-    onCharacterCreate(character);
+    onLoadCharacter?.(savedCharacter);
+    onCharacterCreate(savedCharacter);
   };
 
   const handleNewGame = () => {
@@ -90,7 +81,7 @@ export function CharacterCreation({
   };
 
   if (mode === 'menu' && hasSavedCharacter) {
-    const char = JSON.parse(savedCharacter) as Character;
+    const char = savedCharacter;
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center pointer-events-auto z-50">
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 max-w-md w-full mx-4 text-white">

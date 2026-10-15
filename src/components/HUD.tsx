@@ -1,8 +1,8 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
-import type { GameTime } from '../hooks/useTimeProgression';
-import { formatGameTime, isWorkingHours } from '../hooks/useTimeProgression';
+import { useEffect, useState } from 'react';
+import { formatGameTime, isWorkingHours, type GameTime } from '../lib/gameState';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -23,6 +23,13 @@ export function HUD({
   onChangeCharacter,
   onRest,
 }: HUDProps) {
+  // The controller is mutated every frame; refresh the readout ~10 times a second
+  const [, setFrame] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((n) => n + 1), 100);
+    return () => clearInterval(id);
+  }, []);
+
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);

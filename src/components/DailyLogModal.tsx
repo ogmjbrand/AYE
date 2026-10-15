@@ -1,20 +1,26 @@
+import { DAY_NAMES } from '../lib/gameState';
+
 interface DailyLogModalProps {
   income: number;
   expenses: number;
   netChange: number;
-  dayOfWeek: number;
+  /** The day the player woke up on (0 = Monday). */
+  wakeDayOfWeek: number;
   onContinue: () => void;
 }
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-export function DailyLogModal({ income, expenses, netChange, dayOfWeek, onContinue }: DailyLogModalProps) {
-  const nextDay = DAYS[(dayOfWeek + 1) % 7];
+export function DailyLogModal({ income, expenses, netChange, wakeDayOfWeek, onContinue }: DailyLogModalProps) {
+  const nextDay = DAY_NAMES[wakeDayOfWeek];
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center pointer-events-auto z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 max-w-md w-full mx-4 text-white">
-        <h2 className="font-display text-2xl font-bold mb-6">Daily Summary</h2>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="daily-summary-title"
+        className="bg-gray-900 border border-gray-700 rounded-lg p-8 max-w-md w-full mx-4 text-white"
+      >
+        <h2 id="daily-summary-title" className="font-display text-2xl font-bold mb-6">Daily Summary</h2>
 
         <div className="space-y-4 font-mono text-sm mb-8">
           <div className="bg-gray-800 rounded p-4 space-y-2">
@@ -36,10 +42,11 @@ export function DailyLogModal({ income, expenses, netChange, dayOfWeek, onContin
         </div>
 
         <p className="text-gray-400 text-sm mb-6">
-          You woke up refreshed. Tomorrow is <span className="text-gray-300 font-semibold">{nextDay}</span>.
+          You slept until 07:00. It's now <span className="text-gray-300 font-semibold">{nextDay}</span> morning.
         </p>
 
         <button
+          autoFocus
           onClick={onContinue}
           className="w-full bg-aye-green hover:bg-green-600 text-black font-bold py-3 rounded transition"
         >
