@@ -16,6 +16,26 @@ interface CityProps {
   character?: Character;
 }
 
+interface CameraFollowProps {
+  controller: ReturnType<typeof usePlayerController>;
+  controlsRef: React.RefObject<OrbitControls | null>;
+}
+
+function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
+  useFrame(() => {
+    if (controlsRef.current) {
+      const targetPos = new Vector3(
+        controller.position.x,
+        1,
+        controller.position.z
+      );
+      controlsRef.current.target.lerp(targetPos, 0.1);
+      controlsRef.current.update();
+    }
+  });
+  return null;
+}
+
 function City({ controller, character }: CityProps) {
   const buildings = [
     { position: [-7, 2, -5], size: [3, 4, 3], color: '#c7a17a' },
@@ -127,7 +147,7 @@ export default function App() {
   const [character, setCharacter] = useState<Character | null>(null);
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const controlsRef = useRef<OrbitControls>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
 
   // Load character from localStorage on mount
   useEffect(() => {
@@ -141,21 +161,6 @@ export default function App() {
       }
     }
   }, []);
-
-  // Update OrbitControls target to follow player
-  useFrame(() => {
-    if (controlsRef.current) {
-      const targetPos = new Vector3(
-        controller.position.x,
-        1,
-        controller.position.z
-      );
-
-      // Smooth lerp to the player position
-      controlsRef.current.target.lerp(targetPos, 0.1);
-      controlsRef.current.update();
-    }
-  });
 
   const handleChangeCharacter = () => {
     localStorage.removeItem('aye_character');
@@ -173,6 +178,7 @@ export default function App() {
         dpr={[1, 1.5]}
         gl={{ antialias: true, powerPreference: 'default' }}
       >
+        <CameraFollow controller={controller} controlsRef={controlsRef} />
         <Physics gravity={[0, 0, 0]}>
           <City controller={controller} character={character} />
         </Physics>
