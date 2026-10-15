@@ -11,6 +11,7 @@ interface HUDProps {
   gameTime: GameTime;
   neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
+  onRest?: () => void;
 }
 
 export function HUD({
@@ -20,6 +21,7 @@ export function HUD({
   gameTime,
   neighborhood,
   onChangeCharacter,
+  onRest,
 }: HUDProps) {
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
@@ -49,14 +51,24 @@ export function HUD({
               {formatGameTime(gameTime)} • {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][gameTime.dayOfWeek]}
             </p>
           </div>
-          {onChangeCharacter && (
-            <button
-              onClick={onChangeCharacter}
-              className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
-            >
-              CHANGE
-            </button>
-          )}
+          <div className="flex gap-2">
+            {onRest && (
+              <button
+                onClick={onRest}
+                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
+              >
+                Rest
+              </button>
+            )}
+            {onChangeCharacter && (
+              <button
+                onClick={onChangeCharacter}
+                className="text-xs uppercase tracking-widest font-bold text-gray-400 hover:text-gray-200 transition px-3 py-1 border border-gray-600 hover:border-gray-400 rounded pointer-events-auto"
+              >
+                Change
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

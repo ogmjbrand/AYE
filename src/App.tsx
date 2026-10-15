@@ -8,9 +8,11 @@ import { usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useBalanceProgression } from './hooks/useBalanceProgression';
 import { useTimeProgression } from './hooks/useTimeProgression';
+import { useDailyTracking } from './hooks/useDailyTracking';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
+import { DailyLogModal } from './components/DailyLogModal';
 import './App.css';
 
 interface CityProps {
@@ -147,10 +149,12 @@ function City({ controller, character }: CityProps) {
 
 export default function App() {
   const [character, setCharacter] = useState<Character | null>(null);
+  const [showDailyLog, setShowDailyLog] = useState(false);
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
   const balance = useBalanceProgression(character);
   const gameTime = useTimeProgression();
+  const dailyStats = useDailyTracking();
   const controlsRef = useRef<OrbitControls | null>(null);
 
   // Load character from localStorage on mount
@@ -175,8 +179,26 @@ export default function App() {
     return <CharacterCreation onCharacterCreate={setCharacter} />;
   }
 
+  const handleRest = () => {
+    setShowDailyLog(true);
+  };
+
+  const handleContinueDay = () => {
+    setShowDailyLog(false);
+  };
+
   return (
     <main className="game">
+      {showDailyLog && (
+        <DailyLogModal
+          income={dailyStats.income}
+          expenses={dailyStats.expenses}
+          netChange={dailyStats.netChange}
+          dayOfWeek={gameTime.dayOfWeek}
+          onContinue={handleContinueDay}
+        />
+      )}
+
       <Canvas
         camera={{ position: [13, 11, 17], fov: 48 }}
         dpr={[1, 1.5]}
@@ -204,6 +226,7 @@ export default function App() {
         gameTime={gameTime}
         neighborhood={neighborhood}
         onChangeCharacter={handleChangeCharacter}
+        onRest={handleRest}
       />
     </main>
   );
