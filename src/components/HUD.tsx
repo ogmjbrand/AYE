@@ -3,12 +3,14 @@ import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import type { GameTime } from '../hooks/useTimeProgression';
 import { formatGameTime, isWorkingHours } from '../hooks/useTimeProgression';
+import type { WorkplaceStatus } from '../hooks/useWorkplaceStatus';
 
 interface HUDProps {
   controller: PlayerHandle;
   character?: Character;
   balance: number;
   gameTime: GameTime;
+  workplaceStatus: WorkplaceStatus;
   neighborhood?: Neighborhood | null;
   onChangeCharacter?: () => void;
   onRest?: () => void;
@@ -19,6 +21,7 @@ export function HUD({
   character,
   balance,
   gameTime,
+  workplaceStatus,
   neighborhood,
   onChangeCharacter,
   onRest,
@@ -105,6 +108,14 @@ export function HUD({
                   <span className="text-gray-400">Balance</span>
                   <span className="text-aye-gold">{balance.toLocaleString()} ⓒ</span>
                 </div>
+                {character.career !== 'none' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Workplace</span>
+                    <span className={workplaceStatus.isAtWorkplace ? 'text-aye-green' : 'text-gray-500'}>
+                      {workplaceStatus.isAtWorkplace ? 'Here' : `${workplaceStatus.distanceToWorkplace}u`}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-400">Status</span>
                   <span className={isWorkingHours(gameTime) ? 'text-aye-green' : 'text-gray-500'}>

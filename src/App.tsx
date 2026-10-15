@@ -13,6 +13,8 @@ import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
+import { getCareerLocation } from './lib/careers';
+import { useWorkplaceStatus } from './hooks/useWorkplaceStatus';
 import './App.css';
 
 interface CityProps {
@@ -141,6 +143,23 @@ function City({ controller, character }: CityProps) {
         </RigidBody>
       ))}
 
+      {/* Career Workplace Marker */}
+      {character && (
+        (() => {
+          const workplace = getCareerLocation(character.career);
+          return (
+            <mesh position={workplace.position}>
+              <cylinderGeometry args={[2, 2, 0.5, 32]} />
+              <meshStandardMaterial
+                color="#22c55e"
+                emissive="#22c55e"
+                emissiveIntensity={0.3}
+              />
+            </mesh>
+          );
+        })()
+      )}
+
       {/* Controllable Player */}
       <Player controller={controller} character={character} />
     </>
@@ -155,6 +174,7 @@ export default function App() {
   const balance = useBalanceProgression(character);
   const gameTime = useTimeProgression();
   const dailyStats = useDailyTracking();
+  const workplaceStatus = useWorkplaceStatus(character, controller);
   const controlsRef = useRef<OrbitControls | null>(null);
 
   // Load character from localStorage on mount
@@ -225,6 +245,7 @@ export default function App() {
         balance={balance}
         gameTime={gameTime}
         neighborhood={neighborhood}
+        workplaceStatus={workplaceStatus}
         onChangeCharacter={handleChangeCharacter}
         onRest={handleRest}
       />
