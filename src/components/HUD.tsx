@@ -46,21 +46,38 @@ export function HUD({ controller, character, onChangeCharacter }: HUDProps) {
 
       {/* Player state panel - bottom left */}
       <div className="absolute bottom-0 left-0 p-6 bg-gradient-to-t from-black/60 to-transparent text-white max-w-80">
-        <div className="space-y-1 font-mono text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Position</span>
-            <span>
-              X: <span className="text-aye-green">{x}</span> Z:{' '}
-              <span className="text-aye-green">{z}</span>
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Direction</span>
-            <span className="text-aye-gold">{direction}°</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Speed</span>
-            <span className="text-aye-red">{speed} u/s</span>
+        <div className="space-y-3">
+          {/* Stats */}
+          <div className="space-y-1 font-mono text-sm">
+            {character && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Lifestyle</span>
+                  <span className="capitalize text-aye-green">
+                    {character.lifestyle.replace('-', ' ')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Balance</span>
+                  <span className="text-aye-gold">0 ⓒ</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-400">Position</span>
+              <span>
+                X: <span className="text-aye-green">{x}</span> Z:{' '}
+                <span className="text-aye-green">{z}</span>
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Direction</span>
+              <span className="text-aye-gold">{direction}°</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Speed</span>
+              <span className="text-aye-red">{speed} u/s</span>
+            </div>
           </div>
         </div>
       </div>
