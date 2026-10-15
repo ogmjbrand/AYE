@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
 import { resolveCollisions } from '../lib/world';
+import { movementIntent, type StickInput } from '../lib/movementInput';
 
 export interface PlayerHandle {
   position: Vector3;
@@ -15,13 +16,15 @@ const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
 export const RUN_SPEED = 5.5;
 export const WALK_SPEED = 1.7;
 const keysPressed: Record<string, boolean> = {};
+const stick: StickInput = { forward: 0, turn: 0 };
 
 const playerHandle: PlayerHandle = {
   position: new Vector3(1.5, 0, 2),
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
-    const moveSpeed = keysPressed['shift'] ? WALK_SPEED : RUN_SPEED;
+    const intent = movementIntent(keysPressed, stick);
+    const moveSpeed = intent.walk ? WALK_SPEED : RUN_SPEED;
     const rotationSpeed = 3; // radians per second
     const acceleration = 6;
     const damping = 0.92;
@@ -30,36 +33,22 @@ const playerHandle: PlayerHandle = {
     const forwardX = Math.sin(playerHandle.direction);
     const forwardZ = Math.cos(playerHandle.direction);
 
-    // Target velocity from input
-    let targetVelX = 0;
-    let targetVelZ = 0;
-
-    if (keysPressed['w']) {
-      targetVelX += forwardX * moveSpeed;
-      targetVelZ += forwardZ * moveSpeed;
-    }
-    if (keysPressed['s']) {
-      targetVelX -= forwardX * moveSpeed;
-      targetVelZ -= forwardZ * moveSpeed;
-    }
+    // Target velocity from input; a half-pushed stick moves at half speed
+    const targetVelX = forwardX * moveSpeed * intent.forward;
+    const targetVelZ = forwardZ * moveSpeed * intent.forward;
 
     // Smooth acceleration toward target
     playerHandle.velocity.x += (targetVelX - playerHandle.velocity.x) * acceleration * delta;
     playerHandle.velocity.z += (targetVelZ - playerHandle.velocity.z) * acceleration * delta;
 
     // Damping when no input
-    if (!keysPressed['w'] && !keysPressed['s']) {
+    if (intent.forward === 0) {
       playerHandle.velocity.x *= damping;
       playerHandle.velocity.z *= damping;
     }
 
     // Rotation
-    if (keysPressed['a']) {
-      playerHandle.direction += rotationSpeed * delta;
-    }
-    if (keysPressed['d']) {
-      playerHandle.direction -= rotationSpeed * delta;
-    }
+    playerHandle.direction += rotationSpeed * intent.turn * delta;
 
     // Move, then push out of buildings and keep inside the world bounds
     const prevX = playerHandle.position.x;
@@ -81,6 +70,8 @@ const playerHandle: PlayerHandle = {
 
 function releaseAllKeys() {
   for (const key of MOVE_KEYS) keysPressed[key] = false;
+  stick.forward = 0;
+  stick.turn = 0;
 }
 
 let inputBlocked = false;
@@ -88,6 +79,12 @@ let inputBlocked = false;
 export function setMovementBlocked(blocked: boolean) {
   inputBlocked = blocked;
   if (blocked) releaseAllKeys();
+}
+
+/** Analog input from the on-screen stick; pass zeros when the thumb lifts. */
+export function setStickInput(input: StickInput) {
+  stick.forward = inputBlocked ? 0 : input.forward;
+  stick.turn = inputBlocked ? 0 : input.turn;
 }
 
 export function usePlayerController(): PlayerHandle {

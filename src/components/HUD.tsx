@@ -6,6 +6,7 @@ import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type Gam
 import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { perfStats } from '../world/quality';
+import { TouchStick } from './TouchStick';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -42,7 +43,7 @@ function VendorPrompt({ vendor, onOpen }: { vendor: FoodVendor; onOpen: (vendor:
     <button
       type="button"
       onClick={() => onOpen(vendor)}
-      className={`${PANEL} pointer-events-auto flex items-center gap-3 whitespace-nowrap px-4 py-2.5 text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
+      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
     >
       <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
       <span>
@@ -106,7 +107,7 @@ export function HUD({
             <p className="m-0 font-display text-xl font-semibold leading-none tabular-nums sm:text-2xl">
               {formatGameTime(gameTime)}
             </p>
-            <p className="m-0 mt-1 whitespace-nowrap text-[11px] uppercase tracking-[0.14em] text-ui-muted">
+            <p className="m-0 mt-1 whitespace-nowrap text-[11px] uppercase tracking-[0.06em] text-ui-muted sm:tracking-[0.14em]">
               {DAY_SHORT[gameTime.dayOfWeek]} · <span className="capitalize">{gameTime.period}</span>
             </p>
           </div>
@@ -162,13 +163,16 @@ export function HUD({
       )}
 
       {/* Player panel: the numbers that drive decisions first, profile second, telemetry on request */}
-      <div className="absolute bottom-0 left-0 flex w-full flex-col items-center gap-2 p-3 sm:w-auto sm:p-5">
-        {/* On phones the prompt sits just above the panel so they never overlap */}
-        {vendor && onOpenVendor && (
-          <div className="sm:hidden">
-            <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
-          </div>
-        )}
+      <div className="absolute bottom-0 left-0 flex w-full flex-col gap-2 p-3 sm:w-auto sm:p-5">
+        {/* Touch screens get a thumb-stick; on phones the food prompt shares its row so nothing overlaps */}
+        <div className="flex items-end justify-between gap-2">
+          <TouchStick />
+          {vendor && onOpenVendor && (
+            <div className="ml-auto sm:hidden">
+              <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
+            </div>
+          )}
+        </div>
         <section className={`${PANEL} w-full px-4 py-3.5 sm:w-72`} aria-label="Player status">
           {character && (
             <>
@@ -253,8 +257,8 @@ export function HUD({
         </section>
       </div>
 
-      {/* Keyboard hint: desktop only, phones have no keyboard */}
-      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block">
+      {/* Keyboard hint: desktop only, hidden on touch screens */}
+      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
         <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
       </div>
