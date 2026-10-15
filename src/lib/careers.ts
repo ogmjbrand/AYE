@@ -8,6 +8,7 @@ export interface CareerLocation {
   neighborhood: string;
 }
 
+/** Marker positions sit on the pavement or plaza in front of the matching building in lib/world. */
 const CAREER_LOCATIONS: Record<Career, CareerLocation> = {
   'none': {
     name: 'Nowhere',
@@ -18,43 +19,43 @@ const CAREER_LOCATIONS: Record<Career, CareerLocation> = {
   'student': {
     name: 'University',
     description: 'Continue your education',
-    position: [-12, 0, -12],
+    position: [-5.5, 0, -36],
     neighborhood: 'downtown',
   },
   'artist': {
     name: 'Studio',
     description: 'Create and express yourself',
-    position: [15, 0, 8],
+    position: [5.5, 0, 27],
     neighborhood: 'uptown',
   },
   'entrepreneur': {
     name: 'Office',
     description: 'Run your business operations',
-    position: [-5, 0, 5],
+    position: [5.5, 0, 12],
     neighborhood: 'harbor',
   },
   'athlete': {
     name: 'Sports Complex',
     description: 'Train and compete',
-    position: [8, 0, 28],
+    position: [24, 0, 40],
     neighborhood: 'parks',
   },
   'engineer': {
     name: 'Tech Campus',
     description: 'Build and innovate',
-    position: [-25, 0, 20],
+    position: [-16, 0, 24],
     neighborhood: 'industrial',
   },
   'doctor': {
     name: 'Hospital',
     description: 'Heal and help others',
-    position: [5, 0, -15],
+    position: [5.5, 0, -6],
     neighborhood: 'downtown',
   },
   'pilot': {
     name: 'Airport',
     description: 'Fly across the world',
-    position: [25, 0, 18],
+    position: [29, 0, 12],
     neighborhood: 'parks',
   },
 };

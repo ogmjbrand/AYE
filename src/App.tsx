@@ -1,14 +1,20 @@
 import { useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls as OrbitControlsImpl } from '@react-three/drei';
+import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
-import { Vector3 } from 'three';
+import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
 import { usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { getAmbiance, type GameTime } from './lib/gameState';
+import type { GameTime } from './lib/gameState';
 import { clearSave } from './lib/save';
-import { BUILDINGS } from './lib/world';
+import { groundHeightAt } from './lib/world';
+import { Buildings } from './world/Buildings';
+import { Props } from './world/Props';
+import { SceneLighting } from './world/SceneLighting';
+import { Streets } from './world/Streets';
+import { QualityContext, settingsFor, useQuality, type Quality } from './world/quality';
+import { lightingAt } from './world/timeOfDay';
 import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
@@ -38,7 +44,7 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
   useFrame(({ camera }) => {
     const controls = controlsRef.current;
     if (!controls) return;
-    followTarget.set(controller.position.x, 1, controller.position.z);
+    followTarget.set(controller.position.x, 1.4, controller.position.z);
     followShift.copy(followTarget).sub(controls.target).multiplyScalar(0.1);
     controls.target.add(followShift);
     camera.position.add(followShift);
@@ -47,119 +53,42 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
   return null;
 }
 
-const NIGHT_SKY = '#16192b';
-const DAY_SKY = '#a9c8dc';
+/** Soft contact shadow that stays under the player's feet (high quality only). */
+function FootShadow({ controller }: { controller: ReturnType<typeof usePlayerController> }) {
+  const ref = useRef<Group>(null);
+  useFrame(() => {
+    if (!ref.current) return;
+    const { x, z } = controller.position;
+    ref.current.position.set(x, groundHeightAt(x, z) + 0.01, z);
+  });
+  return (
+    <group ref={ref}>
+      <ContactShadows resolution={256} scale={3} blur={2.2} opacity={0.55} far={1.8} frames={Infinity} />
+    </group>
+  );
+}
+
+/** Glowing ring on the ground marking the player's workplace. */
+function WorkplaceMarker({ position }: { position: [number, number, number] }) {
+  return (
+    <mesh position={[position[0], groundHeightAt(position[0], position[2]) + 0.03, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[1.5, 2, 48]} />
+      <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} transparent opacity={0.75} depthWrite={false} />
+    </mesh>
+  );
+}
 
 function City({ controller, character, gameTime }: CityProps) {
-  // Day/night: sky, fog and light follow the game clock
-  const ambiance = getAmbiance(gameTime);
-  const isNight = ambiance.intensity < 0.5;
-  const sky = isNight ? NIGHT_SKY : DAY_SKY;
-
+  const quality = useQuality();
+  const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
     <>
-      <color attach="background" args={[sky]} />
-      <fog attach="fog" args={[sky, 24, 65]} />
-
-      <ambientLight intensity={1.2 * ambiance.intensity} />
-      <directionalLight
-        position={[8, 15, 8]}
-        intensity={2.2 * ambiance.intensity}
-        color={isNight ? '#8fa3ff' : ambiance.color}
-      />
-
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
-        <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial color="#65765b" />
-      </mesh>
-
-      {/* Main road */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[8, 100]} />
-        <meshStandardMaterial color="#34383d" roughness={1} />
-      </mesh>
-
-      {/* Road markings */}
-      {Array.from({ length: 18 }, (_, i) => (
-        <mesh
-          key={i}
-          position={[0, 0.015, -45 + i * 5.3]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[0.12, 2.5]} />
-          <meshBasicMaterial color="#f5e7bd" />
-        </mesh>
-      ))}
-
-      {/* Sidewalks */}
-      {[-5.2, 5.2].map((x) => (
-        <mesh
-          key={x}
-          position={[x, 0.04, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[2.4, 100]} />
-          <meshStandardMaterial color="#b6b1a4" />
-        </mesh>
-      ))}
-
-      {/* Buildings (collision is handled in usePlayerController via lib/world) */}
-      {BUILDINGS.map((building, i) => (
-        <group key={i} position={building.position}>
-          <mesh position={[0, building.size[1] / 2, 0]} castShadow>
-            <boxGeometry args={building.size} />
-            <meshStandardMaterial color={building.color} roughness={0.85} />
-          </mesh>
-
-          {/* Simple windows */}
-          {Array.from(
-            {
-              length: Math.max(1, Math.floor(building.size[1] / 1.2)),
-            },
-            (_, floor) => (
-              <mesh
-                key={floor}
-                position={[
-                  0,
-                  0.8 + floor * 1.1,
-                  building.size[2] / 2 + 0.008,
-                ]}
-              >
-                <boxGeometry
-                  args={[building.size[0] * 0.65, 0.45, 0.025]}
-                />
-                <meshStandardMaterial
-                  color={isNight ? '#f3c66b' : '#41677b'}
-                  emissive={isNight ? '#f3c66b' : '#000000'}
-                  emissiveIntensity={isNight ? 0.6 : 0}
-                  roughness={0.3}
-                  metalness={0.15}
-                />
-              </mesh>
-            )
-          )}
-        </group>
-      ))}
-
-      {/* Career Workplace Marker */}
-      {character && character.career !== 'none' && (
-        (() => {
-          const workplace = getCareerLocation(character.career);
-          return (
-            <mesh position={workplace.position}>
-              <cylinderGeometry args={[2, 2, 0.5, 32]} />
-              <meshStandardMaterial
-                color="#22c55e"
-                emissive="#22c55e"
-                emissiveIntensity={0.3}
-              />
-            </mesh>
-          );
-        })()
-      )}
-
-      {/* Controllable Player */}
+      <SceneLighting gameTime={gameTime} player={controller} />
+      <Streets />
+      <Buildings />
+      <Props night={night} />
+      {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(character.career).position} />}
+      {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} />
     </>
   );
@@ -195,6 +124,8 @@ function Game({ character, onChangeCharacter }: GameProps) {
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
   const controlsRef = useRef<OrbitControls | null>(null);
+  const [quality, setQuality] = useState<Quality>('high');
+  const settings = settingsFor(quality);
 
   return (
     <main className="game">
@@ -209,23 +140,29 @@ function Game({ character, onChangeCharacter }: GameProps) {
         />
       )}
 
-      <Canvas
-        camera={{ position: [13, 11, 17], fov: 48 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, powerPreference: 'default' }}
-      >
-        <CameraFollow controller={controller} controlsRef={controlsRef} />
-        <City controller={controller} character={character} gameTime={state.time} />
-        <OrbitControlsImpl
-          ref={controlsRef}
-          makeDefault
-          target={[0, 1, 0]}
-          enableDamping
-          maxPolarAngle={Math.PI / 2 - 0.04}
-          minDistance={5}
-          maxDistance={35}
-        />
-      </Canvas>
+      <QualityContext.Provider value={settings}>
+        <Canvas
+          shadows
+          camera={{ position: [1.5, 3.4, -5.5], fov: 50, near: 0.1, far: 2500 }}
+          dpr={[1, settings.maxDpr]}
+          gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
+          fallback={<div className="p-8 text-white">AYE needs WebGL. Please enable hardware acceleration or try another browser.</div>}
+        >
+          {/* Drop to the low tier (no contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
+          <PerformanceMonitor onDecline={() => setQuality('low')} flipflops={1} />
+          <CameraFollow controller={controller} controlsRef={controlsRef} />
+          <City controller={controller} character={character} gameTime={state.time} />
+          <OrbitControlsImpl
+            ref={controlsRef}
+            makeDefault
+            target={[1.5, 1.4, 2]}
+            enableDamping
+            maxPolarAngle={Math.PI / 2 - 0.08}
+            minDistance={2.5}
+            maxDistance={40}
+          />
+        </Canvas>
+      </QualityContext.Provider>
 
       <HUD
         controller={controller}

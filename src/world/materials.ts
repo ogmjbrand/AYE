@@ -1,0 +1,80 @@
+/**
+ * Shared PBR materials. Created once and reused by every mesh so the whole
+ * city renders with a handful of materials (and draw calls).
+ */
+import { AdditiveBlending, Color, DoubleSide, MeshStandardMaterial, type Texture } from 'three';
+import { asphalt, facadeFor, ground, kerb, lightPoolTexture, pavers, roof, type SurfaceSet } from './textures';
+
+const glowing = new Set<MeshStandardMaterial>();
+
+function surface(set: SurfaceSet, opts: { repeat?: [number, number]; vertexColors?: boolean; glow?: boolean } = {}) {
+  const clone = (t: Texture | undefined) => {
+    if (!t || !opts.repeat) return t;
+    const c = t.clone();
+    c.repeat.set(...opts.repeat);
+    c.needsUpdate = true;
+    return c;
+  };
+  const m = new MeshStandardMaterial({
+    map: clone(set.map),
+    roughnessMap: clone(set.orm),
+    metalnessMap: clone(set.orm),
+    normalMap: clone(set.normal) ?? null,
+    roughness: 1,
+    metalness: 1,
+    vertexColors: opts.vertexColors ?? false,
+  });
+  if (set.emissive && opts.glow) {
+    m.emissiveMap = set.emissive;
+    m.emissive = new Color('#ffffff');
+    m.emissiveIntensity = 0;
+    glowing.add(m);
+  }
+  return m;
+}
+
+let cache: ReturnType<typeof build> | null = null;
+
+function build() {
+  const facade = {
+    tower: surface(facadeFor('tower'), { vertexColors: true, glow: true }),
+    office: surface(facadeFor('office'), { vertexColors: true, glow: true }),
+    residential: surface(facadeFor('residential'), { vertexColors: true, glow: true }),
+    shop: surface(facadeFor('shop'), { vertexColors: true, glow: true }),
+  };
+  return {
+    facade,
+    roof: surface(roof(), { vertexColors: true }),
+    road: surface(asphalt()),
+    pavement: surface(pavers()),
+    ground: surface(ground()),
+    kerb: surface(kerb()),
+    marking: new MeshStandardMaterial({ color: '#e9e4d3', roughness: 0.75 }),
+    yellowMarking: new MeshStandardMaterial({ color: '#e0b425', roughness: 0.75 }),
+    concrete: new MeshStandardMaterial({ color: '#9d978b', roughness: 0.9 }),
+    darkMetal: new MeshStandardMaterial({ color: '#2b2d30', roughness: 0.45, metalness: 0.8 }),
+    tank: new MeshStandardMaterial({ color: '#1d2a3a', roughness: 0.6 }),
+    acUnit: new MeshStandardMaterial({ color: '#d9dbd8', roughness: 0.5, metalness: 0.2 }),
+    wood: new MeshStandardMaterial({ color: '#5a4630', roughness: 0.9 }),
+    canvas: new MeshStandardMaterial({ roughness: 0.85, side: DoubleSide }),
+    lightPool: new MeshStandardMaterial({
+      transparent: true, depthWrite: false, blending: AdditiveBlending, color: '#000000',
+      emissive: new Color('#ffffff'), emissiveMap: lightPoolTexture(), emissiveIntensity: 0,
+    }),
+    lampHead: new MeshStandardMaterial({ color: '#30302e', emissive: new Color('#ffcf8a'), emissiveIntensity: 0, roughness: 0.4 }),
+  };
+}
+
+export function materials() {
+  if (!cache) {
+    cache = build();
+    glowing.add(cache.lampHead);
+  }
+  return cache;
+}
+
+/** Window and lamp glow, 0 by day to 1 at night. */
+export function setNightGlow(night: number) {
+  for (const m of glowing) m.emissiveIntensity = m === cache?.lampHead ? night * 4 : night * 0.4;
+  if (cache) cache.lightPool.emissiveIntensity = night * 0.42;
+}

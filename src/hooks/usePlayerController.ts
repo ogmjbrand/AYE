@@ -9,7 +9,11 @@ export interface PlayerHandle {
   applyMovement: (delta: number) => void;
 }
 
-const MOVE_KEYS = ['w', 'a', 's', 'd', ' '];
+const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
+
+/** Metres per second. W jogs; holding Shift walks. */
+export const RUN_SPEED = 5.5;
+export const WALK_SPEED = 1.7;
 const keysPressed: Record<string, boolean> = {};
 
 const playerHandle: PlayerHandle = {
@@ -17,9 +21,9 @@ const playerHandle: PlayerHandle = {
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
-    const moveSpeed = 15; // units per second
+    const moveSpeed = keysPressed['shift'] ? WALK_SPEED : RUN_SPEED;
     const rotationSpeed = 3; // radians per second
-    const acceleration = 2.5;
+    const acceleration = 6;
     const damping = 0.92;
 
     // Forward matches the model's facing: rotation.y = θ points local +Z at (sin θ, cos θ).
