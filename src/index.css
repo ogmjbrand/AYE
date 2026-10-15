@@ -16,6 +16,16 @@
   --color-ui-warn: #f0a35e;
   --color-ui-danger: #ec8b7f;
 
+  /* Character creation: charcoal with muted gold accents */
+  --color-cc-bg: #0f1012;
+  --color-cc-panel: #17181b;
+  --color-cc-field: #1f2125;
+  --color-cc-line: #2e3036;
+  --color-cc-ink: #f5f2ec;
+  --color-cc-muted: #a9a7a1;
+  --color-cc-gold: #c9a45c;
+  --color-cc-gold-strong: #e2c27f;
+
   --font-sans: 'DM Sans', sans-serif;
   --font-display: 'Manrope', sans-serif;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
-import { Box3, type AnimationAction, type Group, type Mesh } from 'three';
+import { Box3, Color, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 
 import { assetManifest, assetUrl } from '../lib/assetManifest';
@@ -9,6 +9,36 @@ import { assetManifest, assetUrl } from '../lib/assetManifest';
 const DEFAULT_AVATAR = { url: 'models/aye-avatar.glb', height: 1.72 };
 
 type Clip = 'Idle' | 'Walk' | 'Run';
+
+/**
+ * Recolours the outfit fabric without touching skin or hair: texels that are
+ * clearly saturated yellow (the built-in model's trousers) take on the chosen
+ * colour, keeping the fabric's shading. Installed once per material.
+ */
+function outfitTint(material: Material): { value: Color } {
+  const m = material as MeshStandardMaterial & { userData: { outfit?: { value: Color } } };
+  if (m.userData.outfit) return m.userData.outfit;
+  const uniform = { value: new Color('#ffffff') };
+  m.userData.outfit = uniform;
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uOutfit = uniform;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uOutfit;')
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        {
+          vec3 c = diffuseColor.rgb;
+          float fabric = smoothstep(0.12, 0.3, min(c.r, c.g) - c.b);
+          float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = mix(c, uOutfit * clamp(lum * 2.2, 0.0, 1.2), fabric);
+        }`,
+      );
+  };
+  m.customProgramCacheKey = () => 'aye-outfit-tint';
+  m.needsUpdate = true;
+  return uniform;
+}
 
 /** Cross-fades to the clip that matches the speed and scales its playback rate. */
 function updateLocomotion(
@@ -45,7 +75,7 @@ function updateLocomotion(
  * Rigged, animated human (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller }: { controller: PlayerHandle }) {
+export function Avatar({ controller, outfitColor }: { controller: PlayerHandle; outfitColor?: string }) {
   const group = useRef<Group>(null);
   // A character listed in public/assets/manifest.json replaces the built-in one
   const avatarFile = assetManifest().avatar ?? DEFAULT_AVATAR;
@@ -79,9 +109,14 @@ export function Avatar({ controller }: { controller: PlayerHandle }) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false; // skinned bounds don't follow the animation
+        if (outfitColor) {
+          for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+            outfitTint(mat).value.set(outfitColor);
+          }
+        }
       }
     });
-  }, [scene]);
+  }, [scene, outfitColor]);
 
   useFrame(() => updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z)));
 
