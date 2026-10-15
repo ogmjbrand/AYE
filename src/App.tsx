@@ -13,6 +13,7 @@ import { Player } from './components/Player';
 import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
+import { getCareerLocation } from './lib/careers';
 import './App.css';
 
 interface CityProps {
@@ -140,6 +141,23 @@ function City({ controller, character, gameTime }: CityProps) {
           )}
         </group>
       ))}
+
+      {/* Career Workplace Marker */}
+      {character && character.career !== 'none' && (
+        (() => {
+          const workplace = getCareerLocation(character.career);
+          return (
+            <mesh position={workplace.position}>
+              <cylinderGeometry args={[2, 2, 0.5, 32]} />
+              <meshStandardMaterial
+                color="#22c55e"
+                emissive="#22c55e"
+                emissiveIntensity={0.3}
+              />
+            </mesh>
+          );
+        })()
+      )}
 
       {/* Controllable Player */}
       <Player controller={controller} character={character} />
