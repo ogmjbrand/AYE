@@ -5,8 +5,8 @@
  * the built-in version, so the game always runs.
  */
 
-export type SurfaceKey = 'road' | 'pavement' | 'ground' | 'roof';
-export const SURFACE_KEYS: readonly SurfaceKey[] = ['road', 'pavement', 'ground', 'roof'];
+export type SurfaceKey = 'road' | 'pavement' | 'ground' | 'roof' | 'concrete';
+export const SURFACE_KEYS: readonly SurfaceKey[] = ['road', 'pavement', 'ground', 'roof', 'concrete'];
 
 export interface SurfaceFiles {
   /** Colour (albedo) image. Required. */
@@ -26,12 +26,25 @@ export interface AvatarFile {
   height: number;
 }
 
+export type VehicleKey = 'danfo';
+export const VEHICLE_KEYS: readonly VehicleKey[] = ['danfo'];
+
+export interface VehicleFile {
+  /** Static (unrigged) GLB of the vehicle, front facing +Z, wheels on y = 0. */
+  url: string;
+  /** Bumper-to-bumper length in metres the model is scaled to. */
+  length: number;
+  /** Degrees to turn the model so its front faces +Z: 0, 90, 180 or 270. */
+  rotateY: number;
+}
+
 export interface AssetManifest {
   surfaces: Partial<Record<SurfaceKey, SurfaceFiles>>;
   avatar: AvatarFile | null;
+  vehicles: Partial<Record<VehicleKey, VehicleFile>>;
 }
 
-export const EMPTY_MANIFEST: AssetManifest = { surfaces: {}, avatar: null };
+export const EMPTY_MANIFEST: AssetManifest = { surfaces: {}, avatar: null, vehicles: {} };
 
 const isPath = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && v.length < 200 && !v.includes('..') && !/^[a-z]+:/i.test(v) && !v.startsWith('/');
@@ -39,7 +52,7 @@ const isPath = (v: unknown): v is string =>
 /** Validates a parsed manifest; drops (and reports) any entry that isn't usable. */
 export function parseManifest(data: unknown): { manifest: AssetManifest; problems: string[] } {
   const problems: string[] = [];
-  const manifest: AssetManifest = { surfaces: {}, avatar: null };
+  const manifest: AssetManifest = { surfaces: {}, avatar: null, vehicles: {} };
   if (typeof data !== 'object' || data === null) {
     return { manifest, problems: ['manifest is not a JSON object'] };
   }
@@ -73,6 +86,21 @@ export function parseManifest(data: unknown): { manifest: AssetManifest; problem
       if (h !== a.height) problems.push('avatar.height missing or out of range (1.2–2.3 m); using 1.75');
       manifest.avatar = { url: a.url, height: h };
     }
+  }
+  const vehicles = (raw.vehicles ?? {}) as Record<string, unknown>;
+  for (const key of VEHICLE_KEYS) {
+    const v = vehicles[key] as Record<string, unknown> | null | undefined;
+    if (!v) continue;
+    if (!isPath(v.url) || !String(v.url).toLowerCase().endsWith('.glb')) {
+      problems.push(`vehicles.${key}.url must be a .glb file path inside public/assets`);
+      continue;
+    }
+    const len = typeof v.length === 'number' && v.length >= 2 && v.length <= 20 ? v.length : 5;
+    if (len !== v.length) problems.push(`vehicles.${key}.length missing or out of range (2–20 m); using 5`);
+    const turn = v.rotateY === undefined ? 0 : v.rotateY;
+    const rotateY = [0, 90, 180, 270].includes(turn as number) ? (turn as number) : 0;
+    if (rotateY !== turn) problems.push(`vehicles.${key}.rotateY must be 0, 90, 180 or 270; using 0`);
+    manifest.vehicles[key] = { url: v.url, length: len, rotateY };
   }
   return { manifest, problems };
 }

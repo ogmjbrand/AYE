@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Licensed assets that may not be redistributed (Mixamo, Fab Standard, paid packs).
+# The game loads them locally; they never go to the public repository.
+public/assets/private/*
+!public/assets/private/README.md

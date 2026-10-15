@@ -3,7 +3,11 @@
     "road": null,
     "pavement": null,
     "ground": null,
-    "roof": null
+    "roof": null,
+    "concrete": null
   },
-  "avatar": null
+  "avatar": null,
+  "vehicles": {
+    "danfo": null
+  }
 }

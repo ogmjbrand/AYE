@@ -83,7 +83,10 @@ function build() {
     kerb: surface(kerb()),
     marking: new MeshStandardMaterial({ color: '#e9e4d3', roughness: 0.75 }),
     yellowMarking: new MeshStandardMaterial({ color: '#e0b425', roughness: 0.75 }),
-    concrete: new MeshStandardMaterial({ color: '#9d978b', roughness: 0.9 }),
+    // Balcony slabs and ledges: a listed concrete texture if there is one, else plain concrete
+    concrete: assetManifest().surfaces.concrete
+      ? surfaceFromFiles(assetManifest().surfaces.concrete!)
+      : new MeshStandardMaterial({ color: '#9d978b', roughness: 0.9 }),
     darkMetal: new MeshStandardMaterial({ color: '#2b2d30', roughness: 0.45, metalness: 0.8 }),
     tank: new MeshStandardMaterial({ color: '#1d2a3a', roughness: 0.6 }),
     acUnit: new MeshStandardMaterial({ color: '#d9dbd8', roughness: 0.5, metalness: 0.2 }),

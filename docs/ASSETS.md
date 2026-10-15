@@ -13,6 +13,12 @@ npm.cmd run dev
 Anything not listed (or that fails to load) falls back to the built-in version,
 so the game always starts.
 
+**Start with [ASSET_CHECKLIST.md](ASSET_CHECKLIST.md)**: exact slots, folders,
+file names, budgets and licence rules, including the `concrete` surface, the
+`danfo` vehicle model and the git-ignored `public/assets/private/` folder for
+files that may not be shared publicly. Shrink models first with
+`npm.cmd run assets:optimize -- input.glb output.glb`.
+
 ## 1. Road, pavement, ground and roof textures
 
 Good free sources with CC0 licences (no attribution needed, commercial use allowed):
@@ -51,7 +57,7 @@ real-world size; asphalt is usually 2–4 m):
 }
 ```
 
-Surfaces you can replace: `road`, `pavement`, `ground`, `roof`.
+Surfaces you can replace: `road`, `pavement`, `ground`, `roof`, `concrete`.
 
 ## 2. The player character
 

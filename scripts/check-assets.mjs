@@ -3,6 +3,11 @@
 import { readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { MeshoptDecoder } from 'meshoptimizer';
+
+await MeshoptDecoder.ready;
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
 
 const ROOT = join(import.meta.dirname, '..', 'public', 'assets');
 const MB = 1024 * 1024;
@@ -36,6 +41,33 @@ for (const [key, s] of Object.entries(manifest.surfaces ?? {})) {
   if (!(s.tileMeters > 0)) warn(`${key}: set tileMeters (how many metres one image covers)`);
 }
 
+/** Shared GLB checks: triangle budget, texture sizes, compression the game can't decode. */
+async function inspectGlb(rel, label, maxTris) {
+  try {
+    const doc = await io.read(join(ROOT, rel));
+    const r = doc.getRoot();
+    const used = r.listExtensionsUsed().map((e) => e.extensionName);
+    if (used.includes('KHR_draco_mesh_compression')) {
+      fail(`${label}: Draco compression is not supported by the game loader; re-export with meshopt (npm run assets:optimize)`);
+    }
+    let tris = 0;
+    for (const m of r.listMeshes()) for (const p of m.listPrimitives()) {
+      const idx = p.getIndices();
+      tris += (idx ? idx.getCount() : p.getAttribute('POSITION').getCount()) / 3;
+    }
+    if (tris > maxTris) warn(`${label}: ${Math.round(tris)} triangles; aim under ${maxTris.toLocaleString()} for integrated graphics`);
+    else ok(`${label}: ${Math.round(tris)} triangles`);
+    for (const t of r.listTextures()) {
+      const size = t.getSize();
+      if (size && Math.max(...size) > 2048) warn(`${label}: texture "${t.getName() || t.getURI()}" is ${size[0]}×${size[1]}; resize to 2048 or less`);
+    }
+    return r;
+  } catch (e) {
+    fail(`${label}: could not read GLB: ${e.message}`);
+    return null;
+  }
+}
+
 console.log('Avatar');
 if (!manifest.avatar) {
   console.log('  --    built-in avatar');
@@ -43,26 +75,25 @@ if (!manifest.avatar) {
   const rel = manifest.avatar.url;
   checkFile(rel, 'avatar', 15);
   if (existsSync(join(ROOT, rel))) {
-    try {
-      const doc = await new NodeIO().read(join(ROOT, rel));
-      const r = doc.getRoot();
+    const r = await inspectGlb(rel, 'avatar', 80000);
+    if (r) {
       const clips = r.listAnimations().map((a) => a.getName());
       for (const want of ['idle', 'walk', 'run']) {
         if (clips.some((c) => c.toLowerCase().includes(want))) ok(`animation "${want}" found`);
         else warn(`no animation named like "${want}" (found: ${clips.join(', ') || 'none'})`);
       }
-      if (r.listSkins().length === 0) fail('model has no skeleton (not rigged); it cannot animate');
-      let tris = 0;
-      for (const m of r.listMeshes()) for (const p of m.listPrimitives()) {
-        const idx = p.getIndices();
-        tris += (idx ? idx.getCount() : p.getAttribute('POSITION').getCount()) / 3;
-      }
-      if (tris > 80000) warn(`${Math.round(tris)} triangles; aim under 80,000 for integrated graphics`);
-      else ok(`${Math.round(tris)} triangles`);
-    } catch (e) {
-      fail(`could not read GLB: ${e.message}. If it is meshopt/draco-compressed, it still loads in the game; check it in the browser.`);
+      if (r.listSkins().length === 0) fail('avatar has no skeleton (not rigged); it cannot animate');
     }
   }
+}
+
+console.log('Vehicles');
+for (const [key, v] of Object.entries(manifest.vehicles ?? {})) {
+  if (!v) { console.log(`  --    ${key}: built-in`); continue; }
+  checkFile(v.url, key, 8);
+  if (existsSync(join(ROOT, v.url))) await inspectGlb(v.url, key, 40000);
+  if (!(v.length >= 2 && v.length <= 20)) warn(`${key}: set length (metres, bumper to bumper; a danfo is about 5)`);
+  if (v.rotateY !== undefined && ![0, 90, 180, 270].includes(v.rotateY)) warn(`${key}: rotateY must be 0, 90, 180 or 270`);
 }
 
 console.log(`\n${errors} error(s), ${warnings} warning(s)`);

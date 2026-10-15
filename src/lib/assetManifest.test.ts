@@ -13,7 +13,7 @@ describe('asset manifest', () => {
   });
 
   it('an empty manifest means use built-in assets', () => {
-    expect(parseManifest({ surfaces: { road: null }, avatar: null })).toEqual({ manifest: { surfaces: {}, avatar: null }, problems: [] });
+    expect(parseManifest({ surfaces: { road: null }, avatar: null })).toEqual({ manifest: { surfaces: {}, avatar: null, vehicles: {} }, problems: [] });
   });
 
   it('rejects paths outside public/assets and non-GLB avatars', () => {
@@ -21,7 +21,7 @@ describe('asset manifest', () => {
       surfaces: { road: { color: '../../secret.jpg', tileMeters: 4 }, ground: { color: 'https://example.com/a.jpg' } },
       avatar: { url: 'models/me.fbx' },
     });
-    expect(manifest).toEqual({ surfaces: {}, avatar: null });
+    expect(manifest).toEqual({ surfaces: {}, avatar: null, vehicles: {} });
     expect(problems.length).toBe(3);
   });
 
@@ -33,6 +33,29 @@ describe('asset manifest', () => {
   });
 
   it('survives garbage', () => {
-    expect(parseManifest('nope').manifest).toEqual({ surfaces: {}, avatar: null });
+    expect(parseManifest('nope').manifest).toEqual({ surfaces: {}, avatar: null, vehicles: {} });
+  });
+
+  it('accepts a concrete surface and a danfo model', () => {
+    const { manifest, problems } = parseManifest({
+      surfaces: { concrete: { color: 'textures/concrete/color.jpg', tileMeters: 2 } },
+      vehicles: { danfo: { url: 'models/vehicles/danfo.glb', length: 4.8 } },
+    });
+    expect(problems).toEqual([]);
+    expect(manifest.surfaces.concrete?.color).toBe('textures/concrete/color.jpg');
+    expect(manifest.vehicles.danfo).toEqual({ url: 'models/vehicles/danfo.glb', length: 4.8, rotateY: 0 });
+  });
+
+  it('rejects bad vehicle entries and defaults the length', () => {
+    const bad = parseManifest({ vehicles: { danfo: { url: 'models/danfo.fbx', length: 5 } } });
+    expect(bad.manifest.vehicles).toEqual({});
+    expect(bad.problems.length).toBe(1);
+    const noLen = parseManifest({ vehicles: { danfo: { url: 'models/danfo.glb' } } });
+    expect(noLen.manifest.vehicles.danfo?.length).toBe(5);
+    const turned = parseManifest({ vehicles: { danfo: { url: 'd.glb', length: 5, rotateY: 180 } } });
+    expect(turned.manifest.vehicles.danfo?.rotateY).toBe(180);
+    const oddTurn = parseManifest({ vehicles: { danfo: { url: 'd.glb', length: 5, rotateY: 45 } } });
+    expect(oddTurn.manifest.vehicles.danfo?.rotateY).toBe(0);
+    expect(oddTurn.problems.length).toBe(1);
   });
 });

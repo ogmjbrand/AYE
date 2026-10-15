@@ -8,6 +8,9 @@ import {
 } from '../lib/world';
 import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
+import { VehicleModel } from './VehicleModel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { assetManifest } from '../lib/assetManifest';
 import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
@@ -254,6 +257,20 @@ function Billboard() {
   );
 }
 
+/** A listed danfo model if there is one; the built-in danfo while loading or if it fails. */
+function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
+  const file = assetManifest().vehicles.danfo;
+  if (!file) return <Danfo vehicle={vehicle} />;
+  const fallback = <Danfo vehicle={vehicle} />;
+  return (
+    <ErrorBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <VehicleModel vehicle={vehicle} file={file} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 export function Props({ night }: { night: number }) {
   return (
     <group>
@@ -261,7 +278,7 @@ export function Props({ night }: { night: number }) {
       <StreetLamps night={night} />
       <PowerLines />
       {DANFOS.map((v, i) => (
-        <Danfo key={i} vehicle={v} />
+        <ParkedDanfo key={i} vehicle={v} />
       ))}
       <MarketStalls />
       <Suspense fallback={null}>
