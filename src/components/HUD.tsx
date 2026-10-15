@@ -2,7 +2,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import type { GameTime } from '../hooks/useTimeProgression';
-import { formatGameTime } from '../hooks/useTimeProgression';
+import { formatGameTime, isWorkingHours } from '../hooks/useTimeProgression';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -92,6 +92,12 @@ export function HUD({
                 <div className="flex justify-between">
                   <span className="text-gray-400">Balance</span>
                   <span className="text-aye-gold">{balance.toLocaleString()} ⓒ</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Status</span>
+                  <span className={isWorkingHours(gameTime) ? 'text-aye-green' : 'text-gray-500'}>
+                    {isWorkingHours(gameTime) ? 'Working' : 'Off Duty'}
+                  </span>
                 </div>
               </>
             )}

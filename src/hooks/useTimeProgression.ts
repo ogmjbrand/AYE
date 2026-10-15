@@ -78,3 +78,7 @@ export function getAmbiance(time: GameTime): { color: string; intensity: number 
     return { color: '#1a1a2e', intensity: 0.3 };
   }
 }
+
+export function isWorkingHours(time: GameTime): boolean {
+  return time.hour >= 9 && time.hour < 17;
+}
