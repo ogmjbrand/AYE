@@ -122,7 +122,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                     <Key k="Phone">Thumb stick bottom-left; drag the scene to look</Key>
                   </dl>
                   <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-cc-muted">
-                    <li>Go to your workplace (the glowing ring) between 09:00 and 17:00 to earn wages.</li>
+                    <li>Go to your workplace (the glowing ring) between 09:00 and 17:00 to earn wages. Once an hour, press E there for a task from your job: good calls earn a bonus and speed up promotion.</li>
                     <li>Eat before you get hungry: hungry work pays half.</li>
                     <li>Get to know the residents. They are computer-controlled, never other players. Close friends will put you up for the night.</li>
                     <li>Rent a home at a door with a “To let” board. Rent is due each night; sleeping anywhere else is sleeping rough.</li>

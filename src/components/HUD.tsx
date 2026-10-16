@@ -34,6 +34,8 @@ interface HUDProps {
   district: District;
   onOpenTravel?: () => void;
   onTalk?: (resident: Resident) => void;
+  /** This hour's task at your workplace, if one is on offer. */
+  workTask?: { place: string; onOpen: () => void } | null;
   /** Set while inside your home: replaces the street prompts. */
   insideHome?: { name: string; prompt: { verb: string; place: string; onOpen: () => void } | null };
   onOpenWardrobe?: () => void;
@@ -98,6 +100,7 @@ export function HUD({
   district,
   onOpenTravel,
   onTalk,
+  workTask,
   insideHome,
   onOpenWardrobe,
   onOpenGadgets,
@@ -135,7 +138,7 @@ export function HUD({
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
   const streetPrompt = prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
-    : null) ?? (door && onOpenHome
+    : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
   const placePrompt = insideHome ? insideHome.prompt : streetPrompt;

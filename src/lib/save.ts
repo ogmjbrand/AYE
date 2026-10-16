@@ -132,10 +132,11 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
+    lastTaskHour: isInt(p.lastTaskHour, -1, Number.MAX_SAFE_INTEGER) ? p.lastTaskHour : -1,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour }));
 }

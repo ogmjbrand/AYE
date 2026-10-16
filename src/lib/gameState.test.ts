@@ -13,6 +13,7 @@ import {
 } from './gameState';
 import { ROUGH_SLEEP_FULLNESS_LOSS, allHomes, moveInFee } from './homes';
 import { TRAVEL_OPTIONS } from './travel';
+import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, FRIENDSHIP_LEVELS } from './people';
 
 const run = (
@@ -315,5 +316,38 @@ describe('relationships', () => {
   it("sleeping on a close friend's couch is not sleeping rough", () => {
     const s = gameReducer(createGameState(5000, createTime(22, 0)), { type: 'sleep', atHome: false, atFriend: true }, 'none', 'student');
     expect(s.summary).toMatchObject({ rough: false, atFriend: true });
+  });
+});
+
+describe('work tasks', () => {
+  const atWork = (hour = 10) => createGameState(5000, createTime(hour, 0, 2));
+  const task = (s: GameState) => taskForHour('doctor', s.time.totalMinutes)!;
+  const answer = (s: GameState, quality: 'best' | 'ok' | 'poor', atWorkplace = true) => {
+    const t = task(s);
+    return gameReducer(s, { type: 'workTask', taskId: t.id, choice: t.options.findIndex((o) => o.quality === quality), atWorkplace }, 'doctor', 'ordinary');
+  };
+
+  it('a good call pays a bonus and counts towards promotion', () => {
+    const s = answer(atWork(), 'best');
+    expect(s.balance).toBe(5000 + Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare));
+    expect(s.workMinutes).toBe(TASK_REWARD.best.xpMinutes);
+    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare));
+  });
+
+  it('a poor call earns nothing extra', () => {
+    const s = answer(atWork(), 'poor');
+    expect(s.balance).toBe(5000);
+    expect(s.lastTaskHour).toBe(10);
+  });
+
+  it('one task per hour, only at work, only in working hours, only the task on offer', () => {
+    const once = answer(atWork(), 'best');
+    expect(answer(once, 'best')).toBe(once);
+    const away = atWork();
+    expect(answer(away, 'best', false)).toBe(away);
+    const night = atWork(22);
+    expect(answer(night, 'best')).toBe(night);
+    const s = atWork();
+    expect(gameReducer(s, { type: 'workTask', taskId: 'pil-weather', choice: 0, atWorkplace: true }, 'doctor', 'ordinary')).toBe(s);
   });
 });

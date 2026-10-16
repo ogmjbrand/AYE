@@ -24,6 +24,7 @@ import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { TRAVEL_OPTIONS, type TravelMode } from './travel';
+import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -81,6 +82,8 @@ export interface GameState {
   districtId: string;
   /** Friendships with residents (lib/people.ts), by resident id. */
   relationships: Record<string, Relationship>;
+  /** Game hour (totalMinutes / 60) of the last work task, or -1: one task per hour. */
+  lastTaskHour: number;
 }
 
 export type GameAction =
@@ -91,6 +94,7 @@ export type GameAction =
   | { type: 'buyEquipment'; id: string }
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
+  | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -187,7 +191,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {} };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1 };
 }
 
 export function emptyLedger(): DayLedger {
@@ -276,6 +280,29 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   };
 }
 
+/**
+ * Answers this hour's work task. Only at the workplace during working hours,
+ * once per game hour, and only the task this hour actually offers; the
+ * reward is worked out here from the task data.
+ */
+function workTask(state: GameState, taskId: string, choice: number, atWorkplace: boolean, career: Career): GameState {
+  const hour = Math.floor(state.time.totalMinutes / 60);
+  const task = taskForHour(career, state.time.totalMinutes);
+  if (state.summary || !atWorkplace || !task || task.id !== taskId || !isWorkingHours(state.time) || state.lastTaskHour === hour) return state;
+  const option = task.options[choice];
+  if (!option) return state;
+  const reward = TASK_REWARD[option.quality];
+  const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
+  const bonus = Math.round(hourly * reward.payShare);
+  return {
+    ...state,
+    balance: state.balance + bonus,
+    today: { ...state.today, income: state.today.income + bonus },
+    workMinutes: state.workMinutes + reward.xpMinutes,
+    lastTaskHour: hour,
+  };
+}
+
 /** Rents a home: pays the move-in fee. Moving from another home gives up the old one. */
 function moveIn(state: GameState, homeId: string): GameState {
   const home = homeById(homeId);
@@ -355,6 +382,8 @@ export function gameReducer(
         today: { ...state.today, expenses: state.today.expenses + item.price },
       };
     }
+    case 'workTask':
+      return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
     case 'socialise':
       return socialise(state, action.residentId, action.activity, career, lifestyle);
     case 'travel':

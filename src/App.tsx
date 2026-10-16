@@ -6,7 +6,6 @@ import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
 import { placePlayer, setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import type { GameTime } from './lib/gameState';
 import { activeLayout, groundHeightAt, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
@@ -31,6 +30,11 @@ import { counterAt, districtById, type District } from './lib/geography';
 import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
 import { TalkPanel } from './components/TalkPanel';
+import { WorkTaskPanel } from './components/WorkTaskPanel';
+import { taskForHour, type WorkTask } from './lib/workTasks';
+import { careerLevel } from './lib/progression';
+import { equipmentPay } from './lib/equipment';
+import { HOURLY_WAGE, isWorkingHours, type GameTime } from './lib/gameState';
 import { Residents } from './world/Residents';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
@@ -201,7 +205,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, workTask } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -229,6 +233,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const neighborhood = useCurrentNeighborhood(controller, district.neighborhoods);
   const [travelOpen, setTravelOpen] = useState(false);
   const [talking, setTalking] = useState<Resident | null>(null);
+  const [task, setTask] = useState<WorkTask | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
   useEffect(() => {
     if (!arrival) return;
@@ -270,6 +275,14 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     if (home) placePlayer(home.door, Math.PI);
     snapCamera();
   };
+  /** This hour's work task, if you're at your workplace during working hours and haven't done it yet. */
+  const taskOnOffer = (): WorkTask | null => {
+    if (indoors || character.career === 'none' || !isWorkingHours(state.time) || state.summary) return null;
+    if (state.lastTaskHour === Math.floor(state.time.totalMinutes / 60)) return null;
+    if (!isAtWorkplace(district, character.career, controller.position.x, controller.position.z)) return null;
+    return taskForHour(character.career, state.time.totalMinutes);
+  };
+  const hourlyPay = Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, state.workMinutes).pay * equipmentPay(state.equipment, character.career));
   const nearSpot = (spot: readonly [number, number]) =>
     Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= USE_RADIUS;
   const [gadgets, setGadgets] = useState(false);
@@ -296,6 +309,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
+      else if (taskOnOffer()) setTask(taskOnOffer());
       else if (door) setHomePanel(door);
     };
     window.addEventListener('keydown', onKey);
@@ -303,9 +317,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task]);
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -492,6 +506,15 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onClose={() => setTalking(null)}
         />
       )}
+      {task && (
+        <WorkTaskPanel
+          task={task}
+          workplace={getCareerLocation(district, character.career)?.name ?? 'Work'}
+          hourlyPay={hourlyPay}
+          onAnswer={(choice) => workTask(task.id, choice)}
+          onClose={() => setTask(null)}
+        />
+      )}
       {travelOpen && (
         <TravelPanel
           from={district}
@@ -510,6 +533,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         district={district}
         onOpenTravel={() => setTravelOpen(true)}
         onTalk={setTalking}
+        workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}
         character={character}
         balance={state.balance}
