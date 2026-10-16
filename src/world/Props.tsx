@@ -138,7 +138,7 @@ function PowerLines() {
 
 // ---------------------------------------------------------------- danfo buses
 
-function Danfo({ vehicle }: { vehicle: Vehicle }) {
+export function Danfo({ vehicle }: { vehicle: Vehicle }) {
   const [w, h, l] = DANFO_SIZE;
   const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.35, metalness: 0.3 }), [vehicle.color]);
   const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
@@ -163,7 +163,7 @@ function Danfo({ vehicle }: { vehicle: Vehicle }) {
         <boxGeometry args={[w - 0.25, bodyH * 0.4, 0.02]} />
       </mesh>
       {/* the two black stripes that mark Lagos danfos */}
-      {[0.38, 0.48].map((f) => (
+      {vehicle.stripes !== false && [0.38, 0.48].map((f) => (
         <mesh key={f} position={[0, 0.45 + bodyH * f, 0]} material={black}>
           <boxGeometry args={[w + 0.025, 0.07, l + 0.01]} />
         </mesh>

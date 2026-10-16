@@ -44,10 +44,15 @@ export const LAGOS_MARINA: DistrictSpec = {
     powerPoles: [-40, -30, -8, 4, 16, 28, 40].map((z) => [-6.7, 0, z] as const),
     // Parked danfo minibuses at the kerbside bus stops
     vehicles: [
-      { position: [2.4, 0, 30], heading: 0, color: '#f2b705' },
-      { position: [2.4, 0, 36.5], heading: 0, color: '#f2b705' },
-      { position: [-2.4, 0, -36], heading: Math.PI, color: '#f2b705' },
-      { position: [-2.4, 0, 10], heading: Math.PI, color: '#e9a800' },
+      { position: [3, 0, 30], heading: 0, color: '#f2b705' },
+      { position: [3, 0, 36.5], heading: 0, color: '#f2b705' },
+      { position: [-3, 0, -36], heading: Math.PI, color: '#f2b705' },
+      { position: [-3, 0, 10], heading: Math.PI, color: '#e9a800' },
+    ],
+    // Danfos and the odd private car, driving on the right
+    traffic: [
+      { x: -0.9, dir: 1, count: 2, colors: ['#f2b705', '#e9a800'], stripes: true },
+      { x: 0.9, dir: -1, count: 2, colors: ['#f2b705', '#2f3a44'], stripes: true },
     ],
     // Market stalls with umbrellas on the pavement outside the shop row
     stalls: [[-6.2, 0, -10.5], [-6.2, 0, -7.5], [-6.2, 0, -1.5]],

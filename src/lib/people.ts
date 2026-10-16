@@ -18,6 +18,8 @@ export interface Resident {
   /** Where they stand, and which way they face (radians, 0 = +Z). */
   position: readonly [number, number, number];
   facing: number;
+  /** Where they stroll, back and forth, starting at `position`. Omit to stand still. */
+  route?: readonly (readonly [number, number])[];
   /** One line per friendship level (index matches FRIENDSHIP_LEVELS). */
   lines: readonly [string, string, string, string, string];
 }
@@ -47,7 +49,7 @@ export const RESIDENTS: readonly Resident[] = [
   // Lagos, Marina Boulevard
   {
     id: 'tunde', district: 'lagos.marina', name: 'Tunde Bakare', role: 'Danfo conductor', lookId: 'male-adult-04',
-    position: [5.2, 0, 32], facing: -Math.PI / 2,
+    position: [5.2, 0, 29.5], facing: -Math.PI / 2, route: [[5.2, 29.5], [5.2, 34.5]],
     lines: [
       'Marina! Obalende! You dey enter? No? Then shift small, I dey work.',
       'Ah, you again. This road no dey sleep, I tell you.',
@@ -58,7 +60,7 @@ export const RESIDENTS: readonly Resident[] = [
   },
   {
     id: 'adaeze', district: 'lagos.marina', name: 'Adaeze Okoro', role: 'Nurse at General Hospital', lookId: 'female-adult-11',
-    position: [5.2, 0, -2], facing: -Math.PI / 2,
+    position: [5.2, 0, -2], facing: -Math.PI / 2, route: [[5.2, -2], [5.2, -10]],
     lines: [
       'Sorry, I am between shifts. Did you need directions?',
       'Hello again. Remember to drink water in this heat.',
@@ -69,7 +71,7 @@ export const RESIDENTS: readonly Resident[] = [
   },
   {
     id: 'bayo', district: 'lagos.marina', name: 'Bayo Adewale', role: 'Developer at Tech Campus', lookId: 'male-adult-18',
-    position: [-5.2, 0, 16], facing: Math.PI / 2,
+    position: [-5.2, 0, 14], facing: Math.PI / 2, route: [[-5.2, 14], [-5.2, 19]],
     lines: [
       'Hey. Just getting some air before stand-up.',
       'Oh hi. Still stuck on the same bug, believe it or not.',
@@ -81,7 +83,7 @@ export const RESIDENTS: readonly Resident[] = [
   // Accra, Oxford Street, Osu
   {
     id: 'kojo', district: 'accra.osu', name: 'Kojo Asante', role: 'Tro-tro mate', lookId: 'male-adult-15',
-    position: [7.2, 0, 34], facing: -Math.PI / 2,
+    position: [7.2, 0, 32], facing: -Math.PI / 2, route: [[7.2, 32], [7.2, 36]],
     lines: [
       'Circle! Circle! Ah, you are not going? Okay, okay.',
       'Charley, how far? You are getting used to Osu now.',
@@ -92,7 +94,7 @@ export const RESIDENTS: readonly Resident[] = [
   },
   {
     id: 'akosua', district: 'accra.osu', name: 'Akosua Boateng', role: 'Kente designer', lookId: 'female-adult-06',
-    position: [-7, 0, -10], facing: Math.PI / 2,
+    position: [-7, 0, -9], facing: Math.PI / 2, route: [[-7, -9], [-7.4, -12]],
     lines: [
       'Welcome to Osu. The Loft is just there if you like kente.',
       'Akwaaba again. I am finishing a new pattern for a wedding.',
@@ -103,7 +105,7 @@ export const RESIDENTS: readonly Resident[] = [
   },
   {
     id: 'yaw', district: 'accra.osu', name: 'Yaw Darko', role: 'Footballer', lookId: 'male-adult-10',
-    position: [19, 0, 1.5], facing: Math.PI,
+    position: [19, 0, 1.5], facing: Math.PI, route: [[19, 1.5], [19, -10]],
     lines: [
       'Training starts soon. You play?',
       'Hey! Come and watch us on Saturday.',
@@ -131,9 +133,60 @@ export function friendshipLevel(points: number): number {
 
 export const gameDay = (totalMinutes: number) => Math.floor(totalMinutes / 1440);
 
+/** Strolling speed (m/s) and how long they stop at each end of their route (s). */
+export const STROLL_SPEED = 0.9;
+export const STROLL_PAUSE = 4;
+/** Residents stop and turn to you within this distance. */
+export const NOTICE_RADIUS = 3.2;
+
+export interface Pose { x: number; z: number; facing: number; moving: boolean }
+
+/**
+ * Where a resident is after `t` seconds of strolling: there and back along
+ * their route, pausing at each end. Pure, so it can be tested and replayed.
+ */
+export function residentPose(r: Resident, t: number): Pose {
+  const pts = r.route && r.route.length > 1 ? r.route : null;
+  if (!pts) return { x: r.position[0], z: r.position[2], facing: r.facing, moving: false };
+  // Out along the route then back, as one list of legs
+  const path = [...pts, ...pts.slice(0, -1).reverse()];
+  const legs = path.slice(1).map((p, i) => {
+    const a = path[i];
+    return { a, b: p, len: Math.hypot(p[0] - a[0], p[1] - a[1]) };
+  });
+  const turnAt = pts.length - 1; // index of the leg that starts the way back
+  const segTime = (i: number) => legs[i].len / STROLL_SPEED + (i === turnAt - 1 || i === legs.length - 1 ? STROLL_PAUSE : 0);
+  const cycle = legs.reduce((sum, _, i) => sum + segTime(i), 0);
+  let rem = ((t % cycle) + cycle) % cycle;
+  for (let i = 0; i < legs.length; i++) {
+    const { a, b, len } = legs[i];
+    const walk = len / STROLL_SPEED;
+    const facing = Math.atan2(b[0] - a[0], b[1] - a[1]);
+    if (rem < walk) {
+      const f = rem / walk;
+      return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, facing, moving: true };
+    }
+    rem -= walk;
+    const pause = segTime(i) - walk;
+    if (rem < pause) return { x: b[0], z: b[1], facing, moving: false };
+    rem -= pause;
+  }
+  return { x: pts[0][0], z: pts[0][1], facing: r.facing, moving: false };
+}
+
+// Where each resident is right now (written by the 3D world each frame), so talking uses their real spot
+const livePositions = new Map<string, { x: number; z: number }>();
+export function setLivePosition(id: string, x: number, z: number) {
+  livePositions.set(id, { x, z });
+}
+export const residentPosition = (r: Resident) => livePositions.get(r.id) ?? { x: r.position[0], z: r.position[2] };
+
 /** The resident within talking distance in this district, if any. */
 export function residentNear(districtId: string, x: number, z: number): Resident | undefined {
-  return residentsIn(districtId).find((r) => Math.hypot(r.position[0] - x, r.position[2] - z) <= TALK_RADIUS);
+  return residentsIn(districtId).find((r) => {
+    const p = residentPosition(r);
+    return Math.hypot(p.x - x, p.z - z) <= TALK_RADIUS;
+  });
 }
 
 /** Keeps known residents only, with points in range. */

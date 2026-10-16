@@ -1,10 +1,12 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, CanvasTexture, Material, SRGBColorSpace, type Group, type Mesh } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
-import { residentsIn, type Resident } from '../lib/people';
+import { NOTICE_RADIUS, STROLL_SPEED, residentPose, residentsIn, setLivePosition, type Resident } from '../lib/people';
+import type { PlayerHandle } from '../hooks/usePlayerController';
 import { groundHeightAt } from '../lib/world';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useDistrict } from './DistrictContext';
@@ -31,7 +33,7 @@ function nameTag(name: string) {
   return t;
 }
 
-function ResidentFigure({ resident }: { resident: Resident }) {
+function ResidentFigure({ resident, player }: { resident: Resident; player: PlayerHandle }) {
   const look = lookById(resident.lookId);
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
@@ -66,18 +68,50 @@ function ResidentFigure({ resident }: { resident: Resident }) {
     return h > 0 ? look.height / h : 1;
   }, [figure, look.height]);
   const { actions, names } = useAnimations(animations, group);
+  const clips = useMemo(() => ({
+    idle: names.find((n) => /idle|stand/i.test(n)) ?? names[0],
+    walk: names.find((n) => /walk/i.test(n)),
+  }), [names]);
+  const walking = useRef(false);
   useEffect(() => {
-    const idle = names.find((n) => /idle|stand/i.test(n)) ?? names[0];
-    const action = idle ? actions[idle] : null;
+    const idle = clips.idle ? actions[clips.idle] : null;
     // Start each resident at a different point of the loop so they don't move in sync
-    action?.reset().startAt(-((resident.id.length * 0.37) % 2)).play();
-    return () => { action?.stop(); };
-  }, [actions, names, resident.id]);
+    idle?.reset().startAt(-((resident.id.length * 0.37) % 2)).play();
+    const walk = clips.walk ? actions[clips.walk] : null;
+    // Play the stride at the rate that matches their strolling speed
+    walk?.setEffectiveTimeScale(STROLL_SPEED / look.walkSpeed);
+    return () => { idle?.stop(); walk?.stop(); };
+  }, [actions, clips, resident.id, look.walkSpeed]);
   const tag = useMemo(() => nameTag(resident.name), [resident.name]);
+
+  // Their own clock only runs while you're not with them, so they stop when you come over
+  const root = useRef<Group>(null);
+  const clock = useRef((resident.id.charCodeAt(0) % 7) * 1.7);
+  const heading = useRef(resident.facing);
+  useFrame((_, dt) => {
+    const step = Math.min(dt, 0.1);
+    const here = residentPose(resident, clock.current);
+    const near = Math.hypot(player.position.x - here.x, player.position.z - here.z) < NOTICE_RADIUS;
+    if (!near) clock.current += step;
+    const pose = near ? { ...here, moving: false } : residentPose(resident, clock.current);
+    const want = near ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
+    // Turn smoothly along the shortest way round
+    const diff = Math.atan2(Math.sin(want - heading.current), Math.cos(want - heading.current));
+    heading.current += diff * Math.min(1, step * 6);
+    root.current?.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
+    if (group.current) group.current.rotation.y = heading.current;
+    setLivePosition(resident.id, pose.x, pose.z);
+    if (pose.moving !== walking.current && clips.walk && clips.idle) {
+      walking.current = pose.moving;
+      const [from, to] = pose.moving ? [actions[clips.idle], actions[clips.walk]] : [actions[clips.walk], actions[clips.idle]];
+      to?.reset().fadeIn(0.3).play();
+      from?.fadeOut(0.3);
+    }
+  });
   const [x, , z] = resident.position;
 
   return (
-    <group position={[x, groundHeightAt(x, z), z]}>
+    <group ref={root} position={[x, groundHeightAt(x, z), z]}>
       <group ref={group} rotation={[0, resident.facing, 0]}>
         <primitive object={figure} scale={scale} />
       </group>
@@ -88,8 +122,8 @@ function ResidentFigure({ resident }: { resident: Resident }) {
   );
 }
 
-/** The residents of the current district, each standing at their usual spot. */
-export function Residents() {
+/** The residents of the current district, strolling their usual routes. */
+export function Residents({ player }: { player: PlayerHandle }) {
   const district = useDistrict();
   const people = residentsIn(district.id);
   return (
@@ -97,7 +131,7 @@ export function Residents() {
       {people.map((r) => (
         <ErrorBoundary key={r.id} fallback={null}>
           <Suspense fallback={null}>
-            <ResidentFigure resident={r} />
+            <ResidentFigure resident={r} player={player} />
           </Suspense>
         </ErrorBoundary>
       ))}

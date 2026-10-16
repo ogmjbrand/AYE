@@ -32,6 +32,7 @@ import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
 import { TalkPanel } from './components/TalkPanel';
 import { Residents } from './world/Residents';
+import { Traffic } from './world/Traffic';
 import { gameDay, residentNear, type Resident } from './lib/people';
 import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
@@ -122,7 +123,8 @@ function City({ controller, character, gameTime, tryOn, homeId, district }: City
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
-      <Residents />
+      <Residents player={controller} />
+      <Traffic player={controller} />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} />
     </>

@@ -35,6 +35,17 @@ export interface Vehicle {
   /** Rotation about Y in radians; 0 faces +Z. */
   heading: number;
   color: string;
+  /** Black side stripes (Lagos danfos have them; Accra tro-tros don't). Default true. */
+  stripes?: boolean;
+}
+
+/** One lane of moving traffic: its centre line, direction along Z and how many vehicles use it. */
+export interface TrafficLane {
+  x: number;
+  dir: 1 | -1;
+  count: number;
+  colors: readonly string[];
+  stripes: boolean;
 }
 
 type Spot = readonly [number, number, number];
@@ -58,6 +69,8 @@ export interface LayoutSpec {
   /** Parked minibuses (danfos in Lagos, tro-tros in Accra). */
   vehicles: readonly Vehicle[];
   stalls: readonly Spot[];
+  /** Moving traffic, driving on the right. */
+  traffic: readonly TrafficLane[];
   /** Roadside billboard with the AYE logo, if the district has one. */
   billboard: Spot | null;
   /** Distant city massing: seed and colours. */
@@ -156,6 +169,9 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
   return { ...spec, palmSpots, lampSpots, obstacles, skylineBuildings: skylineFor(spec) };
 }
 
+// Moving vehicles add themselves here each frame so the player can't walk through them
+export const movingObstacles: Obstacle[] = [];
+
 // The district the player is in. Collision and ground height default to it;
 // rendering reads the same layout through React context (world/LayoutContext).
 let active: DistrictLayout | null = null;
@@ -175,7 +191,7 @@ export function resolveCollisions(
   x: number,
   z: number,
   radius = PLAYER_RADIUS,
-  obstacles: readonly Obstacle[] = activeLayout().obstacles,
+  obstacles: readonly Obstacle[] = movingObstacles.length ? [...activeLayout().obstacles, ...movingObstacles] : activeLayout().obstacles,
 ): { x: number; z: number } {
   for (const o of obstacles) {
     const halfW = o.size[0] / 2;

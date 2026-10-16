@@ -40,9 +40,13 @@ export const ACCRA_OSU: DistrictSpec = {
     powerPoles: [-40, -26, -12, 22, 36].map((z) => [8.2, 0, z] as const),
     // Tro-tros (minibuses) waiting at the stops
     vehicles: [
-      { position: [3.4, 0, 36], heading: 0, color: '#e6e4dc' },
-      { position: [3.4, 0, 28.5], heading: 0, color: '#d7dde3' },
-      { position: [-3.4, 0, -26], heading: Math.PI, color: '#e6e4dc' },
+      { position: [3.4, 0, 36], heading: 0, color: '#e6e4dc', stripes: false },
+      { position: [3.4, 0, 28.5], heading: 0, color: '#d7dde3', stripes: false },
+      { position: [-3.4, 0, -26], heading: Math.PI, color: '#e6e4dc', stripes: false },
+    ],
+    traffic: [
+      { x: -1.2, dir: 1, count: 2, colors: ['#e6e4dc', '#8a1f24'], stripes: false },
+      { x: 1.2, dir: -1, count: 2, colors: ['#d7dde3', '#e6e4dc'], stripes: false },
     ],
     // Kelewele and kebab stalls on the west pavement
     stalls: [[-7.8, 0, 40], [-7.8, 0, 43]],
