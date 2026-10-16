@@ -7,7 +7,6 @@ import { setMovementBlocked, usePlayerController } from './hooks/usePlayerContro
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
 import type { GameTime } from './lib/gameState';
-import { clearSave } from './lib/save';
 import { groundHeightAt } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
@@ -24,7 +23,9 @@ import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import { atFashionHouse, type FashionItem, type Slot } from './lib/fashion';
 import { FashionStore } from './components/FashionStore';
-import { saveCharacter } from './lib/save';
+import { loadCharacter, saveCharacter } from './lib/save';
+import { EntryScreen } from './components/EntryScreen';
+import { loadSettings, nextQualityMode, saveSettings, type QualityMode } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
 
@@ -112,12 +113,14 @@ function City({ controller, character, gameTime, tryOn }: CityProps) {
 }
 
 export default function App() {
-  // Null until the player picks Continue or creates a character on the start screen
-  const [character, setCharacter] = useState<Character | null>(null);
+  // The entry screen comes first; 'create' is character creation; a character means playing
+  const [screen, setScreen] = useState<'entry' | 'create' | 'play'>('entry');
+  const [character, setCharacter] = useState<Character | null>(() => loadCharacter());
+  const [quality, setQuality] = useState<QualityMode>(() => loadSettings().quality);
 
-  const handleChangeCharacter = () => {
-    clearSave();
-    setCharacter(null);
+  const changeQuality = (next: QualityMode) => {
+    setQuality(next);
+    saveSettings({ quality: next });
   };
   // In-game changes to the character (e.g. new clothes) are saved straight away
   const handleCharacterUpdate = (next: Character) => {
@@ -125,21 +128,49 @@ export default function App() {
     setCharacter(next);
   };
 
-  if (!character) {
-    return <CharacterCreation onCharacterCreate={setCharacter} />;
+  if (screen === 'create') {
+    return (
+      <CharacterCreation
+        onCharacterCreate={(c) => { setCharacter(c); setScreen('play'); }}
+        onBack={() => setScreen('entry')}
+      />
+    );
+  }
+  if (screen === 'entry' || !character) {
+    return (
+      <EntryScreen
+        saved={character}
+        quality={quality}
+        onQualityChange={changeQuality}
+        onContinue={() => setScreen('play')}
+        onNewLife={() => setScreen('create')}
+      />
+    );
   }
 
   // Keyed by id so a new character starts with a fresh clock and ledger
-  return <Game key={character.id} character={character} onChangeCharacter={handleChangeCharacter} onCharacterUpdate={handleCharacterUpdate} />;
+  return (
+    <Game
+      key={character.id}
+      character={character}
+      quality={quality}
+      onQualityChange={changeQuality}
+      onExitToMenu={() => setScreen('entry')}
+      onCharacterUpdate={handleCharacterUpdate}
+    />
+  );
 }
 
 interface GameProps {
   character: Character;
-  onChangeCharacter: () => void;
+  quality: QualityMode;
+  onQualityChange: (quality: QualityMode) => void;
+  /** Back to the entry screen; the game is already saved. */
+  onExitToMenu: () => void;
   onCharacterUpdate: (character: Character) => void;
 }
 
-function Game({ character, onChangeCharacter, onCharacterUpdate }: GameProps) {
+function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
   const { state, rest, dismissSummary, eat, purchase } = useGameState(
@@ -209,7 +240,6 @@ function Game({ character, onChangeCharacter, onCharacterUpdate }: GameProps) {
     setTryOn({});
   };
   // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
-  const [qualityMode, setQualityMode] = useState<'auto' | Quality>('auto');
   const [autoQuality, setAutoQuality] = useState<Quality>('high');
   const settings = settingsFor(qualityMode === 'auto' ? autoQuality : qualityMode);
 
@@ -286,14 +316,14 @@ function Game({ character, onChangeCharacter, onCharacterUpdate }: GameProps) {
         balance={state.balance}
         gameTime={state.time}
         neighborhood={neighborhood}
-        onChangeCharacter={onChangeCharacter}
+        onExitToMenu={onExitToMenu}
         onRest={rest}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
         onOpenWardrobe={() => setStore('wardrobe')}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
-        onCycleQuality={() => setQualityMode((m) => (m === 'auto' ? 'high' : m === 'high' ? 'low' : 'auto'))}
+        onCycleQuality={() => onQualityChange(nextQualityMode(qualityMode))}
       />
     </main>
   );

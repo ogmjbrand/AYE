@@ -22,7 +22,7 @@ uses Windows PowerShell, so the commands there are `npm.cmd`.
 
 | Spec milestone | State |
 |---|---|
-| 1. Entry experience | **Missing.** The game opens straight into character creation / Continue. |
+| 1. Entry experience | **Working:** title screen with the AYE mark, Continue / Start a new life (with a warning before replacing a saved life), How to play, and a remembered graphics-quality setting. The in-game Menu button returns here without losing anything. Sign-in arrives with Milestone 4. |
 | 2. Character creation | **Working:** name, gender (incl. non-binary, prefer not to say), self-identified race/heritage and ethnic group, country (200) and state/region, 12 distinct realistic people (Microsoft Rocketbox, MIT), height, live 3D preview. Gaps: no face/body sliders, no hairstyles, no Black woman in the free library. |
 | 3. First playable district | **Working:** one Lagos-inspired street, third-person movement (keyboard plus touch stick), collision, motion-captured idle/walk/run, day/night lighting, skyline, interaction with 3 food vendors, a boutique and career workplaces. |
 | 4. Persistent player life | **Partly:** clock, balance, wages, living costs, hunger, sleep, daily ledger, wardrobe. Saved **only in the browser (localStorage)** and decided **in the client**, so any player can edit their money. Not acceptable once there are accounts, trading or real money. |

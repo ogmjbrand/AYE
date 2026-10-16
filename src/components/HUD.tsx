@@ -17,7 +17,8 @@ interface HUDProps {
   balance: number;
   gameTime: GameTime;
   neighborhood?: Neighborhood | null;
-  onChangeCharacter?: () => void;
+  /** Back to the entry screen (nothing is lost; the game saves as you play). */
+  onExitToMenu?: () => void;
   onRest?: () => void;
   qualityLabel?: string;
   onCycleQuality?: () => void;
@@ -65,7 +66,7 @@ export function HUD({
   balance,
   gameTime,
   neighborhood,
-  onChangeCharacter,
+  onExitToMenu,
   onRest,
   qualityLabel,
   onCycleQuality,
@@ -152,9 +153,9 @@ export function HUD({
                 <span className="capitalize">{qualityLabel}</span>
               </button>
             )}
-            {onChangeCharacter && (
-              <button type="button" onClick={onChangeCharacter} className={BUTTON}>
-                Change
+            {onExitToMenu && (
+              <button type="button" onClick={onExitToMenu} className={BUTTON} title="Back to the main menu (your life is saved)">
+                Menu
               </button>
             )}
           </div>

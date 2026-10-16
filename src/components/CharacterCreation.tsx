@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { CharacterPreview } from './CharacterPreview';
 import { STARTING_BALANCE } from '../lib/gameState';
-import { loadCharacter, saveCharacter } from '../lib/save';
+import { saveCharacter } from '../lib/save';
+import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { DIETS, type Diet } from '../lib/food';
-import { GENDERS, HERITAGES, genderLabel, type Gender } from '../lib/identity';
+import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, looksFor, type BodyType } from '../lib/looks';
-import { resolveStyles, type Slot, type Style, type Wardrobe } from '../lib/fashion';
+import type { Slot, Style, Wardrobe } from '../lib/fashion';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
 
@@ -49,14 +50,11 @@ export interface Character {
 
 interface CharacterCreationProps {
   onCharacterCreate: (character: Character) => void;
-  onLoadCharacter?: (character: Character) => void;
+  /** Back to the entry screen without creating anyone. */
+  onBack?: () => void;
 }
 
-export function CharacterCreation({
-  onCharacterCreate,
-  onLoadCharacter,
-}: CharacterCreationProps) {
-  const [mode, setMode] = useState<'menu' | 'create'>('menu');
+export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreationProps) {
   const [name, setName] = useState('');
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
   const [career, setCareer] = useState<Character['career']>('none');
@@ -88,9 +86,6 @@ export function CharacterCreation({
     setCountry(next);
     setRegion('');
   };
-
-  const [savedCharacter] = useState(() => loadCharacter());
-  const hasSavedCharacter = savedCharacter !== null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,52 +119,7 @@ export function CharacterCreation({
     onCharacterCreate(character);
   };
 
-  const handleLoad = () => {
-    if (!savedCharacter) return;
-    onLoadCharacter?.(savedCharacter);
-    onCharacterCreate(savedCharacter);
-  };
-
-  const handleNewGame = () => {
-    setMode('create');
-    setName('');
-    setLifestyle('ordinary');
-    setCountry(DEFAULT_COUNTRY);
-    setRegion('Lagos');
-  };
-
-  const previewColor = mode === 'menu' && savedCharacter
-    ? `rgb(${savedCharacter.colorR}, ${savedCharacter.colorG}, ${savedCharacter.colorB})`
-    : `rgb(${colorR}, ${colorG}, ${colorB})`;
-
-  if (mode === 'menu' && hasSavedCharacter) {
-    const char = savedCharacter;
-    return (
-      <Shell previewColor={previewColor} previewName={char.name} previewSub={`${formatHome(char.country, char.region)} · ${CAREER_LABEL[char.career]}`} lookId={char.lookId} heightCm={char.heightCm} styles={resolveStyles(char.wardrobe.equipped)}>
-        <section className="space-y-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">Welcome back</p>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-cc-ink mt-2 text-balance">Continue your life</h1>
-          </div>
-          <div className="rounded-xl border border-cc-line bg-cc-field p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-cc-muted">Saved character</p>
-            <p className="font-display text-2xl font-semibold text-cc-ink mt-1">{char.name}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <dt className="text-cc-muted">Home</dt><dd className="text-cc-ink text-right">{formatHome(char.country, char.region)}</dd>
-              <dt className="text-cc-muted">Gender</dt><dd className="text-cc-ink text-right">{genderLabel(char.gender)}</dd>
-              <dt className="text-cc-muted">Lifestyle</dt><dd className="text-cc-ink text-right">{LIFESTYLE_LABEL[char.lifestyle]}</dd>
-              <dt className="text-cc-muted">Career</dt><dd className="text-cc-ink text-right">{CAREER_LABEL[char.career]}</dd>
-              <dt className="text-cc-muted">Diet</dt><dd className="text-cc-ink text-right">{DIETS.find((d) => d.id === char.diet)?.label}</dd>
-            </dl>
-          </div>
-          <div className="grid gap-3">
-            <button type="button" onClick={handleLoad} className={PRIMARY_BUTTON}>Continue</button>
-            <button type="button" onClick={handleNewGame} className={SECONDARY_BUTTON}>New character</button>
-          </div>
-        </section>
-      </Shell>
-    );
-  }
+  const previewColor = `rgb(${colorR}, ${colorG}, ${colorB})`;
 
   return (
     <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm}>
@@ -296,9 +246,9 @@ export function CharacterCreation({
         <div className="space-y-3">
           <button type="submit" disabled={!name.trim()} className={PRIMARY_BUTTON}>Create &amp; play</button>
           {!name.trim() && <p className="text-xs text-cc-muted text-center">Enter a name to continue.</p>}
-          {hasSavedCharacter && (
-            <button type="button" onClick={() => setMode('menu')} className="w-full text-sm text-cc-muted hover:text-cc-ink py-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold rounded">
-              ← Back to saved character
+          {onBack && (
+            <button type="button" onClick={onBack} className="w-full text-sm text-cc-muted hover:text-cc-ink py-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold rounded">
+              ← Back
             </button>
           )}
         </div>
@@ -306,24 +256,6 @@ export function CharacterCreation({
     </Shell>
   );
 }
-
-const LIFESTYLE_LABEL: Record<Lifestyle, string> = {
-  student: 'Student',
-  ordinary: 'Ordinary',
-  'middle-class': 'Middle class',
-  luxury: 'Luxury',
-};
-
-const CAREER_LABEL: Record<Career, string> = {
-  none: 'Undecided',
-  student: 'Student',
-  artist: 'Artist',
-  entrepreneur: 'Entrepreneur',
-  athlete: 'Athlete',
-  engineer: 'Engineer',
-  doctor: 'Doctor',
-  pilot: 'Pilot',
-};
 
 const SECTION_LABEL = 'text-xs font-semibold uppercase tracking-[0.18em] text-cc-gold mb-1';
 const INPUT =
@@ -333,9 +265,6 @@ const PRIMARY_BUTTON =
   'w-full rounded-lg bg-cc-gold py-3 font-display font-bold tracking-wide text-cc-bg hover:bg-cc-gold-strong transition ' +
   'disabled:bg-cc-field disabled:text-cc-muted disabled:border disabled:border-cc-line disabled:cursor-not-allowed ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cc-gold-strong';
-const SECONDARY_BUTTON =
-  'w-full rounded-lg border border-cc-line py-3 font-display font-semibold text-cc-ink hover:border-cc-gold transition ' +
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cc-gold';
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
