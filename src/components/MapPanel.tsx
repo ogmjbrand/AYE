@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { District, PlaceKind } from '../lib/geography';
-import { BUILDINGS, CROSS_STREET, ROAD_HALF_WIDTH, WORLD_BOUND } from '../lib/world';
+import { WORLD_BOUND } from '../lib/world';
 
 const KIND_COLOR: Record<PlaceKind, string> = {
   food: '#f0a35e',
@@ -43,6 +43,7 @@ export function MapPanel({ district, controller, homePlaceId, onClose }: {
     .map((p) => ({ ...p, dist: Math.hypot(p.position[0] - x, p.position[2] - z) }))
     .sort((a, b) => a.dist - b.dist);
   const B = WORLD_BOUND;
+  const { roadHalfWidth: ROAD_HALF_WIDTH, crossStreet: CROSS_STREET, buildings } = district.layout;
   // Map x is mirrored so east (-x) is on the right, matching the compass
   const mx = (v: number) => -v;
   const my = (v: number) => -v;
@@ -58,13 +59,13 @@ export function MapPanel({ district, controller, homePlaceId, onClose }: {
       >
         <div className="relative shrink-0 p-4 sm:w-[26rem]">
           <div className="mb-2 flex items-center justify-between">
-            <h2 id="map-title" className="m-0 font-display text-xl font-bold">{district.name}</h2>
+            <h2 id="map-title" className="m-0 font-display text-xl font-bold">{district.name}, {district.city.name}</h2>
             <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
           </div>
           <svg viewBox={`${-B} ${-B} ${2 * B} ${2 * B}`} className="aspect-square w-full rounded-xl bg-[#1d2126]" role="img" aria-label={`Map of ${district.name}. You are the white arrow.`}>
             <rect x={-ROAD_HALF_WIDTH} y={-B} width={ROAD_HALF_WIDTH * 2} height={2 * B} fill="#3a3f46" />
             <rect x={-B} y={my(CROSS_STREET.maxZ)} width={2 * B} height={CROSS_STREET.maxZ - CROSS_STREET.minZ} fill="#3a3f46" />
-            {BUILDINGS.map((b, i) => (
+            {buildings.map((b, i) => (
               <rect key={i} x={mx(b.position[0]) - b.size[0] / 2} y={my(b.position[2]) - b.size[2] / 2} width={b.size[0]} height={b.size[2]} rx={0.6} fill="#4d545d" />
             ))}
             {places.map((p) => (

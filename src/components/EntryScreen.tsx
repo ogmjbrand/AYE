@@ -5,7 +5,7 @@ import { resolveStyles } from '../lib/fashion';
 import { genderLabel } from '../lib/identity';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { formatHome } from '../lib/places';
-import { CURRENT_DISTRICT, CITIES } from '../lib/geography';
+import { DISTRICTS } from '../lib/geography';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
 
 interface EntryScreenProps {
@@ -41,7 +41,6 @@ const LINK =
 export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife }: EntryScreenProps) {
   const [panel, setPanel] = useState<Panel>('menu');
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const city = CITIES.find((c) => c.districts.includes(CURRENT_DISTRICT));
 
   // Move focus to each panel's heading so keyboard and screen-reader users follow the change
   useEffect(() => {
@@ -111,7 +110,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
               {panel === 'help' && (
                 <PanelBody title="How to play" headingRef={headingRef} onBack={() => setPanel('menu')}>
                   <p className="text-sm text-cc-muted">
-                    You live in {CURRENT_DISTRICT.name}, {city?.name ?? 'Lagos'}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour.
+                    Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.slice(1).map((d) => d.city.name).join(' and ')}.
                   </p>
                   <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                     <Key k="W / S">Move forward / back</Key>

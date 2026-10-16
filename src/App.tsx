@@ -3,11 +3,11 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
+import { placePlayer, setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
 import type { GameTime } from './lib/gameState';
-import { groundHeightAt } from './lib/world';
+import { activeLayout, groundHeightAt, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -21,13 +21,16 @@ import { CharacterCreation, type Character } from './components/CharacterCreatio
 import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
-import { atFashionHouse, type FashionItem, type Slot } from './lib/fashion';
+import type { FashionItem, Slot } from './lib/fashion';
 import { FashionStore } from './components/FashionStore';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
-import { atGadgetHub, hasMap } from './lib/equipment';
-import { CURRENT_DISTRICT } from './lib/geography';
+import { hasMap } from './lib/equipment';
+import { counterAt, districtById, type District } from './lib/geography';
+import { DistrictContext } from './world/DistrictContext';
+import { TravelPanel } from './components/TravelPanel';
+import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
@@ -45,6 +48,7 @@ interface CityProps {
   gameTime: GameTime;
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
+  district: District;
 }
 
 interface CameraFollowProps {
@@ -103,7 +107,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -113,7 +117,7 @@ function City({ controller, character, gameTime, tryOn, homeId }: CityProps) {
       <Buildings />
       <Skyline />
       <Props night={night} />
-      {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(character.career).position} />}
+      {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} />
@@ -179,13 +183,44 @@ interface GameProps {
   onCharacterUpdate: (character: Character) => void;
 }
 
+/** The district the player was last placed in, so returning from the menu keeps their spot. */
+let placedIn: string | null = null;
+
 function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
-  const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment } = useGameState(
+  // Read on every game tick, so it always sees the district the player is in now
+  const districtRef = useRef<District | null>(null);
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel } = useGameState(
     character,
-    () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
+    () => character.career !== 'none' && !!districtRef.current &&
+      isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
   );
+  const district = districtById(state.districtId);
+  // Collision and ground height follow the district (set before this frame's movement)
+  if (activeLayout() !== district.layout) setActiveLayout(district.layout);
+  useEffect(() => {
+    districtRef.current = district;
+    // Arriving in a district (or loading a save there) puts you at its arrival point
+    if (placedIn !== district.id) {
+      placePlayer(district.spawn);
+      placedIn = district.id;
+    }
+  }, [district]);
+  const neighborhood = useCurrentNeighborhood(controller, district.neighborhoods);
+  const [travelOpen, setTravelOpen] = useState(false);
+  const [arrival, setArrival] = useState<string | null>(null);
+  useEffect(() => {
+    if (!arrival) return;
+    const id = setTimeout(() => setArrival(null), 6000);
+    return () => clearTimeout(id);
+  }, [arrival]);
+  const book = (to: District, mode: TravelMode) => {
+    const option = TRAVEL_OPTIONS[mode];
+    if (state.balance < option.fare) return;
+    travel(to.id, mode);
+    setTravelOpen(false);
+    setArrival(`You arrived in ${to.city.name} after ${formatDuration(option.minutes)} by ${option.label.toLowerCase()}.`);
+  };
   const controlsRef = useRef<OrbitControls | null>(null);
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
   const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
@@ -196,28 +231,30 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const phone = hasMap(state.equipment);
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const home = homeById(state.home);
-  const atHome = () => !!home && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS;
+  const atHome = () => !!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS;
 
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
-      const near = nearestVendor(controller.position.x, controller.position.z);
       const { x, z } = controller.position;
-      const door = homeAtDoor(x, z);
+      const near = nearestVendor(district.vendors, x, z);
+      const counter = counterAt(district, x, z);
+      const door = homeAtDoor(district.id, x, z);
       if (near) setVendor(near);
-      else if (atFashionHouse(x, z)) setStore('shop');
-      else if (atGadgetHub(x, z)) setGadgets(true);
+      else if (counter === 'fashion') setStore('shop');
+      else if (counter === 'gadgets') setGadgets(true);
+      else if (counter === 'travel') setTravelOpen(true);
       else if (door) setHomePanel(door);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [controller]);
+  }, [controller, district]);
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets]);
+  }, [vendor, store, homePanel, gadgets, travelOpen]);
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -289,6 +326,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       )}
       {store && (
         <FashionStore
+          shop={district.fashionHouse}
           mode={store}
           wardrobe={wardrobe}
           balance={state.balance}
@@ -301,6 +339,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       )}
       {gadgets && (
         <GadgetStore
+          shop={district.gadgetHub}
           owned={state.equipment}
           balance={state.balance}
           career={character.career}
@@ -310,9 +349,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       )}
       {mapOpen && phone && (
         <MapPanel
-          district={CURRENT_DISTRICT}
+          district={district}
           controller={controller}
-          homePlaceId={state.home ? `${CURRENT_DISTRICT.id}.home.${state.home}` : null}
+          homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
           onClose={() => setMapOpen(false)}
         />
       )}
@@ -354,7 +393,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
-          <City controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} />
+          <DistrictContext.Provider value={district}>
+            <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} />
+          </DistrictContext.Provider>
           {settings.ambientOcclusion && (
             <Suspense fallback={null}>
               <PostEffects />
@@ -372,7 +413,23 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         </Canvas>
       </QualityContext.Provider>
 
+      {travelOpen && (
+        <TravelPanel
+          from={district}
+          balance={state.balance}
+          homeId={state.home}
+          onTravel={book}
+          onClose={() => setTravelOpen(false)}
+        />
+      )}
+      {arrival && (
+        <p role="status" className="pointer-events-none fixed left-1/2 top-24 z-40 m-0 -translate-x-1/2 rounded-xl border border-ui-line bg-ui-panel/90 px-4 py-2 text-sm text-ui-ink shadow-xl">
+          {arrival}
+        </p>
+      )}
       <HUD
+        district={district}
+        onOpenTravel={() => setTravelOpen(true)}
         controller={controller}
         character={character}
         balance={state.balance}

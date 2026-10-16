@@ -1,5 +1,11 @@
+/**
+ * Where each career works. Every district lists its own workplaces
+ * (lib/districts), so a career can be worked in any city.
+ */
 import type { Career } from '../components/CharacterCreation';
-import { Vector3 } from 'three';
+import type { District } from './geography';
+
+export const WORKPLACE_RADIUS = 5;
 
 export interface CareerLocation {
   name: string;
@@ -8,71 +14,15 @@ export interface CareerLocation {
   neighborhood: string;
 }
 
-/** Marker positions sit on the pavement or plaza in front of the matching building in lib/world. */
-export const CAREER_LOCATIONS: Record<Career, CareerLocation> = {
-  'none': {
-    name: 'Nowhere',
-    description: 'You have no job',
-    position: [0, 0, 0],
-    neighborhood: 'downtown',
-  },
-  'student': {
-    name: 'University',
-    description: 'Continue your education',
-    position: [-5.5, 0, -36],
-    neighborhood: 'downtown',
-  },
-  'artist': {
-    name: 'Studio',
-    description: 'Create and express yourself',
-    position: [5.5, 0, 27],
-    neighborhood: 'uptown',
-  },
-  'entrepreneur': {
-    name: 'Office',
-    description: 'Run your business operations',
-    position: [5.5, 0, 12],
-    neighborhood: 'harbor',
-  },
-  'athlete': {
-    name: 'Sports Complex',
-    description: 'Train and compete',
-    position: [24, 0, 40],
-    neighborhood: 'parks',
-  },
-  'engineer': {
-    name: 'Tech Campus',
-    description: 'Build and innovate',
-    position: [-16, 0, 24],
-    neighborhood: 'industrial',
-  },
-  'doctor': {
-    name: 'Hospital',
-    description: 'Heal and help others',
-    position: [5.5, 0, -6],
-    neighborhood: 'downtown',
-  },
-  'pilot': {
-    name: 'Airport',
-    description: 'Fly across the world',
-    position: [29, 0, 12],
-    neighborhood: 'parks',
-  },
-};
-
-export function getCareerLocation(career: Career): CareerLocation {
-  return CAREER_LOCATIONS[career];
+export function getCareerLocation(district: District, career: Career): CareerLocation | null {
+  return career === 'none' ? null : district.workplaces[career];
 }
 
-export function isAtWorkplace(playerPosition: Vector3, career: Career): boolean {
-  const workplace = getCareerLocation(career);
-  const workplacePos = new Vector3(...workplace.position);
-  const distance = playerPosition.distanceTo(workplacePos);
-  return distance < 5;
+export function getDistanceToWorkplace(district: District, career: Career, x: number, z: number): number {
+  const w = getCareerLocation(district, career);
+  return w ? Math.round(Math.hypot(w.position[0] - x, w.position[2] - z) * 10) / 10 : Infinity;
 }
 
-export function getDistanceToWorkplace(playerPosition: Vector3, career: Career): number {
-  const workplace = getCareerLocation(career);
-  const workplacePos = new Vector3(...workplace.position);
-  return Math.round(playerPosition.distanceTo(workplacePos) * 10) / 10;
+export function isAtWorkplace(district: District, career: Career, x: number, z: number): boolean {
+  return getDistanceToWorkplace(district, career, x, z) < WORKPLACE_RADIUS;
 }

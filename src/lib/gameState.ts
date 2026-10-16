@@ -22,6 +22,8 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
+import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
+import { TRAVEL_OPTIONS, type TravelMode } from './travel';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -72,6 +74,8 @@ export interface GameState {
   workMinutes: number;
   /** Owned equipment ids (lib/equipment.ts). */
   equipment: string[];
+  /** The district the player is in (lib/geography.ts). */
+  districtId: string;
 }
 
 export type GameAction =
@@ -80,6 +84,7 @@ export type GameAction =
   | { type: 'moveIn'; homeId: string }
   | { type: 'moveOut' }
   | { type: 'buyEquipment'; id: string }
+  | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -176,7 +181,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [] };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID };
 }
 
 export function emptyLedger(): DayLedger {
@@ -227,6 +232,19 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
     fullness,
     workMinutes,
   };
+}
+
+/** Travels to another district: pays the fare, then the clock runs for the length of the trip. */
+function travel(state: GameState, to: string, mode: TravelMode, career: Career, lifestyle: Lifestyle): GameState {
+  const option = TRAVEL_OPTIONS[mode];
+  if (state.summary || !option || to === state.districtId || !isDistrictId(to) || state.balance < option.fare) return state;
+  let next: GameState = {
+    ...state,
+    balance: state.balance - option.fare,
+    today: { ...state.today, expenses: state.today.expenses + option.fare },
+  };
+  for (let i = 0; i < option.minutes; i++) next = tick(next, career, lifestyle, false);
+  return { ...next, districtId: to };
 }
 
 /** Rents a home: pays the move-in fee. Moving from another home gives up the old one. */
@@ -306,6 +324,8 @@ export function gameReducer(
         today: { ...state.today, expenses: state.today.expenses + item.price },
       };
     }
+    case 'travel':
+      return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':
       return state.summary ? state : { ...state, home: null };
     case 'dismissSummary':

@@ -3,9 +3,8 @@ import { useTexture } from '@react-three/drei';
 import {
   Color, DoubleSide, Euler, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3,
 } from 'three';
-import {
-  DANFO_SIZE, DANFOS, MARKET_STALLS, PALMS, POWER_POLES, STREET_LAMPS, seeded, type Vehicle,
-} from '../lib/world';
+import { DANFO_SIZE, seeded, type Vehicle } from '../lib/world';
+import { useLayout } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
 import { VehicleModel } from './VehicleModel';
@@ -37,6 +36,7 @@ function useFrondGeometry() {
 }
 
 function Palms() {
+  const { palmSpots } = useLayout();
   const frondGeo = useFrondGeometry();
   const frondMat = useMemo(
     () => new MeshStandardMaterial({ map: frondTexture(), alphaTest: 0.5, side: DoubleSide, roughness: 0.8 }),
@@ -47,7 +47,7 @@ function Palms() {
     const rand = seeded(29);
     const trunks: Placement[] = [];
     const fronds: Placement[] = [];
-    for (const [x, , z] of PALMS) {
+    for (const [x, , z] of palmSpots) {
       const h = PALM_HEIGHT * (0.85 + rand() * 0.3);
       trunks.push({ position: new Vector3(x, h / 2, z), scale: new Vector3(1, h, 1) });
       const spin = rand() * Math.PI * 2;
@@ -61,7 +61,7 @@ function Palms() {
       }
     }
     return { trunks, fronds };
-  }, []);
+  }, [palmSpots]);
   return (
     <>
       <Instances items={trunks} material={trunkMat} geometry={<cylinderGeometry args={[0.16, 0.24, 1, 8]} />} />
@@ -76,9 +76,10 @@ const LAMP_HEIGHT = 6.5;
 
 function StreetLamps({ night }: { night: number }) {
   const m = materials();
+  const { lampSpots } = useLayout();
   const { poles, arms, heads, pools } = useMemo(() => {
     const poles: Placement[] = [], arms: Placement[] = [], heads: Placement[] = [], pools: Placement[] = [];
-    for (const [x, , z] of STREET_LAMPS) {
+    for (const [x, , z] of lampSpots) {
       const toRoad = -Math.sign(x);
       poles.push({ position: new Vector3(x, LAMP_HEIGHT / 2, z), scale: new Vector3(1, LAMP_HEIGHT, 1) });
       arms.push({ position: new Vector3(x + toRoad * 0.8, LAMP_HEIGHT - 0.1, z), scale: new Vector3(1.6, 0.08, 0.08) });
@@ -86,7 +87,7 @@ function StreetLamps({ night }: { night: number }) {
       pools.push({ position: new Vector3(x + toRoad * 1.5, 0.15, z), scale: new Vector3(7, 7, 1), rotation: new Euler(-Math.PI / 2, 0, 0) });
     }
     return { poles, arms, heads, pools };
-  }, []);
+  }, [lampSpots]);
   return (
     <>
       <Instances items={poles} material={m.darkMetal} geometry={<cylinderGeometry args={[0.07, 0.1, 1, 8]} />} />
@@ -101,17 +102,18 @@ function StreetLamps({ night }: { night: number }) {
 
 function PowerLines() {
   const m = materials();
+  const { powerPoles } = useLayout();
   const POLE_H = 8.5;
   const { poles, arms, wires } = useMemo(() => {
     const poles: Placement[] = [], arms: Placement[] = [];
-    for (const [x, , z] of POWER_POLES) {
+    for (const [x, , z] of powerPoles) {
       poles.push({ position: new Vector3(x, POLE_H / 2, z), scale: new Vector3(1, POLE_H, 1) });
       arms.push({ position: new Vector3(x, POLE_H - 0.5, z), scale: new Vector3(1.6, 0.12, 0.12) });
     }
     // Sagging cables between neighbouring poles, three per span
     const segs: number[] = [];
-    for (let i = 0; i < POWER_POLES.length - 1; i++) {
-      const a = POWER_POLES[i], b = POWER_POLES[i + 1];
+    for (let i = 0; i < powerPoles.length - 1; i++) {
+      const a = powerPoles[i], b = powerPoles[i + 1];
       for (const dx of [-0.7, 0, 0.7]) {
         const at = (t: number) => [a[0] + dx, POLE_H - 0.42 - 0.9 * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t];
         for (let k = 0; k < 16; k++) segs.push(...at(k / 16), ...at((k + 1) / 16));
@@ -119,7 +121,7 @@ function PowerLines() {
     }
     // All cable spans in one draw call
     return { poles, arms, wires: new Float32Array(segs) };
-  }, []);
+  }, [powerPoles]);
   return (
     <>
       <Instances items={poles} material={m.wood} geometry={<cylinderGeometry args={[0.12, 0.16, 1, 8]} />} />
@@ -188,11 +190,12 @@ function Danfo({ vehicle }: { vehicle: Vehicle }) {
 
 function MarketStalls() {
   const m = materials();
+  const { stalls } = useLayout();
   const goods = useMemo(() => {
     const rand = seeded(43);
     const colors = ['#e4572e', '#f3a712', '#29335c', '#669bbc', '#a8c256', '#d1495b'];
     const out: Placement[] = [];
-    for (const [x, , z] of MARKET_STALLS) {
+    for (const [x, , z] of stalls) {
       for (let i = 0; i < 9; i++) {
         out.push({
           position: new Vector3(x + (rand() - 0.5) * 1.0, 0.95 + rand() * 0.08, z + (rand() - 0.5) * 1.4),
@@ -202,11 +205,11 @@ function MarketStalls() {
       }
     }
     return out;
-  }, []);
+  }, [stalls]);
   const goodsMat = useMemo(() => new MeshStandardMaterial({ roughness: 0.7 }), []);
   return (
     <>
-      {MARKET_STALLS.map(([x, , z], i) => (
+      {stalls.map(([x, , z], i) => (
         <group key={i} position={[x, 0, z]}>
           <mesh position={[0, 0.85, 0]} material={m.wood} castShadow receiveShadow>
             <boxGeometry args={[1.3, 0.08, 1.7]} />
@@ -233,12 +236,12 @@ function MarketStalls() {
 // ---------------------------------------------------------------- billboard
 
 /** Roadside billboard carrying the real AYE logo artwork. */
-function Billboard() {
+function Billboard({ position }: { position: readonly [number, number, number] }) {
   const logo = useTexture(`${import.meta.env.BASE_URL}assets/brand/aye-logo.webp`);
   // eslint-disable-next-line react-hooks/immutability
   logo.colorSpace = SRGBColorSpace;
   return (
-    <group position={[-14, 0, -28.6]}>
+    <group position={position}>
       {[-1.6, 1.6].map((x) => (
         <mesh key={x} position={[x, 2.6, 0]} castShadow>
           <cylinderGeometry args={[0.12, 0.12, 5.2, 8]} />
@@ -272,18 +275,21 @@ function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
 }
 
 export function Props({ night }: { night: number }) {
+  const { vehicles, billboard } = useLayout();
   return (
     <group>
       <Palms />
       <StreetLamps night={night} />
       <PowerLines />
-      {DANFOS.map((v, i) => (
+      {vehicles.map((v, i) => (
         <ParkedDanfo key={i} vehicle={v} />
       ))}
       <MarketStalls />
-      <Suspense fallback={null}>
-        <Billboard />
-      </Suspense>
+      {billboard && (
+        <Suspense fallback={null}>
+          <Billboard position={billboard} />
+        </Suspense>
+      )}
     </group>
   );
 }

@@ -1,15 +1,13 @@
 import { useMemo } from 'react';
 import { Vector3 } from 'three';
-import {
-  CROSS_STREET, PAVEMENT_HEIGHT, PAVEMENT_WIDTH, ROAD_HALF_WIDTH, STREET_LENGTH,
-} from '../lib/world';
+import { PAVEMENT_HEIGHT, STREET_LENGTH } from '../lib/world';
+import { useLayout } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
 
 const HALF = STREET_LENGTH / 2;
 /** How far the (visual-only) boulevard extends, matching the skyline and ground. */
 const FAR = 150;
-const PAVE_OUT = ROAD_HALF_WIDTH + PAVEMENT_WIDTH;
 const KERB_LEN = 2;
 
 /** A flat textured strip lying on the ground, with texture tiling in metres. */
@@ -53,7 +51,7 @@ function Pavement(props: { x0: number; x1: number; z0: number; z1: number }) {
   return <Strip {...props} y={PAVEMENT_HEIGHT} material={materials().pavement} tile={2} />;
 }
 
-function useKerbsAndMarkings() {
+function useKerbsAndMarkings(ROAD_HALF_WIDTH: number, CROSS_STREET: { minZ: number; maxZ: number }) {
   return useMemo(() => {
     const kerbs: Placement[] = [];
     const kerbX = (x: number, z0: number, z1: number) => {
@@ -100,12 +98,14 @@ function useKerbsAndMarkings() {
       zebra.push({ position: new Vector3(0, 0.013, zc + (zc > 0 ? 1.8 : 1.8) * Math.sign(zc - (CROSS_STREET.minZ + CROSS_STREET.maxZ) / 2)), scale: new Vector3(ROAD_HALF_WIDTH * 2 - 0.4, 1, 0.3) });
     }
     return { kerbs, dashes, edges, zebra };
-  }, []);
+  }, [ROAD_HALF_WIDTH, CROSS_STREET]);
 }
 
 export function Streets() {
   const m = materials();
-  const k = useKerbsAndMarkings();
+  const { roadHalfWidth: ROAD_HALF_WIDTH, pavementWidth: PAVEMENT_WIDTH, crossStreet: CROSS_STREET } = useLayout();
+  const PAVE_OUT = ROAD_HALF_WIDTH + PAVEMENT_WIDTH;
+  const k = useKerbsAndMarkings(ROAD_HALF_WIDTH, CROSS_STREET);
   return (
     <group>
       {/* Laterite verges and open ground */}

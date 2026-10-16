@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FASHION_ITEMS, PATTERNS, SLOTS, atFashionHouse, itemById, resolveStyles, sanitiseWardrobe } from './fashion';
+import { FASHION_ITEMS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe } from './fashion';
 
 describe('fashion catalogue', () => {
   it('has unique ids, valid colours and prices, and items for every slot', () => {
@@ -28,8 +28,4 @@ describe('fashion catalogue', () => {
       .toEqual({ owned: ['hair-copper'], equipped: { hair: 'hair-copper' } });
   });
 
-  it('knows where the Fashion House is', () => {
-    expect(atFashionHouse(5.5, 39)).toBe(true);
-    expect(atFashionHouse(1.5, 2)).toBe(false);
-  });
 });

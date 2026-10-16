@@ -9,9 +9,9 @@ import { perfStats } from '../world/quality';
 import { TouchStick } from './TouchStick';
 import { genderLabel, heritageLabel } from '../lib/identity';
 import { formatHome } from '../lib/places';
-import { FASHION_HOUSE, atFashionHouse } from '../lib/fashion';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
-import { GADGET_HUB, atGadgetHub, equipmentPay } from '../lib/equipment';
+import { equipmentPay } from '../lib/equipment';
+import { counterAt, type District } from '../lib/geography';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
 
@@ -29,6 +29,9 @@ interface HUDProps {
   fullness: number;
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
+  /** The district the player is in: its counters, homes and workplaces. */
+  district: District;
+  onOpenTravel?: () => void;
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
@@ -88,6 +91,8 @@ export function HUD({
   fullness,
   onOpenVendor,
   onOpenShop,
+  district,
+  onOpenTravel,
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
@@ -106,17 +111,21 @@ export function HUD({
   // Phones start with a slim one-row panel so the street stays visible
   const [expanded, setExpanded] = useState(false);
 
-  const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
-  const vendor = nearestVendor(controller.position.x, controller.position.z);
-  // One prompt at a time: the food vendor if you're at one, otherwise the boutique
+  const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
+  const { x: px, z: pz } = controller.position;
+  const vendor = nearestVendor(district.vendors, px, pz);
+  const counter = counterAt(district, px, pz);
+  // One prompt at a time: a food vendor, then a shop or desk, then a front door
   const prompt = vendor && onOpenVendor
     ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
-    : onOpenShop && atFashionHouse(controller.position.x, controller.position.z)
-      ? { verb: 'Shop at', place: FASHION_HOUSE.name, onOpen: onOpenShop }
-      : onOpenGadgets && atGadgetHub(controller.position.x, controller.position.z)
-        ? { verb: 'Shop at', place: GADGET_HUB.name, onOpen: onOpenGadgets }
-        : null;
-  const door = !prompt && onOpenHome ? homeAtDoor(controller.position.x, controller.position.z) : undefined;
+    : counter === 'fashion' && onOpenShop
+      ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop }
+      : counter === 'gadgets' && onOpenGadgets
+        ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets }
+        : counter === 'travel' && onOpenTravel
+          ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel }
+          : null;
+  const door = !prompt && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
   const placePrompt = prompt ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
@@ -201,7 +210,7 @@ export function HUD({
       {neighborhood && (
         <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
           <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
-            {neighborhood.name}
+            {neighborhood.name} · {district.city.name}
           </p>
           <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
             {neighborhood.description}

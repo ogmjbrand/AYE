@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Vector3 } from 'three';
 import { resolveCollisions } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
-import { CURRENT_DISTRICT } from '../lib/geography';
+import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
 
 export interface PlayerHandle {
   position: Vector3;
@@ -21,7 +21,7 @@ const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 
 const playerHandle: PlayerHandle = {
-  position: new Vector3(...CURRENT_DISTRICT.spawn),
+  position: new Vector3(...districtById(DEFAULT_DISTRICT_ID).spawn),
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
@@ -121,4 +121,11 @@ export function usePlayerController(): PlayerHandle {
   }, []);
 
   return playerHandle;
+}
+
+/** Puts the player at a spot (e.g. a district's arrival point), standing still. */
+export function placePlayer(spot: readonly [number, number, number], direction = 0) {
+  playerHandle.position.set(spot[0], spot[1], spot[2]);
+  playerHandle.velocity.set(0, 0, 0);
+  playerHandle.direction = direction;
 }

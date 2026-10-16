@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import type { Career } from './CharacterCreation';
-import { EQUIPMENT, GADGET_HUB, type EquipmentItem } from '../lib/equipment';
+import { EQUIPMENT, type EquipmentItem } from '../lib/equipment';
+import type { Counter } from '../lib/geography';
 
 interface GadgetStoreProps {
+  shop: Counter;
   owned: readonly string[];
   balance: number;
   career: Career;
@@ -11,7 +13,7 @@ interface GadgetStoreProps {
 }
 
 /** The Gadget Hub: one-off purchases that change how you live and work. */
-export function GadgetStore({ owned, balance, career, onBuy, onClose }: GadgetStoreProps) {
+export function GadgetStore({ shop, owned, balance, career, onBuy, onClose }: GadgetStoreProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -32,8 +34,8 @@ export function GadgetStore({ owned, balance, career, onBuy, onClose }: GadgetSt
       >
         <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
           <div>
-            <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{GADGET_HUB.kind}</p>
-            <h2 id="gadget-title" className="m-0 mt-1 font-display text-2xl font-bold">{GADGET_HUB.name}</h2>
+            <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{shop.kind}</p>
+            <h2 id="gadget-title" className="m-0 mt-1 font-display text-2xl font-bold">{shop.name}</h2>
             <p className="m-0 mt-1 text-sm text-ui-muted">Balance <span className="tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
           </div>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>

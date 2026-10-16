@@ -25,52 +25,64 @@ export interface Obstacle {
 
 export const WORLD_BOUND = 45;
 export const PLAYER_RADIUS = 0.3;
-
-// Street grid
-export const ROAD_HALF_WIDTH = 4; // boulevard: x in [-4, 4]
-export const PAVEMENT_WIDTH = 3; // pavements: 4 <= |x| <= 7
-export const CROSS_STREET = { minZ: -24, maxZ: -16 } as const;
 export const STREET_LENGTH = 130;
+export const PAVEMENT_HEIGHT = 0.12;
+export const DANFO_SIZE = [2.0, 2.3, 5.0] as const; // width, height, length
+export const STALL_SIZE = [1.4, 1.0, 1.8] as const;
 
-const b = (
+export interface Vehicle {
+  position: readonly [number, number, number];
+  /** Rotation about Y in radians; 0 faces +Z. */
+  heading: number;
+  color: string;
+}
+
+type Spot = readonly [number, number, number];
+
+/**
+ * What makes one district's streets: the street grid (a boulevard along Z
+ * and one cross street), the buildings, and what stands on the pavements.
+ * Each district (lib/districts) supplies one; rendering and collision read it.
+ */
+export interface LayoutSpec {
+  id: string;
+  /** Boulevard: x in [-roadHalfWidth, roadHalfWidth]; pavements run beside it. */
+  roadHalfWidth: number;
+  pavementWidth: number;
+  crossStreet: { minZ: number; maxZ: number };
+  buildings: readonly Building[];
+  /** Palms and lamps along both sides of the boulevard: distance from the centre line, spacing, first offset. */
+  palms: { x: number; spacing: number; offset: number } | null;
+  lamps: { x: number; spacing: number; offset: number };
+  powerPoles: readonly Spot[];
+  /** Parked minibuses (danfos in Lagos, tro-tros in Accra). */
+  vehicles: readonly Vehicle[];
+  stalls: readonly Spot[];
+  /** Roadside billboard with the AYE logo, if the district has one. */
+  billboard: Spot | null;
+  /** Distant city massing: seed and colours. */
+  skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
+}
+
+export interface DistrictLayout extends LayoutSpec {
+  palmSpots: Spot[];
+  lampSpots: Spot[];
+  /** Everything solid: buildings, parked buses, stalls, tree and lamp bases. */
+  obstacles: Obstacle[];
+  skylineBuildings: Building[];
+}
+
+export const building = (
   x: number, z: number, w: number, d: number, h: number,
   style: BuildingStyle, color: string, name?: string,
 ): Building => ({ position: [x, 0, z], size: [w, h, d], style, color, name });
 
-export const BUILDINGS: readonly Building[] = [
-  // West side, north of the cross street
-  b(-11, -6, 6, 12, 7, 'shop', '#d9c7a3', 'Mama Put'),
-  b(-11, 9, 6, 12, 14, 'residential', '#e8d9b5', 'Marina Court'),
-  b(-22, 0, 12, 14, 42, 'tower', '#5f7f8f'),
-  b(-11, 24, 6, 12, 17, 'residential', '#d8a47f', 'Palm View'),
-  b(-23, 24, 10, 12, 22, 'office', '#c9ccc8', 'Tech Campus'),
-  b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Gadget Hub'),
-  // West side, south of the cross street
-  b(-13, -36, 10, 12, 18, 'office', '#d6cdbd', 'University'),
-  b(-26, -36, 10, 10, 13, 'residential', '#e3cf9a'),
-  // East side, north of the cross street
-  b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
-  b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
-  b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
-  b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),
-  b(25, -2, 10, 10, 24, 'office', '#b9c2c4'),
-  b(11, 3, 6, 5, 6, 'shop', '#e9d3b0', 'Taste of Africa'),
-  b(11, 39, 6, 8, 6, 'shop', '#d7c4e0', 'Fashion House'),
-  // East side, south of the cross street
-  b(14, -36, 12, 12, 46, 'tower', '#3f5f73', 'Marina Heights'),
-  b(28, -36, 8, 10, 12, 'residential', '#dcc2a2'),
-];
-
-export const PAVEMENT_HEIGHT = 0.12;
-
 /** Height of the walkable surface (pavements are raised above the road). */
-export function groundHeightAt(x: number, z: number): number {
+export function groundHeightAt(x: number, z: number, layout: DistrictLayout = activeLayout()): number {
+  const { roadHalfWidth: R, pavementWidth: P, crossStreet: C } = layout;
   const ax = Math.abs(x);
-  const onBoulevardPavement = ax >= ROAD_HALF_WIDTH && ax <= ROAD_HALF_WIDTH + PAVEMENT_WIDTH && !(z > CROSS_STREET.minZ && z < CROSS_STREET.maxZ);
-  const onCrossPavement =
-    ax >= ROAD_HALF_WIDTH &&
-    ((z >= CROSS_STREET.minZ - PAVEMENT_WIDTH && z <= CROSS_STREET.minZ) ||
-      (z >= CROSS_STREET.maxZ && z <= CROSS_STREET.maxZ + PAVEMENT_WIDTH));
+  const onBoulevardPavement = ax >= R && ax <= R + P && !(z > C.minZ && z < C.maxZ);
+  const onCrossPavement = ax >= R && ((z >= C.minZ - P && z <= C.minZ) || (z >= C.maxZ && z <= C.maxZ + P));
   return onBoulevardPavement || onCrossPavement ? PAVEMENT_HEIGHT : 0;
 }
 
@@ -86,63 +98,74 @@ export function seeded(seed: number) {
   };
 }
 
-const inCrossStreet = (z: number, margin = 0) =>
-  z > CROSS_STREET.minZ - PAVEMENT_WIDTH - margin && z < CROSS_STREET.maxZ + PAVEMENT_WIDTH + margin;
-
-/** Pavement positions every `spacing` metres along both sides of the boulevard. */
-function alongBoulevard(x: number, spacing: number, offset: number) {
-  const out: [number, number, number][] = [];
+/** Pavement positions every `spacing` metres along both sides of the boulevard, skipping the junction. */
+function alongBoulevard(spec: LayoutSpec, x: number, spacing: number, offset: number) {
+  const { crossStreet: C, pavementWidth: P } = spec;
+  const inCross = (z: number) => z > C.minZ - P - 1 && z < C.maxZ + P + 1;
+  const out: Spot[] = [];
   for (let z = -WORLD_BOUND + offset; z <= WORLD_BOUND; z += spacing) {
-    if (!inCrossStreet(z, 1)) {
-      out.push([x, 0, z], [-x, 0, z]);
+    if (!inCross(z)) out.push([x, 0, z], [-x, 0, z]);
+  }
+  return out;
+}
+
+/**
+ * The wider city seen beyond the walkable block: massing only, not solid
+ * (the player can never reach it), deterministic so it never changes.
+ * Taller towers sit further out, like a business district behind the street.
+ */
+function skylineFor(spec: LayoutSpec): Building[] {
+  const { seed, warm, glass, towerChance } = spec.skyline;
+  const rand = seeded(seed);
+  const out: Building[] = [];
+  const CELL = 20;
+  const EXTENT = 150;
+  for (let cx = -EXTENT + CELL / 2; cx < EXTENT; cx += CELL) {
+    for (let cz = -EXTENT + CELL / 2; cz < EXTENT; cz += CELL) {
+      // Keep clear of the playable block and its buildings
+      if (Math.abs(cx) < 60 && Math.abs(cz) < 64) continue;
+      // Leave the boulevard's corridor open so the street recedes into the distance
+      if (Math.abs(cx) < 20) continue;
+      if (rand() < 0.12) continue; // the odd gap reads as a real city
+      const w = 10 + rand() * 6;
+      const d = 10 + rand() * 6;
+      const x = cx + (rand() - 0.5) * 4;
+      const z = cz + (rand() - 0.5) * 4;
+      const dist = Math.hypot(cx, cz);
+      const isTower = rand() < Math.min(towerChance, 0.1 + (dist - 60) / 200);
+      const h = isTower ? 38 + rand() * (40 + dist / 3) : 10 + rand() * 18;
+      const style: BuildingStyle = isTower ? 'tower' : rand() < 0.5 ? 'office' : 'residential';
+      const palette = isTower ? glass : warm;
+      out.push(building(x, z, w, d, h, style, palette[Math.floor(rand() * palette.length)]));
     }
   }
   return out;
 }
 
-export const PALMS = alongBoulevard(6.3, 12, 2);
-export const STREET_LAMPS = alongBoulevard(4.5, 12, 8);
-/** Wooden power poles run down the west pavement only, as is common in Lagos. */
-export const POWER_POLES: [number, number, number][] = [-40, -30, -8, 4, 16, 28, 40].map(
-  (z) => [-6.7, 0, z],
-);
-
-export interface Vehicle {
-  position: readonly [number, number, number];
-  /** Rotation about Y in radians; 0 faces +Z. */
-  heading: number;
-  color: string;
+export function buildLayout(spec: LayoutSpec): DistrictLayout {
+  const palmSpots = spec.palms ? alongBoulevard(spec, spec.palms.x, spec.palms.spacing, spec.palms.offset) : [];
+  const lampSpots = alongBoulevard(spec, spec.lamps.x, spec.lamps.spacing, spec.lamps.offset);
+  const obstacles: Obstacle[] = [
+    ...spec.buildings,
+    ...spec.vehicles.map((v) => ({ position: v.position, size: DANFO_SIZE })),
+    ...spec.stalls.map((p) => ({ position: p, size: STALL_SIZE })),
+    ...palmSpots.map((p) => ({ position: p, size: [0.5, 1, 0.5] as const })),
+    ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
+    ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
+  ];
+  return { ...spec, palmSpots, lampSpots, obstacles, skylineBuildings: skylineFor(spec) };
 }
 
-/** Parked danfo minibuses at the kerbside bus stops. */
-export const DANFOS: readonly Vehicle[] = [
-  { position: [2.4, 0, 30], heading: 0, color: '#f2b705' },
-  { position: [2.4, 0, 36.5], heading: 0, color: '#f2b705' },
-  { position: [-2.4, 0, -36], heading: Math.PI, color: '#f2b705' },
-  { position: [-2.4, 0, 10], heading: Math.PI, color: '#e9a800' },
-];
-export const DANFO_SIZE = [2.0, 2.3, 5.0] as const; // width, height, length
-
-/** Market stalls with umbrellas on the pavement outside the shop row. */
-export const MARKET_STALLS: [number, number, number][] = [
-  [-6.2, 0, -10.5],
-  [-6.2, 0, -7.5],
-  [-6.2, 0, -1.5],
-];
-export const STALL_SIZE = [1.4, 1.0, 1.8] as const;
-
-/** Everything solid: buildings, parked buses, stalls, tree and lamp bases. */
-export const OBSTACLES: readonly Obstacle[] = [
-  ...BUILDINGS,
-  ...DANFOS.map((v) => ({
-    position: v.position,
-    size: [DANFO_SIZE[0], DANFO_SIZE[1], DANFO_SIZE[2]] as const,
-  })),
-  ...MARKET_STALLS.map((p) => ({ position: p, size: STALL_SIZE })),
-  ...PALMS.map((p) => ({ position: p, size: [0.5, 1, 0.5] as const })),
-  ...STREET_LAMPS.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
-  ...POWER_POLES.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
-];
+// The district the player is in. Collision and ground height default to it;
+// rendering reads the same layout through React context (world/LayoutContext).
+let active: DistrictLayout | null = null;
+export function setActiveLayout(layout: DistrictLayout) {
+  active = layout;
+}
+export function activeLayout(): DistrictLayout {
+  if (!active) throw new Error('No district layout set');
+  return active;
+}
 
 /**
  * Pushes a circle (the player's footprint) out of every obstacle it overlaps.
@@ -152,7 +175,7 @@ export function resolveCollisions(
   x: number,
   z: number,
   radius = PLAYER_RADIUS,
-  obstacles: readonly Obstacle[] = OBSTACLES,
+  obstacles: readonly Obstacle[] = activeLayout().obstacles,
 ): { x: number; z: number } {
   for (const o of obstacles) {
     const halfW = o.size[0] / 2;
@@ -192,38 +215,3 @@ export function resolveCollisions(
   z = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, z));
   return { x, z };
 }
-
-/**
- * The wider city seen beyond the walkable block: massing only, not solid
- * (the player can never reach it), deterministic so it never changes.
- * Taller towers sit further out, like a business district behind the street.
- */
-export const SKYLINE: readonly Building[] = (() => {
-  const rand = seeded(311);
-  const out: Building[] = [];
-  const CELL = 20;
-  const EXTENT = 150;
-  const warm = ['#d8c4a2', '#e3d2b4', '#c9b08c', '#d9a982', '#e8dcc6', '#bfb6a6'];
-  const glass = ['#4f6f82', '#5d7d8c', '#3f5f73', '#6a8796'];
-  for (let cx = -EXTENT + CELL / 2; cx < EXTENT; cx += CELL) {
-    for (let cz = -EXTENT + CELL / 2; cz < EXTENT; cz += CELL) {
-      // Keep clear of the playable block and its buildings
-      if (Math.abs(cx) < 60 && Math.abs(cz) < 64) continue;
-      // Leave the boulevard's corridor open so the street recedes into the distance
-      if (Math.abs(cx) < 20) continue;
-      if (rand() < 0.12) continue; // the odd gap reads as a real city
-      const w = 10 + rand() * 6;
-      const d = 10 + rand() * 6;
-      const x = cx + (rand() - 0.5) * 4;
-      const z = cz + (rand() - 0.5) * 4;
-      const dist = Math.hypot(cx, cz);
-      const towerChance = Math.min(0.55, 0.1 + (dist - 60) / 200);
-      const isTower = rand() < towerChance;
-      const h = isTower ? 38 + rand() * (40 + dist / 3) : 10 + rand() * 18;
-      const style: BuildingStyle = isTower ? 'tower' : rand() < 0.5 ? 'office' : 'residential';
-      const palette = isTower ? glass : warm;
-      out.push(b(x, z, w, d, h, style, palette[Math.floor(rand() * palette.length)]));
-    }
-  }
-  return out;
-})();

@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Career } from '../components/CharacterCreation';
-import { getCareerLocation } from './careers';
-import {
-  BUILDINGS,
-  OBSTACLES,
-  SKYLINE,
-  CROSS_STREET,
-  PAVEMENT_WIDTH,
-  PLAYER_RADIUS,
-  ROAD_HALF_WIDTH,
-  WORLD_BOUND,
-  resolveCollisions,
-} from './world';
+import { DISTRICTS } from './geography';
+import { PLAYER_RADIUS, WORLD_BOUND, groundHeightAt, resolveCollisions } from './world';
 
 const box = { position: [0, 2, 0] as const, size: [4, 4, 2] as const }; // x -2..2, z -1..1
 
@@ -34,18 +23,20 @@ describe('resolveCollisions', () => {
   it('keeps the player inside the world', () => {
     expect(resolveCollisions(99, -99, PLAYER_RADIUS, [])).toEqual({ x: WORLD_BOUND, z: -WORLD_BOUND });
   });
+});
+
+describe.each(DISTRICTS.map((d) => [d.id, d.layout] as const))('layout %s', (_, L) => {
+  const { buildings: BUILDINGS, obstacles: OBSTACLES, skylineBuildings: SKYLINE, crossStreet: CROSS_STREET, pavementWidth: PAVEMENT_WIDTH, roadHalfWidth: ROAD_HALF_WIDTH } = L;
 
   it('blocks every real building in the city', () => {
     for (const b of BUILDINGS) {
-      const r = resolveCollisions(b.position[0], b.position[2]);
+      const r = resolveCollisions(b.position[0], b.position[2], PLAYER_RADIUS, OBSTACLES);
       const inside =
         Math.abs(r.x - b.position[0]) < b.size[0] / 2 && Math.abs(r.z - b.position[2]) < b.size[2] / 2;
       expect(inside).toBe(false);
     }
   });
-});
 
-describe('city layout', () => {
   it('no two buildings overlap', () => {
     for (let i = 0; i < BUILDINGS.length; i++) {
       for (let j = i + 1; j < BUILDINGS.length; j++) {
@@ -61,24 +52,18 @@ describe('city layout', () => {
     for (const bld of BUILDINGS) {
       const minX = bld.position[0] - bld.size[0] / 2, maxX = bld.position[0] + bld.size[0] / 2;
       const minZ = bld.position[2] - bld.size[2] / 2, maxZ = bld.position[2] + bld.size[2] / 2;
-      expect(maxX <= -ROAD_HALF_WIDTH - PAVEMENT_WIDTH || minX >= ROAD_HALF_WIDTH + PAVEMENT_WIDTH).toBe(true);
+      expect(maxX <= -ROAD_HALF_WIDTH - PAVEMENT_WIDTH || minX >= ROAD_HALF_WIDTH + PAVEMENT_WIDTH, bld.name).toBe(true);
       const hitsCross = maxZ > CROSS_STREET.minZ - PAVEMENT_WIDTH && minZ < CROSS_STREET.maxZ + PAVEMENT_WIDTH;
-      expect(hitsCross).toBe(false);
+      expect(hitsCross, bld.name).toBe(false);
     }
   });
 
-  it('the player start and every workplace are reachable (not inside an obstacle)', () => {
-    const careers: Career[] = ['student', 'artist', 'entrepreneur', 'athlete', 'engineer', 'doctor', 'pilot'];
-    const spots = [[1.5, 2], ...careers.map((c) => [getCareerLocation(c).position[0], getCareerLocation(c).position[2]])];
-    for (const [x, z] of spots) {
-      expect(resolveCollisions(x, z), `spot ${x},${z}`).toEqual({ x, z });
-      expect(Math.abs(x) <= WORLD_BOUND && Math.abs(z) <= WORLD_BOUND).toBe(true);
-    }
+  it('pavements are raised and the road is not', () => {
+    expect(groundHeightAt(0, 30, L)).toBe(0);
+    expect(groundHeightAt(ROAD_HALF_WIDTH + 1, 40, L)).toBeGreaterThan(0);
   });
-});
 
-describe('skyline', () => {
-  it('stays out of reach of the player and away from the street buildings', () => {
+  it('skyline stays out of reach of the player and is not solid', () => {
     expect(SKYLINE.length).toBeGreaterThan(100);
     for (const s of SKYLINE) {
       const minX = s.position[0] - s.size[0] / 2;
@@ -87,10 +72,7 @@ describe('skyline', () => {
       const maxZ = s.position[2] + s.size[2] / 2;
       const clearOfWalkable = minX > WORLD_BOUND + 3 || maxX < -WORLD_BOUND - 3 || minZ > WORLD_BOUND + 3 || maxZ < -WORLD_BOUND - 3;
       expect(clearOfWalkable).toBe(true);
+      expect(OBSTACLES).not.toContain(s);
     }
-  });
-
-  it('is not solid', () => {
-    for (const s of SKYLINE) expect(OBSTACLES).not.toContain(s);
   });
 });

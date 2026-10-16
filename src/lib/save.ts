@@ -12,6 +12,7 @@ import { sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
+import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -127,10 +128,12 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
+    // Saves from before travel are in the first district
+    districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId }));
 }

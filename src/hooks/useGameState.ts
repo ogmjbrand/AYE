@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
 import { gameReducer, type GameAction, type GameState } from '../lib/gameState';
 import { loadProgress, saveProgress } from '../lib/save';
+import type { TravelMode } from '../lib/travel';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -43,6 +44,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     moveIn: (homeId: string) => dispatch({ type: 'moveIn', homeId }),
     moveOut: () => dispatch({ type: 'moveOut' }),
     buyEquipment: (id: string) => dispatch({ type: 'buyEquipment', id }),
+    travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),

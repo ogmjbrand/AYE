@@ -119,6 +119,14 @@ describe('progress save', () => {
     expect(p.home).toBeNull();
   });
 
+  it('remembers which city you are in, and falls back to the first for unknown places', () => {
+    const s = new MemoryStorage();
+    saveProgress('abc', { ...createGameState(100), districtId: 'accra.osu' }, s);
+    expect(loadProgress(character, s).districtId).toBe('accra.osu');
+    saveProgress('abc', { ...createGameState(100), districtId: 'atlantis' }, s);
+    expect(loadProgress(character, s).districtId).toBe('lagos.marina');
+  });
+
   it('drops a home that no longer exists', () => {
     const s = new MemoryStorage();
     saveProgress('abc', { ...createGameState(100), home: 'demolished' }, s);

@@ -45,7 +45,3 @@ export function equipmentPay(owned: readonly string[], career: Career): number {
 }
 
 export const hasMap = (owned: readonly string[]) => owned.some((id) => equipmentById(id)?.map);
-
-/** Where the Gadget Hub sells: the pavement in front of its shop. */
-export const GADGET_HUB = { name: 'Gadget Hub', kind: 'Phones, laptops & work kit', position: [-5.5, 0, 38] as const };
-export const atGadgetHub = (x: number, z: number) => Math.hypot(GADGET_HUB.position[0] - x, GADGET_HUB.position[2] - z) <= 3;

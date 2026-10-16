@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { BufferAttribute, BufferGeometry, Color, Vector3 } from 'three';
 import { Instances, type Placement } from './Instances';
-import { BUILDINGS, SKYLINE, seeded, type Building, type BuildingStyle } from '../lib/world';
+import { seeded, type Building, type BuildingStyle } from '../lib/world';
+import { useLayout } from './DistrictContext';
 import { BAY_WIDTH, FACADE_TILE, FLOOR_HEIGHT, signTexture } from './textures';
 import { materials } from './materials';
 
@@ -104,7 +105,7 @@ function facadeGeometries(buildings: readonly Building[], seed: number) {
   };
 }
 
-function useDetails() {
+function useDetails(buildings: readonly Building[]) {
   return useMemo(() => {
     const rand = seeded(19);
     const tanks: Placement[] = [];
@@ -114,7 +115,7 @@ function useDetails() {
     const awnings: Placement[] = [];
     const awningColors = ['#c0392b', '#1f7a4d', '#e2a400', '#2a5d9f', '#7b2d6b'];
 
-    for (const b of BUILDINGS) {
+    for (const b of buildings) {
       const { min, max } = bounds(b);
       const [w, h, d] = b.size;
       const side = streetSide(b);
@@ -176,14 +177,15 @@ function useDetails() {
       }
     }
     return { tanks, acUnits, slabs, railings, awnings };
-  }, []);
+  }, [buildings]);
 }
 
 /** Shop and landmark name boards above the ground floor, facing the boulevard. */
 function Signs() {
+  const { buildings } = useLayout();
   const signs = useMemo(
     () =>
-      BUILDINGS.filter((b) => b.name).map((b) => {
+      buildings.filter((b) => b.name).map((b) => {
         const { min, max } = bounds(b);
         const side = streetSide(b);
         const isShop = b.style === 'shop';
@@ -199,7 +201,7 @@ function Signs() {
           rotationY: side > 0 ? Math.PI / 2 : -Math.PI / 2,
         };
       }),
-    [],
+    [buildings],
   );
   return (
     <>
@@ -215,8 +217,9 @@ function Signs() {
 
 export function Buildings() {
   const m = materials();
-  const geo = useMemo(() => facadeGeometries(BUILDINGS, 7), []);
-  const details = useDetails();
+  const { buildings } = useLayout();
+  const geo = useMemo(() => facadeGeometries(buildings, 7), [buildings]);
+  const details = useDetails(buildings);
   return (
     <group>
       {geo.facades.map(([style, g]) => (
@@ -242,7 +245,8 @@ export function Buildings() {
  */
 export function Skyline() {
   const m = materials();
-  const geo = useMemo(() => facadeGeometries(SKYLINE, 23), []);
+  const { skylineBuildings } = useLayout();
+  const geo = useMemo(() => facadeGeometries(skylineBuildings, 23), [skylineBuildings]);
   return (
     <group>
       {geo.facades.map(([style, g]) => (

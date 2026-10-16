@@ -110,13 +110,6 @@ export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: P
   return out;
 }
 
-/** Where the boutique is: on the pavement in front of the Fashion House. */
-export const FASHION_HOUSE = { name: 'Fashion House', kind: 'Boutique & salon', position: [5.5, 0, 39] as const };
-export const SHOP_RADIUS = 3;
-
-export const atFashionHouse = (x: number, z: number) =>
-  Math.hypot(FASHION_HOUSE.position[0] - x, FASHION_HOUSE.position[2] - z) <= SHOP_RADIUS;
-
 /** A CSS background that previews an item's pattern in the shop. */
 export function swatchCss(style: Style): string {
   const [a, b, c] = style.colors;

@@ -1,21 +1,21 @@
 /**
- * The world model: countries contain cities, cities contain districts, and
- * a district is one playable 3D area with its interactive places. Today there
- * is one district; a second city is added by adding data here (plus its
- * layout and art), not by rewriting the game.
- *
- * Places reference the existing per-system data (food vendors, workplaces,
- * shops) so nothing is duplicated; the registry is the single index that
- * other systems (save data, a future server, travel) can rely on.
+ * The world model: countries contain cities, cities contain districts, and a
+ * district is one playable 3D area. Each district is data (lib/districts):
+ * its street layout, neighbourhoods, food vendors, shops, homes, workplaces
+ * and travel desk. Adding a city means adding a district file, not rewriting
+ * the game; everything else reads the current district from here.
  */
-import { FOOD_VENDORS } from './food';
-import { CAREER_LOCATIONS } from './careers';
-import { FASHION_HOUSE } from './fashion';
-import { HOMES } from './homes';
-import { GADGET_HUB } from './equipment';
 import type { Career } from '../components/CharacterCreation';
+import type { CareerLocation } from './careers';
+import type { FoodVendor } from './food';
+import type { Home } from './homes';
+import type { Neighborhood } from './neighborhoods';
+import { buildLayout, setActiveLayout, type DistrictLayout, type LayoutSpec } from './world';
+import { LAGOS_MARINA } from './districts/lagos';
+import { ACCRA_OSU } from './districts/accra';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public';
+type Spot = readonly [number, number, number];
 
 export interface Place {
   /** Unique across the whole world, e.g. "lagos.marina.mama-put". */
@@ -23,17 +23,9 @@ export interface Place {
   kind: PlaceKind;
   name: string;
   /** Where the player stands to use it, in district coordinates (metres). */
-  position: readonly [number, number, number];
+  position: Spot;
   /** For workplaces: the career that works here. */
   career?: Career;
-}
-
-export interface District {
-  id: string;
-  name: string;
-  /** Player start position. */
-  spawn: readonly [number, number, number];
-  places: readonly Place[];
 }
 
 export interface City {
@@ -43,34 +35,77 @@ export interface City {
   country: string;
   /** IANA time zone, for when cities run on their own clocks. */
   timeZone: string;
-  /** Currency code for local prices; the game currently uses one virtual currency (ⓒ). */
+  /** Local currency code; the game itself uses one virtual currency (ⓒ). */
   currency: string;
-  districts: readonly District[];
 }
 
-const LAGOS_MARINA: District = {
-  id: 'lagos.marina',
-  name: 'Marina Boulevard',
-  spawn: [1.5, 0, 2],
-  places: [
-    ...FOOD_VENDORS.map((v): Place => ({ id: `lagos.marina.${v.id}`, kind: 'food', name: v.name, position: v.position })),
-    { id: 'lagos.marina.fashion-house', kind: 'shop', name: FASHION_HOUSE.name, position: FASHION_HOUSE.position },
-    { id: 'lagos.marina.gadget-hub', kind: 'shop', name: GADGET_HUB.name, position: GADGET_HUB.position },
-    ...HOMES.map((h): Place => ({ id: `lagos.marina.home.${h.id}`, kind: 'home', name: h.name, position: h.door })),
-    ...(Object.entries(CAREER_LOCATIONS) as [Career, (typeof CAREER_LOCATIONS)[Career]][])
-      .filter(([career]) => career !== 'none')
-      .map(([career, loc]): Place => ({
-        id: `lagos.marina.work.${career}`, kind: 'workplace', name: loc.name, position: loc.position, career,
-      })),
-  ],
-};
+/** A shop or service counter: where the player stands to use it. */
+export interface Counter {
+  name: string;
+  kind: string;
+  position: Spot;
+}
 
-export const CITIES: readonly City[] = [
-  { id: 'lagos', name: 'Lagos', country: 'NG', timeZone: 'Africa/Lagos', currency: 'NGN', districts: [LAGOS_MARINA] },
-];
+/** A district as written in lib/districts. */
+export interface DistrictSpec {
+  id: string;
+  city: City;
+  name: string;
+  /** Where the player arrives. */
+  spawn: Spot;
+  layout: LayoutSpec;
+  neighborhoods: readonly Neighborhood[];
+  vendors: readonly FoodVendor[];
+  fashionHouse: Counter;
+  gadgetHub: Counter;
+  travelDesk: Counter;
+  homes: readonly Home[];
+  workplaces: Record<Exclude<Career, 'none'>, CareerLocation>;
+}
 
-/** The district the player is in. One for now; travel will make this part of the save. */
-export const CURRENT_DISTRICT = LAGOS_MARINA;
+export interface District extends Omit<DistrictSpec, 'layout'> {
+  layout: DistrictLayout;
+  /** Every interactive place, indexed for maps, saves and a future server. */
+  places: readonly Place[];
+}
 
-export const allPlaces = (): Place[] => CITIES.flatMap((c) => c.districts.flatMap((d) => d.places));
+/** Within this distance of a counter you can use it (E). */
+export const COUNTER_RADIUS = 3;
+
+function buildDistrict(spec: DistrictSpec): District {
+  const id = (s: string) => `${spec.id}.${s}`;
+  const places: Place[] = [
+    ...spec.vendors.map((v): Place => ({ id: id(v.id), kind: 'food', name: v.name, position: v.position })),
+    { id: id('fashion'), kind: 'shop', name: spec.fashionHouse.name, position: spec.fashionHouse.position },
+    { id: id('gadgets'), kind: 'shop', name: spec.gadgetHub.name, position: spec.gadgetHub.position },
+    { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
+    ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
+    ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
+      id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,
+    })),
+  ];
+  return { ...spec, layout: buildLayout(spec.layout), places };
+}
+
+export const DISTRICTS: readonly District[] = [buildDistrict(LAGOS_MARINA), buildDistrict(ACCRA_OSU)];
+export const DEFAULT_DISTRICT_ID = 'lagos.marina';
+
+export const districtById = (id: string | null | undefined): District =>
+  DISTRICTS.find((d) => d.id === id) ?? DISTRICTS.find((d) => d.id === DEFAULT_DISTRICT_ID)!;
+export const isDistrictId = (id: unknown): id is string => DISTRICTS.some((d) => d.id === id);
+
+// Collision and ground height start in the default district; the game switches this when you travel
+setActiveLayout(districtById(DEFAULT_DISTRICT_ID).layout);
+
+export const allPlaces = (): Place[] => DISTRICTS.flatMap((d) => [...d.places]);
 export const placeById = (id: string) => allPlaces().find((p) => p.id === id);
+
+const near = (c: Counter, x: number, z: number) => Math.hypot(c.position[0] - x, c.position[2] - z) <= COUNTER_RADIUS;
+
+/** Which counter (if any) the player is standing at. */
+export function counterAt(d: District, x: number, z: number): 'fashion' | 'gadgets' | 'travel' | null {
+  if (near(d.fashionHouse, x, z)) return 'fashion';
+  if (near(d.gadgetHub, x, z)) return 'gadgets';
+  if (near(d.travelDesk, x, z)) return 'travel';
+  return null;
+}

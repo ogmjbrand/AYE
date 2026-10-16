@@ -66,6 +66,17 @@ export const DISHES: readonly Dish[] = [
   d('bobotie', 'Bobotie', 'South Africa', 40, 55, ['meat', 'egg', 'dairy'], 'Spiced minced meat baked under an egg custard.'),
   d('shakshuka', 'Shakshuka', 'North Africa', 25, 40, ['egg'], 'Eggs poached in spiced tomato and pepper sauce.'),
   d('doro-wat', 'Doro wat', 'Ethiopia', 40, 60, ['meat', 'egg'], 'Chicken stewed in berbere spice with boiled eggs, on injera.'),
+  // Accra: Ghanaian chop bar, waakye joint and street food
+  d('waakye-special', 'Waakye special', 'Ghana', 30, 60, ['fish', 'egg'], 'Rice and beans cooked with sorghum leaves, with shito, gari, spaghetti, boiled egg and fried fish.'),
+  d('waakye-plain', 'Waakye with stew and plantain', 'Ghana', 20, 50, [], 'Rice and beans with tomato stew, gari and fried ripe plantain.', 'Plant-based: served without shito, egg or fish.'),
+  d('jollof-ghana', 'Ghana jollof and grilled chicken', 'Ghana', 35, 55, ['meat'], 'Fragrant jollof rice with grilled chicken and shito on the side.'),
+  d('fufu-light-soup', 'Fufu and light soup with goat', 'Ghana', 40, 60, ['meat'], 'Pounded cassava and plantain in a peppery tomato soup with goat meat.'),
+  d('banku-tilapia', 'Banku and grilled tilapia', 'Ghana', 40, 55, ['fish'], 'Fermented corn and cassava dough with a whole grilled tilapia and fresh pepper.'),
+  d('kenkey-fish', 'Kenkey with fried fish', 'Ghana', 25, 50, ['fish'], 'Steamed fermented corn dough with fried fish, pepper sauce and onions.'),
+  d('groundnut-soup', 'Groundnut soup with omo tuo', 'Ghana', 30, 55, [], 'Rich peanut soup with mushrooms and garden eggs, served with rice balls.', 'Plant-based version of a soup usually made with meat.'),
+  d('kontomire', 'Kontomire stew and boiled yam', 'Ghana', 25, 50, [], 'Cocoyam-leaf stew with palm oil and agushi, with boiled yam.', 'Plant-based: made without egg or fish.'),
+  d('kelewele', 'Kelewele and groundnuts', 'Ghana', 10, 20, [], 'Ripe plantain cubes fried with ginger and pepper, with roasted groundnuts.'),
+  d('chichinga', 'Chichinga', 'Ghana', 20, 30, ['meat'], 'Spiced beef kebabs grilled over charcoal with suya pepper.'),
 ];
 
 export const dishById = (id: string) => DISHES.find((x) => x.id === id);
@@ -106,36 +117,12 @@ export interface FoodVendor {
   menu: readonly string[];
 }
 
-export const FOOD_VENDORS: readonly FoodVendor[] = [
-  {
-    id: 'mama-put',
-    name: 'Mama Put',
-    kind: 'Nigerian buka',
-    position: [-5.2, 0, -4.5],
-    menu: ['jollof-dodo', 'jollof-chicken', 'ewa-agoyin', 'efo-riro-vegan', 'efo-riro-assorted', 'amala-gbegiri', 'moi-moi', 'fried-rice-prawns'],
-  },
-  {
-    id: 'roadside-market',
-    name: 'Roadside market',
-    kind: 'Street food and snacks',
-    position: [-5.0, 0, -9],
-    menu: ['boli-epa', 'akara-pap', 'puff-puff', 'fruit', 'suya', 'chin-chin', 'roast-fish'],
-  },
-  {
-    id: 'taste-of-africa',
-    name: 'Taste of Africa',
-    kind: 'Pan-African kitchen',
-    position: [5.5, 0, 3],
-    menu: ['misir-shiro', 'red-red', 'sukuma-ugali', 'githeri', 'mafe-vegan', 'thieboudienne', 'koshari', 'vegetable-tagine', 'chakalaka-pap', 'bean-bunny-chow', 'bobotie', 'shakshuka', 'doro-wat'],
-  },
-];
-
 export const VENDOR_RADIUS = 3;
 
-export function nearestVendor(x: number, z: number): FoodVendor | null {
+export function nearestVendor(vendors: readonly FoodVendor[], x: number, z: number): FoodVendor | null {
   let best: FoodVendor | null = null;
   let bestD = VENDOR_RADIUS;
-  for (const v of FOOD_VENDORS) {
+  for (const v of vendors) {
     const dist = Math.hypot(v.position[0] - x, v.position[2] - z);
     if (dist <= bestD) {
       best = v;

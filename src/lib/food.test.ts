@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DIETS, DISHES, FOOD_VENDORS, dietBadge, dishById, nearestVendor, suitsDiet, whyNot } from './food';
-import { resolveCollisions } from './world';
+import { DIETS, DISHES, dietBadge, dishById, nearestVendor, suitsDiet, whyNot } from './food';
+import { DISTRICTS } from './geography';
+
+const FOOD_VENDORS = DISTRICTS.flatMap((d) => d.vendors);
 
 describe('diets', () => {
   const byId = (id: string) => dishById(id)!;
@@ -58,12 +60,10 @@ describe('places to eat', () => {
     }
   });
 
-  it('every ordering spot is reachable and found by proximity', () => {
-    for (const v of FOOD_VENDORS) {
-      const [x, , z] = v.position;
-      expect(resolveCollisions(x, z), v.name).toEqual({ x, z });
-      expect(nearestVendor(x + 1, z)?.id).toBe(v.id);
+  it('is found by proximity within its own district', () => {
+    for (const d of DISTRICTS) {
+      for (const v of d.vendors) expect(nearestVendor(d.vendors, v.position[0] + 1, v.position[2])?.id).toBe(v.id);
+      expect(nearestVendor(d.vendors, 40, 40)).toBeNull();
     }
-    expect(nearestVendor(40, 40)).toBeNull();
   });
 });

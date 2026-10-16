@@ -11,7 +11,8 @@ import {
   gameReducer,
   type GameState,
 } from './gameState';
-import { HOMES, ROUGH_SLEEP_FULLNESS_LOSS, moveInFee } from './homes';
+import { ROUGH_SLEEP_FULLNESS_LOSS, allHomes, moveInFee } from './homes';
+import { TRAVEL_OPTIONS } from './travel';
 
 const run = (
   state: GameState,
@@ -122,7 +123,7 @@ describe('rest', () => {
 });
 
 describe('homes', () => {
-  const room = HOMES[0];
+  const room = allHomes()[0];
   const afterSleep = (s: GameState, atHome: boolean) => gameReducer(s, { type: 'sleep', atHome }, 'none', 'student');
 
   it('moving in costs the move-in fee and is refused without enough money', () => {
@@ -245,5 +246,34 @@ describe('equipment', () => {
     expect(run(kit, 60, 'doctor').today.income).toBe(Math.round(HOURLY_WAGE.doctor * 1.1));
     // Someone else's kit does nothing
     expect(run({ ...kit, equipment: ['kit-pilot'] }, 60, 'doctor').today.income).toBe(HOURLY_WAGE.doctor);
+  });
+});
+
+describe('travel', () => {
+  it('flying to Accra costs the fare, takes the flight time and moves you there', () => {
+    const start = createGameState(5000, createTime(9, 0));
+    const s = gameReducer(start, { type: 'travel', to: 'accra.osu', mode: 'flight' }, 'none', 'student');
+    expect(s.districtId).toBe('accra.osu');
+    expect(s.time.totalMinutes - start.time.totalMinutes).toBe(TRAVEL_OPTIONS.flight.minutes);
+    expect(s.balance).toBe(5000 - TRAVEL_OPTIONS.flight.fare - 3 * HOURLY_LIVING_COST.student);
+    expect(s.fullness).toBeLessThan(100);
+  });
+
+  it('the coach is cheaper but takes much longer', () => {
+    expect(TRAVEL_OPTIONS.coach.fare).toBeLessThan(TRAVEL_OPTIONS.flight.fare);
+    expect(TRAVEL_OPTIONS.coach.minutes).toBeGreaterThan(TRAVEL_OPTIONS.flight.minutes);
+  });
+
+  it('refuses trips you cannot afford, to unknown places or to where you already are', () => {
+    const poor = createGameState(100);
+    expect(gameReducer(poor, { type: 'travel', to: 'accra.osu', mode: 'flight' }, 'none', 'student')).toBe(poor);
+    const rich = createGameState(9000);
+    expect(gameReducer(rich, { type: 'travel', to: 'atlantis', mode: 'coach' }, 'none', 'student')).toBe(rich);
+    expect(gameReducer(rich, { type: 'travel', to: 'lagos.marina', mode: 'coach' }, 'none', 'student')).toBe(rich);
+  });
+
+  it('you are paid in whichever city you work', () => {
+    const accra = { ...createGameState(5000, createTime(9, 0)), districtId: 'accra.osu' };
+    expect(run(accra, 60, 'doctor').today.income).toBe(HOURLY_WAGE.doctor);
   });
 });

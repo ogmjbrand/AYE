@@ -28,7 +28,8 @@ uses Windows PowerShell, so the commands there are `npm.cmd`.
 | 4. Persistent player life | **Partly:** clock, balance, wages, living costs, hunger, sleep, daily ledger, wardrobe. Saved **only in the browser (localStorage)** and decided **in the client**, so any player can edit their money. Not acceptable once there are accounts, trading or real money. |
 | 5. Lifestyle loop | **Partly:** work → paid per minute at the workplace → spend on food and clothes → sleep → daily summary. |
 | 6. Careers, homes, fashion | Careers: a workplace and a five-level ladder per career (e.g. House officer → Consultant), promoted by hours worked, each level raising pay. Equipment from the Gadget Hub: a smartphone (district map) and a work kit per career (+10% pay). Homes: four flats to rent at their front doors (room to penthouse), with a move-in fee, nightly rent, eviction if you can't pay, and rough sleeping otherwise; no interiors yet. Fashion: boutique, salon, wardrobe (fabrics/prints/hair colour on the existing garments; no new cuts or hairstyles yet). |
-| 7–10 | Not started. |
+| 7. Global expansion | **Working:** a second city, Accra (Oxford Street, Osu, Ghana), with its own street layout (wider road, junction to the north, tro-tros), neighbourhoods, Ghanaian food (chop bar, waakye joint, kelewele stall), a kente boutique, gadget shop, three homes and a workplace for every career. Travel desks in both cities sell flights (2,500 ⓒ, 3 h) and coaches (800 ⓒ, 12 h); the clock, rent and hunger keep running on the way. Each district is one data file in `src/lib/districts/`; every layout and placement test runs against each district. |
+| 8–10 | Not started (multiplayer and the creator economy need the backend from Milestone 4 first). |
 
 ### Code layout
 
@@ -68,10 +69,10 @@ Rules that keep this scalable:
 - **Game rules stay out of the UI.** They live in `src/lib` as pure, tested
   functions. The same rules can run on the server later, so client and
   server agree.
-- **The world is data.** `src/lib/geography.ts` (new) models Country → City
-  → District → Places. The current street is the first district,
-  `lagos.marina`. A second city means a new district definition, layout and
-  art, not a rewrite.
+- **The world is data.** `src/lib/geography.ts` models City → District →
+  Places, and each district is one file in `src/lib/districts/` (street
+  layout, neighbourhoods, vendors, shops, homes, workplaces, travel desk).
+  Lagos and Accra both run on the same engine; a third city is a new file.
 - **Assets load per district and per character**, never all at once.
 - **One virtual currency (ⓒ)**, separate from any future real-money
   balance. They must never be mixed (section 7).

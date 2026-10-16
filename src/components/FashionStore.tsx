@@ -4,6 +4,8 @@ import { FASHION_ITEMS, SLOTS, SLOT_LABEL, swatchCss, type FashionItem, type Slo
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
   mode: 'shop' | 'wardrobe';
+  /** The boutique's name and what it sells. */
+  shop: { name: string; kind: string };
   wardrobe: Wardrobe;
   balance: number;
   tryOn: Partial<Record<Slot, string | null>>;
@@ -19,7 +21,7 @@ const BUTTON = 'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition
  * Boutique and wardrobe. A side panel so the player's 3D character stays in
  * view: "Try on" shows an item on the character without buying it.
  */
-export function FashionStore({ mode, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
+export function FashionStore({ mode, shop, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
   const [slot, setSlot] = useState<Slot>('top');
   const [message, setMessage] = useState('');
 
@@ -42,7 +44,7 @@ export function FashionStore({ mode, wardrobe, balance, tryOn, onTryOn, onBuy, o
     >
       <header className="flex items-start justify-between gap-3 border-b border-ui-line/70 px-5 pb-3 pt-4">
         <div>
-          <p className="m-0 text-[11px] uppercase tracking-[0.18em] text-ui-muted">{mode === 'shop' ? 'Fashion House · Boutique & salon' : 'Your wardrobe'}</p>
+          <p className="m-0 text-[11px] uppercase tracking-[0.18em] text-ui-muted">{mode === 'shop' ? `${shop.name} · ${shop.kind}` : 'Your wardrobe'}</p>
           <h2 id="store-title" className="m-0 mt-1 font-display text-xl font-semibold">{mode === 'shop' ? 'Find your look' : 'Get dressed'}</h2>
           <p className="m-0 mt-1 text-xs text-ui-muted">Balance <span className="font-semibold tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
         </div>
