@@ -7,6 +7,8 @@ import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { perfStats } from '../world/quality';
 import { TouchStick } from './TouchStick';
+import { genderLabel, heritageLabel } from '../lib/identity';
+import { formatHome } from '../lib/places';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -261,7 +263,14 @@ export function HUD({
             </button>
             {showDetails && (
               <dl className="m-0 mt-2 space-y-1 text-xs">
-                {character && <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>}
+                {character && (
+                  <>
+                    <Row label="Home">{formatHome(character.country, character.region)}</Row>
+                    <Row label="Gender">{genderLabel(character.gender)}</Row>
+                    <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
+                    <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>
+                  </>
+                )}
                 <Row label="Period">
                   <span className="capitalize">{gameTime.period}</span>
                 </Row>

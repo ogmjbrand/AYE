@@ -5,20 +5,7 @@ import { Box3, Color, type AnimationAction, type Group, type Material, type Mesh
 import type { PlayerHandle } from '../hooks/usePlayerController';
 
 import { assetManifest, assetUrl, type AvatarFile, type OutfitKey } from '../lib/assetManifest';
-
-/**
- * Built-in character: Microsoft Rocketbox "Male_Adult_12" (MIT licence) with its
- * own neutral idle, walk and run motion capture. Clip speeds are the ground
- * speeds the walk and run were captured at (1.2 m per 1.17 s cycle, 2.0 m per
- * 0.71 s cycle). See public/assets/CREDITS.md.
- */
-const DEFAULT_AVATAR: AvatarFile = {
-  url: 'models/characters/rocketbox-male-adult-12.glb',
-  height: 1.78,
-  walkSpeed: 1.03,
-  runSpeed: 2.8,
-  outfit: 'blue',
-};
+import { lookById } from '../lib/looks';
 
 /** How strongly a texel counts as outfit fabric, per avatar. */
 const FABRIC_MASK: Record<Exclude<OutfitKey, 'none'>, string> = {
@@ -92,13 +79,21 @@ function updateLocomotion(
 }
 
 /**
- * Rigged, animated human (see public/assets/CREDITS.md). Picks idle / walk /
+ * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, outfitColor }: { controller: PlayerHandle; outfitColor?: string }) {
+export function Avatar({ controller, outfitColor, lookId, heightCm }: {
+  controller: PlayerHandle;
+  outfitColor?: string;
+  /** Which person to show (lib/looks.ts); the default look if omitted. */
+  lookId?: string;
+  /** Standing height; the look's own height if omitted. */
+  heightCm?: number;
+}) {
   const group = useRef<Group>(null);
-  // A character listed in public/assets/manifest.json replaces the built-in one
-  const avatarFile = assetManifest().avatar ?? DEFAULT_AVATAR;
+  // A character listed in public/assets/manifest.json replaces the built-in looks
+  const avatarFile: AvatarFile = assetManifest().avatar ?? lookById(lookId);
+  const targetHeight = heightCm ? heightCm / 100 : avatarFile.height;
   const { scene, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
   const { actions } = useAnimations(animations, group);
   // Match clips by name (case-insensitive) so downloaded characters work without renaming
@@ -119,8 +114,8 @@ export function Avatar({ controller, outfitColor }: { controller: PlayerHandle; 
   const scale = useMemo(() => {
     const box = new Box3().setFromObject(scene);
     const h = box.max.y - box.min.y;
-    return h > 0 ? avatarFile.height / h : 1;
-  }, [scene, avatarFile.height]);
+    return h > 0 ? targetHeight / h : 1;
+  }, [scene, targetHeight]);
 
   useEffect(() => {
     scene.traverse((o) => {

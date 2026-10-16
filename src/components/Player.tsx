@@ -55,7 +55,7 @@ export function Player({ controller, character }: PlayerProps) {
     <group ref={groupRef}>
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} outfitColor={character ? bodyColor : undefined} />
+          <Avatar controller={controller} outfitColor={character ? bodyColor : undefined} lookId={character?.lookId} heightCm={character?.heightCm} />
         </Suspense>
       </ErrorBoundary>
     </group>

@@ -3,6 +3,10 @@ import { CharacterPreview } from './CharacterPreview';
 import { STARTING_BALANCE } from '../lib/gameState';
 import { loadCharacter, saveCharacter } from '../lib/save';
 import { DIETS, type Diet } from '../lib/food';
+import { GENDERS, HERITAGES, genderLabel, type Gender } from '../lib/identity';
+import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, lookById, looksFor, type BodyType } from '../lib/looks';
+import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
+import { assetUrl } from '../lib/assetManifest';
 
 export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
 export type Career =
@@ -18,6 +22,17 @@ export type Career =
 export interface Character {
   id: string;
   name: string;
+  gender: Gender;
+  /** Self-identified heritage (see lib/identity.ts) and an optional specific ethnic group, e.g. "Yoruba". */
+  heritage: string;
+  ethnicGroup: string;
+  /** ISO 3166-1 alpha-2 country code and state/region name. */
+  country: string;
+  region: string;
+  body: BodyType;
+  /** Which 3D person (lib/looks.ts) and how tall, in centimetres. */
+  lookId: string;
+  heightCm: number;
   lifestyle: Lifestyle;
   career: Career;
   diet: Diet;
@@ -43,9 +58,35 @@ export function CharacterCreation({
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
   const [career, setCareer] = useState<Character['career']>('none');
   const [diet, setDiet] = useState<Diet>('everything');
-  const [colorR, setColorR] = useState(139);
-  const [colorG, setColorG] = useState(93);
-  const [colorB, setColorB] = useState(62);
+  // Natural denim, so a recolourable look keeps its real colour unless the player changes it
+  const [colorR, setColorR] = useState(54);
+  const [colorG, setColorG] = useState(82);
+  const [colorB, setColorB] = useState(125);
+  const [gender, setGender] = useState<Gender>('unspecified');
+  const [heritage, setHeritage] = useState('unspecified');
+  const [ethnicGroup, setEthnicGroup] = useState('');
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
+  const [region, setRegion] = useState('Lagos');
+  const [body, setBody] = useState<BodyType>('feminine');
+  const [lookId, setLookId] = useState(() => looksFor('feminine')[0].id);
+  const [heightCm, setHeightCm] = useState(defaultHeightCm('feminine'));
+  const [countries] = useState(countryOptions);
+
+  const chooseBody = (next: BodyType) => {
+    if (next === body) return;
+    setBody(next);
+    setLookId(looksFor(next)[0].id);
+    setHeightCm(defaultHeightCm(next));
+  };
+  const chooseGender = (next: Gender) => {
+    setGender(next);
+    const implied = bodyForGender(next);
+    if (implied) chooseBody(implied);
+  };
+  const chooseCountry = (next: string) => {
+    setCountry(next);
+    setRegion('');
+  };
 
   const [savedCharacter] = useState(() => loadCharacter());
   const hasSavedCharacter = savedCharacter !== null;
@@ -61,6 +102,14 @@ export function CharacterCreation({
       lifestyle,
       career,
       diet,
+      gender,
+      heritage,
+      ethnicGroup: ethnicGroup.trim(),
+      country,
+      region: region.trim(),
+      body,
+      lookId,
+      heightCm,
       colorR,
       colorG,
       colorB,
@@ -83,6 +132,8 @@ export function CharacterCreation({
     setMode('create');
     setName('');
     setLifestyle('ordinary');
+    setCountry(DEFAULT_COUNTRY);
+    setRegion('Lagos');
   };
 
   const previewColor = mode === 'menu' && savedCharacter
@@ -92,7 +143,7 @@ export function CharacterCreation({
   if (mode === 'menu' && hasSavedCharacter) {
     const char = savedCharacter;
     return (
-      <Shell previewColor={previewColor} previewName={char.name} previewSub={`${LIFESTYLE_LABEL[char.lifestyle]} · ${CAREER_LABEL[char.career]}`}>
+      <Shell previewColor={previewColor} previewName={char.name} previewSub={`${formatHome(char.country, char.region)} · ${CAREER_LABEL[char.career]}`} lookId={char.lookId} heightCm={char.heightCm}>
         <section className="space-y-6">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">Welcome back</p>
@@ -102,6 +153,8 @@ export function CharacterCreation({
             <p className="text-xs uppercase tracking-[0.18em] text-cc-muted">Saved character</p>
             <p className="font-display text-2xl font-semibold text-cc-ink mt-1">{char.name}</p>
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <dt className="text-cc-muted">Home</dt><dd className="text-cc-ink text-right">{formatHome(char.country, char.region)}</dd>
+              <dt className="text-cc-muted">Gender</dt><dd className="text-cc-ink text-right">{genderLabel(char.gender)}</dd>
               <dt className="text-cc-muted">Lifestyle</dt><dd className="text-cc-ink text-right">{LIFESTYLE_LABEL[char.lifestyle]}</dd>
               <dt className="text-cc-muted">Career</dt><dd className="text-cc-ink text-right">{CAREER_LABEL[char.career]}</dd>
               <dt className="text-cc-muted">Diet</dt><dd className="text-cc-ink text-right">{DIETS.find((d) => d.id === char.diet)?.label}</dd>
@@ -117,7 +170,7 @@ export function CharacterCreation({
   }
 
   return (
-    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${LIFESTYLE_LABEL[lifestyle]} · ${CAREER_LABEL[career]}`}>
+    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm}>
       <form onSubmit={handleCreate} className="space-y-8" aria-labelledby="create-title">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">New life</p>
@@ -140,6 +193,74 @@ export function CharacterCreation({
               className={INPUT}
             />
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="gender" label="Gender">
+              <select id="gender" value={gender} onChange={(e) => chooseGender(e.target.value as Gender)} className={INPUT}>
+                {GENDERS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+              </select>
+            </Field>
+            <Field id="heritage" label="Race / heritage">
+              <select id="heritage" value={heritage} onChange={(e) => setHeritage(e.target.value)} className={INPUT}>
+                {HERITAGES.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field id="ethnic-group" label="Ethnic group (optional)" hint="Your own words, e.g. Yoruba, Igbo, Hausa, Zulu, Punjabi.">
+            <input id="ethnic-group" type="text" value={ethnicGroup} onChange={(e) => setEthnicGroup(e.target.value)} maxLength={40} autoComplete="off" className={INPUT} />
+          </Field>
+        </fieldset>
+
+        <fieldset className="space-y-4">
+          <legend className={SECTION_LABEL}>Home</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="country" label="Country">
+              <select id="country" value={country} onChange={(e) => chooseCountry(e.target.value)} className={INPUT}>
+                {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field id="region" label={regionTerm(country)}>
+              {SUBDIVISIONS[country] ? (
+                <select id="region" value={region} onChange={(e) => setRegion(e.target.value)} className={INPUT}>
+                  <option value="">Choose…</option>
+                  {SUBDIVISIONS[country].names.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              ) : (
+                <input id="region" type="text" value={region} onChange={(e) => setRegion(e.target.value)} maxLength={60} autoComplete="off" placeholder="Optional" className={INPUT} />
+              )}
+            </Field>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-4">
+          <legend className={SECTION_LABEL}>Appearance</legend>
+          {!bodyForGender(gender) && (
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Body type">
+              {(['feminine', 'masculine'] as const).map((b) => (
+                <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => chooseBody(b)}
+                  className={`rounded-lg border py-2 text-sm capitalize transition ${body === b ? 'border-cc-gold bg-cc-gold/10 text-cc-ink' : 'border-cc-line text-cc-muted hover:border-cc-gold/60'}`}>
+                  {b} body
+                </button>
+              ))}
+            </div>
+          )}
+          <div>
+            <p className="mb-2 text-sm font-medium text-cc-ink">Look</p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-3" role="radiogroup" aria-label="Look">
+              {looksFor(body).map((l, i) => (
+                <button key={l.id} type="button" role="radio" aria-checked={lookId === l.id} aria-label={`Look ${i + 1}`} onClick={() => setLookId(l.id)}
+                  className={`overflow-hidden rounded-lg border bg-cc-field transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${lookId === l.id ? 'border-cc-gold ring-2 ring-cc-gold/40' : 'border-cc-line hover:border-cc-gold/60'}`}>
+                  <img src={assetUrl(`models/characters/rocketbox/thumbs/${l.id}.webp`)} alt="" loading="lazy" className="aspect-square w-full object-cover" />
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-cc-muted">Real people from the Rocketbox library. More faces, skin tones and hairstyles are coming with the new character system.</p>
+          </div>
+          <div className="grid grid-cols-[4rem_1fr_3.5rem] items-center gap-3">
+            <label htmlFor="height" className="text-sm text-cc-muted">Height</label>
+            <input id="height" type="range" min={HEIGHT_RANGE.min} max={HEIGHT_RANGE.max} value={heightCm}
+              onChange={(e) => setHeightCm(parseInt(e.target.value))} className="w-full accent-cc-gold cursor-pointer" />
+            <span className="font-mono text-sm text-cc-ink text-right tabular-nums">{heightCm} cm</span>
+          </div>
         </fieldset>
 
         <fieldset className="space-y-4">
@@ -169,7 +290,7 @@ export function CharacterCreation({
           </Field>
         </fieldset>
 
-        <fieldset className="space-y-4">
+        {lookById(lookId).outfit !== 'none' && <fieldset className="space-y-4">
           <legend className={SECTION_LABEL}>Outfit colour</legend>
           <div className="flex items-center gap-4 rounded-xl border border-cc-line bg-cc-field p-4">
             <span
@@ -201,7 +322,7 @@ export function CharacterCreation({
               <span className="font-mono text-sm text-cc-ink text-right tabular-nums">{value}</span>
             </div>
           ))}
-        </fieldset>
+        </fieldset>}
 
         <div className="space-y-3">
           <button type="submit" disabled={!name.trim()} className={PRIMARY_BUTTON}>Create &amp; play</button>
@@ -258,8 +379,8 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 }
 
 /** Two columns on wide screens (controls | live preview); stacked on phones. */
-function Shell({ children, previewColor, previewName, previewSub }: {
-  children: ReactNode; previewColor: string; previewName: string; previewSub: string;
+function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm }: {
+  children: ReactNode; previewColor: string; previewName: string; previewSub: string; lookId: string; heightCm: number;
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-cc-bg text-cc-ink" style={{ backgroundImage: 'radial-gradient(1200px 600px at 75% 30%, rgba(201,164,92,0.08), transparent 60%)' }}>
@@ -272,8 +393,8 @@ function Shell({ children, previewColor, previewName, previewSub }: {
           <div className="order-2 lg:order-1 rounded-2xl border border-cc-line bg-cc-panel p-5 sm:p-8 shadow-2xl shadow-black/40">
             {children}
           </div>
-          <aside className="order-1 lg:order-2 relative min-h-[22rem] lg:min-h-[36rem] rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
-            <CharacterPreview outfitColor={previewColor} />
+          <aside className="order-1 lg:order-2 relative min-h-[22rem] lg:sticky lg:top-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:self-start rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
+            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6 bg-gradient-to-t from-cc-bg/90 to-transparent">
               <p className="font-display text-2xl font-bold text-cc-ink truncate">{previewName}</p>
               <p className="text-sm text-cc-muted">{previewSub}</p>

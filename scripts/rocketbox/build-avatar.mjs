@@ -11,7 +11,7 @@
 // baked into the walk and run clips so they play in place (the game moves the
 // character itself), drops the 3ds Max "Footsteps" helper track and attaches
 // PBR textures (colour, normal, roughness) to the body and head materials.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 
@@ -67,6 +67,18 @@ await addClip(runPath, 'Run', true);
 const texture = (file, mime) => doc.createTexture(basename(file)).setImage(readFileSync(file)).setMimeType(mime).setURI(basename(file));
 
 for (const m of root.listMaterials()) {
+  if (/_opacity$/i.test(m.getName()) && existsSync(`${texDir}/opacity_color.png`)) {
+    // Eyelashes: cut-out alpha, visible from both sides
+    m.setBaseColorFactor([1, 1, 1, 1])
+      .setBaseColorTexture(texture(`${texDir}/opacity_color.png`, 'image/png'))
+      .setMetallicFactor(0)
+      .setRoughnessFactor(0.7)
+      .setAlphaMode('MASK')
+      .setAlphaCutoff(0.4)
+      .setDoubleSided(true);
+    console.log(`material ${m.getName()}: cut-out texture attached`);
+    continue;
+  }
   const part = /_head$/i.test(m.getName()) ? 'head' : /_body$/i.test(m.getName()) ? 'body' : null;
   if (!part) { console.log(`material ${m.getName()}: left as is`); continue; }
   m.setBaseColorFactor([1, 1, 1, 1])

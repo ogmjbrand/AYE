@@ -12,4 +12,8 @@ for part in ('body', 'head'):
     rough = sp.point(lambda v: int(255 * max(0.32, min(0.92, 0.92 - (v / 255) * 0.75))))
     orm = Image.merge('RGB', (Image.new('L', rough.size, 255), rough, Image.new('L', rough.size, 0)))
     orm.save(f'{dst}/{part}_orm.png')
+# Eyelashes and similar cut-out cards keep their alpha channel
+opacity = f'{src}/{prefix}_opacity_color.tga'
+if os.path.exists(opacity):
+    Image.open(opacity).convert('RGBA').save(f'{dst}/opacity_color.png')
 print('ok', sorted(os.listdir(dst)))

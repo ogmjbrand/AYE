@@ -16,6 +16,8 @@ class MemoryStorage implements Storage {
 const character: Character = {
   id: 'abc', name: 'Ada', lifestyle: 'ordinary', career: 'doctor', diet: 'vegan',
   colorR: 1, colorG: 2, colorB: 3, balance: 5000, createdAt: 1, lastBalanceUpdate: 1,
+  gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
+  body: 'feminine', lookId: 'female-adult-10', heightCm: 168,
 };
 
 describe('character save', () => {
@@ -38,6 +40,30 @@ describe('character save', () => {
   });
 
   it('rejects null', () => expect(parseCharacter(null)).toBeNull());
+
+  it('characters saved before identity existed get neutral defaults and the original look', () => {
+    const { gender, heritage, ethnicGroup, country, region, body, lookId, heightCm, ...old } = character;
+    void gender; void heritage; void ethnicGroup; void country; void region; void body; void lookId; void heightCm;
+    const c = parseCharacter(old)!;
+    expect(c).toMatchObject({
+      gender: 'unspecified', heritage: 'unspecified', ethnicGroup: '', country: 'NG', region: '',
+      body: 'masculine', lookId: 'male-adult-12', heightCm: 177,
+    });
+  });
+
+  it('repairs invalid identity fields instead of discarding the save', () => {
+    const c = parseCharacter({
+      ...character, gender: 'robot', heritage: 'martian', country: 'ZZ', heightCm: 400,
+      lookId: 'male-adult-18', ethnicGroup: 'x'.repeat(100),
+    })!;
+    expect(c.gender).toBe('unspecified');
+    expect(c.heritage).toBe('unspecified');
+    expect(c.country).toBe('NG');
+    expect(c.heightCm).toBe(165);
+    // A masculine look with a feminine body falls back to a feminine look
+    expect(c.lookId).toBe('female-adult-08');
+    expect(c.ethnicGroup.length).toBe(40);
+  });
 
   it('characters saved before diets existed default to eating everything', () => {
     const { diet: _omit, ...old } = character;

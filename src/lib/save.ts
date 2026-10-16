@@ -5,6 +5,9 @@
 import type { Career, Character, Lifestyle } from '../components/CharacterCreation';
 import { createGameState, getPeriod, type GameState } from './gameState';
 import { DIETS, type Diet } from './food';
+import { GENDERS, HERITAGES, type Gender } from './identity';
+import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
+import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -41,8 +44,25 @@ export function parseCharacter(data: unknown): Character | null {
   ) {
     return null;
   }
-  // Characters saved before diets existed eat everything
-  return { ...(c as unknown as Character), diet: (c.diet as Diet | undefined) ?? 'everything' };
+  // Fields added later get defaults, so older saves keep working:
+  // diet (everything), identity (unspecified), home (Nigeria), look (the original built-in man)
+  const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const gender = GENDERS.some((g) => g.id === c.gender) ? (c.gender as Gender) : 'unspecified';
+  const look = LOOKS.find((l) => l.id === c.lookId) ?? lookById(undefined);
+  const body: BodyType = c.body === 'feminine' || c.body === 'masculine' ? c.body : look.body;
+  return {
+    ...(c as unknown as Character),
+    diet: (c.diet as Diet | undefined) ?? 'everything',
+    gender,
+    heritage: HERITAGES.some((h) => h.id === c.heritage) ? (c.heritage as string) : 'unspecified',
+    ethnicGroup: str(c.ethnicGroup, 40),
+    country: COUNTRY_CODES.includes(c.country as string) ? (c.country as string) : DEFAULT_COUNTRY,
+    region: str(c.region, 60),
+    // A look must match the body; otherwise fall back to the first look for that body
+    lookId: look.body === body ? look.id : LOOKS.find((l) => l.body === body)!.id,
+    body,
+    heightCm: isNum(c.heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max) ? Math.round(c.heightCm) : defaultHeightCm(body),
+  };
 }
 
 export function loadCharacter(storage: Storage = localStorage): Character | null {
