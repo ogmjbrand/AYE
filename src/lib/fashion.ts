@@ -10,7 +10,7 @@ export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair'];
 export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour' };
 
 /** Shader pattern ids (must match the GLSL in components/outfitShader.ts). */
-export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6 } as const;
+export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6, bogolan: 7, houndstooth: 8, batik: 9 } as const;
 export type Pattern = keyof typeof PATTERNS;
 
 export interface Style {
@@ -28,29 +28,42 @@ export interface FashionItem {
   price: number;
   collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon';
   style: Style;
+  /** Districts whose boutique stocks it (lib/geography.ts); everywhere if omitted. */
+  stockedIn?: readonly string[];
 }
 
 const item = (
   id: string, slot: Slot, name: string, price: number, collection: FashionItem['collection'],
-  pattern: Pattern, colors: [string, string?, string?], scale = 18,
+  pattern: Pattern, colors: [string, string?, string?], scale = 18, stockedIn?: readonly string[],
 ): FashionItem => ({
   id, slot, name, price, collection,
   style: { pattern, colors: [colors[0], colors[1] ?? colors[0], colors[2] ?? colors[1] ?? colors[0]], scale },
+  ...(stockedIn ? { stockedIn } : {}),
 });
+
+const LAGOS = ['lagos.marina'] as const;
+const ACCRA = ['accra.osu'] as const;
 
 export const FASHION_ITEMS: readonly FashionItem[] = [
   // Tops
   item('top-ankara-sunset', 'top', 'Ankara print · Sunset', 450, 'African prints', 'ankara', ['#d8622b', '#12707a', '#f1d6a2'], 16),
   item('top-ankara-royal', 'top', 'Ankara print · Royal', 450, 'African prints', 'ankara', ['#1d3f91', '#f0b33a', '#b8322a'], 16),
   item('top-adire-indigo', 'top', 'Adire · Indigo', 380, 'African prints', 'adire', ['#1f2a5c', '#a9bce0', '#2c3a78'], 26),
-  item('top-kente-gold', 'top', 'Kente weave · Gold & indigo', 900, 'African prints', 'kente', ['#d4a12a', '#1f2a5c', '#7a2230'], 10),
+  item('top-kente-gold', 'top', 'Kente weave · Gold & indigo', 900, 'African prints', 'kente', ['#d4a12a', '#1f2a5c', '#7a2230'], 10, ACCRA),
   item('top-linen-ivory', 'top', 'Linen · Ivory', 220, 'Everyday', 'solid', ['#ece4d4']),
   item('top-cotton-midnight', 'top', 'Cotton · Midnight', 200, 'Everyday', 'solid', ['#1c2130']),
   item('top-cotton-terracotta', 'top', 'Cotton · Terracotta', 200, 'Everyday', 'solid', ['#a4512f']),
   item('top-breton-navy', 'top', 'Breton stripe · Navy', 260, 'Everyday', 'stripes', ['#ece4d4', '#1d2a4a'], 40),
   item('top-gingham-rose', 'top', 'Gingham · Rose', 280, 'Everyday', 'check', ['#f1e7e4', '#d98a94', '#b9606d'], 36),
   item('top-silk-burgundy', 'top', 'Silk · Burgundy', 1200, 'Luxury', 'solid', ['#6a1d2e']),
-  item('top-asooke-champagne', 'top', 'Aso-oke · Champagne', 2400, 'Luxury', 'kente', ['#d9c49b', '#8a5a2b', '#efe6d2'], 12),
+  item('top-asooke-champagne', 'top', 'Aso-oke · Champagne', 2400, 'Luxury', 'kente', ['#d9c49b', '#8a5a2b', '#efe6d2'], 12, LAGOS),
+  item('top-asooke-wine', 'top', 'Aso-oke · Wine & gold', 2200, 'Luxury', 'kente', ['#5a1830', '#c9a45c', '#3a0f1f'], 12, LAGOS),
+  item('top-adire-eleko', 'top', 'Adire eleko · Deep indigo', 520, 'African prints', 'adire', ['#1a2550', '#c9d3ea', '#25356e'], 22, LAGOS),
+  item('top-kente-adweneasa', 'top', 'Kente · Adweneasa', 1100, 'Luxury', 'kente', ['#2a7a3a', '#e0b030', '#a8282a'], 10, ACCRA),
+  item('top-batakari-stripe', 'top', 'Batakari smock · Indigo stripe', 700, 'African prints', 'stripes', ['#2a2f5a', '#d9d2c0'], 30, ACCRA),
+  item('top-bogolan-earth', 'top', 'Bogolan mud cloth · Earth', 520, 'African prints', 'bogolan', ['#3b2a1e', '#e8dcc4', '#8a5a32'], 16),
+  item('top-batik-ocean', 'top', 'Batik · Ocean', 420, 'African prints', 'batik', ['#1d4f73', '#e9e2cf', '#2f7fa3'], 14),
+  item('top-houndstooth-mono', 'top', 'Houndstooth · Monochrome', 600, 'Tailored', 'houndstooth', ['#1b1b1d', '#efece6'], 40),
   // Bottoms
   item('bottom-denim-classic', 'bottom', 'Denim · Classic blue', 300, 'Everyday', 'solid', ['#3a5883']),
   item('bottom-denim-black', 'bottom', 'Denim · Washed black', 300, 'Everyday', 'solid', ['#2a2b2f']),
@@ -59,6 +72,10 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('bottom-pinstripe-charcoal', 'bottom', 'Pinstripe · Charcoal', 650, 'Tailored', 'pinstripe', ['#33353b', '#a9abb0'], 60),
   item('bottom-ankara-sunset', 'bottom', 'Ankara print · Sunset', 480, 'African prints', 'ankara', ['#d8622b', '#12707a', '#f1d6a2'], 16),
   item('bottom-adire-indigo', 'bottom', 'Adire · Indigo', 400, 'African prints', 'adire', ['#1f2a5c', '#a9bce0', '#2c3a78'], 26),
+  item('bottom-kente-adweneasa', 'bottom', 'Kente · Adweneasa', 1150, 'Luxury', 'kente', ['#2a7a3a', '#e0b030', '#a8282a'], 10, ACCRA),
+  item('bottom-bogolan-earth', 'bottom', 'Bogolan mud cloth · Earth', 540, 'African prints', 'bogolan', ['#3b2a1e', '#e8dcc4', '#8a5a32'], 16),
+  item('bottom-batik-ocean', 'bottom', 'Batik · Ocean', 440, 'African prints', 'batik', ['#1d4f73', '#e9e2cf', '#2f7fa3'], 14),
+  item('bottom-houndstooth-mono', 'bottom', 'Houndstooth · Monochrome', 620, 'Tailored', 'houndstooth', ['#1b1b1d', '#efece6'], 40),
   // Shoes
   item('shoes-clean-white', 'shoes', 'Clean white', 250, 'Everyday', 'solid', ['#efefea']),
   item('shoes-leather-black', 'shoes', 'Leather · Black', 700, 'Tailored', 'solid', ['#1b1b1d']),
@@ -77,11 +94,24 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
 
+/** A saved look: a name and what to wear in each slot. */
+export interface Outfit {
+  name: string;
+  equipped: Partial<Record<Slot, string>>;
+}
+
+export const MAX_OUTFITS = 6;
+
 /** What a character owns and has on. An empty slot means the look's original clothes or hair. */
 export interface Wardrobe {
   owned: string[];
   equipped: Partial<Record<Slot, string>>;
+  /** Saved looks (absent until the player saves one). */
+  outfits?: Outfit[];
 }
+
+/** Items a district's boutique sells. */
+export const stockedIn = (districtId: string) => FASHION_ITEMS.filter((i) => !i.stockedIn || i.stockedIn.includes(districtId));
 
 export const EMPTY_WARDROBE: Wardrobe = { owned: [], equipped: {} };
 
@@ -90,13 +120,20 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
   if (typeof data !== 'object' || data === null) return { owned: [], equipped: {} };
   const w = data as { owned?: unknown; equipped?: unknown };
   const owned = Array.isArray(w.owned) ? [...new Set(w.owned.filter((id): id is string => typeof id === 'string' && !!itemById(id)))] : [];
-  const equipped: Partial<Record<Slot, string>> = {};
-  const eq = (typeof w.equipped === 'object' && w.equipped !== null ? w.equipped : {}) as Record<string, unknown>;
-  for (const slot of SLOTS) {
-    const id = eq[slot];
-    if (typeof id === 'string' && owned.includes(id) && itemById(id)?.slot === slot) equipped[slot] = id;
-  }
-  return { owned, equipped };
+  const cleanEquipped = (data: unknown) => {
+    const out: Partial<Record<Slot, string>> = {};
+    const eq = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
+    for (const slot of SLOTS) {
+      const id = eq[slot];
+      if (typeof id === 'string' && owned.includes(id) && itemById(id)?.slot === slot) out[slot] = id;
+    }
+    return out;
+  };
+  const outfits = (Array.isArray((w as { outfits?: unknown }).outfits) ? (w as { outfits: unknown[] }).outfits : [])
+    .filter((o): o is { name: string; equipped: unknown } => typeof o === 'object' && o !== null && typeof (o as { name?: unknown }).name === 'string' && (o as { name: string }).name.trim() !== '')
+    .slice(0, MAX_OUTFITS)
+    .map((o) => ({ name: o.name.trim().slice(0, 24), equipped: cleanEquipped(o.equipped) }));
+  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}) };
 }
 
 /** The styles to draw for each slot (equipped items, overridden by anything being tried on). */
@@ -120,6 +157,9 @@ export function swatchCss(style: Style): string {
     case 'ankara': return `radial-gradient(circle at 50% 50%, ${c} 0 18%, ${b} 19% 34%, transparent 35%) 0 0 / 22px 22px, ${a}`;
     case 'kente': return `repeating-linear-gradient(90deg, ${a} 0 10px, ${b} 10px 14px, ${c} 14px 18px, ${a} 18px 22px), ${a}`;
     case 'adire': return `radial-gradient(circle, ${b} 0 25%, transparent 45%) 0 0 / 16px 16px, ${a}`;
+    case 'bogolan': return `linear-gradient(90deg, transparent 45%, ${b} 45% 55%, transparent 55%) 0 0 / 14px 14px, radial-gradient(circle, ${b} 0 18%, transparent 22%) 7px 7px / 14px 14px, ${a}`;
+    case 'houndstooth': return `repeating-linear-gradient(45deg, ${a} 0 3px, ${b} 3px 6px), conic-gradient(${a} 25%, ${b} 0 50%, ${a} 0 75%, ${b} 0) 0 0 / 12px 12px`;
+    case 'batik': return `radial-gradient(circle, ${b} 0 22%, transparent 26%) 0 0 / 18px 18px, repeating-linear-gradient(70deg, transparent 0 9px, ${c}88 9px 10px), ${a}`;
     default: return a;
   }
 }

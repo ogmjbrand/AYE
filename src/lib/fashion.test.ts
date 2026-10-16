@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FASHION_ITEMS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe } from './fashion';
+import { FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { isDistrictId } from './geography';
 
 describe('fashion catalogue', () => {
   it('has unique ids, valid colours and prices, and items for every slot', () => {
@@ -28,4 +29,34 @@ describe('fashion catalogue', () => {
       .toEqual({ owned: ['hair-copper'], equipped: { hair: 'hair-copper' } });
   });
 
+  it('each boutique has its own range, plus the basics everywhere', () => {
+    for (const i of FASHION_ITEMS) for (const d of i.stockedIn ?? []) expect(isDistrictId(d), i.id).toBe(true);
+    const lagos = stockedIn('lagos.marina').map((i) => i.id);
+    const accra = stockedIn('accra.osu').map((i) => i.id);
+    expect(lagos).toContain('top-asooke-champagne');
+    expect(lagos).not.toContain('top-kente-adweneasa');
+    expect(accra).toContain('top-kente-adweneasa');
+    expect(accra).not.toContain('top-asooke-champagne');
+    expect(lagos).toContain('top-linen-ivory');
+    expect(accra).toContain('top-linen-ivory');
+    for (const slot of SLOTS) {
+      expect(lagos.some((id) => itemById(id)!.slot === slot), slot).toBe(true);
+      expect(accra.some((id) => itemById(id)!.slot === slot), slot).toBe(true);
+    }
+  });
+
+  it('keeps saved looks tidy: owned items only, named, at most six', () => {
+    const w = sanitiseWardrobe({
+      owned: ['top-batik-ocean', 'hair-copper'],
+      equipped: {},
+      outfits: [
+        { name: '  Sunday best  ', equipped: { top: 'top-batik-ocean', hair: 'hair-copper', shoes: 'shoes-leather-tan' } },
+        { name: '', equipped: {} },
+        ...Array.from({ length: 10 }, (_, i) => ({ name: `Look ${i}`, equipped: {} })),
+      ],
+    });
+    expect(w.outfits![0]).toEqual({ name: 'Sunday best', equipped: { top: 'top-batik-ocean', hair: 'hair-copper' } });
+    expect(w.outfits!.length).toBe(MAX_OUTFITS);
+    expect(sanitiseWardrobe({ owned: [], equipped: {} }).outfits).toBeUndefined();
+  });
 });

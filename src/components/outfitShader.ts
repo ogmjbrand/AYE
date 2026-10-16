@@ -63,12 +63,42 @@ vec3 ayePattern(float p, vec2 uv, float s, vec3 a, vec3 b, vec3 c) {
     col = mix(col, b, step(0.92, fract(q.y * 6.0)));
     return col;
   }
-  // Adire: hand-dyed indigo with soft resist circles
-  vec2 cell = floor(q);
-  vec2 jitter = vec2(ayeHash(cell), ayeHash(cell + 7.3)) * 0.3 - 0.15;
-  float d = length(f - jitter);
-  float spot = 1.0 - smoothstep(0.08, 0.2, d);
-  return mix(mix(a, c, ayeHash(cell + 3.1) * 0.5), b, spot);
+  if (p < 6.5) {
+    // Adire: hand-dyed indigo with soft resist circles
+    vec2 cell = floor(q);
+    vec2 jitter = vec2(ayeHash(cell), ayeHash(cell + 7.3)) * 0.3 - 0.15;
+    float d = length(f - jitter);
+    float spot = 1.0 - smoothstep(0.08, 0.2, d);
+    return mix(mix(a, c, ayeHash(cell + 3.1) * 0.5), b, spot);
+  }
+  if (p < 7.5) {
+    // Bogolan (mud cloth): hand-painted grid of dots, crosses and diagonals on a dark ground
+    vec2 cell = floor(q);
+    vec2 g = fract(q);
+    float k = mod(cell.x + cell.y * 2.0, 3.0);
+    float m = k < 1.0 ? step(length(g - 0.5), 0.17)
+      : k < 2.0 ? max(step(abs(g.x - 0.5), 0.06), step(abs(g.y - 0.5), 0.06))
+      : step(abs(fract(g.x + g.y) - 0.5), 0.1);
+    float frame = step(0.92, max(g.x, g.y));
+    vec3 col = mix(a, c, step(0.6, ayeHash(cell)) * 0.35);
+    return mix(col, b, max(m, frame));
+  }
+  if (p < 8.5) {
+    // Houndstooth: solid dark and light quarters, diagonal stripes where they meet
+    vec2 g = fract(q) * 2.0;
+    float cx = step(1.0, g.x);
+    float cy = step(1.0, g.y);
+    vec2 h = fract(g);
+    float v = cx == cy ? cx : step(0.5, fract((h.x + h.y) * 2.0));
+    return mix(a, b, v);
+  }
+  // Batik: wax-resist flowers with the fine crackle where the wax broke
+  float r = length(f);
+  float petals = 0.5 + 0.5 * cos(atan(f.y, f.x) * 6.0);
+  float flower = step(r, 0.16 + 0.12 * petals);
+  float crack = 1.0 - smoothstep(0.0, 0.035, abs(fract(q.x * 1.7 + 0.35 * sin(q.y * 3.1)) - 0.5));
+  vec3 col = mix(a, b, flower);
+  return mix(col, c, crack * 0.55 * (1.0 - flower));
 }
 `;
 

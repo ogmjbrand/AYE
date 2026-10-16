@@ -392,6 +392,14 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       {store && (
         <FashionStore
           shop={district.fashionHouse}
+          districtId={district.id}
+          onSaveOutfit={(name) => onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, outfits: [...(wardrobe.outfits ?? []), { name, equipped: { ...wardrobe.equipped } }] } })}
+          onWearOutfit={(i) => {
+            const outfit = wardrobe.outfits?.[i];
+            if (outfit) onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, equipped: { ...outfit.equipped } } });
+            setTryOn({});
+          }}
+          onDeleteOutfit={(i) => onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, outfits: (wardrobe.outfits ?? []).filter((_, k) => k !== i) } })}
           mode={store}
           wardrobe={wardrobe}
           balance={state.balance}

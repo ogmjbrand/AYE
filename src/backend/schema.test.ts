@@ -6,7 +6,10 @@
  */
 import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
-import migration from '../../supabase/migrations/20261016120000_player_life.sql?raw';
+// Every migration, applied in filename (timestamp) order, as Supabase would
+const MIGRATIONS = Object.entries(import.meta.glob('../../supabase/migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([, sql]) => sql);
 import { FASHION_ITEMS } from '../lib/fashion';
 import { EQUIPMENT } from '../lib/equipment';
 import { HOURLY_LIVING_COST, HOURLY_WAGE, STARTING_BALANCE } from '../lib/gameState';
@@ -47,7 +50,7 @@ const balance = async (character: string) =>
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  await db.exec(migration);
+  for (const sql of MIGRATIONS) await db.exec(sql);
   await db.exec(`insert into auth.users (id) values ('${ALICE}'), ('${BOB}');`);
 }, 30_000);
 

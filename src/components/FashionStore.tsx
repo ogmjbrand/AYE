@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { FASHION_ITEMS, SLOTS, SLOT_LABEL, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
+import { FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, itemById, resolveStyles, stockedIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
 
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
   mode: 'shop' | 'wardrobe';
   /** The boutique's name and what it sells. */
   shop: { name: string; kind: string };
+  /** The district the boutique is in: each stocks its own range. */
+  districtId: string;
+  onSaveOutfit?: (name: string) => void;
+  onWearOutfit?: (index: number) => void;
+  onDeleteOutfit?: (index: number) => void;
   wardrobe: Wardrobe;
   balance: number;
   tryOn: Partial<Record<Slot, string | null>>;
@@ -21,7 +26,7 @@ const BUTTON = 'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition
  * Boutique and wardrobe. A side panel so the player's 3D character stays in
  * view: "Try on" shows an item on the character without buying it.
  */
-export function FashionStore({ mode, shop, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
+export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfit, onDeleteOutfit, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
   const [slot, setSlot] = useState<Slot>('top');
   const [message, setMessage] = useState('');
 
@@ -31,7 +36,10 @@ export function FashionStore({ mode, shop, wardrobe, balance, tryOn, onTryOn, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const items = FASHION_ITEMS.filter((i) => i.slot === slot && (mode === 'shop' || wardrobe.owned.includes(i.id)));
+  const [outfitName, setOutfitName] = useState('');
+  const catalogue = mode === 'shop' ? stockedIn(districtId) : FASHION_ITEMS.filter((i) => wardrobe.owned.includes(i.id));
+  const items = catalogue.filter((i) => i.slot === slot);
+  const outfits = wardrobe.outfits ?? [];
   const equippedId = wardrobe.equipped[slot] ?? null;
   const shownId = slot in tryOn ? tryOn[slot] ?? null : equippedId;
 
@@ -61,6 +69,35 @@ export function FashionStore({ mode, shop, wardrobe, balance, tryOn, onTryOn, on
       </nav>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        {mode === 'wardrobe' && onSaveOutfit && (
+          <section aria-labelledby="looks-title" className="mb-3 rounded-xl border border-ui-line/70 p-3">
+            <h3 id="looks-title" className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Saved looks</h3>
+            {outfits.length === 0 && <p className="m-0 mt-1 text-xs text-ui-muted">Save what you're wearing to change back into it in one tap.</p>}
+            <ul className="m-0 mt-2 grid list-none gap-1.5 p-0">
+              {outfits.map((o, i) => {
+                const looks = resolveStyles(o.equipped);
+                return (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex shrink-0 gap-0.5" aria-hidden>
+                      {SLOTS.map((s) => <span key={s} className="h-5 w-3 rounded-sm border border-ui-line" style={{ background: looks[s] ? swatchCss(looks[s]!) : '#2a2d33' }} />)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm" title={SLOTS.map((s) => itemById(o.equipped[s])?.name ?? `Original ${s}`).join(', ')}>{o.name}</span>
+                    <button type="button" className={`${BUTTON} border-ui-line hover:border-ui-accent`} onClick={() => onWearOutfit?.(i)}>Wear</button>
+                    <button type="button" className={`${BUTTON} border-ui-line text-ui-muted hover:text-ui-ink`} aria-label={`Delete look ${o.name}`} onClick={() => onDeleteOutfit?.(i)}>✕</button>
+                  </li>
+                );
+              })}
+            </ul>
+            {outfits.length < MAX_OUTFITS && (
+              <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (outfitName.trim()) { onSaveOutfit(outfitName.trim()); setOutfitName(''); } }}>
+                <label htmlFor="outfit-name" className="sr-only">Name this look</label>
+                <input id="outfit-name" value={outfitName} maxLength={24} onChange={(e) => setOutfitName(e.target.value)} placeholder="Name this look, e.g. Sunday best"
+                  className="min-w-0 flex-1 rounded-md border border-ui-line bg-black/20 px-2.5 py-1.5 text-sm text-ui-ink placeholder:text-ui-faint focus:border-ui-accent focus:outline-none" />
+                <button type="submit" disabled={!outfitName.trim()} className={`${BUTTON} border-ui-accent bg-ui-accent/20 text-ui-ink hover:bg-ui-accent/30`}>Save</button>
+              </form>
+            )}
+          </section>
+        )}
         <ItemRow
           title={slot === 'hair' ? 'Natural colour' : 'Original'}
           subtitle={slot === 'hair' ? 'Your own hair colour' : 'What you were wearing'}
