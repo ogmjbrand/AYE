@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react';
+import { Suspense, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
@@ -6,10 +6,13 @@ import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
+import { resolveStyles, type Slot } from '../lib/fashion';
 
 interface PlayerProps {
   controller: PlayerHandle;
   character?: Character;
+  /** Items being tried on in the shop, shown instead of what's equipped (null = original). */
+  tryOn?: Partial<Record<Slot, string | null>>;
 }
 
 /** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
@@ -28,12 +31,15 @@ function CapsuleFigure({ color }: { color: string }) {
   );
 }
 
-export function Player({ controller, character }: PlayerProps) {
+export function Player({ controller, character, tryOn }: PlayerProps) {
   const groupRef = useRef<Group>(null);
 
   const bodyColor = character
     ? `rgb(${character.colorR}, ${character.colorG}, ${character.colorB})`
     : '#252a33';
+
+  const equipped = character?.wardrobe.equipped;
+  const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
@@ -55,7 +61,7 @@ export function Player({ controller, character }: PlayerProps) {
     <group ref={groupRef}>
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} outfitColor={character ? bodyColor : undefined} lookId={character?.lookId} heightCm={character?.heightCm} />
+          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} />
         </Suspense>
       </ErrorBoundary>
     </group>

@@ -42,5 +42,6 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     rest: () => dispatch({ type: 'sleep' }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
+    purchase: (price: number) => dispatch({ type: 'purchase', price }),
   };
 }

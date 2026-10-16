@@ -55,6 +55,7 @@ export type GameAction =
   | { type: 'tick'; atWorkplace: boolean }
   | { type: 'sleep' }
   | { type: 'eat'; price: number; fullness: number }
+  | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -110,6 +111,12 @@ function eat(state: GameState, price: number, gain: number): GameState {
     fullness: Math.min(100, state.fullness + gain),
     today: { ...state.today, expenses: state.today.expenses + price },
   };
+}
+
+/** Spends money on something that isn't food (clothes, hair). Refused if the player can't afford it. */
+function purchase(state: GameState, price: number): GameState {
+  if (!(price > 0) || state.balance < price || state.summary) return state;
+  return { ...state, balance: state.balance - price, today: { ...state.today, expenses: state.today.expenses + price } };
 }
 
 export function getPeriod(hour: number): Period {
@@ -225,5 +232,7 @@ export function gameReducer(
       return { ...state, summary: null };
     case 'eat':
       return eat(state, action.price, action.fullness);
+    case 'purchase':
+      return purchase(state, action.price);
   }
 }

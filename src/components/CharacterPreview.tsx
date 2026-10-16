@@ -6,6 +6,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { assetUrl } from '../lib/assetManifest';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
+import type { Slot, Style } from '../lib/fashion';
 
 /** A standing-still controller so the avatar plays its idle animation. */
 function useStillController(): PlayerHandle {
@@ -34,9 +35,14 @@ function Placeholder({ color }: { color: string }) {
 
 /**
  * Live 3D preview of the in-game character model (the same GLB the game uses),
- * turning slowly, with the chosen look, height and outfit colour applied.
+ * turning slowly, with the chosen look, height and clothes applied.
  */
-export function CharacterPreview({ outfitColor, lookId, heightCm }: { outfitColor: string; lookId?: string; heightCm?: number }) {
+export function CharacterPreview({ outfitColor, lookId, heightCm, styles }: {
+  outfitColor: string;
+  lookId?: string;
+  heightCm?: number;
+  styles?: Partial<Record<Slot, Style>>;
+}) {
   const still = useStillController();
   return (
     <Canvas
@@ -57,7 +63,7 @@ export function CharacterPreview({ outfitColor, lookId, heightCm }: { outfitColo
       <Turntable>
         <ErrorBoundary fallback={<Placeholder color={outfitColor} />}>
           <Suspense fallback={<Placeholder color={outfitColor} />}>
-            <Avatar key={lookId} controller={still} outfitColor={outfitColor} lookId={lookId} heightCm={heightCm} />
+            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

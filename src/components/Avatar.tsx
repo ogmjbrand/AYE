@@ -1,52 +1,45 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useAnimations, useGLTF } from '@react-three/drei';
-import { Box3, Color, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial } from 'three';
+import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
+import { Box3, NoColorSpace, type AnimationAction, type Group, type Mesh, type Object3D } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 
-import { assetManifest, assetUrl, type AvatarFile, type OutfitKey } from '../lib/assetManifest';
+import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
+import type { Slot, Style } from '../lib/fashion';
+import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
 
-/** How strongly a texel counts as outfit fabric, per avatar. */
-const FABRIC_MASK: Record<Exclude<OutfitKey, 'none'>, string> = {
-  // The old built-in model's saturated yellow trousers
-  yellow: 'smoothstep(0.12, 0.3, min(c.r, c.g) - c.b)',
-  // Denim: clearly bluer than it is red; skin and white trainers stay untouched
-  // (faded denim is only slightly blue, so the threshold is low to recolour it evenly)
-  blue: 'smoothstep(0.0, 0.035, c.b - c.r)',
-};
+const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
+
+/** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
+function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
+  const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
+  const uniforms = useMemo(() => {
+    const list: StyleUniforms[] = [];
+    for (const tex of [bodyMask, headMask]) {
+      // Garment maps are data in glTF UV space, like the model's own textures
+      tex.flipY = false;
+      tex.colorSpace = NoColorSpace;
+      tex.needsUpdate = true;
+    }
+    scene.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const u = installStyleShader(mat, /_head$/i.test(mat.name) ? headMask : bodyMask);
+        if (u) list.push(u);
+      }
+    });
+    return list;
+  }, [scene, bodyMask, headMask]);
+  useEffect(() => {
+    for (const u of uniforms) applyStyles(u, styles);
+  }, [uniforms, styles]);
+  return null;
+}
+
 
 type Clip = 'Idle' | 'Walk' | 'Run';
-
-/**
- * Recolours the outfit fabric without touching skin or hair: texels that match
- * the avatar's fabric mask take on the chosen colour, keeping the fabric's
- * shading and texture. Installed once per material.
- */
-function outfitTint(material: Material, key: Exclude<OutfitKey, 'none'>): { value: Color } {
-  const m = material as MeshStandardMaterial & { userData: { outfit?: { value: Color } } };
-  if (m.userData.outfit) return m.userData.outfit;
-  const uniform = { value: new Color('#ffffff') };
-  m.userData.outfit = uniform;
-  m.onBeforeCompile = (shader) => {
-    shader.uniforms.uOutfit = uniform;
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uOutfit;')
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-        {
-          vec3 c = diffuseColor.rgb;
-          float fabric = ${FABRIC_MASK[key]};
-          float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-          diffuseColor.rgb = mix(c, uOutfit * clamp(lum * 2.2, 0.0, 1.2), fabric);
-        }`,
-      );
-  };
-  m.customProgramCacheKey = () => `aye-outfit-tint-${key}`;
-  m.needsUpdate = true;
-  return uniform;
-}
 
 /** Cross-fades to the clip that matches the speed and scales its playback rate. */
 function updateLocomotion(
@@ -82,9 +75,10 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, outfitColor, lookId, heightCm }: {
+export function Avatar({ controller, lookId, heightCm, styles }: {
   controller: PlayerHandle;
-  outfitColor?: string;
+  /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
+  styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
   lookId?: string;
   /** Standing height; the look's own height if omitted. */
@@ -124,20 +118,18 @@ export function Avatar({ controller, outfitColor, lookId, heightCm }: {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false; // skinned bounds don't follow the animation
-        if (outfitColor && avatarFile.outfit !== 'none') {
-          for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-            outfitTint(mat, avatarFile.outfit).value.set(outfitColor);
-          }
-        }
       }
     });
-  }, [scene, outfitColor, avatarFile.outfit]);
+  }, [scene]);
+  // Garment maps exist only for the built-in looks, not for a model listed in the asset manifest
+  const styledLook = assetManifest().avatar ? null : lookById(lookId).id;
 
   useFrame(() => updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile));
 
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
+      {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
     </group>
   );
 }

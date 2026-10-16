@@ -18,6 +18,7 @@ const character: Character = {
   colorR: 1, colorG: 2, colorB: 3, balance: 5000, createdAt: 1, lastBalanceUpdate: 1,
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
   body: 'feminine', lookId: 'female-adult-10', heightCm: 168,
+  wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
 };
 
 describe('character save', () => {
@@ -49,6 +50,20 @@ describe('character save', () => {
       gender: 'unspecified', heritage: 'unspecified', ethnicGroup: '', country: 'NG', region: '',
       body: 'masculine', lookId: 'male-adult-12', heightCm: 177,
     });
+  });
+
+  it('characters saved before the wardrobe existed own nothing and wear their original clothes', () => {
+    const { wardrobe, ...old } = character;
+    void wardrobe;
+    expect(parseCharacter(old)!.wardrobe).toEqual({ owned: [], equipped: {} });
+  });
+
+  it('drops unknown or unowned wardrobe items', () => {
+    const c = parseCharacter({
+      ...character,
+      wardrobe: { owned: ['top-ankara-sunset', 'ghost-item', 'top-ankara-sunset'], equipped: { top: 'top-ankara-sunset', shoes: 'shoes-metallic-gold', hair: 'ghost-item' } },
+    })!;
+    expect(c.wardrobe).toEqual({ owned: ['top-ankara-sunset'], equipped: { top: 'top-ankara-sunset' } });
   });
 
   it('repairs invalid identity fields instead of discarding the save', () => {

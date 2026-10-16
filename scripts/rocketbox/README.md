@@ -23,6 +23,13 @@ folder gives you `node_modules/fbx2gltf/bin/<OS>/FBX2glTF`).
 3. Textures: `python scripts/rocketbox/convert-textures.py <TexturesDir> <outDir> <id> 2048 1024`
 4. Assemble: `node scripts/rocketbox/build-avatar.mjs avatar.glb idle.glb walk.glb run.glb <outDir> built.glb`
 5. Shrink: `npm run assets:optimize -- built.glb public/assets/models/characters/<name>.glb 2048`
-6. Point `DEFAULT_AVATAR` in `src/components/Avatar.tsx` (or `avatar` in
+6. Garment maps (for the boutique and wardrobe):
+   `node scripts/rocketbox/garment-masks.mjs built.glb <outDir> public/assets/models/characters/rocketbox/masks <look-id>`.
+   Check the result by eye: the body map should be red on the top, green on
+   the bottom, blue on the shoes and black on skin; the head map red on hair
+   and headwear only. Garments close to the person's skin colour (beige,
+   khaki on lighter skin) restyle only partly.
+7. Portrait for the look picker: `public/assets/models/characters/rocketbox/thumbs/<look-id>.webp` (192 px, rendered from the model).
+8. Point `DEFAULT_AVATAR` in `src/components/Avatar.tsx` (or `avatar` in
    `public/assets/manifest.json`) at it. Measure the clips' ground speeds
    (forward travel of `Bip01` per cycle ÷ cycle length) for `walkSpeed`/`runSpeed`.

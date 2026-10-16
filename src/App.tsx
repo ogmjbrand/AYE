@@ -22,6 +22,9 @@ import { CharacterCreation, type Character } from './components/CharacterCreatio
 import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
+import { atFashionHouse, type FashionItem, type Slot } from './lib/fashion';
+import { FashionStore } from './components/FashionStore';
+import { saveCharacter } from './lib/save';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
 
@@ -32,6 +35,7 @@ interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
   character?: Character;
   gameTime: GameTime;
+  tryOn: Partial<Record<Slot, string | null>>;
 }
 
 interface CameraFollowProps {
@@ -90,7 +94,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime }: CityProps) {
+function City({ controller, character, gameTime, tryOn }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -102,7 +106,7 @@ function City({ controller, character, gameTime }: CityProps) {
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(character.career).position} />}
       {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player controller={controller} character={character} />
+      <Player controller={controller} character={character} tryOn={tryOn} />
     </>
   );
 }
@@ -115,45 +119,95 @@ export default function App() {
     clearSave();
     setCharacter(null);
   };
+  // In-game changes to the character (e.g. new clothes) are saved straight away
+  const handleCharacterUpdate = (next: Character) => {
+    saveCharacter(next);
+    setCharacter(next);
+  };
 
   if (!character) {
     return <CharacterCreation onCharacterCreate={setCharacter} />;
   }
 
   // Keyed by id so a new character starts with a fresh clock and ledger
-  return <Game key={character.id} character={character} onChangeCharacter={handleChangeCharacter} />;
+  return <Game key={character.id} character={character} onChangeCharacter={handleChangeCharacter} onCharacterUpdate={handleCharacterUpdate} />;
 }
 
 interface GameProps {
   character: Character;
   onChangeCharacter: () => void;
+  onCharacterUpdate: (character: Character) => void;
 }
 
-function Game({ character, onChangeCharacter }: GameProps) {
+function Game({ character, onChangeCharacter, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary, eat } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase } = useGameState(
     character,
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
   const controlsRef = useRef<OrbitControls | null>(null);
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
+  const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
+  const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
 
-  // E opens the menu of the vendor you're standing at
+  // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
       const near = nearestVendor(controller.position.x, controller.position.z);
       if (near) setVendor(near);
+      else if (atFashionHouse(controller.position.x, controller.position.z)) setStore('shop');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [controller]);
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null);
+    setMovementBlocked(vendor !== null || store !== null);
     return () => setMovementBlocked(false);
-  }, [vendor]);
+  }, [vendor, store]);
+
+  // While dressing, swing the camera round to the front of the player so the clothes are visible
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!store || !controls) return;
+    const { x, z } = controller.position;
+    const d = controller.direction;
+    controls.object.position.set(x + Math.sin(d) * 3.2, CAMERA_TARGET_HEIGHT + 0.6, z + Math.cos(d) * 3.2);
+    controls.target.set(x, CAMERA_TARGET_HEIGHT, z);
+    controls.update();
+  }, [store, controller]);
+
+  const wardrobe = character.wardrobe;
+  const wear = (slot: Slot, id: string | null) => {
+    const equipped = { ...wardrobe.equipped };
+    if (id) equipped[slot] = id;
+    else delete equipped[slot];
+    onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, equipped } });
+    setTryOn((t) => {
+      const next = { ...t };
+      delete next[slot];
+      return next;
+    });
+  };
+  const buy = (item: FashionItem) => {
+    if (wardrobe.owned.includes(item.id) || state.balance < item.price) return;
+    purchase(item.price);
+    onCharacterUpdate({
+      ...character,
+      wardrobe: { owned: [...wardrobe.owned, item.id], equipped: { ...wardrobe.equipped, [item.slot]: item.id } },
+    });
+    setTryOn((t) => {
+      const next = { ...t };
+      delete next[item.slot];
+      return next;
+    });
+  };
+  const closeStore = () => {
+    setStore(null);
+    setTryOn({});
+  };
   // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
   const [qualityMode, setQualityMode] = useState<'auto' | Quality>('auto');
   const [autoQuality, setAutoQuality] = useState<Quality>('high');
@@ -171,6 +225,18 @@ function Game({ character, onChangeCharacter }: GameProps) {
             if (suitsDiet(dish, character.diet)) eat(dish.price, dish.fullness);
           }}
           onClose={() => setVendor(null)}
+        />
+      )}
+      {store && (
+        <FashionStore
+          mode={store}
+          wardrobe={wardrobe}
+          balance={state.balance}
+          tryOn={tryOn}
+          onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}
+          onBuy={buy}
+          onEquip={wear}
+          onClose={closeStore}
         />
       )}
       {state.summary && (
@@ -196,7 +262,7 @@ function Game({ character, onChangeCharacter }: GameProps) {
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
-          <City controller={controller} character={character} gameTime={state.time} />
+          <City controller={controller} character={character} gameTime={state.time} tryOn={tryOn} />
           {settings.ambientOcclusion && (
             <Suspense fallback={null}>
               <PostEffects />
@@ -224,6 +290,8 @@ function Game({ character, onChangeCharacter }: GameProps) {
         onRest={rest}
         fullness={state.fullness}
         onOpenVendor={setVendor}
+        onOpenShop={() => setStore('shop')}
+        onOpenWardrobe={() => setStore('wardrobe')}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
         onCycleQuality={() => setQualityMode((m) => (m === 'auto' ? 'high' : m === 'high' ? 'low' : 'auto'))}
       />

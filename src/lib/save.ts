@@ -8,6 +8,7 @@ import { DIETS, type Diet } from './food';
 import { GENDERS, HERITAGES, type Gender } from './identity';
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
+import { sanitiseWardrobe } from './fashion';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -62,6 +63,8 @@ export function parseCharacter(data: unknown): Character | null {
     lookId: look.body === body ? look.id : LOOKS.find((l) => l.body === body)!.id,
     body,
     heightCm: isNum(c.heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max) ? Math.round(c.heightCm) : defaultHeightCm(body),
+    // Unknown items (e.g. removed from the catalogue) are dropped; nothing is lost otherwise
+    wardrobe: sanitiseWardrobe(c.wardrobe),
   };
 }
 

@@ -143,3 +143,17 @@ describe('hunger and eating', () => {
     expect(s.today.income).toBe(Math.round(HOURLY_WAGE.doctor / 2));
   });
 });
+
+describe('shopping', () => {
+  it('a purchase costs money and counts as an expense', () => {
+    const s = gameReducer(createGameState(1000), { type: 'purchase', price: 450 }, 'doctor', 'ordinary');
+    expect(s.balance).toBe(550);
+    expect(s.today.expenses).toBe(450);
+  });
+
+  it("can't buy what you can't afford, or nothing", () => {
+    const s = createGameState(100);
+    expect(gameReducer(s, { type: 'purchase', price: 450 }, 'doctor', 'ordinary')).toBe(s);
+    expect(gameReducer(s, { type: 'purchase', price: 0 }, 'doctor', 'ordinary')).toBe(s);
+  });
+});

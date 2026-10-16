@@ -9,6 +9,7 @@ import { perfStats } from '../world/quality';
 import { TouchStick } from './TouchStick';
 import { genderLabel, heritageLabel } from '../lib/identity';
 import { formatHome } from '../lib/places';
+import { FASHION_HOUSE, atFashionHouse } from '../lib/fashion';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -22,6 +23,8 @@ interface HUDProps {
   onCycleQuality?: () => void;
   fullness: number;
   onOpenVendor?: (vendor: FoodVendor) => void;
+  onOpenShop?: () => void;
+  onOpenWardrobe?: () => void;
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -40,16 +43,17 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function VendorPrompt({ vendor, onOpen }: { vendor: FoodVendor; onOpen: (vendor: FoodVendor) => void }) {
+/** "E — do something here" prompt for food vendors and shops. */
+function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onOpen: () => void }) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(vendor)}
+      onClick={onOpen}
       className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
     >
       <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
       <span>
-        Order food at <span className="font-semibold">{vendor.name}</span>
+        {verb} <span className="font-semibold">{place}</span>
       </span>
     </button>
   );
@@ -67,6 +71,8 @@ export function HUD({
   onCycleQuality,
   fullness,
   onOpenVendor,
+  onOpenShop,
+  onOpenWardrobe,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -80,6 +86,12 @@ export function HUD({
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller);
   const vendor = nearestVendor(controller.position.x, controller.position.z);
+  // One prompt at a time: the food vendor if you're at one, otherwise the boutique
+  const prompt = vendor && onOpenVendor
+    ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
+    : onOpenShop && atFashionHouse(controller.position.x, controller.position.z)
+      ? { verb: 'Shop at', place: FASHION_HOUSE.name, onOpen: onOpenShop }
+      : null;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
@@ -119,6 +131,11 @@ export function HUD({
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+            {onOpenWardrobe && (
+              <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own">
+                Wardrobe
+              </button>
+            )}
             {onRest && (
               <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00">
                 Rest
@@ -159,10 +176,10 @@ export function HUD({
         </div>
       )}
 
-      {/* Food prompt when standing at a vendor (desktop: bottom centre) */}
-      {vendor && onOpenVendor && (
+      {/* Prompt when standing at a vendor or shop (desktop: bottom centre) */}
+      {prompt && (
         <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
-          <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
+          <PlacePrompt {...prompt} />
         </div>
       )}
 
@@ -171,9 +188,9 @@ export function HUD({
         {/* Touch screens get a thumb-stick; on phones the food prompt shares its row so nothing overlaps */}
         <div className="flex items-end justify-between gap-2">
           <TouchStick />
-          {vendor && onOpenVendor && (
+          {prompt && (
             <div className="ml-auto sm:hidden">
-              <VendorPrompt vendor={vendor} onOpen={onOpenVendor} />
+              <PlacePrompt {...prompt} />
             </div>
           )}
         </div>

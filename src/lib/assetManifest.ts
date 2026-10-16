@@ -19,8 +19,6 @@ export interface SurfaceFiles {
   tileMeters: number;
 }
 
-export type OutfitKey = 'yellow' | 'blue' | 'none';
-
 export interface AvatarFile {
   /** GLB with animations named Idle, Walk and Run. */
   url: string;
@@ -30,8 +28,6 @@ export interface AvatarFile {
   walkSpeed: number;
   /** Ground speed (m/s) the Run clip was captured at. */
   runSpeed: number;
-  /** Which fabric colour the outfit-colour setting recolours ('none' disables it). */
-  outfit: OutfitKey;
 }
 
 export type VehicleKey = 'danfo';
@@ -93,8 +89,7 @@ export function parseManifest(data: unknown): { manifest: AssetManifest; problem
       const h = typeof a.height === 'number' && a.height >= 1.2 && a.height <= 2.3 ? a.height : 1.75;
       if (h !== a.height) problems.push('avatar.height missing or out of range (1.2–2.3 m); using 1.75');
       const speed = (v: unknown, fallback: number) => (typeof v === 'number' && v > 0.3 && v < 12 ? v : fallback);
-      const outfit: OutfitKey = a.outfit === 'yellow' || a.outfit === 'blue' ? a.outfit : 'none';
-      manifest.avatar = { url: a.url, height: h, walkSpeed: speed(a.walkSpeed, 1.4), runSpeed: speed(a.runSpeed, 3.5), outfit };
+      manifest.avatar = { url: a.url, height: h, walkSpeed: speed(a.walkSpeed, 1.4), runSpeed: speed(a.runSpeed, 3.5) };
     }
   }
   const vehicles = (raw.vehicles ?? {}) as Record<string, unknown>;

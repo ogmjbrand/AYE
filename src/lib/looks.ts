@@ -17,12 +17,11 @@ export interface Look extends AvatarFile {
 const FEMININE = { walkSpeed: 1.21, runSpeed: 2.76 };
 const MASCULINE = { walkSpeed: 1.03, runSpeed: 2.8 };
 
-const look = (id: string, body: BodyType, outfit: AvatarFile['outfit'] = 'none'): Look => ({
+const look = (id: string, body: BodyType): Look => ({
   id,
   body,
   url: `models/characters/rocketbox/${id}.glb`,
   height: body === 'feminine' ? 1.65 : 1.78,
-  outfit,
   ...(body === 'feminine' ? FEMININE : MASCULINE),
 });
 
@@ -33,7 +32,7 @@ export const LOOKS: readonly Look[] = [
   look('female-adult-11', 'feminine'),
   look('female-adult-10', 'feminine'),
   look('female-adult-04', 'feminine'),
-  look('male-adult-12', 'masculine', 'blue'),
+  look('male-adult-12', 'masculine'),
   look('male-adult-18', 'masculine'),
   look('male-adult-04', 'masculine'),
   look('male-adult-15', 'masculine'),

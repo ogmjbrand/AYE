@@ -4,7 +4,8 @@ import { STARTING_BALANCE } from '../lib/gameState';
 import { loadCharacter, saveCharacter } from '../lib/save';
 import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, genderLabel, type Gender } from '../lib/identity';
-import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, lookById, looksFor, type BodyType } from '../lib/looks';
+import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, looksFor, type BodyType } from '../lib/looks';
+import { resolveStyles, type Slot, type Style, type Wardrobe } from '../lib/fashion';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
 
@@ -33,6 +34,8 @@ export interface Character {
   /** Which 3D person (lib/looks.ts) and how tall, in centimetres. */
   lookId: string;
   heightCm: number;
+  /** Clothes and hair dye bought in the game (lib/fashion.ts). */
+  wardrobe: Wardrobe;
   lifestyle: Lifestyle;
   career: Career;
   diet: Diet;
@@ -58,10 +61,8 @@ export function CharacterCreation({
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
   const [career, setCareer] = useState<Character['career']>('none');
   const [diet, setDiet] = useState<Diet>('everything');
-  // Natural denim, so a recolourable look keeps its real colour unless the player changes it
-  const [colorR, setColorR] = useState(54);
-  const [colorG, setColorG] = useState(82);
-  const [colorB, setColorB] = useState(125);
+  // Legacy outfit colour, kept in saves for compatibility; clothes now come from the wardrobe
+  const [colorR, colorG, colorB] = [54, 82, 125];
   const [gender, setGender] = useState<Gender>('unspecified');
   const [heritage, setHeritage] = useState('unspecified');
   const [ethnicGroup, setEthnicGroup] = useState('');
@@ -110,6 +111,7 @@ export function CharacterCreation({
       body,
       lookId,
       heightCm,
+      wardrobe: { owned: [], equipped: {} },
       colorR,
       colorG,
       colorB,
@@ -143,7 +145,7 @@ export function CharacterCreation({
   if (mode === 'menu' && hasSavedCharacter) {
     const char = savedCharacter;
     return (
-      <Shell previewColor={previewColor} previewName={char.name} previewSub={`${formatHome(char.country, char.region)} · ${CAREER_LABEL[char.career]}`} lookId={char.lookId} heightCm={char.heightCm}>
+      <Shell previewColor={previewColor} previewName={char.name} previewSub={`${formatHome(char.country, char.region)} · ${CAREER_LABEL[char.career]}`} lookId={char.lookId} heightCm={char.heightCm} styles={resolveStyles(char.wardrobe.equipped)}>
         <section className="space-y-6">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">Welcome back</p>
@@ -290,39 +292,6 @@ export function CharacterCreation({
           </Field>
         </fieldset>
 
-        {lookById(lookId).outfit !== 'none' && <fieldset className="space-y-4">
-          <legend className={SECTION_LABEL}>Outfit colour</legend>
-          <div className="flex items-center gap-4 rounded-xl border border-cc-line bg-cc-field p-4">
-            <span
-              className="h-12 w-12 shrink-0 rounded-lg border border-cc-line shadow-inner"
-              style={{ backgroundColor: `rgb(${colorR}, ${colorG}, ${colorB})` }}
-              aria-hidden
-            />
-            <div className="min-w-0">
-              <p className="text-sm text-cc-ink">Shown on the preview</p>
-              <p className="font-mono text-xs text-cc-muted tabular-nums">rgb({colorR}, {colorG}, {colorB})</p>
-            </div>
-          </div>
-          {([
-            ['red', 'Red', colorR, setColorR],
-            ['green', 'Green', colorG, setColorG],
-            ['blue', 'Blue', colorB, setColorB],
-          ] as const).map(([key, label, value, set]) => (
-            <div key={key} className="grid grid-cols-[4rem_1fr_2.5rem] items-center gap-3">
-              <label htmlFor={`color-${key}`} className="text-sm text-cc-muted">{label}</label>
-              <input
-                id={`color-${key}`}
-                type="range"
-                min="0"
-                max="255"
-                value={value}
-                onChange={(e) => set(parseInt(e.target.value))}
-                className="w-full accent-cc-gold cursor-pointer"
-              />
-              <span className="font-mono text-sm text-cc-ink text-right tabular-nums">{value}</span>
-            </div>
-          ))}
-        </fieldset>}
 
         <div className="space-y-3">
           <button type="submit" disabled={!name.trim()} className={PRIMARY_BUTTON}>Create &amp; play</button>
@@ -379,8 +348,9 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 }
 
 /** Two columns on wide screens (controls | live preview); stacked on phones. */
-function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm }: {
+function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm, styles }: {
   children: ReactNode; previewColor: string; previewName: string; previewSub: string; lookId: string; heightCm: number;
+  styles?: Partial<Record<Slot, Style>>;
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-cc-bg text-cc-ink" style={{ backgroundImage: 'radial-gradient(1200px 600px at 75% 30%, rgba(201,164,92,0.08), transparent 60%)' }}>
@@ -394,7 +364,7 @@ function Shell({ children, previewColor, previewName, previewSub, lookId, height
             {children}
           </div>
           <aside className="order-1 lg:order-2 relative min-h-[22rem] lg:sticky lg:top-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:self-start rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
-            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} />
+            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} styles={styles} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6 bg-gradient-to-t from-cc-bg/90 to-transparent">
               <p className="font-display text-2xl font-bold text-cc-ink truncate">{previewName}</p>
               <p className="text-sm text-cc-muted">{previewSub}</p>

@@ -1,0 +1,148 @@
+import { Color, DataTexture, NoColorSpace, type Material, type MeshStandardMaterial, type Texture } from 'three';
+import { PATTERNS, type Slot, type Style } from '../lib/fashion';
+
+/**
+ * Restyles a Rocketbox avatar's clothes and hair in the fragment shader.
+ * A garment map (see scripts/rocketbox/garment-masks.mjs) says which texels
+ * belong to the top, bottom, shoes (body texture: R, G, B) or hair (head
+ * texture: R; cut-out cards such as hijab drapes count as headwear). Those
+ * texels take the chosen fabric's colours and pattern,
+ * keeping the original fabric's folds and shading; skin is never touched.
+ */
+
+interface SlotUniforms {
+  on: { value: number };
+  pattern: { value: number };
+  scale: { value: number };
+  a: { value: Color };
+  b: { value: Color };
+  c: { value: Color };
+}
+
+export type StyleUniforms = Partial<Record<Slot, SlotUniforms>>;
+
+const BODY_SLOTS: readonly (readonly [Slot, string])[] = [['top', 'r'], ['bottom', 'g'], ['shoes', 'b']];
+
+/** Cut-out cards (hijab drapes, eyelashes) are all hair/headwear: a mask that is 1 everywhere. */
+const FULL_MASK = (() => {
+  const t = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  t.colorSpace = NoColorSpace;
+  t.needsUpdate = true;
+  return t;
+})();
+const HEAD_SLOTS: readonly (readonly [Slot, string])[] = [['hair', 'r']];
+
+const PATTERN_GLSL = /* glsl */ `
+float ayeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// p: ${Object.entries(PATTERNS).map(([k, v]) => `${v}=${k}`).join(', ')}
+vec3 ayePattern(float p, vec2 uv, float s, vec3 a, vec3 b, vec3 c) {
+  vec2 q = uv * s;
+  vec2 f = fract(q) - 0.5;
+  if (p < 0.5) return a;
+  if (p < 1.5) return mix(a, b, step(0.5, fract(q.x)));
+  if (p < 2.5) return mix(a, b, 1.0 - step(0.08, fract(q.x)));
+  if (p < 3.5) {
+    float gx = step(0.5, fract(q.x));
+    float gy = step(0.5, fract(q.y));
+    return gx * gy > 0.5 ? c : (gx + gy > 0.5 ? b : a);
+  }
+  if (p < 4.5) {
+    // Ankara-style wax print: ringed medallions on a diamond lattice
+    float r = length(f);
+    float diamond = step(abs(f.x) + abs(f.y), 0.5);
+    vec3 col = mix(b, a, diamond);
+    col = mix(col, c, step(r, 0.3) * step(0.2, r));
+    col = mix(col, b, step(r, 0.11));
+    return col;
+  }
+  if (p < 5.5) {
+    // Kente/aso-oke: woven bands with alternating blocks and thin weft lines
+    float band = floor(q.x * 2.0);
+    float block = step(0.5, fract(q.y * 1.5 + band * 0.5));
+    vec3 col = mod(band, 2.0) < 1.0 ? mix(a, b, block) : mix(c, a, block);
+    col = mix(col, b, step(0.92, fract(q.y * 6.0)));
+    return col;
+  }
+  // Adire: hand-dyed indigo with soft resist circles
+  vec2 cell = floor(q);
+  vec2 jitter = vec2(ayeHash(cell), ayeHash(cell + 7.3)) * 0.3 - 0.15;
+  float d = length(f - jitter);
+  float spot = 1.0 - smoothstep(0.08, 0.2, d);
+  return mix(mix(a, c, ayeHash(cell + 3.1) * 0.5), b, spot);
+}
+`;
+
+function slotGlsl(slot: Slot, channel: string) {
+  return /* glsl */ `
+  {
+    float w = ayeMask.${channel} * uAye_${slot}_on;
+    if (w > 0.001) {
+      vec3 fabric = ayePattern(uAye_${slot}_pattern, vMapUv, uAye_${slot}_scale, uAye_${slot}_a, uAye_${slot}_b, uAye_${slot}_c);
+      diffuseColor.rgb = mix(diffuseColor.rgb, fabric * ayeShade, w);
+    }
+  }`;
+}
+
+/**
+ * Installs the restyling shader on a body or head material (once) and returns
+ * its uniforms. Returns null for materials that aren't a Rocketbox body/head.
+ */
+export function installStyleShader(material: Material, maskTexture: Texture): StyleUniforms | null {
+  let mask = maskTexture;
+  const m = material as MeshStandardMaterial & { userData: { ayeStyle?: StyleUniforms } };
+  if (m.userData.ayeStyle) return m.userData.ayeStyle;
+  const cutout = /_opacity$/i.test(m.name);
+  const slots = /_body$/i.test(m.name) ? BODY_SLOTS : /_head$/i.test(m.name) || cutout ? HEAD_SLOTS : null;
+  if (!slots || !m.map) return null;
+  if (cutout) mask = FULL_MASK;
+
+  const uniforms: StyleUniforms = {};
+  for (const [slot] of slots) {
+    uniforms[slot] = {
+      on: { value: 0 }, pattern: { value: 0 }, scale: { value: 16 },
+      a: { value: new Color() }, b: { value: new Color() }, c: { value: new Color() },
+    };
+  }
+  const isHead = slots === HEAD_SLOTS;
+  m.userData.ayeStyle = uniforms;
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uAyeMask = { value: mask };
+    let decl = 'uniform sampler2D uAyeMask;\n';
+    for (const [slot] of slots) {
+      const u = uniforms[slot]!;
+      for (const [key, val] of Object.entries(u)) shader.uniforms[`uAye_${slot}_${key}`] = val;
+      decl += `uniform float uAye_${slot}_on; uniform float uAye_${slot}_pattern; uniform float uAye_${slot}_scale;\n`;
+      decl += `uniform vec3 uAye_${slot}_a; uniform vec3 uAye_${slot}_b; uniform vec3 uAye_${slot}_c;\n`;
+    }
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${decl}${PATTERN_GLSL}`)
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        {
+          vec4 ayeMask = texture2D(uAyeMask, vMapUv);
+          // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
+          float ayeLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
+          ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
+        }`,
+      );
+  };
+  m.customProgramCacheKey = () => `aye-style-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.needsUpdate = true;
+  return uniforms;
+}
+
+/** Points the uniforms at the styles to show; slots without a style show the original clothes. */
+export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot, Style>>) {
+  for (const [slot, u] of Object.entries(uniforms) as [Slot, SlotUniforms][]) {
+    const s = styles[slot];
+    u.on.value = s ? 1 : 0;
+    if (!s) continue;
+    u.pattern.value = PATTERNS[s.pattern];
+    u.scale.value = s.scale;
+    u.a.value.set(s.colors[0]);
+    u.b.value.set(s.colors[1]);
+    u.c.value.set(s.colors[2]);
+  }
+}
