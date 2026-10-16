@@ -27,3 +27,4 @@ dist-ssr
 # The game loads them locally; they never go to the public repository.
 public/assets/private/*
 !public/assets/private/README.md
+assets-src/makehuman/base/
