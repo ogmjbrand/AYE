@@ -7,6 +7,7 @@ import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, looksFor, type BodyType } from '../lib/looks';
 import type { Slot, Style, Wardrobe } from '../lib/fashion';
+import { AVERAGE_SHAPE, SHAPE_PRESETS, SHAPE_SLIDERS, presetFor, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
 
@@ -35,6 +36,8 @@ export interface Character {
   /** Which 3D person (lib/looks.ts) and how tall, in centimetres. */
   lookId: string;
   heightCm: number;
+  /** Build, muscle, curves and belly (lib/bodyShape.ts). */
+  shape: BodyShape;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
   lifestyle: Lifestyle;
@@ -69,6 +72,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
   const [body, setBody] = useState<BodyType>('feminine');
   const [lookId, setLookId] = useState(() => looksFor('feminine')[0].id);
   const [heightCm, setHeightCm] = useState(defaultHeightCm('feminine'));
+  const [shape, setShape] = useState<BodyShape>(AVERAGE_SHAPE);
   const [countries] = useState(countryOptions);
 
   const chooseBody = (next: BodyType) => {
@@ -106,6 +110,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
       body,
       lookId,
       heightCm,
+      shape,
       wardrobe: { owned: [], equipped: {} },
       colorR,
       colorG,
@@ -122,7 +127,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
   const previewColor = `rgb(${colorR}, ${colorG}, ${colorB})`;
 
   return (
-    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm}>
+    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm} shape={shape}>
       <form onSubmit={handleCreate} className="space-y-8" aria-labelledby="create-title">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">New life</p>
@@ -213,6 +218,34 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
               onChange={(e) => setHeightCm(parseInt(e.target.value))} className="w-full accent-cc-gold cursor-pointer" />
             <span className="font-mono text-sm text-cc-ink text-right tabular-nums">{heightCm} cm</span>
           </div>
+          <div>
+            <p className="mb-2 text-sm font-medium text-cc-ink">Body shape</p>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Body shape">
+              {SHAPE_PRESETS.map((p) => {
+                const on = presetFor(shape)?.id === p.id;
+                return (
+                  <button key={p.id} type="button" role="radio" aria-checked={on} onClick={() => setShape(p.shape)}
+                    className={`rounded-full border px-3 py-1 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${on ? 'border-cc-gold bg-cc-gold/10 text-cc-ink' : 'border-cc-line text-cc-muted hover:border-cc-gold/60'}`}>
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 space-y-2">
+              {SHAPE_SLIDERS.map((s) => (
+                <div key={s.key} className="grid grid-cols-[6.5rem_1fr] items-center gap-3">
+                  <label htmlFor={`shape-${s.key}`} className="text-sm text-cc-muted">{s.label}</label>
+                  <div>
+                    <input id={`shape-${s.key}`} type="range" min={s.min * 100} max={100} step={5} value={Math.round(shape[s.key] * 100)}
+                      aria-valuetext={`${s.ends[0]} to ${s.ends[1]}: ${Math.round(((shape[s.key] - s.min) / (1 - s.min)) * 100)}%`}
+                      onChange={(e) => setShape({ ...shape, [s.key]: parseInt(e.target.value) / 100 })}
+                      className="w-full accent-cc-gold cursor-pointer" />
+                    <div className="flex justify-between text-[11px] text-cc-muted"><span>{s.ends[0]}</span><span>{s.ends[1]}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </fieldset>
 
         <fieldset className="space-y-4">
@@ -277,8 +310,9 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 }
 
 /** Two columns on wide screens (controls | live preview); stacked on phones. */
-function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm, styles }: {
+function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm, styles, shape }: {
   children: ReactNode; previewColor: string; previewName: string; previewSub: string; lookId: string; heightCm: number;
+  shape?: BodyShape;
   styles?: Partial<Record<Slot, Style>>;
 }) {
   return (
@@ -293,7 +327,7 @@ function Shell({ children, previewColor, previewName, previewSub, lookId, height
             {children}
           </div>
           <aside className="order-1 lg:order-2 relative min-h-[22rem] lg:sticky lg:top-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:self-start rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
-            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} styles={styles} />
+            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6 bg-gradient-to-t from-cc-bg/90 to-transparent">
               <p className="font-display text-2xl font-bold text-cc-ink truncate">{previewName}</p>
               <p className="text-sm text-cc-muted">{previewSub}</p>

@@ -8,6 +8,8 @@ import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
 import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
+import { applyBodyShape } from './bodyShapeSkin';
+import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 
@@ -75,8 +77,10 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape }: {
   controller: PlayerHandle;
+  /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
+  shape?: BodyShape;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
   styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
@@ -121,6 +125,11 @@ export function Avatar({ controller, lookId, heightCm, styles }: {
       }
     });
   }, [scene]);
+  // The GLB scene is cached and shared, so the shape is (re)applied whenever it or the scene changes
+  const shapeKey = JSON.stringify(shape ?? AVERAGE_SHAPE);
+  useEffect(() => {
+    applyBodyShape(scene, JSON.parse(shapeKey) as BodyShape);
+  }, [scene, shapeKey]);
   // Garment maps exist only for the built-in looks, not for a model listed in the asset manifest
   const styledLook = assetManifest().avatar ? null : lookById(lookId).id;
 

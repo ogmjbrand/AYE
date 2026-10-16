@@ -161,6 +161,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                 lookId={saved.lookId}
                 heightCm={saved.heightCm}
                 styles={resolveStyles(saved.wardrobe.equipped)}
+                shape={saved.shape}
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cc-bg/95 to-transparent p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-cc-gold">Welcome back</p>

@@ -17,7 +17,7 @@ const character: Character = {
   id: 'abc', name: 'Ada', lifestyle: 'ordinary', career: 'doctor', diet: 'vegan',
   colorR: 1, colorG: 2, colorB: 3, balance: 5000, createdAt: 1, lastBalanceUpdate: 1,
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
-  body: 'feminine', lookId: 'female-adult-10', heightCm: 168,
+  body: 'feminine', lookId: 'female-adult-10', heightCm: 168, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15 },
   wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
 };
 
@@ -56,6 +56,12 @@ describe('character save', () => {
     const { wardrobe, ...old } = character;
     void wardrobe;
     expect(parseCharacter(old)!.wardrobe).toEqual({ owned: [], equipped: {} });
+  });
+
+  it('characters saved before body shape existed are average', () => {
+    const { shape, ...old } = character;
+    void shape;
+    expect(parseCharacter(old)!.shape).toEqual({ weight: 0, muscle: 0, curves: 0, belly: 0 });
   });
 
   it('drops unknown or unowned wardrobe items', () => {

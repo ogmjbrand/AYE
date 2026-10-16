@@ -7,6 +7,7 @@ import { assetUrl } from '../lib/assetManifest';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
 import type { Slot, Style } from '../lib/fashion';
+import type { BodyShape } from '../lib/bodyShape';
 
 /** A standing-still controller so the avatar plays its idle animation. */
 function useStillController(): PlayerHandle {
@@ -16,10 +17,14 @@ function useStillController(): PlayerHandle {
   );
 }
 
+/** Turns slowly; holds a three-quarter view instead when the player prefers reduced motion. */
 function Turntable({ children }: { children: ReactNode }) {
   const ref = useRef<Group>(null);
+  const still = useMemo(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta * 0.35;
+    if (!ref.current) return;
+    if (still) ref.current.rotation.y = -0.6;
+    else ref.current.rotation.y += delta * 0.35;
   });
   return <group ref={ref}>{children}</group>;
 }
@@ -37,8 +42,9 @@ function Placeholder({ color }: { color: string }) {
  * Live 3D preview of the in-game character model (the same GLB the game uses),
  * turning slowly, with the chosen look, height and clothes applied.
  */
-export function CharacterPreview({ outfitColor, lookId, heightCm, styles }: {
+export function CharacterPreview({ outfitColor, lookId, heightCm, styles, shape }: {
   outfitColor: string;
+  shape?: BodyShape;
   lookId?: string;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
@@ -63,7 +69,7 @@ export function CharacterPreview({ outfitColor, lookId, heightCm, styles }: {
       <Turntable>
         <ErrorBoundary fallback={<Placeholder color={outfitColor} />}>
           <Suspense fallback={<Placeholder color={outfitColor} />}>
-            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} />
+            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>
