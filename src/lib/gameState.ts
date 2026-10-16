@@ -13,10 +13,14 @@
  *     very hungry (below HUNGRY_THRESHOLD) work is paid at half rate.
  *   - Renting a home costs a move-in fee, then rent each night you sleep.
  *     If you can't pay, you're evicted. Sleeping anywhere but home is
- *     sleeping rough, which leaves you hungrier.
+ *     sleeping rough, which leaves you hungrier. A night in your own bed
+ *     uses half the usual hunger.
+ *   - Every worked minute counts towards promotion (lib/progression.ts);
+ *     each level raises the hourly wage.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
+import { careerLevel, levelIndex } from './progression';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -46,6 +50,8 @@ export interface DaySummary extends DayLedger {
   rough: boolean;
   /** Lost their home because they couldn't pay the night's rent. */
   evicted: boolean;
+  /** New job title if the day's work earned a promotion. */
+  promotedTo: string | null;
 }
 
 export interface GameState {
@@ -61,6 +67,8 @@ export interface GameState {
   summary: DaySummary | null;
   /** The rented home (lib/homes.ts), or null. */
   home: string | null;
+  /** All minutes ever worked in this career (experience for promotion). */
+  workMinutes: number;
 }
 
 export type GameAction =
@@ -107,6 +115,8 @@ export const STARTING_BALANCE: Record<Lifestyle, number> = {
 /** Fullness lost per game minute: a full meter empties in 16 game hours. */
 export const FULLNESS_LOSS_PER_MINUTE = 100 / (16 * 60);
 export const HUNGRY_THRESHOLD = 20;
+/** Asleep in your own bed, hunger builds at half the waking rate. */
+export const HOME_SLEEP_HUNGER_RATE = 0.5;
 
 export function hungerLabel(fullness: number): 'Full' | 'Fed' | 'Peckish' | 'Hungry' | 'Starving' {
   if (fullness >= 80) return 'Full';
@@ -162,7 +172,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0 };
 }
 
 export function emptyLedger(): DayLedger {
@@ -188,16 +198,19 @@ function advanceMinute(time: GameTime): GameTime {
  * and the player is at their workplace. When an hour ends, pay the wage for
  * the minutes worked in it and charge the hour's living cost.
  */
-function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean): GameState {
+function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean, hungerRate = 1): GameState {
   const worked = atWorkplace && career !== 'none' && isWorkingHours(state.time) ? 1 : 0;
   const pay = worked * (state.fullness < HUNGRY_THRESHOLD ? 0.5 : 1);
   const minutesWorkedThisHour = state.minutesWorkedThisHour + pay;
-  const fullness = Math.max(0, state.fullness - FULLNESS_LOSS_PER_MINUTE);
+  const fullness = Math.max(0, state.fullness - FULLNESS_LOSS_PER_MINUTE * hungerRate);
   const time = advanceMinute(state.time);
   const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
-  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness };
+  const workMinutes = state.workMinutes + worked;
+  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, workMinutes };
 
-  const income = Math.round((HOURLY_WAGE[career] * minutesWorkedThisHour) / 60);
+  // Paid at the rate of the level held when the hour ends
+  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay;
+  const income = Math.round((wage * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
   const expenses = Math.min(HOURLY_LIVING_COST[lifestyle], afterIncome);
 
@@ -208,6 +221,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
     today: { ...today, income: today.income + income, expenses: today.expenses + expenses },
     minutesWorkedThisHour: 0,
     fullness,
+    workMinutes,
   };
 }
 
@@ -239,10 +253,13 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
     }
   }
   const rough = !(start.home && atHome);
-  let next = tick(start, career, lifestyle, false);
+  const hungerRate = rough ? 1 : HOME_SLEEP_HUNGER_RATE;
+  let next = tick(start, career, lifestyle, false, hungerRate);
   while (!(next.time.hour === WAKE_HOUR && next.time.minute === 0)) {
-    next = tick(next, career, lifestyle, false);
+    next = tick(next, career, lifestyle, false, hungerRate);
   }
+  const startOfDay = next.workMinutes - next.today.minutesWorked;
+  const promoted = levelIndex(career, next.workMinutes) > levelIndex(career, startOfDay);
   const { income, expenses, minutesWorked } = next.today;
   return {
     ...next,
@@ -257,6 +274,7 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
       rent,
       rough,
       evicted,
+      promotedTo: promoted ? careerLevel(career, next.workMinutes).title : null,
     },
   };
 }

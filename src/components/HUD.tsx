@@ -11,6 +11,8 @@ import { genderLabel, heritageLabel } from '../lib/identity';
 import { formatHome } from '../lib/places';
 import { FASHION_HOUSE, atFashionHouse } from '../lib/fashion';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
+import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
+import { HOURLY_WAGE } from '../lib/gameState';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -30,6 +32,8 @@ interface HUDProps {
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
+  /** Experience in the current career, in worked minutes (lib/progression.ts). */
+  workMinutes?: number;
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -80,6 +84,7 @@ export function HUD({
   onOpenWardrobe,
   homeId = null,
   onOpenHome,
+  workMinutes = 0,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -233,8 +238,8 @@ export function HUD({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
-                    <p className="m-0 mt-0.5 truncate text-xs capitalize text-ui-muted">
-                      {character.career === 'none' ? 'Undecided' : character.career} · {character.lifestyle.replace('-', ' ')}
+                    <p className="m-0 mt-0.5 truncate text-xs text-ui-muted">
+                      {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
                     </p>
                   </div>
                   <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
@@ -293,6 +298,16 @@ export function HUD({
               <dl className="m-0 mt-2 space-y-1 text-xs">
                 {character && (
                   <>
+                    {character.career !== 'none' && (() => {
+                      const left = hoursToNextLevel(character.career, workMinutes);
+                      const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
+                      return (
+                        <>
+                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay)} ⓒ an hour</Row>
+                          <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
+                        </>
+                      );
+                    })()}
                     <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
                     <Row label="From">{formatHome(character.country, character.region)}</Row>
                     <Row label="Gender">{genderLabel(character.gender)}</Row>

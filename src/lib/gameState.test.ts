@@ -5,6 +5,7 @@ import {
   HUNGRY_THRESHOLD,
   HOURLY_LIVING_COST,
   HOURLY_WAGE,
+  HOME_SLEEP_HUNGER_RATE,
   createGameState,
   createTime,
   gameReducer,
@@ -100,6 +101,7 @@ describe('rest', () => {
       rent: 0,
       rough: true,
       evicted: false,
+      promotedTo: null,
     });
     expect(s.today).toEqual({ income: 0, expenses: 0, minutesWorked: 0 });
     expect(s.balance).toBe(5000 + s.summary!.netChange);
@@ -139,7 +141,8 @@ describe('homes', () => {
     const s = afterSleep(home, true);
     expect(s.summary).toMatchObject({ rent: room.rentPerNight, rough: false, evicted: false });
     expect(s.summary!.expenses).toBe(room.rentPerNight + 9 * HOURLY_LIVING_COST.student);
-    expect(s.fullness).toBeCloseTo(100 - 9 * 60 * FULLNESS_LOSS_PER_MINUTE);
+    // A night in your own bed uses half the usual hunger
+    expect(s.fullness).toBeCloseTo(100 - 9 * 60 * FULLNESS_LOSS_PER_MINUTE * HOME_SLEEP_HUNGER_RATE);
   });
 
   it('sleeping away from home (or with no home) is sleeping rough and leaves you hungrier', () => {
@@ -159,6 +162,28 @@ describe('homes', () => {
   it('moving out gives up the home', () => {
     const s = gameReducer({ ...createGameState(5000), home: room.id }, { type: 'moveOut' }, 'none', 'student');
     expect(s.home).toBeNull();
+  });
+});
+
+describe('career progression', () => {
+  it('promotes after enough hours worked, announces it in the morning and raises the wage', () => {
+    // 15h 59m of experience, then one more working hour crosses the 16h rung
+    let s = { ...createGameState(5000, createTime(9, 0, 2)), workMinutes: 16 * 60 - 1 };
+    s = run(s, 60, 'engineer');
+    expect(s.workMinutes).toBe(16 * 60 + 59);
+    // The hour is paid at the level held when it ends
+    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.engineer * 1.15));
+    s = gameReducer(s, { type: 'sleep', atHome: false }, 'engineer', 'ordinary');
+    expect(s.summary!.promotedTo).toBe('Engineer');
+    s = gameReducer(s, { type: 'dismissSummary' }, 'engineer', 'ordinary');
+    // Next working day, still at the new level
+    s = run({ ...s, time: createTime(9, 0, 3), fullness: 100 }, 60, 'engineer');
+    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.engineer * 1.15));
+  });
+
+  it('no promotion on an ordinary day', () => {
+    const s = gameReducer(run(createGameState(5000, createTime(9, 0)), 60, 'doctor'), { type: 'sleep', atHome: false }, 'doctor', 'ordinary');
+    expect(s.summary!.promotedTo).toBeNull();
   });
 });
 

@@ -123,10 +123,12 @@ export function loadProgress(character: Character, storage: Storage = localStora
     summary: null,
     // Saves from before homes existed have none
     home: homeById(p.home as string | undefined)?.id ?? null,
+    // Saves from before promotions start with no experience
+    workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes }));
 }

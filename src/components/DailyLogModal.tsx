@@ -13,10 +13,12 @@ interface DailyLogModalProps {
   rough?: boolean;
   /** Lost the home for not paying rent. */
   evicted?: boolean;
+  /** New job title, if promoted. */
+  promotedTo?: string | null;
   onContinue: () => void;
 }
 
-export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, rent = 0, rough = false, evicted = false, onContinue }: DailyLogModalProps) {
+export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, rent = 0, rough = false, evicted = false, promotedTo = null, onContinue }: DailyLogModalProps) {
   const nextDay = DAY_NAMES[wakeDayOfWeek];
   const hoursWorked = `${Math.floor(minutesWorked / 60)}h ${String(minutesWorked % 60).padStart(2, '0')}m`;
 
@@ -59,6 +61,11 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
           </div>
         </div>
 
+        {promotedTo && (
+          <p role="status" className="mb-4 rounded bg-ui-accent/15 px-3 py-2 text-sm text-ui-accent-strong">
+            Promoted! You're now <span className="font-semibold">{promotedTo}</span>, with a pay rise.
+          </p>
+        )}
         {evicted && (
           <p role="alert" className="mb-4 rounded bg-ui-danger/15 px-3 py-2 text-sm text-ui-danger">
             You couldn't pay last night's rent, so you lost your home. Rent a cheaper place when you can.

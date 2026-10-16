@@ -302,6 +302,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           rent={state.summary.rent}
           rough={state.summary.rough}
           evicted={state.summary.evicted}
+          promotedTo={state.summary.promotedTo}
           onContinue={dismissSummary}
         />
       )}
@@ -346,6 +347,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         onRest={() => rest(atHome())}
         homeId={state.home}
         onOpenHome={setHomePanel}
+        workMinutes={state.workMinutes}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
