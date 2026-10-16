@@ -123,7 +123,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
             <ItemRow
               key={item.id}
               title={item.name}
-              subtitle={`${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}`}
+              subtitle={`${item.style.fabric ? `${item.style.fabric.name[0].toUpperCase()}${item.style.fabric.name.slice(1)} · ` : ''}${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}`}
               swatch={swatchCss(item.style)}
               active={shownId === item.id}
               actions={

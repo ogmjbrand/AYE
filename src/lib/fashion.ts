@@ -13,12 +13,50 @@ export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms'
 export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6, bogolan: 7, houndstooth: 8, batik: 9 } as const;
 export type Pattern = keyof typeof PATTERNS;
 
+/** How a fabric catches the light: roughness (0 glossy … 1 matte), weave texture and metallic sheen. */
+export interface Fabric {
+  name: 'cotton' | 'linen' | 'silk' | 'denim' | 'wool' | 'wax print' | 'handwoven' | 'leather' | 'suede' | 'metallic';
+  roughness: number;
+  /** 0 none, 1 plain weave, 2 twill (diagonal), 3 handwoven rib. */
+  weave: 0 | 1 | 2 | 3;
+  metalness: number;
+}
+
+export const FABRICS: Record<Fabric['name'], Fabric> = {
+  cotton: { name: 'cotton', roughness: 0.85, weave: 1, metalness: 0 },
+  linen: { name: 'linen', roughness: 0.92, weave: 1, metalness: 0 },
+  silk: { name: 'silk', roughness: 0.52, weave: 0, metalness: 0 },
+  denim: { name: 'denim', roughness: 0.85, weave: 2, metalness: 0 },
+  wool: { name: 'wool', roughness: 0.9, weave: 1, metalness: 0 },
+  'wax print': { name: 'wax print', roughness: 0.62, weave: 1, metalness: 0 },
+  handwoven: { name: 'handwoven', roughness: 0.75, weave: 3, metalness: 0 },
+  leather: { name: 'leather', roughness: 0.5, weave: 0, metalness: 0 },
+  suede: { name: 'suede', roughness: 0.97, weave: 0, metalness: 0 },
+  metallic: { name: 'metallic', roughness: 0.28, weave: 0, metalness: 0.75 },
+};
+
+/** The fabric an item is made of, from what it is. Hair dye keeps the hair's own finish. */
+export function fabricFor(id: string, pattern: Pattern): Fabric | undefined {
+  if (id.startsWith('hair-')) return undefined;
+  if (id.includes('silk')) return FABRICS.silk;
+  if (id.includes('denim')) return FABRICS.denim;
+  if (id.includes('linen')) return FABRICS.linen;
+  if (id.includes('metallic')) return FABRICS.metallic;
+  if (id.includes('suede')) return FABRICS.suede;
+  if (id.includes('leather')) return FABRICS.leather;
+  if (pattern === 'kente' || id.includes('batakari')) return FABRICS.handwoven;
+  if (pattern === 'ankara' || pattern === 'batik' || pattern === 'adire' || pattern === 'bogolan') return FABRICS['wax print'];
+  if (pattern === 'houndstooth' || pattern === 'pinstripe') return FABRICS.wool;
+  return FABRICS.cotton;
+}
+
 export interface Style {
   pattern: Pattern;
   /** Main, second and third colour (hex). */
   colors: readonly [string, string, string];
   /** Repeats across the texture; larger = smaller motif. */
   scale: number;
+  fabric?: Fabric;
 }
 
 export interface FashionItem {
@@ -37,7 +75,7 @@ const item = (
   pattern: Pattern, colors: [string, string?, string?], scale = 18, stockedIn?: readonly string[],
 ): FashionItem => ({
   id, slot, name, price, collection,
-  style: { pattern, colors: [colors[0], colors[1] ?? colors[0], colors[2] ?? colors[1] ?? colors[0]], scale },
+  style: { pattern, colors: [colors[0], colors[1] ?? colors[0], colors[2] ?? colors[1] ?? colors[0]], scale, fabric: fabricFor(id, pattern) },
   ...(stockedIn ? { stockedIn } : {}),
 });
 

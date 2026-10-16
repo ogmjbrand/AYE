@@ -88,6 +88,10 @@ function build() {
       ? surfaceFromFiles(assetManifest().surfaces.concrete!)
       : new MeshStandardMaterial({ color: '#9d978b', roughness: 0.9 }),
     darkMetal: new MeshStandardMaterial({ color: '#2b2d30', roughness: 0.45, metalness: 0.8 }),
+    // Real glass over the painted panes: reflects the sky, lets lit rooms show through at night
+    windowGlass: new MeshStandardMaterial({ color: '#a9bccb', roughness: 0.06, metalness: 0.95, transparent: true, opacity: 0.38, envMapIntensity: 1.3, depthWrite: false }),
+    // Painted concrete for sills, lintels, floor bands and copings
+    trim: new MeshStandardMaterial({ color: '#d8d1c3', roughness: 0.85 }),
     tank: new MeshStandardMaterial({ color: '#1d2a3a', roughness: 0.6 }),
     acUnit: new MeshStandardMaterial({ color: '#d9dbd8', roughness: 0.5, metalness: 0.2 }),
     wood: new MeshStandardMaterial({ color: '#5a4630', roughness: 0.9 }),
