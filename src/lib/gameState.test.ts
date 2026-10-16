@@ -229,3 +229,21 @@ describe('shopping', () => {
     expect(gameReducer(s, { type: 'purchase', price: 0 }, 'doctor', 'ordinary')).toBe(s);
   });
 });
+
+describe('equipment', () => {
+  it('buying equipment costs money once and is refused when unaffordable', () => {
+    let s = gameReducer(createGameState(5000), { type: 'buyEquipment', id: 'smartphone' }, 'none', 'student');
+    expect(s.equipment).toEqual(['smartphone']);
+    expect(s.balance).toBe(4100);
+    s = gameReducer(s, { type: 'buyEquipment', id: 'smartphone' }, 'none', 'student');
+    expect(s.balance).toBe(4100);
+    expect(gameReducer(createGameState(10), { type: 'buyEquipment', id: 'smartphone' }, 'none', 'student').equipment).toEqual([]);
+  });
+
+  it("a career's work kit raises that career's pay by 10%", () => {
+    const kit = { ...createGameState(5000, createTime(9, 0)), equipment: ['kit-doctor'] };
+    expect(run(kit, 60, 'doctor').today.income).toBe(Math.round(HOURLY_WAGE.doctor * 1.1));
+    // Someone else's kit does nothing
+    expect(run({ ...kit, equipment: ['kit-pilot'] }, 60, 'doctor').today.income).toBe(HOURLY_WAGE.doctor);
+  });
+});

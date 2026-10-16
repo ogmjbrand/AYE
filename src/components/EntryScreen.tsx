@@ -117,7 +117,8 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                     <Key k="W / S">Move forward / back</Key>
                     <Key k="A / D">Turn</Key>
                     <Key k="Shift">Hold to walk instead of jog</Key>
-                    <Key k="E">Use what's in front of you: food stalls, the Fashion House, front doors</Key>
+                    <Key k="E">Use what's in front of you: food stalls, the Fashion House, front doors, the Gadget Hub</Key>
+                    <Key k="M">Phone map (once you own a smartphone)</Key>
                     <Key k="Mouse">Drag to look around, scroll to zoom</Key>
                     <Key k="Phone">Thumb stick bottom-left; drag the scene to look</Key>
                   </dl>

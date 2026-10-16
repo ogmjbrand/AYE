@@ -44,7 +44,7 @@ export const BUILDINGS: readonly Building[] = [
   b(-22, 0, 12, 14, 42, 'tower', '#5f7f8f'),
   b(-11, 24, 6, 12, 17, 'residential', '#d8a47f', 'Palm View'),
   b(-23, 24, 10, 12, 22, 'office', '#c9ccc8', 'Tech Campus'),
-  b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Pharmacy'),
+  b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Gadget Hub'),
   // West side, south of the cross street
   b(-13, -36, 10, 12, 18, 'office', '#d6cdbd', 'University'),
   b(-26, -36, 10, 10, 13, 'residential', '#e3cf9a'),

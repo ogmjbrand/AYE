@@ -31,6 +31,7 @@ describe('world registry', () => {
     const careers = allPlaces().filter((p) => p.kind === 'workplace').map((p) => p.career);
     expect(careers.sort()).toEqual(['artist', 'athlete', 'doctor', 'engineer', 'entrepreneur', 'pilot', 'student']);
     expect(placeById('lagos.marina.fashion-house')?.kind).toBe('shop');
+    expect(placeById('lagos.marina.gadget-hub')?.kind).toBe('shop');
     expect(allPlaces().filter((p) => p.kind === 'food').length).toBe(3);
     expect(allPlaces().filter((p) => p.kind === 'home').length).toBe(4);
   });

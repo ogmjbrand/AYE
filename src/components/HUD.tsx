@@ -11,6 +11,7 @@ import { genderLabel, heritageLabel } from '../lib/identity';
 import { formatHome } from '../lib/places';
 import { FASHION_HOUSE, atFashionHouse } from '../lib/fashion';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
+import { GADGET_HUB, atGadgetHub, equipmentPay } from '../lib/equipment';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
 
@@ -29,11 +30,17 @@ interface HUDProps {
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   onOpenWardrobe?: () => void;
+  /** Opens the gadget shop when standing at it. */
+  onOpenGadgets?: () => void;
+  /** Opens the smartphone map (only passed once you own a phone). */
+  onOpenMap?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
   /** Experience in the current career, in worked minutes (lib/progression.ts). */
   workMinutes?: number;
+  /** Owned equipment (work kits raise pay). */
+  equipment?: readonly string[];
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -82,9 +89,12 @@ export function HUD({
   onOpenVendor,
   onOpenShop,
   onOpenWardrobe,
+  onOpenGadgets,
+  onOpenMap,
   homeId = null,
   onOpenHome,
   workMinutes = 0,
+  equipment = [],
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -103,7 +113,9 @@ export function HUD({
     ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
     : onOpenShop && atFashionHouse(controller.position.x, controller.position.z)
       ? { verb: 'Shop at', place: FASHION_HOUSE.name, onOpen: onOpenShop }
-      : null;
+      : onOpenGadgets && atGadgetHub(controller.position.x, controller.position.z)
+        ? { verb: 'Shop at', place: GADGET_HUB.name, onOpen: onOpenGadgets }
+        : null;
   const door = !prompt && onOpenHome ? homeAtDoor(controller.position.x, controller.position.z) : undefined;
   const placePrompt = prompt ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
@@ -147,6 +159,11 @@ export function HUD({
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+            {onOpenMap && (
+              <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the map on your phone (M)">
+                Map
+              </button>
+            )}
             {onOpenWardrobe && (
               <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own">
                 Wardrobe
@@ -303,7 +320,7 @@ export function HUD({
                       const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
                       return (
                         <>
-                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay)} ⓒ an hour</Row>
+                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} ⓒ an hour</Row>
                           <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
                         </>
                       );

@@ -42,6 +42,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     rest: (atHome: boolean) => dispatch({ type: 'sleep', atHome }),
     moveIn: (homeId: string) => dispatch({ type: 'moveIn', homeId }),
     moveOut: () => dispatch({ type: 'moveOut' }),
+    buyEquipment: (id: string) => dispatch({ type: 'buyEquipment', id }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),

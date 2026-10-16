@@ -11,6 +11,7 @@ import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from '.
 import { sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { homeById } from './homes';
+import { sanitiseEquipment } from './equipment';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -125,10 +126,11 @@ export function loadProgress(character: Character, storage: Storage = localStora
     home: homeById(p.home as string | undefined)?.id ?? null,
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
+    equipment: sanitiseEquipment(p.equipment),
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment }));
 }

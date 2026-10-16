@@ -21,6 +21,7 @@
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
+import { equipmentById, equipmentPay } from './equipment';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -69,6 +70,8 @@ export interface GameState {
   home: string | null;
   /** All minutes ever worked in this career (experience for promotion). */
   workMinutes: number;
+  /** Owned equipment ids (lib/equipment.ts). */
+  equipment: string[];
 }
 
 export type GameAction =
@@ -76,6 +79,7 @@ export type GameAction =
   | { type: 'sleep'; atHome: boolean }
   | { type: 'moveIn'; homeId: string }
   | { type: 'moveOut' }
+  | { type: 'buyEquipment'; id: string }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -172,7 +176,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0 };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [] };
 }
 
 export function emptyLedger(): DayLedger {
@@ -209,7 +213,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, workMinutes };
 
   // Paid at the rate of the level held when the hour ends
-  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay;
+  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
   const income = Math.round((wage * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
   const expenses = Math.min(HOURLY_LIVING_COST[lifestyle], afterIncome);
@@ -292,6 +296,16 @@ export function gameReducer(
       return state.summary ? state : sleep(state, career, lifestyle, action.atHome);
     case 'moveIn':
       return moveIn(state, action.homeId);
+    case 'buyEquipment': {
+      const item = equipmentById(action.id);
+      if (!item || state.equipment.includes(item.id) || state.balance < item.price || state.summary) return state;
+      return {
+        ...state,
+        equipment: [...state.equipment, item.id],
+        balance: state.balance - item.price,
+        today: { ...state.today, expenses: state.today.expenses + item.price },
+      };
+    }
     case 'moveOut':
       return state.summary ? state : { ...state, home: null };
     case 'dismissSummary':

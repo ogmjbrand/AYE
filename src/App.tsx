@@ -24,6 +24,10 @@ import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import { atFashionHouse, type FashionItem, type Slot } from './lib/fashion';
 import { FashionStore } from './components/FashionStore';
 import { HomePanel } from './components/HomePanel';
+import { GadgetStore } from './components/GadgetStore';
+import { MapPanel } from './components/MapPanel';
+import { atGadgetHub, hasMap } from './lib/equipment';
+import { CURRENT_DISTRICT } from './lib/geography';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
@@ -178,7 +182,7 @@ interface GameProps {
 function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment } = useGameState(
     character,
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
@@ -187,6 +191,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
   const [homePanel, setHomePanel] = useState<Home | null>(null);
+  const [gadgets, setGadgets] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const phone = hasMap(state.equipment);
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const home = homeById(state.home);
   const atHome = () => !!home && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS;
@@ -200,6 +207,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       const door = homeAtDoor(x, z);
       if (near) setVendor(near);
       else if (atFashionHouse(x, z)) setStore('shop');
+      else if (atGadgetHub(x, z)) setGadgets(true);
       else if (door) setHomePanel(door);
     };
     window.addEventListener('keydown', onKey);
@@ -207,9 +215,19 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   }, [controller]);
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel]);
+  }, [vendor, store, homePanel, gadgets]);
+
+  // M opens the phone map once you own a phone
+  useEffect(() => {
+    if (!phone) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'm' && !(e.target instanceof HTMLInputElement)) setMapOpen((o) => !o);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phone]);
 
   // While dressing, swing the camera round to the front of the player so the clothes are visible
   useEffect(() => {
@@ -281,6 +299,23 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onClose={closeStore}
         />
       )}
+      {gadgets && (
+        <GadgetStore
+          owned={state.equipment}
+          balance={state.balance}
+          career={character.career}
+          onBuy={(item) => buyEquipment(item.id)}
+          onClose={() => setGadgets(false)}
+        />
+      )}
+      {mapOpen && phone && (
+        <MapPanel
+          district={CURRENT_DISTRICT}
+          controller={controller}
+          homePlaceId={state.home ? `${CURRENT_DISTRICT.id}.home.${state.home}` : null}
+          onClose={() => setMapOpen(false)}
+        />
+      )}
       {homePanel && (
         <HomePanel
           home={homePanel}
@@ -348,6 +383,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         homeId={state.home}
         onOpenHome={setHomePanel}
         workMinutes={state.workMinutes}
+        equipment={state.equipment}
+        onOpenGadgets={() => setGadgets(true)}
+        onOpenMap={phone ? () => setMapOpen(true) : undefined}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}

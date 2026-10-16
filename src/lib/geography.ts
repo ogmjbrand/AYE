@@ -12,6 +12,7 @@ import { FOOD_VENDORS } from './food';
 import { CAREER_LOCATIONS } from './careers';
 import { FASHION_HOUSE } from './fashion';
 import { HOMES } from './homes';
+import { GADGET_HUB } from './equipment';
 import type { Career } from '../components/CharacterCreation';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public';
@@ -54,6 +55,7 @@ const LAGOS_MARINA: District = {
   places: [
     ...FOOD_VENDORS.map((v): Place => ({ id: `lagos.marina.${v.id}`, kind: 'food', name: v.name, position: v.position })),
     { id: 'lagos.marina.fashion-house', kind: 'shop', name: FASHION_HOUSE.name, position: FASHION_HOUSE.position },
+    { id: 'lagos.marina.gadget-hub', kind: 'shop', name: GADGET_HUB.name, position: GADGET_HUB.position },
     ...HOMES.map((h): Place => ({ id: `lagos.marina.home.${h.id}`, kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(CAREER_LOCATIONS) as [Career, (typeof CAREER_LOCATIONS)[Career]][])
       .filter(([career]) => career !== 'none')
