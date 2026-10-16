@@ -24,6 +24,7 @@ import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { TRAVEL_OPTIONS, type TravelMode } from './travel';
+import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -49,8 +50,10 @@ export interface DaySummary extends DayLedger {
   wakeDayOfWeek: number;
   /** Rent paid for the night (also counted in expenses). */
   rent: number;
-  /** Slept somewhere other than their own home. */
+  /** Slept somewhere other than their own home or a friend's couch. */
   rough: boolean;
+  /** Slept on a close friend's couch. */
+  atFriend: boolean;
   /** Lost their home because they couldn't pay the night's rent. */
   evicted: boolean;
   /** New job title if the day's work earned a promotion. */
@@ -76,15 +79,18 @@ export interface GameState {
   equipment: string[];
   /** The district the player is in (lib/geography.ts). */
   districtId: string;
+  /** Friendships with residents (lib/people.ts), by resident id. */
+  relationships: Record<string, Relationship>;
 }
 
 export type GameAction =
   | { type: 'tick'; atWorkplace: boolean }
-  | { type: 'sleep'; atHome: boolean }
+  | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
   | { type: 'moveOut' }
   | { type: 'buyEquipment'; id: string }
   | { type: 'travel'; to: string; mode: TravelMode }
+  | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -181,7 +187,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {} };
 }
 
 export function emptyLedger(): DayLedger {
@@ -247,6 +253,29 @@ function travel(state: GameState, to: string, mode: TravelMode, career: Career, 
   return { ...next, districtId: to };
 }
 
+/**
+ * Spends time with a resident who lives in the player's current district:
+ * one activity per resident per game day. Treats cost money; hanging out
+ * needs a friendship and takes an hour.
+ */
+function socialise(state: GameState, residentId: string, activity: Activity, career: Career, lifestyle: Lifestyle): GameState {
+  const resident = residentById(residentId);
+  const a = ACTIVITIES[activity];
+  if (state.summary || !resident || !a || resident.district !== state.districtId) return state;
+  const rel = state.relationships[residentId] ?? { points: 0, lastDay: -1 };
+  const today = gameDay(state.time.totalMinutes);
+  if (rel.lastDay === today || state.balance < a.cost) return state;
+  if (activity === 'hangout' && friendshipLevel(rel.points) < HANGOUT_LEVEL) return state;
+  let next: GameState = a.cost > 0
+    ? { ...state, balance: state.balance - a.cost, today: { ...state.today, expenses: state.today.expenses + a.cost } }
+    : state;
+  for (let i = 0; i < a.minutes; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + a.points), lastDay: today } },
+  };
+}
+
 /** Rents a home: pays the move-in fee. Moving from another home gives up the old one. */
 function moveIn(state: GameState, homeId: string): GameState {
   const home = homeById(homeId);
@@ -260,7 +289,7 @@ function moveIn(state: GameState, homeId: string): GameState {
  * Sleep until the next 07:00 (strictly in the future), then report the day.
  * Tonight's rent is due first; if it can't be paid the player is evicted.
  */
-function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: boolean): GameState {
+function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: boolean, atFriend = false): GameState {
   let start = state;
   let rent = 0;
   let evicted = false;
@@ -274,7 +303,8 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
       start = { ...state, home: null };
     }
   }
-  const rough = !(start.home && atHome);
+  const sleptHome = !!start.home && atHome;
+  const rough = !sleptHome && !atFriend;
   const hungerRate = rough ? 1 : HOME_SLEEP_HUNGER_RATE;
   let next = tick(start, career, lifestyle, false, hungerRate);
   while (!(next.time.hour === WAKE_HOUR && next.time.minute === 0)) {
@@ -295,6 +325,7 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
       wakeDayOfWeek: next.time.dayOfWeek,
       rent,
       rough,
+      atFriend: !sleptHome && atFriend,
       evicted,
       promotedTo: promoted ? careerLevel(career, next.workMinutes).title : null,
     },
@@ -311,7 +342,7 @@ export function gameReducer(
     case 'tick':
       return state.summary ? state : tick(state, career, lifestyle, action.atWorkplace);
     case 'sleep':
-      return state.summary ? state : sleep(state, career, lifestyle, action.atHome);
+      return state.summary ? state : sleep(state, career, lifestyle, action.atHome, action.atFriend);
     case 'moveIn':
       return moveIn(state, action.homeId);
     case 'buyEquipment': {
@@ -324,6 +355,8 @@ export function gameReducer(
         today: { ...state.today, expenses: state.today.expenses + item.price },
       };
     }
+    case 'socialise':
+      return socialise(state, action.residentId, action.activity, career, lifestyle);
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':

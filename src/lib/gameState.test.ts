@@ -13,6 +13,7 @@ import {
 } from './gameState';
 import { ROUGH_SLEEP_FULLNESS_LOSS, allHomes, moveInFee } from './homes';
 import { TRAVEL_OPTIONS } from './travel';
+import { ACTIVITIES, FRIENDSHIP_LEVELS } from './people';
 
 const run = (
   state: GameState,
@@ -101,6 +102,7 @@ describe('rest', () => {
       wakeDayOfWeek: 3,
       rent: 0,
       rough: true,
+      atFriend: false,
       evicted: false,
       promotedTo: null,
     });
@@ -275,5 +277,43 @@ describe('travel', () => {
   it('you are paid in whichever city you work', () => {
     const accra = { ...createGameState(5000, createTime(9, 0)), districtId: 'accra.osu' };
     expect(run(accra, 60, 'doctor').today.income).toBe(HOURLY_WAGE.doctor);
+  });
+});
+
+describe('relationships', () => {
+  const lagos = () => createGameState(5000, createTime(10, 0, 2));
+  const social = (s: GameState, residentId: string, activity: 'chat' | 'treat' | 'hangout') =>
+    gameReducer(s, { type: 'socialise', residentId, activity }, 'none', 'student');
+
+  it('chatting builds friendship, once per resident per day', () => {
+    let s = social(lagos(), 'tunde', 'chat');
+    expect(s.relationships.tunde.points).toBe(ACTIVITIES.chat.points);
+    s = social(s, 'tunde', 'treat');
+    expect(s.relationships.tunde.points).toBe(ACTIVITIES.chat.points);
+    // Another resident is fine the same day
+    expect(social(s, 'adaeze', 'chat').relationships.adaeze.points).toBe(ACTIVITIES.chat.points);
+    // The next day you can see Tunde again
+    const tomorrow = social({ ...s, time: { ...s.time, totalMinutes: s.time.totalMinutes + 1440 } }, 'tunde', 'chat');
+    expect(tomorrow.relationships.tunde.points).toBe(2 * ACTIVITIES.chat.points);
+  });
+
+  it('treats cost money; hanging out needs a friendship and takes an hour', () => {
+    const treated = social(lagos(), 'tunde', 'treat');
+    expect(treated.balance).toBe(5000 - ACTIVITIES.treat.cost);
+    expect(social(lagos(), 'tunde', 'hangout').relationships.tunde).toBeUndefined();
+    const friends = { ...lagos(), relationships: { tunde: { points: FRIENDSHIP_LEVELS[2].points, lastDay: -1 } } };
+    const s = social(friends, 'tunde', 'hangout');
+    expect(s.relationships.tunde.points).toBe(FRIENDSHIP_LEVELS[2].points + ACTIVITIES.hangout.points);
+    expect(s.time.totalMinutes - friends.time.totalMinutes).toBe(60);
+  });
+
+  it('you can only spend time with people in the city you are in', () => {
+    expect(social(lagos(), 'kojo', 'chat').relationships.kojo).toBeUndefined();
+    expect(social({ ...lagos(), districtId: 'accra.osu' }, 'kojo', 'chat').relationships.kojo.points).toBe(ACTIVITIES.chat.points);
+  });
+
+  it("sleeping on a close friend's couch is not sleeping rough", () => {
+    const s = gameReducer(createGameState(5000, createTime(22, 0)), { type: 'sleep', atHome: false, atFriend: true }, 'none', 'student');
+    expect(s.summary).toMatchObject({ rough: false, atFriend: true });
   });
 });

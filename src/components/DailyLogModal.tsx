@@ -11,6 +11,8 @@ interface DailyLogModalProps {
   rent?: number;
   /** Slept somewhere other than home. */
   rough?: boolean;
+  /** Slept on a friend's couch. */
+  atFriend?: boolean;
   /** Lost the home for not paying rent. */
   evicted?: boolean;
   /** New job title, if promoted. */
@@ -18,7 +20,7 @@ interface DailyLogModalProps {
   onContinue: () => void;
 }
 
-export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, rent = 0, rough = false, evicted = false, promotedTo = null, onContinue }: DailyLogModalProps) {
+export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, rent = 0, rough = false, atFriend = false, evicted = false, promotedTo = null, onContinue }: DailyLogModalProps) {
   const nextDay = DAY_NAMES[wakeDayOfWeek];
   const hoursWorked = `${Math.floor(minutesWorked / 60)}h ${String(minutesWorked % 60).padStart(2, '0')}m`;
 
@@ -72,7 +74,7 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
           </p>
         )}
         <p className="text-gray-400 text-sm mb-6">
-          {rough ? 'You slept rough and woke up hungry and stiff. ' : 'You slept well at home. '}
+          {rough ? 'You slept rough and woke up hungry and stiff. ' : atFriend ? "You slept on a friend's couch. " : 'You slept well at home. '}
           You slept until 07:00. It's now <span className="text-gray-300 font-semibold">{nextDay}</span> morning.
         </p>
 

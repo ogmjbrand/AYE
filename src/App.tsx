@@ -30,6 +30,9 @@ import { hasMap } from './lib/equipment';
 import { counterAt, districtById, type District } from './lib/geography';
 import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
+import { TalkPanel } from './components/TalkPanel';
+import { Residents } from './world/Residents';
+import { gameDay, residentNear, type Resident } from './lib/people';
 import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
@@ -119,6 +122,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district }: City
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
+      <Residents />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} />
     </>
@@ -190,7 +194,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -208,6 +212,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   }, [district]);
   const neighborhood = useCurrentNeighborhood(controller, district.neighborhoods);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [talking, setTalking] = useState<Resident | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
   useEffect(() => {
     if (!arrival) return;
@@ -245,6 +250,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       else if (counter === 'fashion') setStore('shop');
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
+      else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
       else if (door) setHomePanel(door);
     };
     window.addEventListener('keydown', onKey);
@@ -252,9 +258,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   }, [controller, district]);
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking]);
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -375,6 +381,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           wakeDayOfWeek={state.summary.wakeDayOfWeek}
           rent={state.summary.rent}
           rough={state.summary.rough}
+          atFriend={state.summary.atFriend}
           evicted={state.summary.evicted}
           promotedTo={state.summary.promotedTo}
           onContinue={dismissSummary}
@@ -413,6 +420,17 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         </Canvas>
       </QualityContext.Provider>
 
+      {talking && (
+        <TalkPanel
+          resident={talking}
+          relationship={state.relationships[talking.id]}
+          today={gameDay(state.time.totalMinutes)}
+          balance={state.balance}
+          onActivity={(activity) => socialise(talking.id, activity)}
+          onStayOver={() => { setTalking(null); rest(false, true); }}
+          onClose={() => setTalking(null)}
+        />
+      )}
       {travelOpen && (
         <TravelPanel
           from={district}
@@ -430,6 +448,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       <HUD
         district={district}
         onOpenTravel={() => setTravelOpen(true)}
+        onTalk={setTalking}
         controller={controller}
         character={character}
         balance={state.balance}

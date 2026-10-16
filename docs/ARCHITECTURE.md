@@ -29,7 +29,8 @@ uses Windows PowerShell, so the commands there are `npm.cmd`.
 | 5. Lifestyle loop | **Partly:** work → paid per minute at the workplace → spend on food and clothes → sleep → daily summary. |
 | 6. Careers, homes, fashion | Careers: a workplace and a five-level ladder per career (e.g. House officer → Consultant), promoted by hours worked, each level raising pay. Equipment from the Gadget Hub: a smartphone (district map) and a work kit per career (+10% pay). Homes: four flats to rent at their front doors (room to penthouse), with a move-in fee, nightly rent, eviction if you can't pay, and rough sleeping otherwise; no interiors yet. Fashion: boutique, salon, wardrobe (fabrics/prints/hair colour on the existing garments; no new cuts or hairstyles yet). |
 | 7. Global expansion | **Working:** a second city, Accra (Oxford Street, Osu, Ghana), with its own street layout (wider road, junction to the north, tro-tros), neighbourhoods, Ghanaian food (chop bar, waakye joint, kelewele stall), a kente boutique, gadget shop, three homes and a workplace for every career. Travel desks in both cities sell flights (2,500 ⓒ, 3 h) and coaches (800 ⓒ, 12 h); the clock, rent and hunger keep running on the way. Each district is one data file in `src/lib/districts/`; every layout and placement test runs against each district. |
-| 8–10 | Not started (multiplayer and the creator economy need the backend from Milestone 4 first). |
+| 8. Social and multiplayer | **Social, offline:** three residents per city (computer-controlled and labelled so, never shown as players) with friendship levels, daily chats, treats and hang-outs, and a couch to sleep on once you're close. **Multiplayer:** not started; it needs the backend from Milestone 4. |
+| 9–10 | Not started (the creator economy needs the backend, legal review and safety tooling first). |
 
 ### Code layout
 

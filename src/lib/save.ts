@@ -13,6 +13,7 @@ import { sanitiseShape } from './bodyShape';
 import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
+import { sanitiseRelationships } from './people';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -130,10 +131,11 @@ export function loadProgress(character: Character, storage: Storage = localStora
     equipment: sanitiseEquipment(p.equipment),
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
+    relationships: sanitiseRelationships(p.relationships),
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships }));
 }

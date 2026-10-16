@@ -12,6 +12,7 @@ import { formatHome } from '../lib/places';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
 import { equipmentPay } from '../lib/equipment';
 import { counterAt, type District } from '../lib/geography';
+import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
 
@@ -32,6 +33,7 @@ interface HUDProps {
   /** The district the player is in: its counters, homes and workplaces. */
   district: District;
   onOpenTravel?: () => void;
+  onTalk?: (resident: Resident) => void;
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
@@ -93,6 +95,7 @@ export function HUD({
   onOpenShop,
   district,
   onOpenTravel,
+  onTalk,
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
@@ -125,8 +128,11 @@ export function HUD({
         : counter === 'travel' && onOpenTravel
           ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel }
           : null;
-  const door = !prompt && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const placePrompt = prompt ?? (door && onOpenHome
+  const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
+  const placePrompt = prompt ?? (resident && onTalk
+    ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
+    : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
