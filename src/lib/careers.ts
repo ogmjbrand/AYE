@@ -9,7 +9,7 @@ export interface CareerLocation {
 }
 
 /** Marker positions sit on the pavement or plaza in front of the matching building in lib/world. */
-const CAREER_LOCATIONS: Record<Career, CareerLocation> = {
+export const CAREER_LOCATIONS: Record<Career, CareerLocation> = {
   'none': {
     name: 'Nowhere',
     description: 'You have no job',

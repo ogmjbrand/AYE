@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Vector3 } from 'three';
 import { resolveCollisions } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
+import { CURRENT_DISTRICT } from '../lib/geography';
 
 export interface PlayerHandle {
   position: Vector3;
@@ -20,7 +21,7 @@ const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 
 const playerHandle: PlayerHandle = {
-  position: new Vector3(1.5, 0, 2),
+  position: new Vector3(...CURRENT_DISTRICT.spawn),
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
