@@ -9,6 +9,8 @@ interface HomePanelProps {
   onMoveIn: () => void;
   onMoveOut: () => void;
   onSleep: () => void;
+  /** Walk inside (your own home only). */
+  onGoInside?: () => void;
   onClose: () => void;
 }
 
@@ -17,7 +19,7 @@ const PRIMARY = `${BUTTON} bg-ui-accent text-black hover:bg-ui-accent-strong`;
 const SECONDARY = `${BUTTON} border border-ui-line text-ui-ink hover:border-ui-accent`;
 
 /** The front door of a home: a listing to rent, or your own place to sleep in or leave. */
-export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, onSleep, onClose }: HomePanelProps) {
+export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, onSleep, onGoInside, onClose }: HomePanelProps) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const mine = currentHomeId === home.id;
   const current = homeById(currentHomeId);
@@ -71,7 +73,8 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
               </div>
             ) : (
               <div className="space-y-3">
-                <button type="button" autoFocus className={PRIMARY} onClick={onSleep}>Sleep here until 07:00</button>
+                {onGoInside && <button type="button" autoFocus className={PRIMARY} onClick={onGoInside}>Go inside</button>}
+                <button type="button" className={onGoInside ? SECONDARY : PRIMARY} onClick={onSleep}>Sleep here until 07:00</button>
                 <button type="button" className={SECONDARY} onClick={() => setConfirmLeave(true)}>Move out</button>
                 <p className="m-0 text-xs text-ui-muted">Rent is paid each night you sleep, wherever you sleep. If you can't pay, you lose the home.</p>
               </div>

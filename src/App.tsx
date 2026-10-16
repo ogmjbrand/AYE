@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
@@ -33,6 +33,9 @@ import { TravelPanel } from './components/TravelPanel';
 import { TalkPanel } from './components/TalkPanel';
 import { Residents } from './world/Residents';
 import { Traffic } from './world/Traffic';
+import { HomeInterior } from './world/HomeInterior';
+import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
+import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, residentNear, type Resident } from './lib/people';
 import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
@@ -196,14 +199,25 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
+  // Inside your own home (room coordinates): never counts as being at work
+  const insideRef = useRef(false);
   const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise } = useGameState(
     character,
-    () => character.career !== 'none' && !!districtRef.current &&
+    () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
   );
   const district = districtById(state.districtId);
-  // Collision and ground height follow the district (set before this frame's movement)
-  if (activeLayout() !== district.layout) setActiveLayout(district.layout);
+  const home = homeById(state.home);
+  const [inside, setInside] = useState(false);
+  const interior = home ? interiorFor(home) : null;
+  const roomLayout = useMemo(() => (interior ? interiorLayout(interior) : null), [interior]);
+  const indoors = inside && !!home && home.district === district.id && !!roomLayout;
+  // Collision and ground height follow where you are (set before this frame's movement)
+  const layoutNow = indoors ? roomLayout! : district.layout;
+  if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
+  useEffect(() => {
+    insideRef.current = indoors;
+  }, [indoors]);
   useEffect(() => {
     districtRef.current = district;
     // Arriving in a district (or loading a save there) puts you at its arrival point
@@ -225,6 +239,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     const option = TRAVEL_OPTIONS[mode];
     if (state.balance < option.fare) return;
     travel(to.id, mode);
+    setInside(false);
     setTravelOpen(false);
     setArrival(`You arrived in ${to.city.name} after ${formatDuration(option.minutes)} by ${option.label.toLowerCase()}.`);
   };
@@ -233,17 +248,45 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
   const [homePanel, setHomePanel] = useState<Home | null>(null);
+  /** Puts the camera straight behind the player after a jump (going in or out of a building). */
+  const snapCamera = () => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const { x, z } = controller.position;
+    const d = controller.direction;
+    controls.target.set(x, CAMERA_TARGET_HEIGHT, z);
+    controls.object.position.set(x - Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 1.6, z - Math.cos(d) * 4.2);
+    controls.update();
+  };
+  const goInside = () => {
+    if (!interior) return;
+    setHomePanel(null);
+    setInside(true);
+    placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
+    snapCamera();
+  };
+  const goOutside = () => {
+    setInside(false);
+    if (home) placePlayer(home.door, Math.PI);
+    snapCamera();
+  };
+  const nearSpot = (spot: readonly [number, number]) =>
+    Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= USE_RADIUS;
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
   // At your own front door you sleep at home; anywhere else is sleeping rough
-  const home = homeById(state.home);
-  const atHome = () => !!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS;
+  const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
 
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      if (indoors && interior) {
+        if (nearSpot(bedSpot(interior))) rest(true);
+        else if (nearSpot(doorSpot(interior))) goOutside();
+        return;
+      }
       const { x, z } = controller.position;
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
@@ -257,7 +300,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [controller, district]);
+  });
 
   useEffect(() => {
     setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null);
@@ -371,6 +414,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onMoveIn={() => moveIn(homePanel.id)}
           onMoveOut={moveOut}
           onSleep={() => { setHomePanel(null); rest(true); }}
+          onGoInside={goInside}
           onClose={() => setHomePanel(null)}
         />
       )}
@@ -386,7 +430,15 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           atFriend={state.summary.atFriend}
           evicted={state.summary.evicted}
           promotedTo={state.summary.promotedTo}
-          onContinue={dismissSummary}
+          onContinue={() => {
+            // Evicted in your sleep: you wake up back on the street
+            if (inside && state.summary?.evicted) {
+              setInside(false);
+              placePlayer(district.spawn);
+              snapCamera();
+            }
+            dismissSummary();
+          }}
         />
       )}
 
@@ -403,7 +455,14 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
           <DistrictContext.Provider value={district}>
-            <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} />
+            {indoors && interior ? (
+              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time}>
+                <InteriorLighting gameTime={state.time} player={controller} />
+                <Player controller={controller} character={character} tryOn={tryOn} />
+              </HomeInterior>
+            ) : (
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} />
+            )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
             <Suspense fallback={null}>
@@ -460,6 +519,14 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         onRest={() => rest(atHome())}
         homeId={state.home}
         onOpenHome={setHomePanel}
+        insideHome={indoors && interior ? {
+          name: home!.name,
+          prompt: nearSpot(bedSpot(interior))
+            ? { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) }
+            : nearSpot(doorSpot(interior))
+              ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside }
+              : null,
+        } : undefined}
         workMinutes={state.workMinutes}
         equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}

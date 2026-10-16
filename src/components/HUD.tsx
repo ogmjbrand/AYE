@@ -34,6 +34,8 @@ interface HUDProps {
   district: District;
   onOpenTravel?: () => void;
   onTalk?: (resident: Resident) => void;
+  /** Set while inside your home: replaces the street prompts. */
+  insideHome?: { name: string; prompt: { verb: string; place: string; onOpen: () => void } | null };
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
@@ -96,6 +98,7 @@ export function HUD({
   district,
   onOpenTravel,
   onTalk,
+  insideHome,
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
@@ -130,11 +133,12 @@ export function HUD({
           : null;
   const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const placePrompt = prompt ?? (resident && onTalk
+  const streetPrompt = prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
+  const placePrompt = insideHome ? insideHome.prompt : streetPrompt;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
@@ -213,13 +217,13 @@ export function HUD({
       </div>
 
       {/* Where you are: under the top bar, centred */}
-      {neighborhood && (
+      {(insideHome || neighborhood) && (
         <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
           <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
-            {neighborhood.name} · {district.city.name}
+            {insideHome ? `At home · ${district.city.name}` : `${neighborhood!.name} · ${district.city.name}`}
           </p>
           <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
-            {neighborhood.description}
+            {insideHome ? insideHome.name : neighborhood!.description}
           </p>
         </div>
       )}
@@ -287,7 +291,7 @@ export function HUD({
                       {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
                     </p>
                   </div>
-                  {character.career !== 'none' && (
+                  {character.career !== 'none' && !insideHome && (
                     <p className="m-0 text-right text-xs text-ui-muted">
                       Workplace
                       <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
