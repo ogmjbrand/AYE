@@ -10,6 +10,7 @@ import {
   gameReducer,
   type GameState,
 } from './gameState';
+import { HOMES, ROUGH_SLEEP_FULLNESS_LOSS, moveInFee } from './homes';
 
 const run = (
   state: GameState,
@@ -88,7 +89,7 @@ describe('work shifts', () => {
 describe('rest', () => {
   it('sleeps to the next 07:00, settles every hour and reports the day', () => {
     let s = run(createGameState(5000, createTime(9, 0, 2)), 8 * 60); // work 09:00-17:00
-    s = gameReducer(s, { type: 'sleep' }, 'doctor', 'ordinary');
+    s = gameReducer(s, { type: 'sleep', atHome: false }, 'doctor', 'ordinary');
     expect(s.time).toMatchObject({ hour: 7, minute: 0, dayOfWeek: 3 });
     expect(s.summary).toEqual({
       minutesWorked: 8 * 60,
@@ -96,22 +97,68 @@ describe('rest', () => {
       expenses: 22 * HOURLY_LIVING_COST.ordinary, // 09:00 -> 07:00 next day
       netChange: 8 * HOURLY_WAGE.doctor - 22 * HOURLY_LIVING_COST.ordinary,
       wakeDayOfWeek: 3,
+      rent: 0,
+      rough: true,
+      evicted: false,
     });
     expect(s.today).toEqual({ income: 0, expenses: 0, minutesWorked: 0 });
     expect(s.balance).toBe(5000 + s.summary!.netChange);
   });
 
   it('resting before dawn wakes the same morning', () => {
-    const s = gameReducer(createGameState(100, createTime(2, 30, 4)), { type: 'sleep' }, 'none', 'student');
+    const s = gameReducer(createGameState(100, createTime(2, 30, 4)), { type: 'sleep', atHome: false }, 'none', 'student');
     expect(s.time).toMatchObject({ hour: 7, minute: 0, dayOfWeek: 4 });
   });
 
   it('pauses the clock until the summary is dismissed', () => {
-    let s = gameReducer(createGameState(100), { type: 'sleep' }, 'none', 'student');
+    let s = gameReducer(createGameState(100), { type: 'sleep', atHome: false }, 'none', 'student');
     const paused = run(s, 30);
     expect(paused.time).toEqual(s.time);
     s = gameReducer(s, { type: 'dismissSummary' }, 'none', 'student');
     expect(run(s, 1).time.minute).toBe(1);
+  });
+});
+
+describe('homes', () => {
+  const room = HOMES[0];
+  const afterSleep = (s: GameState, atHome: boolean) => gameReducer(s, { type: 'sleep', atHome }, 'none', 'student');
+
+  it('moving in costs the move-in fee and is refused without enough money', () => {
+    const s = gameReducer(createGameState(5000), { type: 'moveIn', homeId: room.id }, 'none', 'student');
+    expect(s.home).toBe(room.id);
+    expect(s.balance).toBe(5000 - moveInFee(room));
+    expect(s.today.expenses).toBe(moveInFee(room));
+    const poor = gameReducer(createGameState(10), { type: 'moveIn', homeId: room.id }, 'none', 'student');
+    expect(poor.home).toBeNull();
+    expect(poor.balance).toBe(10);
+    expect(gameReducer(createGameState(5000), { type: 'moveIn', homeId: 'nowhere' }, 'none', 'student').home).toBeNull();
+  });
+
+  it('charges rent each night and sleeping at home is a proper rest', () => {
+    const home = { ...createGameState(5000, createTime(22, 0)), home: room.id };
+    const s = afterSleep(home, true);
+    expect(s.summary).toMatchObject({ rent: room.rentPerNight, rough: false, evicted: false });
+    expect(s.summary!.expenses).toBe(room.rentPerNight + 9 * HOURLY_LIVING_COST.student);
+    expect(s.fullness).toBeCloseTo(100 - 9 * 60 * FULLNESS_LOSS_PER_MINUTE);
+  });
+
+  it('sleeping away from home (or with no home) is sleeping rough and leaves you hungrier', () => {
+    const away = afterSleep({ ...createGameState(5000, createTime(22, 0)), home: room.id }, false);
+    expect(away.summary).toMatchObject({ rent: room.rentPerNight, rough: true });
+    const none = afterSleep(createGameState(5000, createTime(22, 0)), false);
+    expect(none.summary).toMatchObject({ rent: 0, rough: true });
+    expect(none.fullness).toBeCloseTo(100 - 9 * 60 * FULLNESS_LOSS_PER_MINUTE - ROUGH_SLEEP_FULLNESS_LOSS);
+  });
+
+  it('evicts a player who cannot pay the night\'s rent', () => {
+    const s = afterSleep({ ...createGameState(room.rentPerNight - 1, createTime(22, 0)), home: room.id }, true);
+    expect(s.home).toBeNull();
+    expect(s.summary).toMatchObject({ rent: 0, rough: true, evicted: true });
+  });
+
+  it('moving out gives up the home', () => {
+    const s = gameReducer({ ...createGameState(5000), home: room.id }, { type: 'moveOut' }, 'none', 'student');
+    expect(s.home).toBeNull();
   });
 });
 

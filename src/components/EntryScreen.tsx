@@ -117,13 +117,14 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                     <Key k="W / S">Move forward / back</Key>
                     <Key k="A / D">Turn</Key>
                     <Key k="Shift">Hold to walk instead of jog</Key>
-                    <Key k="E">Use what's in front of you: food stalls, the Fashion House</Key>
+                    <Key k="E">Use what's in front of you: food stalls, the Fashion House, front doors</Key>
                     <Key k="Mouse">Drag to look around, scroll to zoom</Key>
                     <Key k="Phone">Thumb stick bottom-left; drag the scene to look</Key>
                   </dl>
                   <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-cc-muted">
                     <li>Go to your workplace (the glowing ring) between 09:00 and 17:00 to earn wages.</li>
                     <li>Eat before you get hungry: hungry work pays half.</li>
+                    <li>Rent a home at a door with a “To let” board. Rent is due each night; sleeping anywhere else is sleeping rough.</li>
                     <li>Rest sleeps until 07:00 and shows how your day went.</li>
                   </ul>
                 </PanelBody>

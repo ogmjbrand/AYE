@@ -7,10 +7,16 @@ interface DailyLogModalProps {
   minutesWorked: number;
   /** The day the player woke up on (0 = Monday). */
   wakeDayOfWeek: number;
+  /** Rent paid for the night (included in expenses). */
+  rent?: number;
+  /** Slept somewhere other than home. */
+  rough?: boolean;
+  /** Lost the home for not paying rent. */
+  evicted?: boolean;
   onContinue: () => void;
 }
 
-export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, onContinue }: DailyLogModalProps) {
+export function DailyLogModal({ income, expenses, netChange, minutesWorked, wakeDayOfWeek, rent = 0, rough = false, evicted = false, onContinue }: DailyLogModalProps) {
   const nextDay = DAY_NAMES[wakeDayOfWeek];
   const hoursWorked = `${Math.floor(minutesWorked / 60)}h ${String(minutesWorked % 60).padStart(2, '0')}m`;
 
@@ -38,6 +44,12 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
               <span className="text-gray-400">Expenses</span>
               <span className="text-ui-danger">-{expenses.toLocaleString()} ⓒ</span>
             </div>
+            {rent > 0 && (
+              <div className="flex justify-between pl-3 text-xs">
+                <span className="text-gray-500">of which rent</span>
+                <span className="text-gray-400">{rent.toLocaleString()} ⓒ</span>
+              </div>
+            )}
             <div className="border-t border-gray-700 pt-2 flex justify-between font-bold">
               <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>Net Change</span>
               <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>
@@ -47,7 +59,13 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
           </div>
         </div>
 
+        {evicted && (
+          <p role="alert" className="mb-4 rounded bg-ui-danger/15 px-3 py-2 text-sm text-ui-danger">
+            You couldn't pay last night's rent, so you lost your home. Rent a cheaper place when you can.
+          </p>
+        )}
         <p className="text-gray-400 text-sm mb-6">
+          {rough ? 'You slept rough and woke up hungry and stiff. ' : 'You slept well at home. '}
           You slept until 07:00. It's now <span className="text-gray-300 font-semibold">{nextDay}</span> morning.
         </p>
 

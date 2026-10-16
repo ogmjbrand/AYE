@@ -23,6 +23,9 @@ import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import { atFashionHouse, type FashionItem, type Slot } from './lib/fashion';
 import { FashionStore } from './components/FashionStore';
+import { HomePanel } from './components/HomePanel';
+import { HomeMarkers } from './world/HomeMarkers';
+import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
 import { loadSettings, nextQualityMode, saveSettings, type QualityMode } from './lib/settings';
@@ -37,6 +40,7 @@ interface CityProps {
   character?: Character;
   gameTime: GameTime;
   tryOn: Partial<Record<Slot, string | null>>;
+  homeId: string | null;
 }
 
 interface CameraFollowProps {
@@ -95,7 +99,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -106,6 +110,7 @@ function City({ controller, character, gameTime, tryOn }: CityProps) {
       <Skyline />
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(character.career).position} />}
+      <HomeMarkers homeId={homeId} />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} />
     </>
@@ -173,7 +178,7 @@ interface GameProps {
 function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   const neighborhood = useCurrentNeighborhood(controller);
-  const { state, rest, dismissSummary, eat, purchase } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut } = useGameState(
     character,
     () => character.career !== 'none' && isAtWorkplace(controller.position, character.career),
   );
@@ -181,23 +186,30 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
   const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
+  const [homePanel, setHomePanel] = useState<Home | null>(null);
+  // At your own front door you sleep at home; anywhere else is sleeping rough
+  const home = homeById(state.home);
+  const atHome = () => !!home && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS;
 
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
       const near = nearestVendor(controller.position.x, controller.position.z);
+      const { x, z } = controller.position;
+      const door = homeAtDoor(x, z);
       if (near) setVendor(near);
-      else if (atFashionHouse(controller.position.x, controller.position.z)) setStore('shop');
+      else if (atFashionHouse(x, z)) setStore('shop');
+      else if (door) setHomePanel(door);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [controller]);
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null);
     return () => setMovementBlocked(false);
-  }, [vendor, store]);
+  }, [vendor, store, homePanel]);
 
   // While dressing, swing the camera round to the front of the player so the clothes are visible
   useEffect(() => {
@@ -269,6 +281,17 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onClose={closeStore}
         />
       )}
+      {homePanel && (
+        <HomePanel
+          home={homePanel}
+          currentHomeId={state.home}
+          balance={state.balance}
+          onMoveIn={() => moveIn(homePanel.id)}
+          onMoveOut={moveOut}
+          onSleep={() => { setHomePanel(null); rest(true); }}
+          onClose={() => setHomePanel(null)}
+        />
+      )}
       {state.summary && (
         <DailyLogModal
           income={state.summary.income}
@@ -276,6 +299,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           netChange={state.summary.netChange}
           minutesWorked={state.summary.minutesWorked}
           wakeDayOfWeek={state.summary.wakeDayOfWeek}
+          rent={state.summary.rent}
+          rough={state.summary.rough}
+          evicted={state.summary.evicted}
           onContinue={dismissSummary}
         />
       )}
@@ -292,7 +318,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
-          <City controller={controller} character={character} gameTime={state.time} tryOn={tryOn} />
+          <City controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} />
           {settings.ambientOcclusion && (
             <Suspense fallback={null}>
               <PostEffects />
@@ -317,7 +343,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         gameTime={state.time}
         neighborhood={neighborhood}
         onExitToMenu={onExitToMenu}
-        onRest={rest}
+        onRest={() => rest(atHome())}
+        homeId={state.home}
+        onOpenHome={setHomePanel}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}

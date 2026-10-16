@@ -40,9 +40,9 @@ const b = (
 export const BUILDINGS: readonly Building[] = [
   // West side, north of the cross street
   b(-11, -6, 6, 12, 7, 'shop', '#d9c7a3', 'Mama Put'),
-  b(-11, 9, 6, 12, 14, 'residential', '#e8d9b5'),
+  b(-11, 9, 6, 12, 14, 'residential', '#e8d9b5', 'Marina Court'),
   b(-22, 0, 12, 14, 42, 'tower', '#5f7f8f'),
-  b(-11, 24, 6, 12, 17, 'residential', '#d8a47f'),
+  b(-11, 24, 6, 12, 17, 'residential', '#d8a47f', 'Palm View'),
   b(-23, 24, 10, 12, 22, 'office', '#c9ccc8', 'Tech Campus'),
   b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Pharmacy'),
   // West side, south of the cross street
@@ -52,12 +52,12 @@ export const BUILDINGS: readonly Building[] = [
   b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
   b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
   b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
-  b(24, 27, 10, 10, 15, 'residential', '#efe3c8'),
+  b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),
   b(25, -2, 10, 10, 24, 'office', '#b9c2c4'),
   b(11, 3, 6, 5, 6, 'shop', '#e9d3b0', 'Taste of Africa'),
   b(11, 39, 6, 8, 6, 'shop', '#d7c4e0', 'Fashion House'),
   // East side, south of the cross street
-  b(14, -36, 12, 12, 46, 'tower', '#3f5f73'),
+  b(14, -36, 12, 12, 46, 'tower', '#3f5f73', 'Marina Heights'),
   b(28, -36, 8, 10, 12, 'residential', '#dcc2a2'),
 ];
 

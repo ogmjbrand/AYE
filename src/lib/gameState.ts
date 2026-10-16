@@ -11,8 +11,12 @@
  *   - Resting sleeps until the next 07:00, closes the day's ledger and reports it.
  *   - Fullness (0–100) falls steadily, sleep included; eating raises it. While
  *     very hungry (below HUNGRY_THRESHOLD) work is paid at half rate.
+ *   - Renting a home costs a move-in fee, then rent each night you sleep.
+ *     If you can't pay, you're evicted. Sleeping anywhere but home is
+ *     sleeping rough, which leaves you hungrier.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
+import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -36,6 +40,12 @@ export interface DaySummary extends DayLedger {
   netChange: number;
   /** The day the player wakes up on (0 = Monday). */
   wakeDayOfWeek: number;
+  /** Rent paid for the night (also counted in expenses). */
+  rent: number;
+  /** Slept somewhere other than their own home. */
+  rough: boolean;
+  /** Lost their home because they couldn't pay the night's rent. */
+  evicted: boolean;
 }
 
 export interface GameState {
@@ -49,11 +59,15 @@ export interface GameState {
   fullness: number;
   /** Set after resting; the clock is paused until it is dismissed. */
   summary: DaySummary | null;
+  /** The rented home (lib/homes.ts), or null. */
+  home: string | null;
 }
 
 export type GameAction =
   | { type: 'tick'; atWorkplace: boolean }
-  | { type: 'sleep' }
+  | { type: 'sleep'; atHome: boolean }
+  | { type: 'moveIn'; homeId: string }
+  | { type: 'moveOut' }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -148,7 +162,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null };
 }
 
 export function emptyLedger(): DayLedger {
@@ -197,15 +211,42 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   };
 }
 
-/** Sleep until the next 07:00 (strictly in the future), then report the day. */
-function sleep(state: GameState, career: Career, lifestyle: Lifestyle): GameState {
-  let next = tick(state, career, lifestyle, false);
+/** Rents a home: pays the move-in fee. Moving from another home gives up the old one. */
+function moveIn(state: GameState, homeId: string): GameState {
+  const home = homeById(homeId);
+  if (!home || state.home === homeId || state.summary) return state;
+  const fee = moveInFee(home);
+  if (state.balance < fee) return state;
+  return { ...state, home: homeId, balance: state.balance - fee, today: { ...state.today, expenses: state.today.expenses + fee } };
+}
+
+/**
+ * Sleep until the next 07:00 (strictly in the future), then report the day.
+ * Tonight's rent is due first; if it can't be paid the player is evicted.
+ */
+function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: boolean): GameState {
+  let start = state;
+  let rent = 0;
+  let evicted = false;
+  const home = homeById(state.home);
+  if (home) {
+    if (state.balance >= home.rentPerNight) {
+      rent = home.rentPerNight;
+      start = { ...state, balance: state.balance - rent, today: { ...state.today, expenses: state.today.expenses + rent } };
+    } else {
+      evicted = true;
+      start = { ...state, home: null };
+    }
+  }
+  const rough = !(start.home && atHome);
+  let next = tick(start, career, lifestyle, false);
   while (!(next.time.hour === WAKE_HOUR && next.time.minute === 0)) {
     next = tick(next, career, lifestyle, false);
   }
   const { income, expenses, minutesWorked } = next.today;
   return {
     ...next,
+    fullness: rough ? Math.max(0, next.fullness - ROUGH_SLEEP_FULLNESS_LOSS) : next.fullness,
     today: emptyLedger(),
     summary: {
       income,
@@ -213,6 +254,9 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle): GameStat
       minutesWorked,
       netChange: income - expenses,
       wakeDayOfWeek: next.time.dayOfWeek,
+      rent,
+      rough,
+      evicted,
     },
   };
 }
@@ -227,7 +271,11 @@ export function gameReducer(
     case 'tick':
       return state.summary ? state : tick(state, career, lifestyle, action.atWorkplace);
     case 'sleep':
-      return state.summary ? state : sleep(state, career, lifestyle);
+      return state.summary ? state : sleep(state, career, lifestyle, action.atHome);
+    case 'moveIn':
+      return moveIn(state, action.homeId);
+    case 'moveOut':
+      return state.summary ? state : { ...state, home: null };
     case 'dismissSummary':
       return { ...state, summary: null };
     case 'eat':

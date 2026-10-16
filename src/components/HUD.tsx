@@ -10,6 +10,7 @@ import { TouchStick } from './TouchStick';
 import { genderLabel, heritageLabel } from '../lib/identity';
 import { formatHome } from '../lib/places';
 import { FASHION_HOUSE, atFashionHouse } from '../lib/fashion';
+import { homeAtDoor, homeById, type Home } from '../lib/homes';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -26,6 +27,9 @@ interface HUDProps {
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   onOpenWardrobe?: () => void;
+  /** The rented home, if any (lib/homes.ts). */
+  homeId?: string | null;
+  onOpenHome?: (home: Home) => void;
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -74,6 +78,8 @@ export function HUD({
   onOpenVendor,
   onOpenShop,
   onOpenWardrobe,
+  homeId = null,
+  onOpenHome,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -93,6 +99,10 @@ export function HUD({
     : onOpenShop && atFashionHouse(controller.position.x, controller.position.z)
       ? { verb: 'Shop at', place: FASHION_HOUSE.name, onOpen: onOpenShop }
       : null;
+  const door = !prompt && onOpenHome ? homeAtDoor(controller.position.x, controller.position.z) : undefined;
+  const placePrompt = prompt ?? (door && onOpenHome
+    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
+    : null);
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
@@ -178,9 +188,9 @@ export function HUD({
       )}
 
       {/* Prompt when standing at a vendor or shop (desktop: bottom centre) */}
-      {prompt && (
+      {placePrompt && (
         <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
-          <PlacePrompt {...prompt} />
+          <PlacePrompt {...placePrompt} />
         </div>
       )}
 
@@ -189,9 +199,9 @@ export function HUD({
         {/* Touch screens get a thumb-stick; on phones the food prompt shares its row so nothing overlaps */}
         <div className="flex items-end justify-between gap-2">
           <TouchStick />
-          {prompt && (
+          {placePrompt && (
             <div className="ml-auto sm:hidden">
-              <PlacePrompt {...prompt} />
+              <PlacePrompt {...placePrompt} />
             </div>
           )}
         </div>
@@ -283,7 +293,8 @@ export function HUD({
               <dl className="m-0 mt-2 space-y-1 text-xs">
                 {character && (
                   <>
-                    <Row label="Home">{formatHome(character.country, character.region)}</Row>
+                    <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
+                    <Row label="From">{formatHome(character.country, character.region)}</Row>
                     <Row label="Gender">{genderLabel(character.gender)}</Row>
                     <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
                     <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>

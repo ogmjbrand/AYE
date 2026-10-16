@@ -100,7 +100,7 @@ describe('character save', () => {
 describe('progress save', () => {
   it('restores balance and clock for the same character', () => {
     const s = new MemoryStorage();
-    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12 };
+    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini' };
     saveProgress('abc', state, s);
     expect(loadProgress(character, s)).toEqual(state);
   });
@@ -116,6 +116,13 @@ describe('progress save', () => {
     expect(p.today.minutesWorked).toBe(0);
     expect(p.minutesWorkedThisHour).toBe(0);
     expect(p.fullness).toBe(100);
+    expect(p.home).toBeNull();
+  });
+
+  it('drops a home that no longer exists', () => {
+    const s = new MemoryStorage();
+    saveProgress('abc', { ...createGameState(100), home: 'demolished' }, s);
+    expect(loadProgress(character, s).home).toBeNull();
   });
 
   it('starts fresh for a different character or corrupted data', () => {

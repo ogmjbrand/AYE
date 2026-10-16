@@ -10,6 +10,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
 import { sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
+import { homeById } from './homes';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -120,10 +121,12 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before hunger existed start fed
     fullness: isNum(p.fullness, 0, 100) ? p.fullness : 100,
     summary: null,
+    // Saves from before homes existed have none
+    home: homeById(p.home as string | undefined)?.id ?? null,
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home }));
 }
