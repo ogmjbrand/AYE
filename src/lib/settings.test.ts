@@ -12,10 +12,16 @@ class MemoryStorage implements Storage {
 }
 
 describe('settings', () => {
-  it('round-trips the quality preference', () => {
+  it('round-trips the quality and route preferences', () => {
     const s = new MemoryStorage();
-    saveSettings({ quality: 'low' }, s);
-    expect(loadSettings(s)).toEqual({ quality: 'low' });
+    saveSettings({ quality: 'low', showRoute: false }, s);
+    expect(loadSettings(s)).toEqual({ quality: 'low', showRoute: false });
+  });
+
+  it('keeps an older save that has no route preference, showing the route', () => {
+    const s = new MemoryStorage();
+    s.setItem('aye_settings', '{"quality":"high"}');
+    expect(loadSettings(s)).toEqual({ quality: 'high', showRoute: true });
   });
 
   it('falls back to defaults for missing, corrupt or unknown values', () => {
@@ -23,7 +29,7 @@ describe('settings', () => {
     expect(loadSettings(s)).toEqual(DEFAULT_SETTINGS);
     s.setItem('aye_settings', '{not json');
     expect(loadSettings(s)).toEqual(DEFAULT_SETTINGS);
-    expect(parseSettings({ quality: 'ultra' })).toEqual(DEFAULT_SETTINGS);
+    expect(parseSettings({ quality: 'ultra', showRoute: 'yes' })).toEqual(DEFAULT_SETTINGS);
   });
 
   it('cycles auto → high → low → auto', () => {

@@ -28,19 +28,41 @@ let route: Point[] = [];
 let replanned = false;
 let stuckFor = 0;
 
+/** How the latest trip is going, for the HUD: under way, or how it ended. */
+export interface Trip {
+  /** Bumps with every new trip, so a message about an old one can be told apart. */
+  seq: number;
+  status: 'moving' | 'arrived' | 'cancelled' | 'blocked';
+  /** Set when the trip was to a place from the city directory. */
+  destinationId?: string;
+  label?: string;
+}
+let trip: Trip | null = null;
+let tripSeq = 0;
+const tripListeners = new Set<() => void>();
+function endTrip(status: Trip['status']) {
+  moveTarget = null;
+  route = [];
+  if (trip?.status === 'moving') {
+    trip = { ...trip, status };
+    tripListeners.forEach((l) => l());
+  }
+}
+
 const playerHandle: PlayerHandle = {
   position: new Vector3(...districtById(DEFAULT_DISTRICT_ID).spawn),
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
     let intent = movementIntent(keysPressed, stick);
-    if (intent.forward !== 0 || intent.turn !== 0) moveTarget = null; // steering by hand cancels the trip
-    else if (moveTarget && route.length) {
+    if (intent.forward !== 0 || intent.turn !== 0) {
+      if (moveTarget) endTrip('cancelled'); // steering by hand cancels the trip
+    } else if (moveTarget && route.length) {
       const final = route.length === 1;
       const s = steerTowards(playerHandle.position.x, playerHandle.position.z, playerHandle.direction, { ...route[0], walk: moveTarget.walk }, final);
       if (s.arrived) {
         route.shift();
-        if (route.length === 0) moveTarget = null;
+        if (route.length === 0) endTrip('arrived');
       } else intent = s;
     }
     const moveSpeed = intent.walk ? WALK_SPEED : RUN_SPEED;
@@ -94,7 +116,7 @@ const playerHandle: PlayerHandle = {
         replanned = true;
         stuckFor = 0;
         if (again) route = again;
-        else moveTarget = null;
+        else endTrip('blocked');
       }
     } else stuckFor = 0;
   },
@@ -102,7 +124,7 @@ const playerHandle: PlayerHandle = {
 
 function releaseAllKeys() {
   for (const key of MOVE_KEYS) keysPressed[key] = false;
-  moveTarget = null;
+  if (moveTarget) endTrip('cancelled');
   stick.forward = 0;
   stick.turn = 0;
 }
@@ -123,13 +145,28 @@ function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Po
  * Sends the player to a spot on the ground (from a click or tap), routing
  * round anything in the way; null cancels. Returns false if there's no way there.
  */
-export function setMoveTarget(target: MoveTarget | null): boolean {
+export function setMoveTarget(target: MoveTarget | null, about?: { destinationId?: string; label?: string }): boolean {
   stuckFor = 0;
   replanned = false;
   const path = target && !inputBlocked ? planRoute(target) : null;
-  moveTarget = path ? target : null;
-  route = path ?? [];
-  return target === null || path !== null;
+  if (!path) {
+    if (moveTarget) endTrip('cancelled');
+    return target === null;
+  }
+  moveTarget = target;
+  route = path;
+  trip = { seq: ++tripSeq, status: 'moving', ...about };
+  tripListeners.forEach((l) => l());
+  return true;
+}
+
+/** The latest trip (null before the first). */
+export const getTrip = (): Trip | null => trip;
+
+/** Calls `listener` whenever a trip starts or ends; returns the unsubscribe. */
+export function subscribeTrip(listener: () => void) {
+  tripListeners.add(listener);
+  return () => { tripListeners.delete(listener); };
 }
 
 /** The route still to walk after a click: the remaining waypoints. */
@@ -186,5 +223,5 @@ export function placePlayer(spot: readonly [number, number, number], direction =
   playerHandle.position.set(spot[0], spot[1], spot[2]);
   playerHandle.velocity.set(0, 0, 0);
   playerHandle.direction = direction;
-  moveTarget = null;
+  if (moveTarget) endTrip('cancelled');
 }

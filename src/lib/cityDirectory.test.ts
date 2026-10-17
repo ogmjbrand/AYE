@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest';
+import { CATEGORIES, categoryCounts, cityDirectory, filterDirectory } from './cityDirectory';
+import { DISTRICTS, counterAt } from './geography';
+import { nearestVendor } from './food';
+import { homeAtDoor } from './homes';
+import { isAtWorkplace } from './careers';
+import { findPath, walkGridFor } from './pathfinding';
+import type { Career } from '../components/CharacterCreation';
+
+const lagos = DISTRICTS[0];
+
+describe('city directory', () => {
+  it('lists the real vendors, shops, desk, homes and workplaces at their game coordinates', () => {
+    const list = cityDirectory(lagos, 'doctor', null);
+    const mamaPut = list.find((d) => d.name === 'Mama Put')!;
+    expect(mamaPut.status).toBe('open');
+    expect(mamaPut.position).toEqual({ x: -5.2, z: -4.5 });
+    expect(list.filter((d) => d.categories.includes('residential')).length).toBe(lagos.homes.length);
+    expect(list.filter((d) => d.categories.includes('restaurants')).length).toBe(lagos.vendors.length);
+  });
+
+  it('only your own workplace is open; the rest are honest "visit" entries', () => {
+    const list = cityDirectory(lagos, 'doctor', null);
+    expect(list.find((d) => d.id.endsWith('work.doctor'))!.status).toBe('open');
+    expect(list.find((d) => d.id.endsWith('work.student'))!.status).toBe('visit');
+    expect(list.find((d) => d.id.endsWith('work.student'))!.categories).toContain('universities');
+    expect(list.find((d) => d.id.endsWith('work.athlete'))!.categories).toContain('gyms');
+  });
+
+  it('marks parks, nightlife and malls as planned, with nowhere to walk to', () => {
+    const planned = cityDirectory(lagos, 'doctor', null).filter((d) => d.status === 'planned');
+    expect(planned.map((d) => d.categories[0]).sort()).toEqual(['nightlife', 'parks', 'shopping']);
+    for (const p of planned) expect(p.position).toBeUndefined();
+  });
+
+  it('every category has at least one entry', () => {
+    const counts = categoryCounts(cityDirectory(lagos, 'pilot', null));
+    for (const c of CATEGORIES) expect(counts[c.id], c.id).toBeGreaterThan(0);
+  });
+
+  it('searches names, kinds and category labels, nearest first and planned last', () => {
+    const list = cityDirectory(lagos, 'doctor', null);
+    expect(filterDirectory(list, 'all', 'buka', { x: 0, z: 0 }).map((d) => d.name)).toEqual(['Mama Put']);
+    expect(filterDirectory(list, 'all', 'HOSPITAL', { x: 0, z: 0 }).length).toBeGreaterThan(0);
+    const shops = filterDirectory(list, 'shopping', '', { x: 0, z: 40 });
+    expect(shops[0].distance!).toBeLessThanOrEqual(shops[1].distance!);
+    expect(shops[shops.length - 1].status).toBe('planned');
+  });
+
+  it('every walkable destination can be reached, and arriving there triggers its real interaction', () => {
+    for (const d of DISTRICTS) {
+      const grid = walkGridFor(d.layout.obstacles);
+      const from = { x: d.spawn[0], z: d.spawn[2] };
+      for (const career of ['doctor', 'student', 'athlete', 'pilot', 'artist', 'engineer', 'entrepreneur'] as Career[]) {
+        for (const dest of cityDirectory(d, career, null).filter((x) => x.position)) {
+          const path = findPath(grid, from, dest.position!);
+          expect(path, `${dest.id}`).not.toBeNull();
+          const end = path![path!.length - 1];
+          // Within 0.35 m of the route's end is where the walk stops
+          const at = { x: end.x, z: end.z };
+          const key = dest.id.slice(d.id.length + 1);
+          if (dest.categories.includes('restaurants')) expect(nearestVendor(d.vendors, at.x, at.z)?.id, dest.id).toBe(key);
+          else if (key === 'fashion' || key === 'gadgets' || key === 'travel') expect(counterAt(d, at.x, at.z), dest.id).toBe(key);
+          else if (key.startsWith('home.')) expect(homeAtDoor(d.id, at.x, at.z)?.id, dest.id).toBe(key.slice(5));
+          else if (key.startsWith('work.') && dest.status === 'open') expect(isAtWorkplace(d, career, at.x, at.z), dest.id).toBe(true);
+        }
+      }
+    }
+  });
+});

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Plane, Raycaster, Vector2, Vector3, type Mesh, type MeshBasicMaterial } from 'three';
+import { Matrix4, Plane, Raycaster, Vector2, Vector3, type InstancedMesh, type Mesh, type MeshBasicMaterial } from 'three';
 import { getMoveTarget, getRoute, isMovementBlocked, setMoveTarget, type PlayerHandle } from '../hooks/usePlayerController';
 import { isClick, makeTarget } from '../lib/clickToMove';
 import { groundHeightAt } from '../lib/world';
@@ -11,7 +11,7 @@ import { groundHeightAt } from '../lib/world';
  * The route goes round buildings and parked vehicles; a ring marks where
  * it ends until you arrive.
  */
-export function ClickToMove({ player }: { player: PlayerHandle }) {
+export function ClickToMove({ player, showRoute = true }: { player: PlayerHandle; showRoute?: boolean }) {
   const { camera, gl } = useThree();
   const ring = useRef<Mesh>(null);
 
@@ -70,9 +70,49 @@ export function ClickToMove({ player }: { player: PlayerHandle }) {
   });
 
   return (
-    <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false} renderOrder={2}>
-      <ringGeometry args={[0.28, 0.4, 40]} />
-      <meshBasicMaterial color="#8ab4d8" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
-    </mesh>
+    <>
+      {showRoute && <RouteDots player={player} />}
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false} renderOrder={2}>
+        <ringGeometry args={[0.28, 0.4, 40]} />
+        <meshBasicMaterial color="#8ab4d8" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+      </mesh>
+    </>
+  );
+}
+
+const DOT_SPACING = 0.9;
+const MAX_DOTS = 120;
+
+/** A faint dotted line along the rest of the route: one instanced mesh, so one draw call. */
+function RouteDots({ player }: { player: PlayerHandle }) {
+  const dots = useRef<InstancedMesh>(null);
+  // Flat on the ground: each dot is a disc turned to face up
+  const m = useMemo(() => new Matrix4().makeRotationX(-Math.PI / 2), []);
+  useFrame(() => {
+    const mesh = dots.current;
+    if (!mesh) return;
+    const route = getMoveTarget() ? getRoute() : [];
+    let n = 0;
+    let ax = player.position.x, az = player.position.z;
+    // Start a little ahead of the feet, then a dot every DOT_SPACING metres along each leg
+    let carry = 0.8;
+    for (const p of route) {
+      const len = Math.hypot(p.x - ax, p.z - az);
+      for (let d = carry; d < len && n < MAX_DOTS; d += DOT_SPACING) {
+        const x = ax + ((p.x - ax) * d) / len, z = az + ((p.z - az) * d) / len;
+        m.setPosition(x, groundHeightAt(x, z) + 0.03, z);
+        mesh.setMatrixAt(n++, m);
+      }
+      carry = len > carry ? DOT_SPACING - ((len - carry) % DOT_SPACING) : carry - len;
+      ax = p.x; az = p.z;
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={dots} args={[undefined, undefined, MAX_DOTS]} frustumCulled={false} renderOrder={1}>
+      <circleGeometry args={[0.07, 10]} />
+      <meshBasicMaterial color="#8ab4d8" transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+    </instancedMesh>
   );
 }

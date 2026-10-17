@@ -43,6 +43,8 @@ interface HUDProps {
   onOpenGadgets?: () => void;
   /** Opens the smartphone map (only passed once you own a phone). */
   onOpenMap?: () => void;
+  /** The ⋯ city locations directory. */
+  onOpenLocations?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
@@ -105,6 +107,7 @@ export function HUD({
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
+  onOpenLocations,
   homeId = null,
   onOpenHome,
   workMinutes = 0,
@@ -181,6 +184,11 @@ export function HUD({
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+            {onOpenLocations && (
+              <button type="button" onClick={onOpenLocations} className={BUTTON} title="City locations: restaurants, shops, homes, workplaces" aria-label="City locations">
+                <span aria-hidden="true" className="text-base leading-none">⋯</span>
+              </button>
+            )}
             {onOpenMap && (
               <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the map on your phone (M)">
                 Map

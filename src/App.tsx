@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { placePlayer, setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
+import { placePlayer, setMovementBlocked, setMoveTarget, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
 import { activeLayout, groundHeightAt, setActiveLayout } from './lib/world';
@@ -25,6 +25,10 @@ import { FashionStore } from './components/FashionStore';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
+import { CityLocationsPanel } from './components/CityLocationsPanel';
+import { TripStatus } from './components/TripStatus';
+import { cityDirectory, type Destination } from './lib/cityDirectory';
+import { makeTarget } from './lib/clickToMove';
 import { hasMap } from './lib/equipment';
 import { counterAt, districtById, type District } from './lib/geography';
 import { DistrictContext } from './world/DistrictContext';
@@ -47,7 +51,7 @@ import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
-import { loadSettings, nextQualityMode, saveSettings, type QualityMode } from './lib/settings';
+import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import './App.css';
 
@@ -145,12 +149,14 @@ export default function App() {
   // The entry screen comes first; 'create' is character creation; a character means playing
   const [screen, setScreen] = useState<'entry' | 'create' | 'play'>('entry');
   const [character, setCharacter] = useState<Character | null>(() => loadCharacter());
-  const [quality, setQuality] = useState<QualityMode>(() => loadSettings().quality);
-
-  const changeQuality = (next: QualityMode) => {
-    setQuality(next);
-    saveSettings({ quality: next });
+  const [settings, setSettings] = useState<Settings>(() => loadSettings());
+  const quality = settings.quality;
+  const changeSettings = (patch: Partial<Settings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    saveSettings(next);
   };
+  const changeQuality = (next: QualityMode) => changeSettings({ quality: next });
   // In-game changes to the character (e.g. new clothes) are saved straight away
   const handleCharacterUpdate = (next: Character) => {
     saveCharacter(next);
@@ -184,6 +190,8 @@ export default function App() {
       character={character}
       quality={quality}
       onQualityChange={changeQuality}
+      showRoute={settings.showRoute}
+      onShowRouteChange={(showRoute) => changeSettings({ showRoute })}
       onExitToMenu={() => setScreen('entry')}
       onCharacterUpdate={handleCharacterUpdate}
     />
@@ -194,6 +202,9 @@ interface GameProps {
   character: Character;
   quality: QualityMode;
   onQualityChange: (quality: QualityMode) => void;
+  /** Dotted route line on the ground for click-to-move trips. */
+  showRoute: boolean;
+  onShowRouteChange: (show: boolean) => void;
   /** Back to the entry screen; the game is already saved. */
   onExitToMenu: () => void;
   onCharacterUpdate: (character: Character) => void;
@@ -202,7 +213,7 @@ interface GameProps {
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
 let placedIn: string | null = null;
 
-function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
+function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
@@ -235,6 +246,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   }, [district]);
   const neighborhood = useCurrentNeighborhood(controller, district.neighborhoods);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [locationsOpen, setLocationsOpen] = useState(false);
   const [talking, setTalking] = useState<Resident | null>(null);
   const [task, setTask] = useState<WorkTask | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
@@ -320,9 +332,25 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen]);
+
+  // The ⋯ directory: real places in this district; Go walks there with the route finder
+  const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
+  const goTo = (d: Destination): string | null => {
+    if (!d.position) return 'This place isn’t in the city yet.';
+    setMovementBlocked(false); // the panel is closing; let the trip start
+    const { x, z } = controller.position;
+    if (Math.hypot(d.position.x - x, d.position.z - z) < 1) return 'You’re already here.';
+    const ok = setMoveTarget(makeTarget(x, z, d.position.x, d.position.z, false), { destinationId: d.id, label: d.name });
+    if (!ok) {
+      setMovementBlocked(true);
+      return 'There’s no way to walk there from where you are.';
+    }
+    setLocationsOpen(false);
+    return null;
+  };
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -423,6 +451,19 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onClose={() => setGadgets(false)}
         />
       )}
+      {locationsOpen && !indoors && (
+        <CityLocationsPanel
+          district={district}
+          from={{ x: controller.position.x, z: controller.position.z }}
+          career={character.career}
+          homeId={state.home}
+          showRoute={showRoute}
+          onShowRouteChange={onShowRouteChange}
+          onGo={goTo}
+          onClose={() => setLocationsOpen(false)}
+        />
+      )}
+      {!indoors && <TripStatus destinations={destinations} />}
       {mapOpen && phone && (
         <MapPanel
           district={district}
@@ -479,7 +520,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
-          <ClickToMove player={controller} />
+          <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time}>
@@ -567,6 +608,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}
         onOpenMap={phone ? () => setMapOpen(true) : undefined}
+        onOpenLocations={indoors ? undefined : () => setLocationsOpen(true)}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
