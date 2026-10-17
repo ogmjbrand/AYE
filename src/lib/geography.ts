@@ -18,6 +18,7 @@ import { ACCRA_OSU } from './districts/accra';
 import { generateDistrict } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
 import { AFRICA } from './districts/africa';
+import { WORLD } from './districts/world';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
@@ -109,7 +110,7 @@ function buildDistrict(spec: DistrictSpec): District {
 export const DISTRICTS: readonly District[] = [
   buildDistrict(LAGOS_MARINA),
   buildDistrict(ACCRA_OSU),
-  ...[...NIGERIA, ...AFRICA].map((c) => buildDistrict(generateDistrict(c))),
+  ...[...NIGERIA, ...AFRICA, ...WORLD].map((c) => buildDistrict(generateDistrict(c))),
 ];
 export const DEFAULT_DISTRICT_ID = 'lagos.marina';
 

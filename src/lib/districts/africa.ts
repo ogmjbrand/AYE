@@ -7,7 +7,7 @@
  */
 import type { CitySeed, RegionStyle, VendorStyle } from './generate';
 
-const HOMES: RegionStyle['homes'] = {
+export const HOMES: RegionStyle['homes'] = {
   marina: [
     { kind: 'Room in a shared flat', description: 'A single room with a fan. Shared kitchen and bathroom with three flatmates.' },
     { kind: 'Studio flat', description: 'Your own room with a kitchenette and shower, a short walk from the main road.' },
@@ -21,17 +21,17 @@ const HOMES: RegionStyle['homes'] = {
   ],
 };
 
-const PAN_AFRICAN: VendorStyle = {
+export const PAN_AFRICAN: VendorStyle = {
   names: ['Taste of Africa'],
   kind: 'Pan-African kitchen',
   menu: ['misir-shiro', 'red-red', 'sukuma-ugali', 'githeri', 'mafe-vegan', 'thieboudienne', 'koshari', 'vegetable-tagine', 'chakalaka-pap', 'bean-bunny-chow', 'bobotie', 'shakshuka', 'doro-wat'],
 };
 
-const WARM = ['#e3d2b4', '#d8c4a2', '#e8dcc6', '#c9b08c', '#efe3c8', '#d9cbb0'];
-const OCHRE = ['#c99a6b', '#b98a5f', '#d4b08a', '#a87a52', '#dcc2a0', '#c4a07c'];
-const SAND = ['#e8e0d0', '#d9cdb8', '#cfc2a8', '#e2d6c2', '#c8b89a', '#ddd2bf'];
-const PASTEL = ['#e7d2b0', '#d9b9a0', '#c9d3c2', '#e3c7a8', '#d5c8b8', '#cdd6dc'];
-const BUSES = ['#e6e4dc', '#d7dde3', '#c9d3d8'];
+export const WARM = ['#e3d2b4', '#d8c4a2', '#e8dcc6', '#c9b08c', '#efe3c8', '#d9cbb0'];
+export const OCHRE = ['#c99a6b', '#b98a5f', '#d4b08a', '#a87a52', '#dcc2a0', '#c4a07c'];
+export const SAND = ['#e8e0d0', '#d9cdb8', '#cfc2a8', '#e2d6c2', '#c8b89a', '#ddd2bf'];
+export const PASTEL = ['#e7d2b0', '#d9b9a0', '#c9d3c2', '#e3c7a8', '#d5c8b8', '#cdd6dc'];
+export const BUSES = ['#e6e4dc', '#d7dde3', '#c9d3d8'];
 const TREES = { names: ['Gardens', 'Park', 'Green', 'Garden Square'] };
 
 const base = (walls: readonly string[], park: string): Pick<RegionStyle, 'second' | 'walls' | 'buses' | 'busStripes' | 'homes' | 'park'> => ({

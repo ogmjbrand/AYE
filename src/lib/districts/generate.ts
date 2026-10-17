@@ -105,6 +105,10 @@ export interface RegionStyle {
   busStripes: boolean;
   /** Home kinds and descriptions by plan slot (marina has 4 homes, osu 3). */
   homes: Readonly<Record<TemplateId, readonly { kind: string; description: string }[]>>;
+  /** Palm trees along the boulevard (off for cold or high cities). Default true. */
+  palms?: boolean;
+  /** What the person who calls the stops on a minibus is called there. Default "Bus conductor". */
+  busRole?: string;
   /** Names for the district's residents. */
   names: { male: readonly string[]; female: readonly string[]; family: readonly string[] };
 }
@@ -124,8 +128,10 @@ export interface CitySeed {
   style: RegionStyle;
   /** Rents and cover charges compared with Lagos (1). */
   cost: number;
-  /** Islands have their own; coaches only run within one. Mainland Africa, Europe and Asia if omitted. */
+  /** Islands and other continents have their own; coaches only run within one. Mainland Africa if omitted. */
   landmass?: string;
+  /** Traffic keeps to the left (UK, Japan, India, Australia...). */
+  driveLeft?: boolean;
   /** Pick the street plan and how it's laid instead of deriving them from the id. */
   template?: TemplateId;
   variant?: Variant;
@@ -274,7 +280,9 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     return { ...b, color, name: role ? nameFor(role) : undefined };
   });
   const recolour = <V extends { color: string }>(v: V, i: number): V => ({ ...v, color: S.buses[(hashString(seed.id) + i) % S.buses.length] });
-  const traffic: TrafficLane[] = layout.traffic.map((l) => ({ ...l, colors: S.buses, stripes: S.busStripes }));
+  // Driving on the left: lanes swap sides (same direction of travel per side flips), parked buses turn round
+  const left = seed.driveLeft ? -1 : 1;
+  const traffic: TrafficLane[] = layout.traffic.map((l) => ({ ...l, x: l.x * left, colors: S.buses, stripes: S.busStripes }));
 
   const neighborhoods: Neighborhood[] = T.spec.neighborhoods.map((n) => ({ ...n, ...T.neighborhoods[n.id], bounds: rect(f, n.bounds) }));
 
@@ -286,7 +294,8 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     layout: {
       ...layout,
       buildings,
-      vehicles: layout.vehicles.map((v, i) => ({ ...recolour(v, i), stripes: S.busStripes })),
+      vehicles: layout.vehicles.map((v, i) => ({ ...recolour(v, i), stripes: S.busStripes, heading: seed.driveLeft ? v.heading + Math.PI : v.heading })),
+      palms: S.palms === false ? null : layout.palms,
       traffic,
       skyline: { ...layout.skyline, seed: hashString(seed.id) % 100000, warm: walls },
     },

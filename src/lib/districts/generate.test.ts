@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DISTRICTS } from '../geography';
-import { SUBDIVISIONS } from '../places';
+import { COUNTRY_CODES, SUBDIVISIONS } from '../places';
 import { generateDistrict, TEMPLATES } from './generate';
 import { NIGERIA, SOUTH_WEST } from './nigeria';
 import { districtById } from '../geography';
@@ -68,5 +68,31 @@ describe('generated districts', () => {
     expect(travelOptions(lagos, city('nairobi')).map((o) => o.mode)).toEqual(['flight']);
     expect(travelOptions(city('maputo'), city('antananarivo')).map((o) => o.mode)).toEqual(['flight']);
     expect(travelOptions(city('yaounde'), city('malabo')).map((o) => o.mode)).toEqual(['flight']);
+  });
+
+  it('reach every country and territory in the game, Vatican City aside', () => {
+    const countries = new Set(DISTRICTS.map((d) => d.city.country));
+    for (const c of COUNTRY_CODES) if (c !== 'VA') expect(countries.has(c), c).toBe(true);
+  });
+
+  it('drive on the left where the country does, and grow palms only where it is warm', () => {
+    const tokyo = DISTRICTS.find((d) => d.city.id === 'tokyo')!;
+    const paris = DISTRICTS.find((d) => d.city.id === 'paris')!;
+    // Lagos (right-hand): the lane at negative x heads north; in Tokyo it heads south
+    const north = (d: typeof tokyo) => d.layout.traffic.find((l) => l.dir === 1)!.x;
+    expect(north(districtById('lagos.marina'))).toBeLessThan(0);
+    expect(north(tokyo)).toBeGreaterThan(0);
+    expect(north(paris)).toBeLessThan(0);
+    expect(tokyo.layout.palms).toBeNull();
+    expect(DISTRICTS.find((d) => d.city.id === 'bangkok')!.layout.palms).not.toBeNull();
+  });
+
+  it('only run coaches over land', () => {
+    const city = (id: string) => DISTRICTS.find((d) => d.city.id === id)!.city;
+    expect(travelOptions(city('paris'), city('brussels')).map((o) => o.mode)).toEqual(['coach', 'flight']);
+    expect(travelOptions(city('london'), city('paris')).map((o) => o.mode)).toEqual(['flight']);
+    expect(travelOptions(city('panama-city'), city('bogota')).map((o) => o.mode)).toEqual(['flight']);
+    expect(travelOptions(city('cairo'), city('tel-aviv')).map((o) => o.mode)).toEqual(['flight']);
+    expect(travelOptions(city('kuala-lumpur'), city('singapore')).map((o) => o.mode)).toEqual(['coach', 'flight']);
   });
 });

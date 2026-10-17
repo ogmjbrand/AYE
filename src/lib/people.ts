@@ -7,6 +7,7 @@
 import { hashString, pick, placeIn, planFor, slug, TEMPLATES, type CitySeed, type TemplateId } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
 import { AFRICA } from './districts/africa';
+import { WORLD } from './districts/world';
 import { LOOKS } from './looks';
 
 export type Activity = 'chat' | 'treat' | 'hangout';
@@ -128,12 +129,12 @@ const HAND_BUILT: readonly Resident[] = [
 const TEMPLATE_PEOPLE: Record<TemplateId, readonly { role: string; lines: Resident['lines'] }[]> = {
   marina: [
     {
-      role: 'Bus conductor',
+      role: '{bus}',
       lines: [
-        'You dey enter? No? Then shift small, I dey work.',
-        'Ah, you again. This road no dey sleep, I tell you.',
-        'Sit down small. Traffic this morning was something else.',
-        'You be family now. If you ever need where to sleep, my couch is yours.',
+        'Getting on? No? Then mind the door, I am working.',
+        'Ah, you again. This road never sleeps, I tell you.',
+        'Sit down a minute. Traffic this morning was something else.',
+        'You are family now. If you ever need somewhere to sleep, my couch is yours.',
         'Best person on this whole road. Anything you need, just call me.',
       ],
     },
@@ -141,7 +142,7 @@ const TEMPLATE_PEOPLE: Record<TemplateId, readonly { role: string; lines: Reside
       role: 'Nurse at {hospital}',
       lines: [
         'Sorry, I am between shifts. Did you need directions?',
-        'Hello again. Remember to drink water in this heat.',
+        'Hello again. Remember to drink some water today.',
         'Night shift was long. Tell me something good that happened today.',
         'You are welcome at mine any time you need a bed.',
         'You are the first person I call after a hard shift. Thank you for that.',
@@ -160,7 +161,7 @@ const TEMPLATE_PEOPLE: Record<TemplateId, readonly { role: string; lines: Reside
   ],
   osu: [
     {
-      role: 'Bus conductor',
+      role: '{bus}',
       lines: [
         'Last stop! Ah, you are not going? Okay, okay.',
         'How far? You are getting used to this place now.',
@@ -192,6 +193,18 @@ const TEMPLATE_PEOPLE: Record<TemplateId, readonly { role: string; lines: Reside
   ],
 };
 
+/** In Nigeria the conductor speaks pidgin. */
+const NAIJA_CONDUCTOR = {
+  role: 'Bus conductor',
+  lines: [
+    'You dey enter? No? Then shift small, I dey work.',
+    'Ah, you again. This road no dey sleep, I tell you.',
+    'Sit down small. Traffic this morning was something else.',
+    'You be family now. If you ever need where to sleep, my couch dey for you.',
+    'Best person on this whole road. Anything you need, just call me.',
+  ] as Resident['lines'],
+};
+
 function generatedResidents(seed: CitySeed): Resident[] {
   const plan = planFor(seed);
   const district = TEMPLATES[plan.template].spec;
@@ -207,12 +220,12 @@ function generatedResidents(seed: CitySeed): Resident[] {
     const family = pick(seed.style.names.family, `${seed.id}:${i}:family`);
     const looks = LOOKS.filter((l) => l.body === (female ? 'feminine' : 'masculine'));
     const { position, facing } = placeIn(seed, r.position, r.facing);
-    const slot = TEMPLATE_PEOPLE[plan.template][i];
+    const slot = seed.country === 'NG' && plan.template === 'marina' && i === 0 ? NAIJA_CONDUCTOR : TEMPLATE_PEOPLE[plan.template][i];
     return {
       id: `${seed.id}-${slug(first)}`,
       district: plan.id,
       name: `${first} ${family}`,
-      role: slot.role.replace('{hospital}', `${seed.name} General Hospital`).replace('{tech}', `${seed.name} Tech Hub`),
+      role: slot.role.replace('{bus}', seed.style.busRole ?? 'Bus conductor').replace('{hospital}', `${seed.name} General Hospital`).replace('{tech}', `${seed.name} Tech Hub`),
       lookId: pick(looks, `${seed.id}:${i}:look`).id,
       position,
       facing,
@@ -226,7 +239,7 @@ function generatedResidents(seed: CitySeed): Resident[] {
 }
 
 /** Everyone, in every district. Always computer-controlled, and labelled so. */
-export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...[...NIGERIA, ...AFRICA].flatMap(generatedResidents)];
+export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...[...NIGERIA, ...AFRICA, ...WORLD].flatMap(generatedResidents)];
 
 export const residentById = (id: string) => RESIDENTS.find((r) => r.id === id);
 export const residentsIn = (districtId: string) => RESIDENTS.filter((r) => r.district === districtId);

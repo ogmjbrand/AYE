@@ -76,5 +76,5 @@ describe('city directory', () => {
         }
       }
     }
-  });
+  }, 120_000);
 });
