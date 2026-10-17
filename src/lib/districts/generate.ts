@@ -17,7 +17,10 @@ import type { FoodVendor } from '../food';
 import type { City, Counter, DistrictSpec } from '../geography';
 import type { Home } from '../homes';
 import type { Neighborhood } from '../neighborhoods';
-import type { Building, LayoutSpec, ParkLayout, TrafficLane, Vehicle } from '../world';
+import type { Building, LayoutSpec, ParkLayout, TrafficLane, Vehicle, VehicleKind } from '../world';
+
+/** Muted car paints: greys, a dark blue, a deep red, a sand. */
+const CAR_COLORS = ['#8a8f96', '#2b3440', '#c9c5bc', '#6b2a2a', '#2f4a6b', '#b8ab92'];
 import { WORLD_BOUND } from '../world';
 import { LAGOS_MARINA } from './lagos';
 import { ACCRA_OSU } from './accra';
@@ -149,6 +152,10 @@ export interface RegionStyle {
   /** Parked and moving minibuses. */
   buses: readonly string[];
   busStripes: boolean;
+  /** What's on the road: minibuses (default), ordinary cars, or both. */
+  vehicles?: 'minibus' | 'car' | 'mixed';
+  /** Kerbs and edge lines: painted black-and-yellow (default) or plain grey with white lines. */
+  streetStyle?: 'painted' | 'plain';
   /** Home kinds and descriptions by plan slot (marina has 4 homes, osu 3). */
   homes: Readonly<Record<'marina' | 'osu', readonly { kind: string; description: string }[]>>;
   /** Palm trees along the boulevard (off for cold or high cities). Default true. */
@@ -327,10 +334,16 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     const color = b.style === 'tower' ? b.color : walls[hashString(`${seed.id}:${i}`) % walls.length];
     return { ...b, color, name: role ? nameFor(role) : undefined };
   });
-  const recolour = <V extends { color: string }>(v: V, i: number): V => ({ ...v, color: S.buses[(hashString(seed.id) + i) % S.buses.length] });
+  // Cars, minibuses or a mix of the two, each in its own colours
+  const kindAt = (i: number): VehicleKind => (S.vehicles === 'car' || (S.vehicles === 'mixed' && i % 2 === 1) ? 'car' : 'minibus');
+  const paletteFor = (kind: VehicleKind) => (kind === 'car' ? CAR_COLORS : S.buses);
+  const recolour = <V extends { color: string }>(v: V, i: number): V => {
+    const colors = paletteFor(kindAt(i));
+    return { ...v, color: colors[(hashString(seed.id) + i) % colors.length] };
+  };
   // Driving on the left: lanes swap sides (same direction of travel per side flips), parked buses turn round
   const left = seed.driveLeft ? -1 : 1;
-  const traffic: TrafficLane[] = layout.traffic.map((l) => ({ ...l, x: l.x * left, colors: S.buses, stripes: S.busStripes }));
+  const traffic: TrafficLane[] = layout.traffic.map((l, i) => ({ ...l, x: l.x * left, colors: paletteFor(kindAt(i)), stripes: S.busStripes, kind: kindAt(i) }));
 
   const neighborhoods: Neighborhood[] = T.spec.neighborhoods.map((n) => ({ ...n, ...T.neighborhoods[n.id], bounds: rect(f, n.bounds) }));
 
@@ -342,7 +355,8 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     layout: {
       ...layout,
       buildings,
-      vehicles: layout.vehicles.map((v, i) => ({ ...recolour(v, i), stripes: S.busStripes, heading: seed.driveLeft ? v.heading + Math.PI : v.heading })),
+      vehicles: layout.vehicles.map((v, i) => ({ ...recolour(v, i), stripes: S.busStripes, kind: kindAt(i), heading: seed.driveLeft ? v.heading + Math.PI : v.heading })),
+      streetStyle: S.streetStyle ?? 'painted',
       palms: S.palms === false ? null : layout.palms,
       traffic,
       skyline: { ...layout.skyline, seed: hashString(seed.id) % 100000, warm: walls },

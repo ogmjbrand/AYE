@@ -37,7 +37,11 @@ export interface Vehicle {
   color: string;
   /** Black side stripes (Lagos danfos have them; Accra tro-tros don't). Default true. */
   stripes?: boolean;
+  /** A minibus (default) or an ordinary car. Both take up DANFO_SIZE for collisions. */
+  kind?: VehicleKind;
 }
+
+export type VehicleKind = 'minibus' | 'car';
 
 /** One lane of moving traffic: its centre line, direction along Z and how many vehicles use it. */
 export interface TrafficLane {
@@ -46,6 +50,8 @@ export interface TrafficLane {
   count: number;
   colors: readonly string[];
   stripes: boolean;
+  /** Minibuses (default) or cars. */
+  kind?: VehicleKind;
 }
 
 type Spot = readonly [number, number, number];
@@ -77,6 +83,8 @@ export interface LayoutSpec {
   park: ParkLayout | null;
   /** Chairs on the pavement outside the lounge (solid), facing the street. */
   terraceChairs: readonly { x: number; z: number; facing: number }[];
+  /** Painted black-and-yellow kerbs and yellow edge lines (default), or plain grey kerbs and white lines. */
+  streetStyle?: 'painted' | 'plain';
   /** Distant city massing: seed and colours. */
   skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
 }

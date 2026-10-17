@@ -260,8 +260,46 @@ function Billboard({ position, facing }: { position: readonly [number, number, n
   );
 }
 
-/** A listed danfo model if there is one; the built-in danfo while loading or if it fails. */
+/** An ordinary hatchback, built from boxes, for cities where cars outnumber minibuses. */
+export function Car({ vehicle }: { vehicle: Vehicle }) {
+  const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.3, metalness: 0.4 }), [vehicle.color]);
+  const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
+  const dark = useMemo(() => new MeshStandardMaterial({ color: '#191919', roughness: 0.85 }), []);
+  const w = 1.8, l = 4.2;
+  return (
+    <group position={vehicle.position} rotation={[0, vehicle.heading, 0]}>
+      {/* lower body */}
+      <mesh position={[0, 0.62, 0]} material={paint} castShadow receiveShadow>
+        <boxGeometry args={[w, 0.62, l]} />
+      </mesh>
+      {/* cabin with glass all round */}
+      <mesh position={[0, 1.18, -0.2]} material={glass} castShadow>
+        <boxGeometry args={[w - 0.12, 0.5, l * 0.52]} />
+      </mesh>
+      <mesh position={[0, 1.45, -0.2]} material={paint} castShadow>
+        <boxGeometry args={[w - 0.1, 0.06, l * 0.54]} />
+      </mesh>
+      {/* bumpers */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[0, 0.42, s * (l / 2 + 0.04)]} material={dark}>
+          <boxGeometry args={[w, 0.18, 0.1]} />
+        </mesh>
+      ))}
+      {/* wheels */}
+      {[-1, 1].flatMap((sx) =>
+        [-1, 1].map((sz) => (
+          <mesh key={`${sx}${sz}`} position={[sx * (w / 2 - 0.02), 0.32, sz * (l / 2 - 0.75)]} rotation={[0, 0, Math.PI / 2]} material={dark} castShadow>
+            <cylinderGeometry args={[0.32, 0.32, 0.22, 14]} />
+          </mesh>
+        )),
+      )}
+    </group>
+  );
+}
+
+/** A listed danfo model if there is one; the built-in danfo while loading or if it fails. Cars are always built in. */
 function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
+  if (vehicle.kind === 'car') return <Car vehicle={vehicle} />;
   const file = assetManifest().vehicles.danfo;
   if (!file) return <Danfo vehicle={vehicle} />;
   const fallback = <Danfo vehicle={vehicle} />;

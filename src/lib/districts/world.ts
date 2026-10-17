@@ -32,6 +32,8 @@ interface StyleSpec {
   names: RegionStyle['names'];
   palms?: boolean;
   busRole?: string;
+  vehicles?: RegionStyle['vehicles'];
+  streetStyle?: RegionStyle['streetStyle'];
 }
 
 /** Every city abroad also has an African kitchen: the diaspora is everywhere. */
@@ -50,6 +52,9 @@ function style(s: StyleSpec): RegionStyle {
     names: s.names,
     ...(s.palms === false ? { palms: false } : {}),
     busRole: s.busRole ?? 'Bus driver',
+    // Unless a region says otherwise: cars on plain streets
+    vehicles: s.vehicles ?? 'car',
+    streetStyle: s.streetStyle ?? 'plain',
   };
 }
 /** The same style with other names, music or menu for one country. */
@@ -243,6 +248,7 @@ const YEMENI = tweak(GULF, { names: n('Ahmed, Saleh, Abdulrahman, Ali, Nabil, Fu
 // ---------------------------------------------------------------- South Asia
 
 const INDIAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Annapurna Bhojanalaya, Spice Route', 'Indian kitchen', 'chana-masala dal-rice masala-dosa biryani butter-chicken paneer-tikka vada-pav'),
   snacks: v('Chaat corner, Chai stall', 'Chai and street food', 'vada-pav samosa-veg masala-chai fruit'),
   lounge: 'Bollywood, bhangra and indie bands, open late.',
@@ -334,6 +340,7 @@ const NORTH_KOREAN = tweak(KOREAN, {
 // ---------------------------------------------------------------- Southeast Asia
 
 const MAINLAND_SEA = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Raan Ahaan, Khao Gaeng', 'Thai and Lao kitchen', 'green-curry-veg pad-thai tom-yum laap amok lahpet mango-sticky-rice'),
   snacks: v('Street cart, Night market stall', 'Street food', 'mango-sticky-rice fruit goi-cuon-chay moo-ping'),
   lounge: 'Luk thung, mor lam and live bands, open late.',
@@ -360,6 +367,7 @@ const VIETNAMESE = tweak(MAINLAND_SEA, {
   names: n('Minh, Huy, Tuấn, Đức, Nam, Khoa, Long', 'Linh, Hương, Mai, Trang, Ngọc, Thảo, Anh', 'Nguyễn, Trần, Lê, Phạm, Hoàng, Võ, Đặng'),
 });
 const MALAY = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Kedai Makan, Warung', 'Malay and Indonesian kitchen', 'nasi-lemak roti-canai-dhal laksa chicken-rice nasi-goreng gado-gado tempeh-goreng'),
   snacks: v('Satay stall, Hawker stall', 'Hawker snacks', 'roti-canai-dhal tempeh-goreng fruit satay'),
   lounge: 'Dangdut, Malay pop and live bands, open late.',
@@ -370,6 +378,7 @@ const MALAY = style({
 const INDONESIAN = tweak(MALAY, { names: n('Budi, Agus, Dimas, Rizky, Andi, Fajar, Yusuf', 'Siti, Dewi, Putri, Ayu, Rina, Sri, Indah', 'Santoso, Wijaya, Saputra, Hidayat, Kurniawan, Pratama, Setiawan') });
 const BRUNEIAN = tweak(MALAY, { lounge: { names: ['{city} Live'], description: 'Malay pop on a small stage, with teh tarik.' + DRY } });
 const FILIPINO = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Carinderia, Lutong Bahay', 'Filipino kitchen', 'adobo pancit ginataang-gulay monggo turon'),
   snacks: v('Sari-sari store, Taho vendor', 'Street snacks', 'turon taho fruit banh-mi-chay'),
   lounge: 'Live OPM bands and karaoke, open late.',
@@ -394,6 +403,7 @@ const ANTIPODEAN = style({
   names: n('Jack, Oliver, Liam, Noah, Tama, Ethan, Lachlan', 'Charlotte, Olivia, Mia, Isla, Aroha, Ruby, Chloe', 'Smith, Williams, Brown, Wilson, Taylor, Ngata, Nguyen'),
 });
 const PACIFIC = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Island Kitchen, Mama’s Kai', 'Island kitchen', 'kokoda palusami lu-sipi taro-coconut breadfruit'),
   snacks: v('Market stall, Roadside stall', 'Market snacks', 'breadfruit fruit taro-coconut kokoda'),
   lounge: 'Island reggae and string bands, open late.',
@@ -419,6 +429,7 @@ const CANADIAN = tweak(NORTH_AMERICAN, {
   names: n('Liam, Noah, Étienne, Mathieu, Ethan, Lucas, Jayden', 'Olivia, Emma, Chloé, Charlotte, Amelia, Léa, Ava', 'Tremblay, Smith, Roy, Gagnon, Brown, Wilson, Martin'),
 });
 const MESOAMERICAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Fonda, Comedor', 'Fonda', 'tacos-al-pastor frijoles-tortillas guacamole pupusas gallo-pinto tamales sancocho'),
   snacks: v('Taquería, Puesto', 'Street food', 'guacamole elote fruit frijoles-tortillas'),
   lounge: 'Cumbia, marimba and live bands, open late.',
@@ -428,6 +439,7 @@ const MESOAMERICAN = style({
 });
 const MEXICAN = tweak(MESOAMERICAN, { loungeText: 'Mariachi, cumbia and son jarocho, open late.' });
 const CARIBBEAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Cookshop, Mama’s Kitchen', 'Caribbean kitchen', 'jerk-chicken rice-and-peas ackee-saltfish doubles roti-channa conch-fritters cou-cou'),
   snacks: v('Doubles stand, Roadside stall', 'Street food', 'doubles fruit plantain-chips conch-fritters'),
   lounge: 'Reggae, dancehall and soca, open late.',
@@ -440,6 +452,7 @@ const GUIANAS = tweak(CARIBBEAN, {
   names: n('Ravi, Andre, Shamir, Kevin, Devon, Mark, Rishi', 'Shivani, Natasha, Kerry-Ann, Anjali, Simone, Melissa, Ria', 'Singh, Persaud, Williams, Ramdin, Khan, Ramsaroop, Kartosen'),
 });
 const HISPANIC_CARIBBEAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Paladar, Fonda Criolla', 'Creole kitchen', 'congri mangu griot mofongo rice-and-peas sancocho'),
   snacks: v('Fritura, Kiosk', 'Fried snacks', 'tostones fruit plantain-chips'),
   lounge: 'Salsa, son and merengue, open late.',
@@ -452,6 +465,7 @@ const HAITIAN = tweak(HISPANIC_CARIBBEAN, {
   names: n('Jean, Pierre, Wilson, Jacques, Stanley, Ricardo, Emmanuel', 'Marie, Rose, Nadège, Fabienne, Guerline, Wideline, Sandra', 'Joseph, Jean-Baptiste, Pierre, Louis, Charles, Desir, Augustin'),
 });
 const SOUTH_AMERICAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Picantería, El Rincón', 'South American kitchen', 'arepa bandeja-paisa ceviche lomo-saltado quinoa-soup empanada asado porotos-granados'),
   snacks: v('Empanadas stand, Kiosco', 'Street food', 'arepa empanada fruit tostones chipa'),
   lounge: 'Salsa, cumbia and tango, open late.',
@@ -460,6 +474,7 @@ const SOUTH_AMERICAN = style({
   names: n('Santiago, Mateo, Sebastián, Diego, Juan, Andrés, Nicolás', 'Valentina, Camila, Isabella, Sofía, Lucía, Daniela, Martina', 'González, Rodríguez, Gómez, Fernández, López, Díaz, Torres'),
 });
 const BRAZILIAN = style({
+  vehicles: 'mixed', streetStyle: 'painted',
   kitchen: v('Boteco, Comida Caseira', 'Brazilian kitchen', 'feijoada feijao-arroz moqueca acai-bowl tapioca-crepe'),
   snacks: v('Padaria, Barraca', 'Bakery and snacks', 'pao-de-queijo acai-bowl tapioca-crepe fruit'),
   lounge: 'Samba, forró and funk carioca, open late.',

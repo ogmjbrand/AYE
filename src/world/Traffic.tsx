@@ -2,20 +2,20 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
-import { initTraffic, stepTraffic, type Car } from '../lib/traffic';
+import { initTraffic, stepTraffic, type Car as MovingCar } from '../lib/traffic';
 import { DANFO_SIZE, movingObstacles } from '../lib/world';
-import { Danfo } from './Props';
+import { Car, Danfo } from './Props';
 import { useLayout } from './DistrictContext';
 
-/** Minibuses driving the boulevard; they stop for the player and are solid to walk into. */
+/** Minibuses and cars driving the boulevard; they stop for the player and are solid to walk into. */
 export function Traffic({ player }: { player: PlayerHandle }) {
   const { traffic } = useLayout();
-  const cars = useRef<Car[]>(initTraffic(traffic));
+  const cars = useRef<MovingCar[]>(initTraffic(traffic));
   const groups = useRef<(Group | null)[]>([]);
   const looks = useMemo(
     () => initTraffic(traffic).map((c, i) => {
       const lane = traffic[c.lane];
-      return { color: lane.colors[i % lane.colors.length], stripes: lane.stripes, heading: lane.dir > 0 ? 0 : Math.PI, x: lane.x, z: c.z };
+      return { color: lane.colors[i % lane.colors.length], stripes: lane.stripes, kind: lane.kind, heading: lane.dir > 0 ? 0 : Math.PI, x: lane.x, z: c.z };
     }),
     [traffic],
   );
@@ -35,7 +35,9 @@ export function Traffic({ player }: { player: PlayerHandle }) {
     <>
       {looks.map((l, i) => (
         <group key={i} ref={(g) => { groups.current[i] = g; }} position={[l.x, 0, l.z]}>
-          <Danfo vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes }} />
+          {l.kind === 'car'
+            ? <Car vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color }} />
+            : <Danfo vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes }} />}
         </group>
       ))}
     </>

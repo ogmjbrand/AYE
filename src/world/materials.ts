@@ -81,6 +81,7 @@ function build() {
     pavement: groundSurface('pavement', pavers),
     ground: groundSurface('ground', ground),
     kerb: surface(kerb()),
+    plainKerb: new MeshStandardMaterial({ color: '#b5b1a9', roughness: 0.9 }),
     marking: new MeshStandardMaterial({ color: '#e9e4d3', roughness: 0.75 }),
     yellowMarking: new MeshStandardMaterial({ color: '#e0b425', roughness: 0.75 }),
     // Balcony slabs and ledges: a listed concrete texture if there is one, else plain concrete

@@ -97,6 +97,7 @@ export const CENTRAL: RegionStyle = {
 };
 
 export const EAST: RegionStyle = {
+  vehicles: 'mixed',
   ...base(WARM, SHADE),
   kitchen: { names: ['Hoteli ya Mama', '{city} Hoteli'], kind: 'Hoteli', menu: ['sukuma-ugali', 'githeri', 'pilau', 'nyama-choma', 'chapati-beans', 'matoke', 'isombe'] },
   snacks: { names: ['Kibanda', 'Mandazi stand'], kind: 'Street snacks', menu: ['mandazi', 'samosa-veg', 'mishkaki', 'rolex', 'fruit', 'mahindi-choma'] },
@@ -158,6 +159,7 @@ export const NILE: RegionStyle = {
 };
 
 export const MAGHREB: RegionStyle = {
+  vehicles: 'mixed', streetStyle: 'plain',
   ...base(SAND, 'Palms and orange trees over the benches, busy in the evening.'),
   kitchen: { names: ['Medina Kitchen', 'Al Nour Kitchen'], kind: 'North African kitchen', menu: ['koshari', 'vegetable-tagine', 'harira-vegan', 'lablabi', 'couscous-lamb', 'shakshuka', 'brik'] },
   snacks: { names: ['Falafel stand', 'Bakery corner'], kind: 'Bakery and street food', menu: ['taamiya', 'ful', 'msemen', 'makroud', 'fruit'] },
@@ -174,6 +176,7 @@ export const MAGHREB: RegionStyle = {
 const MAGHREB_DRY: RegionStyle = { ...MAGHREB, lounge: { names: ['{city} Live'], description: 'Arabic pop and malouf on a small stage, with mint tea and juice. No alcohol served.' } };
 
 export const SOUTHERN: RegionStyle = {
+  vehicles: 'mixed',
   ...base(WARM, 'Jacarandas and benches. Quiet in the day, busy at the weekend.'),
   kitchen: { names: ['Shisa Nyama', 'Kasi Kitchen'], kind: 'Shisa nyama and kitchen', menu: ['shisa-nyama', 'chakalaka-pap', 'umngqusho', 'nshima-greens', 'bean-bunny-chow', 'bobotie'] },
   snacks: { names: ['Spaza corner', 'Vetkoek stand'], kind: 'Street food', menu: ['vetkoek', 'mielies', 'biltong', 'fruit', 'samosa-veg'] },
@@ -187,6 +190,7 @@ export const SOUTHERN: RegionStyle = {
 };
 
 export const LUSOPHONE: RegionStyle = {
+  vehicles: 'mixed',
   ...base(PASTEL, PALMS),
   kitchen: { names: ['Tasca do Bairro', 'Casa da Avó'], kind: 'Lusophone kitchen', menu: ['muamba', 'funge-feijao', 'matapa', 'peri-peri-chicken', 'cachupa', 'caril-camarao'] },
   snacks: { names: ['Quiosque', 'Banca do mercado'], kind: 'Street snacks', menu: ['mandioca-frita', 'badjias', 'fruit', 'samosa-veg', 'brochettes'] },
@@ -213,6 +217,7 @@ export const MADAGASCAR: RegionStyle = {
 };
 
 export const INDIAN_OCEAN: RegionStyle = {
+  vehicles: 'mixed',
   ...base(PASTEL, PALMS),
   kitchen: { names: ['Creole Kitchen', 'La Case Créole'], kind: 'Creole kitchen', menu: ['dholl-puri', 'rougaille-vegan', 'octopus-curry', 'gateaux-piments', 'caril-camarao'] },
   snacks: { names: ['Gâteaux piments stand', 'Beach kiosk'], kind: 'Street snacks', menu: ['gateaux-piments', 'samosa-veg', 'fruit', 'alouda'] },
