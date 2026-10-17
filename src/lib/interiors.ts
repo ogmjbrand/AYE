@@ -143,6 +143,7 @@ export function interiorLayout(i: Interior): DistrictLayout {
     stalls: [],
     traffic: [],
     billboard: null,
+    park: null,
     skyline: { seed: 1, warm: ['#000'], glass: ['#000'], towerChance: 0 },
   });
 }

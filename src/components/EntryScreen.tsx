@@ -126,7 +126,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                     <li>Go to your workplace (the glowing ring) between 09:00 and 17:00 to earn wages. Once an hour, press E there for a task from your job: good calls earn a bonus and speed up promotion.</li>
                     <li>Eat before you get hungry: hungry work pays half.</li>
                     <li>Get to know the residents. They are computer-controlled, never other players. Close friends will put you up for the night, and friends will come out with you to the lounge in the evening.</li>
-                    <li>The ⋯ button lists every place in the city by category and walks you there.</li>
+                    <li>The ⋯ button lists every place in the city by category and walks you there. Sit on a park bench to let time pass, e.g. until the lounge opens.</li>
                     <li>Rent a home at a door with a “To let” board. Rent is due each night; sleeping anywhere else is sleeping rough.</li>
                     <li>Rest sleeps until 07:00 and shows how your day went.</li>
                   </ul>

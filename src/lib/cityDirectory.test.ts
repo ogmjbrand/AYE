@@ -4,6 +4,7 @@ import { DISTRICTS, counterAt } from './geography';
 import { nearestVendor } from './food';
 import { homeAtDoor } from './homes';
 import { venueAt } from './nightlife';
+import { parkAt } from './parks';
 import { isAtWorkplace } from './careers';
 import { findPath, walkGridFor } from './pathfinding';
 import type { Career } from '../components/CharacterCreation';
@@ -28,10 +29,11 @@ describe('city directory', () => {
     expect(list.find((d) => d.id.endsWith('work.athlete'))!.categories).toContain('gyms');
   });
 
-  it('marks parks and malls as planned, with nowhere to walk to; nightlife is real', () => {
+  it('marks the mall as planned, with nowhere to walk to; nightlife and parks are real', () => {
     const list = cityDirectory(lagos, 'doctor', null);
     const planned = list.filter((d) => d.status === 'planned');
-    expect(planned.map((d) => d.categories[0]).sort()).toEqual(['parks', 'shopping']);
+    expect(planned.map((d) => d.categories[0]).sort()).toEqual(['shopping']);
+    expect(list.find((d) => d.categories.includes('parks'))).toMatchObject({ name: lagos.park.name, status: 'open' });
     expect(list.find((d) => d.categories.includes('nightlife'))).toMatchObject({ name: lagos.nightlife.name, status: 'open' });
     for (const p of planned) expect(p.position).toBeUndefined();
   });
@@ -64,6 +66,7 @@ describe('city directory', () => {
           const key = dest.id.slice(d.id.length + 1);
           if (dest.categories.includes('restaurants')) expect(nearestVendor(d.vendors, at.x, at.z)?.id, dest.id).toBe(key);
           else if (key === 'fashion' || key === 'gadgets' || key === 'travel') expect(counterAt(d, at.x, at.z), dest.id).toBe(key);
+          else if (key.startsWith('park.')) expect(parkAt(d.park, at.x, at.z)?.id, dest.id).toBe(d.park.id);
           else if (key.startsWith('night.')) expect(venueAt(d.nightlife, at.x, at.z)?.id, dest.id).toBe(d.nightlife.id);
           else if (key.startsWith('home.')) expect(homeAtDoor(d.id, at.x, at.z)?.id, dest.id).toBe(key.slice(5));
           else if (key.startsWith('work.') && dest.status === 'open') expect(isAtWorkplace(d, career, at.x, at.z), dest.id).toBe(true);

@@ -11,11 +11,12 @@ import type { FoodVendor } from './food';
 import type { Home } from './homes';
 import type { Neighborhood } from './neighborhoods';
 import type { Venue } from './nightlife';
+import type { Park } from './parks';
 import { buildLayout, setActiveLayout, type DistrictLayout, type LayoutSpec } from './world';
 import { LAGOS_MARINA } from './districts/lagos';
 import { ACCRA_OSU } from './districts/accra';
 
-export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife';
+export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
 
 export interface Place {
@@ -64,6 +65,8 @@ export interface DistrictSpec {
   workplaces: Record<Exclude<Career, 'none'>, CareerLocation>;
   /** The district's live-music lounge (lib/nightlife.ts). */
   nightlife: Venue;
+  /** The district's public park: benches where you can sit and let time pass (lib/parks.ts). */
+  park: Park;
 }
 
 export interface District extends Omit<DistrictSpec, 'layout'> {
@@ -82,6 +85,7 @@ function buildDistrict(spec: DistrictSpec): District {
     { id: id('fashion'), kind: 'shop', name: spec.fashionHouse.name, position: spec.fashionHouse.position },
     { id: id('gadgets'), kind: 'shop', name: spec.gadgetHub.name, position: spec.gadgetHub.position },
     { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
+    { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({

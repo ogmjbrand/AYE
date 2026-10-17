@@ -29,6 +29,8 @@ import { CityLocationsPanel } from './components/CityLocationsPanel';
 import { TripStatus } from './components/TripStatus';
 import { NightlifePanel } from './components/NightlifePanel';
 import { venueAt } from './lib/nightlife';
+import { parkAt } from './lib/parks';
+import { ParkPanel } from './components/ParkPanel';
 import { cityDirectory, type Destination } from './lib/cityDirectory';
 import { makeTarget } from './lib/clickToMove';
 import { hasMap } from './lib/equipment';
@@ -44,6 +46,7 @@ import { HOURLY_WAGE, isWorkingHours, type GameTime } from './lib/gameState';
 import { Residents } from './world/Residents';
 import { ClickToMove } from './world/ClickToMove';
 import { VenueFront } from './world/VenueFront';
+import { Park } from './world/Park';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
@@ -139,6 +142,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <Skyline />
       <Props night={night} />
       <VenueFront hour={gameTime.hour} night={night} />
+      <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
       <Residents player={controller} talkingTo={talkingTo} />
@@ -223,7 +227,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, workTask } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -252,6 +256,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [travelOpen, setTravelOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
   const [nightOpen, setNightOpen] = useState(false);
+  const [parkOpen, setParkOpen] = useState(false);
   const [talking, setTalking] = useState<Resident | null>(null);
   const [task, setTask] = useState<WorkTask | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
@@ -329,6 +334,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
       else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
+      else if (parkAt(district.park, x, z)) setParkOpen(true);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
       else if (taskOnOffer()) setTask(taskOnOffer());
       else if (door) setHomePanel(door);
@@ -338,9 +344,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -470,6 +476,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       {!indoors && <TripStatus destinations={destinations} />}
+      {parkOpen && (
+        <ParkPanel park={district.park} time={state.time} onWait={wait} onClose={() => setParkOpen(false)} />
+      )}
       {nightOpen && (
         <NightlifePanel
           venue={district.nightlife}
@@ -603,6 +612,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         district={district}
         onOpenTravel={() => setTravelOpen(true)}
         onOpenNightlife={() => setNightOpen(true)}
+        onOpenPark={() => setParkOpen(true)}
         onTalk={setTalking}
         workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}

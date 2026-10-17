@@ -23,6 +23,7 @@ import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
+import { WAIT_OPTIONS } from './parks';
 import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
 import { TRAVEL_OPTIONS, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
@@ -96,6 +97,7 @@ export type GameAction =
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'nightOut'; residentId: string }
+  | { type: 'wait'; minutes: number }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
@@ -410,6 +412,13 @@ export function gameReducer(
       return socialise(state, action.residentId, action.activity, career, lifestyle);
     case 'nightOut':
       return nightOut(state, action.residentId, career, lifestyle);
+    case 'wait': {
+      // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work
+      if (state.summary || !(WAIT_OPTIONS as readonly number[]).includes(action.minutes)) return state;
+      let next = state;
+      for (let i = 0; i < action.minutes; i++) next = tick(next, career, lifestyle, false);
+      return next;
+    }
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':

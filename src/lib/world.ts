@@ -73,9 +73,21 @@ export interface LayoutSpec {
   traffic: readonly TrafficLane[];
   /** Roadside billboard with the AYE logo, if the district has one. */
   billboard: Spot | null;
+  /** A small public park: lawn, paths, shade trees and benches (trees and benches are solid). */
+  park: ParkLayout | null;
   /** Distant city massing: seed and colours. */
   skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
 }
+
+export interface ParkLayout {
+  area: { minX: number; maxX: number; minZ: number; maxZ: number };
+  trees: readonly (readonly [number, number])[];
+  /** Benches: centre and facing (0 = facing +z, π/2 = facing +x). */
+  benches: readonly { x: number; z: number; facing: number }[];
+  /** Footpaths (drawn only, nothing solid): rectangles on the ground, which may lead out to the street. */
+  paths: readonly { x0: number; x1: number; z0: number; z1: number }[];
+}
+export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
 
 export interface DistrictLayout extends LayoutSpec {
   palmSpots: Spot[];
@@ -165,6 +177,12 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...palmSpots.map((p) => ({ position: p, size: [0.5, 1, 0.5] as const })),
     ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
+    ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
+    ...(spec.park?.benches ?? []).map((b) => {
+      // Benches face along an axis; their footprint swaps width and depth when turned sideways
+      const sideways = Math.abs(Math.sin(b.facing)) > 0.5;
+      return { position: [b.x, 0, b.z] as const, size: (sideways ? [BENCH_SIZE[2], 1, BENCH_SIZE[0]] : [BENCH_SIZE[0], 1, BENCH_SIZE[2]]) as readonly [number, number, number] };
+    }),
   ];
   return { ...spec, palmSpots, lampSpots, obstacles, skylineBuildings: skylineFor(spec) };
 }
