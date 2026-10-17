@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Plane, Raycaster, Vector2, Vector3, type Mesh, type MeshBasicMaterial } from 'three';
-import { getMoveTarget, isMovementBlocked, setMoveTarget, type PlayerHandle } from '../hooks/usePlayerController';
+import { getMoveTarget, getRoute, isMovementBlocked, setMoveTarget, type PlayerHandle } from '../hooks/usePlayerController';
 import { isClick, makeTarget } from '../lib/clickToMove';
-import { groundHeightAt, resolveCollisions } from '../lib/world';
+import { groundHeightAt } from '../lib/world';
 
 /**
  * Click or tap the ground to walk there. A press that turns into a drag
  * orbits the camera as before; a second finger (pinch zoom) never moves you.
- * A ring marks the spot until you arrive.
+ * The route goes round buildings and parked vehicles; a ring marks where
+ * it ends until you arrive.
  */
 export function ClickToMove({ player }: { player: PlayerHandle }) {
   const { camera, gl } = useThree();
@@ -38,11 +39,10 @@ export function ClickToMove({ player }: { player: PlayerHandle }) {
       const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
       if (!raycaster.ray.intersectPlane(ground, hit)) return;
-      // Not too far, and not inside a building: the nearest free spot
+      // Not absurdly far; the route goes round buildings and buses, or to the nearest spot outside one
       const far = Math.hypot(hit.x - player.position.x, hit.z - player.position.z);
-      if (far > 60) return;
-      const spot = resolveCollisions(hit.x, hit.z);
-      setMoveTarget(makeTarget(player.position.x, player.position.z, spot.x, spot.z, e.shiftKey));
+      if (far > 80) return;
+      setMoveTarget(makeTarget(player.position.x, player.position.z, hit.x, hit.z, e.shiftKey));
     };
     const onCancel = (e: PointerEvent) => { down.delete(e.pointerId); if (down.size === 0) multiTouch = false; };
 
@@ -59,10 +59,11 @@ export function ClickToMove({ player }: { player: PlayerHandle }) {
   useFrame(({ clock }) => {
     const m = ring.current;
     if (!m) return;
-    const target = getMoveTarget();
-    m.visible = target !== null;
-    if (!target) return;
-    m.position.set(target.x, groundHeightAt(target.x, target.z) + 0.04, target.z);
+    const route = getRoute();
+    const end = getMoveTarget() ? route[route.length - 1] : undefined;
+    m.visible = end !== undefined;
+    if (!end) return;
+    m.position.set(end.x, groundHeightAt(end.x, end.z) + 0.04, end.z);
     const pulse = 1 + 0.12 * Math.sin(clock.elapsedTime * 6);
     m.scale.setScalar(pulse);
     (m.material as MeshBasicMaterial).opacity = 0.55 + 0.25 * Math.sin(clock.elapsedTime * 6);

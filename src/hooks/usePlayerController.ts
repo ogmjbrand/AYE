@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
-import { resolveCollisions } from '../lib/world';
+import { activeLayout, movingObstacles, resolveCollisions } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
+import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
 import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
 
 export interface PlayerHandle {
@@ -22,6 +23,9 @@ const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 // Where a click or tap sent the player, until they arrive, steer themselves or get stuck
 let moveTarget: MoveTarget | null = null;
+// The legs of the route there, around buildings and parked vehicles
+let route: Point[] = [];
+let replanned = false;
 let stuckFor = 0;
 
 const playerHandle: PlayerHandle = {
@@ -31,10 +35,13 @@ const playerHandle: PlayerHandle = {
   applyMovement: (delta: number) => {
     let intent = movementIntent(keysPressed, stick);
     if (intent.forward !== 0 || intent.turn !== 0) moveTarget = null; // steering by hand cancels the trip
-    else if (moveTarget) {
-      const s = steerTowards(playerHandle.position.x, playerHandle.position.z, playerHandle.direction, moveTarget);
-      if (s.arrived) moveTarget = null;
-      else intent = s;
+    else if (moveTarget && route.length) {
+      const final = route.length === 1;
+      const s = steerTowards(playerHandle.position.x, playerHandle.position.z, playerHandle.direction, { ...route[0], walk: moveTarget.walk }, final);
+      if (s.arrived) {
+        route.shift();
+        if (route.length === 0) moveTarget = null;
+      } else intent = s;
     }
     const moveSpeed = intent.walk ? WALK_SPEED : RUN_SPEED;
     const rotationSpeed = 3; // radians per second
@@ -81,7 +88,14 @@ const playerHandle: PlayerHandle = {
     // A clicked trip that's blocked (a wall, a parked bus) gives up rather than pushing forever
     if (moveTarget && intent.forward > 0.3 && Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z) < 0.25) {
       stuckFor += delta;
-      if (stuckFor > STUCK_SECONDS) moveTarget = null;
+      if (stuckFor > STUCK_SECONDS) {
+        // Probably traffic in the way: plan once more around where vehicles are now, else give up
+        const again = replanned ? null : planRoute(moveTarget, [...activeLayout().obstacles, ...movingObstacles]);
+        replanned = true;
+        stuckFor = 0;
+        if (again) route = again;
+        else moveTarget = null;
+      }
     } else stuckFor = 0;
   },
 };
@@ -100,11 +114,26 @@ export function setMovementBlocked(blocked: boolean) {
   if (blocked) releaseAllKeys();
 }
 
-/** Sends the player to a spot on the ground (from a click or tap); null cancels. */
-export function setMoveTarget(target: MoveTarget | null) {
-  moveTarget = inputBlocked ? null : target;
-  stuckFor = 0;
+function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Point[] | null {
+  const grid = obstacles === activeLayout().obstacles ? walkGridFor(obstacles) : buildWalkGrid(obstacles);
+  return findPath(grid, { x: playerHandle.position.x, z: playerHandle.position.z }, target);
 }
+
+/**
+ * Sends the player to a spot on the ground (from a click or tap), routing
+ * round anything in the way; null cancels. Returns false if there's no way there.
+ */
+export function setMoveTarget(target: MoveTarget | null): boolean {
+  stuckFor = 0;
+  replanned = false;
+  const path = target && !inputBlocked ? planRoute(target) : null;
+  moveTarget = path ? target : null;
+  route = path ?? [];
+  return target === null || path !== null;
+}
+
+/** The route still to walk after a click: the remaining waypoints. */
+export const getRoute = (): readonly Point[] => route;
 
 /** Where the player is heading after a click, if anywhere. */
 export const getMoveTarget = (): MoveTarget | null => moveTarget;

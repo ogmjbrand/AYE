@@ -12,6 +12,9 @@ export interface MoveTarget {
   walk: boolean;
 }
 
+/** A waypoint on the way there is passed within this distance, without slowing down. */
+export const PASS_RADIUS = 0.6;
+
 /** Close enough to count as there, in metres. */
 export const ARRIVE_RADIUS = 0.35;
 /** Targets nearer than this are walked to rather than jogged. */
@@ -35,17 +38,17 @@ export function makeTarget(fromX: number, fromZ: number, x: number, z: number, s
 /**
  * Steering toward the target from where the player stands and faces
  * (heading θ faces (sin θ, cos θ)). Turns on the spot when the target is
- * well behind, eases off on arrival.
+ * well behind, eases off on arrival (not at waypoints along the way).
  */
-export function steerTowards(x: number, z: number, heading: number, target: MoveTarget): MovementIntent & { arrived: boolean } {
+export function steerTowards(x: number, z: number, heading: number, target: MoveTarget, final = true): MovementIntent & { arrived: boolean } {
   const dx = target.x - x;
   const dz = target.z - z;
   const dist = Math.hypot(dx, dz);
-  if (dist < ARRIVE_RADIUS) return { forward: 0, turn: 0, walk: target.walk, arrived: true };
+  if (dist < (final ? ARRIVE_RADIUS : PASS_RADIUS)) return { forward: 0, turn: 0, walk: target.walk, arrived: true };
   const err = wrap(Math.atan2(dx, dz) - heading);
   const turn = Math.max(-1, Math.min(1, err * 2.5));
   // Facing well away: turn first, then go; slow down over the last metre
   const facing = Math.abs(err) > 1.2 ? 0 : Math.max(0, Math.cos(err));
-  const forward = facing * Math.min(1, Math.max(0.35, dist / 1));
+  const forward = facing * (final ? Math.min(1, Math.max(0.35, dist / 1)) : 1);
   return { forward, turn, walk: target.walk, arrived: false };
 }
