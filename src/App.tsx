@@ -31,6 +31,10 @@ import { NightlifePanel } from './components/NightlifePanel';
 import { venueAt } from './lib/nightlife';
 import { parkAt } from './lib/parks';
 import { ParkPanel } from './components/ParkPanel';
+import { SitBar } from './components/SitBar';
+import { useSitSession } from './hooks/useSitSession';
+import { benchSeats, chairSeats, nearestSeat } from './lib/seating';
+import type { WaitMinutes } from './lib/parks';
 import { cityDirectory, type Destination } from './lib/cityDirectory';
 import { makeTarget } from './lib/clickToMove';
 import { hasMap } from './lib/equipment';
@@ -51,7 +55,7 @@ import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
-import { gameDay, residentNear, type Resident } from './lib/people';
+import { gameDay, residentById, residentNear, type Resident } from './lib/people';
 import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
@@ -316,10 +320,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
 
+  // Sitting down somewhere (park benches, the lounge terrace): see sitInPark and sitOnTerrace below
+  const sit = useSitSession(controller, wait);
+
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      // E on a seat gets you up; on the way to one it does nothing
+      if (sit.session) {
+        if (sit.session.phase === 'seated') sit.cancel();
+        return;
+      }
       if (indoors && interior) {
         if (nearSpot(bedSpot(interior))) rest(true);
         else if (nearSpot(doorSpot(interior))) goOutside();
@@ -362,6 +374,26 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     }
     setLocationsOpen(false);
     return null;
+  };
+
+  // Sitting: walk to the nearest free bench (or a terrace chair) and sit; waits pass in steps through the usual rules
+  const sitInPark = (minutes: WaitMinutes) => {
+    const seat = nearestSeat(benchSeats(district.layout.park), controller.position.x, controller.position.z);
+    setParkOpen(false);
+    setMovementBlocked(false); // the panel is closing; let the walk start
+    if (seat) sit.start({ seat, place: district.park.name, minutes });
+  };
+  const sitOnTerrace = (place: string, holdSeconds?: number) => {
+    const seat = nearestSeat(chairSeats(district.layout.terraceChairs), controller.position.x, controller.position.z);
+    setNightOpen(false);
+    setMovementBlocked(false);
+    if (seat) sit.start({ seat, place, minutes: 0, holdSeconds });
+  };
+  // A night out is charged once, as before; afterwards you sit outside with your friend's name for a moment
+  const goOutWith = (residentId: string) => {
+    nightOut(residentId);
+    const first = residentById(residentId)?.name.split(' ')[0];
+    sitOnTerrace(`${district.nightlife.name}${first ? ` after a night out with ${first}` : ''}`, 6);
   };
 
   // M opens the phone map once you own a phone
@@ -477,8 +509,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       )}
       {!indoors && <TripStatus destinations={destinations} />}
       {parkOpen && (
-        <ParkPanel park={district.park} time={state.time} onWait={wait} onClose={() => setParkOpen(false)} />
+        <ParkPanel park={district.park} time={state.time} onSit={sitInPark} onClose={() => setParkOpen(false)} />
       )}
+      {sit.session && <SitBar session={sit.session} onStand={sit.cancel} />}
       {nightOpen && (
         <NightlifePanel
           venue={district.nightlife}
@@ -486,7 +519,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           time={state.time}
           balance={state.balance}
           relationships={state.relationships}
-          onNightOut={nightOut}
+          onNightOut={goOutWith}
+          onSitOutside={() => sitOnTerrace(district.nightlife.name)}
           onClose={() => setNightOpen(false)}
         />
       )}
@@ -613,6 +647,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenTravel={() => setTravelOpen(true)}
         onOpenNightlife={() => setNightOpen(true)}
         onOpenPark={() => setParkOpen(true)}
+        busy={!!sit.session}
         onTalk={setTalking}
         workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}

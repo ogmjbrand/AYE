@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { WAIT_OPTIONS, type Park, type WaitMinutes } from '../lib/parks';
 import { formatGameTime, type GameTime } from '../lib/gameState';
 
 interface ParkPanelProps {
   park: Park;
   time: GameTime;
-  onWait: (minutes: WaitMinutes) => void;
+  /** Walk to a free bench and sit there while this much time passes. */
+  onSit: (minutes: WaitMinutes) => void;
   onClose: () => void;
 }
 
@@ -16,8 +17,7 @@ const clockAfter = (t: GameTime, m: number) => {
 };
 
 /** A park bench: sit for a while and let time pass. */
-export function ParkPanel({ park, time, onWait, onClose }: ParkPanelProps) {
-  const [sat, setSat] = useState<number | null>(null);
+export function ParkPanel({ park, time, onSit, onClose }: ParkPanelProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -42,30 +42,22 @@ export function ParkPanel({ park, time, onWait, onClose }: ParkPanelProps) {
         </header>
         <div className="space-y-4 p-5">
           <p className="m-0 text-sm">{park.description}</p>
-          {sat !== null ? (
-            <p role="status" className="m-0 rounded-lg bg-black/20 px-3 py-2 text-sm">
-              You sat for {label(sat).toLowerCase()}. It&rsquo;s now {formatGameTime(time)}.
-            </p>
-          ) : (
-            <>
-              <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Sit on a bench</p>
-              <ul className="m-0 grid list-none gap-2 p-0">
-                {WAIT_OPTIONS.map((m) => (
-                  <li key={m}>
-                    <button
-                      type="button"
-                      onClick={() => { onWait(m); setSat(m); }}
-                      className="flex w-full items-center justify-between rounded-xl border border-ui-line p-3 text-left text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-                    >
-                      <span className="font-semibold">{label(m)}</span>
-                      <span className="text-xs text-ui-muted">until {clockAfter(time, m)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className="m-0 text-xs text-ui-muted">The clock keeps running while you sit: living costs and hunger carry on, and you aren&rsquo;t paid.</p>
-            </>
-          )}
+          <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Sit on a bench</p>
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {WAIT_OPTIONS.map((m) => (
+              <li key={m}>
+                <button
+                  type="button"
+                  onClick={() => onSit(m)}
+                  className="flex w-full items-center justify-between rounded-xl border border-ui-line p-3 text-left text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+                >
+                  <span className="font-semibold">{label(m)}</span>
+                  <span className="text-xs text-ui-muted">until {clockAfter(time, m)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="m-0 text-xs text-ui-muted">The clock keeps running while you sit: living costs and hunger carry on, and you aren&rsquo;t paid. Get up any time; you&rsquo;re only charged for the time you sat.</p>
         </div>
       </div>
     </div>

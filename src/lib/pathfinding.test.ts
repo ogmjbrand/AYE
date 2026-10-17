@@ -51,6 +51,13 @@ describe('path finding', () => {
     expect(routeIsClear(shop, { x: 0, z: 0 }, path)).toBe(true);
   });
 
+  it('starting right next to an obstacle, a few centimetres from the goal, still gives a route', () => {
+    const chair = [box(0, 0, 0.6, 0.6)];
+    const g = buildWalkGrid(chair);
+    const path = findPath(g, { x: 0.75, z: 0.05 }, { x: 0.8, z: 0 });
+    expect(path).toEqual([{ x: 0.8, z: 0 }]);
+  });
+
   it('says so when there is no way there', () => {
     const pen = [box(0, 3, 8, 1), box(0, -3, 8, 1), box(3, 0, 1, 8), box(-3, 0, 1, 8)];
     expect(findPath(buildWalkGrid(pen), { x: 0, z: 0 }, { x: 20, z: 0 })).toBeNull();

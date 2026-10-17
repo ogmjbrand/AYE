@@ -128,7 +128,8 @@ export function findPath(g: WalkGrid, from: Point, to: Point): Point[] | null {
   const goal = nearestFree(g, to);
   if (start === null || goal === null) return null;
   const end: Point = g.blocked[toCell(to.z) * SIZE + toCell(to.x)] ? { x: toWorld(goal % SIZE), z: toWorld(Math.floor(goal / SIZE)) } : to;
-  if (clearLine(g, from, end)) return [end];
+  // Already in the same spot (e.g. both ends squeezed into the same cell beside an obstacle): just step to it
+  if (start === goal || clearLine(g, from, end)) return [end];
 
   const gx = goal % SIZE, gz = Math.floor(goal / SIZE);
   const h = (n: number) => {

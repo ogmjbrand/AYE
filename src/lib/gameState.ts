@@ -24,6 +24,8 @@ import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
 import { WAIT_OPTIONS } from './parks';
+
+const MAX_WAIT = Math.max(...WAIT_OPTIONS);
 import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
 import { TRAVEL_OPTIONS, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
@@ -413,8 +415,9 @@ export function gameReducer(
     case 'nightOut':
       return nightOut(state, action.residentId, career, lifestyle);
     case 'wait': {
-      // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work
-      if (state.summary || !(WAIT_OPTIONS as readonly number[]).includes(action.minutes)) return state;
+      // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work.
+      // A sit is applied in small steps as it plays out, so any whole number of minutes up to the longest option
+      if (state.summary || !Number.isInteger(action.minutes) || action.minutes < 1 || action.minutes > MAX_WAIT) return state;
       let next = state;
       for (let i = 0; i < action.minutes; i++) next = tick(next, career, lifestyle, false);
       return next;

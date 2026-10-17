@@ -51,6 +51,8 @@ export const ACCRA_OSU: DistrictSpec = {
     // Kelewele and kebab stalls on the west pavement
     stalls: [[-7.8, 0, 40], [-7.8, 0, 43]],
     billboard: [-20, 0, 2],
+    // Two chairs either side of Osu Nights' door, facing the street
+    terraceChairs: [{ x: -8.6, z: -24.6, facing: Math.PI / 2 }, { x: -8.6, z: -21.4, facing: Math.PI / 2 }],
     // Osu Green, behind Kente Loft: in from the cross street, or along the lane beside Osu Gadgets
     park: {
       area: { minX: -34, maxX: -19, minZ: -19, maxZ: 0 },

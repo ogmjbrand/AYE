@@ -36,18 +36,18 @@ folder gives you `node_modules/fbx2gltf/bin/<OS>/FBX2glTF`).
 
 ## Gestures (shared by every look of a body type)
 
-Talk, listen and wave clips live in one clips-only file per body type,
+Talk, listen, wave and sit clips live in one clips-only file per body type,
 `gestures-masculine.glb` and `gestures-feminine.glb`; three.js binds them to
 any look by bone name, so the 12 avatars don't need rebuilding. To add or
 change a gesture:
 
 1. Download the clips from `Assets/Animations/all_animations_max_motextr_static/`
    (files end in `.max.fbx`), e.g. `m_gestic_talk_neutral_01`,
-   `m_gestic_listen_neutral_01`, `m_wave_01` (and the `f_` versions).
+   `m_gestic_listen_neutral_01`, `m_wave_01`, `m_sit_chair_idle_neutral_01` (and the `f_` versions).
 2. Convert each with FBX2glTF as above.
-3. `node scripts/rocketbox/build-gestures.mjs gestures-masculine.raw.glb Talk=m_gestic_talk_neutral_01.glb Listen=m_gestic_listen_neutral_01.glb Wave=m_wave_01.glb`
+3. `node scripts/rocketbox/build-gestures.mjs gestures-masculine.raw.glb Talk=m_gestic_talk_neutral_01.glb Listen=m_gestic_listen_neutral_01.glb Wave=m_wave_01.glb Sit=m_sit_chair_idle_neutral_01.glb`
 4. `npm run assets:optimize -- gestures-masculine.raw.glb public/assets/models/characters/rocketbox/gestures-masculine.glb`
 
-Clip names (`Talk`, `Listen`, `Wave`) are what `src/lib/bodyLanguage.ts` asks for.
+Clip names (`Talk`, `Listen`, `Wave`, `Sit`) are what `src/lib/bodyLanguage.ts` asks for.
 Clips that hold the fingers still get the idle clip's relaxed hand at load
 time (`src/components/handPose.ts`).

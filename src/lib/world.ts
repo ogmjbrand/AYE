@@ -75,6 +75,8 @@ export interface LayoutSpec {
   billboard: Spot | null;
   /** A small public park: lawn, paths, shade trees and benches (trees and benches are solid). */
   park: ParkLayout | null;
+  /** Chairs on the pavement outside the lounge (solid), facing the street. */
+  terraceChairs: readonly { x: number; z: number; facing: number }[];
   /** Distant city massing: seed and colours. */
   skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
 }
@@ -88,6 +90,7 @@ export interface ParkLayout {
   paths: readonly { x0: number; x1: number; z0: number; z1: number }[];
 }
 export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
+export const CHAIR_SIZE = 0.62;
 
 export interface DistrictLayout extends LayoutSpec {
   palmSpots: Spot[];
@@ -178,6 +181,7 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
     ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
+    ...spec.terraceChairs.map((c) => ({ position: [c.x, 0, c.z] as const, size: [CHAIR_SIZE, 1, CHAIR_SIZE] as const })),
     ...(spec.park?.benches ?? []).map((b) => {
       // Benches face along an axis; their footprint swaps width and depth when turned sideways
       const sideways = Math.abs(Math.sin(b.facing)) > 0.5;

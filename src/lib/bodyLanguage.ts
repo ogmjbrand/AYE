@@ -7,7 +7,7 @@
  */
 import type { BodyType } from './looks';
 
-export type Gesture = 'Talk' | 'Listen' | 'Wave';
+export type Gesture = 'Talk' | 'Listen' | 'Wave' | 'Sit';
 
 /** Seconds each person speaks before the other takes a turn. */
 export const TURN_SECONDS = 5;

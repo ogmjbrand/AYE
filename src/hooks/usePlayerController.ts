@@ -4,6 +4,7 @@ import { activeLayout, movingObstacles, resolveCollisions } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
+import { seatedSpot, standSpot, type Seat } from '../lib/seating';
 import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
 
 export interface PlayerHandle {
@@ -49,12 +50,23 @@ function endTrip(status: Trip['status']) {
   }
 }
 
+// Sitting on a bench or chair: the body stays put on the seat until you get up
+let seated: Seat | null = null;
+const seatListeners = new Set<() => void>();
+const notifySeat = () => seatListeners.forEach((l) => l());
+
 const playerHandle: PlayerHandle = {
   position: new Vector3(...districtById(DEFAULT_DISTRICT_ID).spawn),
   direction: 0,
   velocity: new Vector3(),
   applyMovement: (delta: number) => {
     let intent = movementIntent(keysPressed, stick);
+    if (seated) {
+      // Pressing a direction gets you up; otherwise you stay exactly on the seat (no collision push off the bench)
+      playerHandle.velocity.set(0, 0, 0);
+      if (intent.forward !== 0 || intent.turn !== 0) standUp();
+      return;
+    }
     if (intent.forward !== 0 || intent.turn !== 0) {
       if (moveTarget) endTrip('cancelled'); // steering by hand cancels the trip
     } else if (moveTarget && route.length) {
@@ -146,6 +158,7 @@ function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Po
  * round anything in the way; null cancels. Returns false if there's no way there.
  */
 export function setMoveTarget(target: MoveTarget | null, about?: { destinationId?: string; label?: string }): boolean {
+  if (target && seated) standUp(); // clicking somewhere else gets you up first
   stuckFor = 0;
   replanned = false;
   const path = target && !inputBlocked ? planRoute(target) : null;
@@ -157,8 +170,41 @@ export function setMoveTarget(target: MoveTarget | null, about?: { destinationId
   route = path;
   trip = { seq: ++tripSeq, status: 'moving', ...about };
   tripListeners.forEach((l) => l());
+  // Nothing left to walk: you're already there
+  if (route.length === 0) endTrip('arrived');
   return true;
 }
+
+/** Sits down on a seat: the character's origin goes just behind the cushion, facing the way the seat does. */
+export function sitAt(seat: Seat) {
+  if (moveTarget) endTrip('cancelled');
+  const p = seatedSpot(seat);
+  playerHandle.position.x = p.x;
+  playerHandle.position.z = p.z;
+  playerHandle.velocity.set(0, 0, 0);
+  playerHandle.direction = seat.facing;
+  seated = seat;
+  notifySeat();
+}
+
+/** Gets up and steps in front of the seat, facing the same way. Does nothing if not seated. */
+export function standUp() {
+  if (!seated) return;
+  const p = standSpot(seated);
+  playerHandle.position.x = p.x;
+  playerHandle.position.z = p.z;
+  seated = null;
+  notifySeat();
+}
+
+export const getSeated = (): Seat | null => seated;
+export function subscribeSeated(listener: () => void) {
+  seatListeners.add(listener);
+  return () => { seatListeners.delete(listener); };
+}
+
+/** The number the next trip will get (so a caller can listen for its end before starting it). */
+export const nextTripSeq = () => tripSeq + 1;
 
 /** The latest trip (null before the first). */
 export const getTrip = (): Trip | null => trip;
@@ -224,4 +270,5 @@ export function placePlayer(spot: readonly [number, number, number], direction =
   playerHandle.velocity.set(0, 0, 0);
   playerHandle.direction = direction;
   if (moveTarget) endTrip('cancelled');
+  if (seated) { seated = null; notifySeat(); }
 }

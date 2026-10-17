@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
 import { Box3, NoColorSpace, type AnimationAction, type Group, type Mesh, type Object3D } from 'three';
-import type { PlayerHandle } from '../hooks/usePlayerController';
+import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
+import { seatDrop } from '../lib/seating';
 
 import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
@@ -55,8 +56,9 @@ function updateLocomotion(
   avatar: AvatarFile,
   gesture: Gesture | null,
   mixerTime: number,
+  sitting = false,
 ) {
-  const next: State = speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run';
+  const next: State = sitting ? 'Sit' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run';
   if (next !== current.current) {
     const prev = current.current ? get(current.current) : null;
     const action = get(next);
@@ -67,10 +69,13 @@ function updateLocomotion(
     if (next === 'Talk' || next === 'Listen') {
       // Long takes: join them part-way through so turns don't repeat the same opening
       action?.reset().startAt(mixerTime - ((mixerTime * 7.3) % 20)).fadeIn(0.4).play();
+    } else if (next === 'Sit' || current.current === 'Sit') {
+      // Settling onto a seat or getting up: a slower blend, so the body lowers and rises rather than snapping
+      action?.reset().fadeIn(0.7).play();
     } else {
       action?.reset().fadeIn(0.25).play();
     }
-    prev?.fadeOut(next === 'Walk' || next === 'Run' ? 0.25 : 0.4);
+    prev?.fadeOut(next === 'Sit' || current.current === 'Sit' ? 0.7 : next === 'Walk' || next === 'Run' ? 0.25 : 0.4);
     current.current = next;
   }
   const action = get(next);
@@ -150,7 +155,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   const idleClip = useMemo(() => clipsWithHands.find((c) => c.name === clips.Idle), [clipsWithHands, clips]);
   const conversationStart = useRef<number | null>(null);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (conversing && conversationStart.current === null) conversationStart.current = mixer.time;
     if (!conversing) conversationStart.current = null;
     const gesture = conversationStart.current === null ? null : conversationGesture('player', mixer.time - conversationStart.current);
@@ -161,7 +166,15 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
       }
       return gestures[state];
     };
-    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time);
+    // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
+    const seat = getSeated();
+    const sitting = !!seat && !!gestures.Sit;
+    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, sitting);
+    const g = group.current;
+    if (g) {
+      const drop = sitting ? seatDrop(seat, targetHeight) : 0;
+      g.position.y += (drop - g.position.y) * Math.min(1, delta * 5);
+    }
   });
 
   return (

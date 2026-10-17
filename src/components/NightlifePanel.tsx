@@ -13,13 +13,15 @@ interface NightlifePanelProps {
   balance: number;
   relationships: Record<string, Relationship>;
   onNightOut: (residentId: string) => void;
+  /** Sit on one of the chairs outside (free; get up whenever you like). */
+  onSitOutside: () => void;
   onClose: () => void;
 }
 
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 /** The lounge door: hours, cover, and a night out with one of your friends. */
-export function NightlifePanel({ venue, districtId, time, balance, relationships, onNightOut, onClose }: NightlifePanelProps) {
+export function NightlifePanel({ venue, districtId, time, balance, relationships, onNightOut, onSitOutside, onClose }: NightlifePanelProps) {
   const [went, setWent] = useState<string | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -102,6 +104,14 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
               </ul>
             </>
           )}
+          <button
+            type="button"
+            onClick={onSitOutside}
+            className="w-full rounded-xl border border-ui-line p-3 text-left text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+          >
+            <span className="font-semibold">Sit on the terrace</span>
+            <span className="block text-xs text-ui-muted">Free. Take one of the chairs outside and watch the street; get up whenever you like.</span>
+          </button>
           <p className="m-0 text-[11px] text-ui-muted">The people here are computer-controlled residents, not other players. Money is virtual (ⓒ).</p>
         </div>
       </div>

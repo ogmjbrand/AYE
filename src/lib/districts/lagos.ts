@@ -57,6 +57,8 @@ export const LAGOS_MARINA: DistrictSpec = {
     // Market stalls with umbrellas on the pavement outside the shop row
     stalls: [[-6.2, 0, -10.5], [-6.2, 0, -7.5], [-6.2, 0, -1.5]],
     billboard: [-14, 0, -28.6],
+    // Two chairs either side of Lagoon Live's door, facing the street
+    terraceChairs: [{ x: 7.6, z: 18.75, facing: -Math.PI / 2 }, { x: 7.6, z: 21.25, facing: -Math.PI / 2 }],
     // Uptown Gardens, behind the hospital: in from the cross street, paths crossing at the middle
     park: {
       area: { minX: 20, maxX: 33, minZ: -13, maxZ: 4 },

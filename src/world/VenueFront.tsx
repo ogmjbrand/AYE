@@ -12,6 +12,7 @@ import { groundHeightAt } from '../lib/world';
 export function VenueFront({ hour, night }: { hour: number; night: number }) {
   const district = useDistrict();
   const venue = district.nightlife;
+  const chairs = district.layout.terraceChairs;
   const spot = useMemo(() => {
     const b = district.layout.buildings.find((x) => x.name === venue.name);
     if (!b) return null;
@@ -38,6 +39,26 @@ export function VenueFront({ hour, night }: { hour: number; night: number }) {
         <planeGeometry args={[spot.width * 0.85, 0.09]} />
         <meshStandardMaterial color="#3a2f4a" emissive="#a98cf0" emissiveIntensity={open ? 1.2 + 2 * night : 0} toneMapped={false} />
       </mesh>
+      {/* Terrace chairs either side of the door: a low wooden frame, cushion and backrest (solid: lib/world.ts) */}
+      {chairs.map((c, i) => {
+        const y = groundHeightAt(c.x, c.z);
+        return (
+          <group key={i} position={[c.x, y, c.z]} rotation={[0, c.facing, 0]}>
+            <mesh position={[0, 0.2, 0]} castShadow>
+              <boxGeometry args={[0.58, 0.4, 0.55]} />
+              <meshStandardMaterial color="#4a3a2c" roughness={0.85} />
+            </mesh>
+            <mesh position={[0, 0.43, 0.02]}>
+              <boxGeometry args={[0.52, 0.06, 0.48]} />
+              <meshStandardMaterial color="#8c7a64" roughness={0.95} />
+            </mesh>
+            <mesh position={[0, 0.66, -0.25]} castShadow>
+              <boxGeometry args={[0.58, 0.46, 0.07]} />
+              <meshStandardMaterial color="#4a3a2c" roughness={0.85} />
+            </mesh>
+          </group>
+        );
+      })}
       {/* Light spilling onto the pavement */}
       {open && night > 0.05 && (
         <mesh position={[spot.faceX + spot.out * 1.4, base + 0.02, spot.z]} rotation={[-Math.PI / 2, 0, 0]}>

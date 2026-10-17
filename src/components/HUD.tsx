@@ -39,6 +39,8 @@ interface HUDProps {
   onOpenNightlife?: () => void;
   /** Opens the park bench (lib/parks.ts). */
   onOpenPark?: () => void;
+  /** Sitting down or on the way to a seat: no place prompts. */
+  busy?: boolean;
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
@@ -109,6 +111,7 @@ export function HUD({
   onOpenTravel,
   onOpenNightlife,
   onOpenPark,
+  busy = false,
   onTalk,
   workTask,
   insideHome,
@@ -156,7 +159,7 @@ export function HUD({
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
-  const placePrompt = insideHome ? insideHome.prompt : streetPrompt;
+  const placePrompt = busy ? null : insideHome ? insideHome.prompt : streetPrompt;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }

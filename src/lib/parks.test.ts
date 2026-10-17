@@ -25,6 +25,9 @@ describe('sitting in the park', () => {
     expect(wait(s, 60).today.income).toBe(0);
     expect(wait(s, 999)).toBe(s);
     expect(wait(s, -30)).toBe(s);
+    expect(wait(s, 0)).toBe(s);
+    expect(wait(s, 2.5)).toBe(s);
+    expect(wait(s, 121)).toBe(s);
   });
 });
 
