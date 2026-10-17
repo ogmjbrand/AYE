@@ -54,6 +54,7 @@ const NORTH_SNACKS: VendorStyle = {
 };
 
 export const NORTH_WEST: RegionStyle = {
+  vehicles: ['tricycle', 'minibus'],
   kitchen: {
     names: ['Mai Tuwo', 'Gidan Abinci', 'Hajiya Kitchen'],
     kind: 'Tuwo house',
@@ -85,6 +86,7 @@ export const NORTH_EAST: RegionStyle = {
 const KANEM: RegionStyle = { ...NORTH_EAST, names: KANURI };
 
 export const NORTH_CENTRAL: RegionStyle = {
+  vehicles: ['minibus', 'tricycle'],
   kitchen: {
     names: ['Food Basket', 'Yam House', 'Mama Put'],
     kind: 'Middle Belt kitchen',
@@ -107,6 +109,7 @@ export const NORTH_CENTRAL: RegionStyle = {
 };
 
 export const SOUTH_WEST: RegionStyle = {
+  vehicles: ['minibus', 'tricycle'],
   kitchen: {
     names: ['Mama Put', 'Amala Spot', 'Iya Bose Buka'],
     kind: 'Yoruba buka',
@@ -129,6 +132,7 @@ export const SOUTH_WEST: RegionStyle = {
 };
 
 export const SOUTH_EAST: RegionStyle = {
+  vehicles: ['minibus', 'tricycle'],
   kitchen: {
     names: ['Mama Chi Kitchen', 'Nne Kitchen', 'Ofe House'],
     kind: 'Igbo kitchen',
@@ -151,6 +155,7 @@ export const SOUTH_EAST: RegionStyle = {
 };
 
 export const SOUTH_SOUTH: RegionStyle = {
+  vehicles: ['minibus', 'tricycle'],
   kitchen: {
     names: ['Creek Kitchen', 'Mama Calabar Kitchen', 'Soup Pot'],
     kind: 'Soup kitchen',

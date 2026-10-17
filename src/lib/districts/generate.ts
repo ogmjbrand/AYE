@@ -21,6 +21,10 @@ import type { Building, LayoutSpec, ParkLayout, TrafficLane, Vehicle, VehicleKin
 
 /** Muted car paints: greys, a dark blue, a deep red, a sand. */
 const CAR_COLORS = ['#8a8f96', '#2b3440', '#c9c5bc', '#6b2a2a', '#2f4a6b', '#b8ab92'];
+/** Keke and tuk-tuk paints: ochre, teal, maroon. */
+const TRICYCLE_COLORS = ['#c99a2e', '#3d6e7a', '#7a3d3d'];
+/** Jeepney body paints under the chrome: deep blue, maroon, teal. */
+const JEEPNEY_COLORS = ['#2f4a6b', '#6b2a2a', '#2e6b62'];
 import { WORLD_BOUND } from '../world';
 import { LAGOS_MARINA } from './lagos';
 import { ACCRA_OSU } from './accra';
@@ -153,7 +157,7 @@ export interface RegionStyle {
   buses: readonly string[];
   busStripes: boolean;
   /** What's on the road: minibuses (default), ordinary cars, or both. */
-  vehicles?: 'minibus' | 'car' | 'mixed';
+  vehicles?: 'minibus' | 'car' | 'mixed' | readonly VehicleKind[];
   /** Kerbs and edge lines: painted black-and-yellow (default) or plain grey with white lines. */
   streetStyle?: 'painted' | 'plain';
   /** Home kinds and descriptions by plan slot (marina has 4 homes, osu 3). */
@@ -335,8 +339,9 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     return { ...b, color, name: role ? nameFor(role) : undefined };
   });
   // Cars, minibuses or a mix of the two, each in its own colours
-  const kindAt = (i: number): VehicleKind => (S.vehicles === 'car' || (S.vehicles === 'mixed' && i % 2 === 1) ? 'car' : 'minibus');
-  const paletteFor = (kind: VehicleKind) => (kind === 'car' ? CAR_COLORS : S.buses);
+  const mix: readonly VehicleKind[] = typeof S.vehicles === 'object' ? S.vehicles : S.vehicles === 'car' ? ['car'] : S.vehicles === 'mixed' ? ['minibus', 'car'] : ['minibus'];
+  const kindAt = (i: number): VehicleKind => mix[i % mix.length];
+  const paletteFor = (kind: VehicleKind) => (kind === 'car' ? CAR_COLORS : kind === 'tricycle' ? TRICYCLE_COLORS : kind === 'jeepney' ? JEEPNEY_COLORS : S.buses);
   const recolour = <V extends { color: string }>(v: V, i: number): V => {
     const colors = paletteFor(kindAt(i));
     return { ...v, color: colors[(hashString(seed.id) + i) % colors.length] };

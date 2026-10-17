@@ -4,10 +4,10 @@ import type { Group } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { initTraffic, stepTraffic, type Car as MovingCar } from '../lib/traffic';
 import { DANFO_SIZE, movingObstacles } from '../lib/world';
-import { Car, Danfo } from './Props';
+import { BuiltInVehicle } from './Props';
 import { useLayout } from './DistrictContext';
 
-/** Minibuses and cars driving the boulevard; they stop for the player and are solid to walk into. */
+/** Minibuses, cars, tricycles and jeepneys driving the boulevard; they stop for the player and are solid to walk into. */
 export function Traffic({ player }: { player: PlayerHandle }) {
   const { traffic } = useLayout();
   const cars = useRef<MovingCar[]>(initTraffic(traffic));
@@ -35,9 +35,7 @@ export function Traffic({ player }: { player: PlayerHandle }) {
     <>
       {looks.map((l, i) => (
         <group key={i} ref={(g) => { groups.current[i] = g; }} position={[l.x, 0, l.z]}>
-          {l.kind === 'car'
-            ? <Car vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color }} />
-            : <Danfo vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes }} />}
+          <BuiltInVehicle vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes, kind: l.kind }} />
         </group>
       ))}
     </>

@@ -41,7 +41,8 @@ export interface Vehicle {
   kind?: VehicleKind;
 }
 
-export type VehicleKind = 'minibus' | 'car';
+/** Minibus (danfo, tro-tro, matatu), car, motor tricycle (keke, tuk-tuk, bajaj) or Philippine jeepney. */
+export type VehicleKind = 'minibus' | 'car' | 'tricycle' | 'jeepney';
 
 /** One lane of moving traffic: its centre line, direction along Z and how many vehicles use it. */
 export interface TrafficLane {

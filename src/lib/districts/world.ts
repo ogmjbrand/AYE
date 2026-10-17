@@ -248,7 +248,7 @@ const YEMENI = tweak(GULF, { names: n('Ahmed, Saleh, Abdulrahman, Ali, Nabil, Fu
 // ---------------------------------------------------------------- South Asia
 
 const INDIAN = style({
-  vehicles: 'mixed', streetStyle: 'painted',
+  vehicles: ['tricycle', 'car'], streetStyle: 'painted',
   kitchen: v('Annapurna Bhojanalaya, Spice Route', 'Indian kitchen', 'chana-masala dal-rice masala-dosa biryani butter-chicken paneer-tikka vada-pav'),
   snacks: v('Chaat corner, Chai stall', 'Chai and street food', 'vada-pav samosa-veg masala-chai fruit'),
   lounge: 'Bollywood, bhangra and indie bands, open late.',
@@ -340,7 +340,7 @@ const NORTH_KOREAN = tweak(KOREAN, {
 // ---------------------------------------------------------------- Southeast Asia
 
 const MAINLAND_SEA = style({
-  vehicles: 'mixed', streetStyle: 'painted',
+  vehicles: ['tricycle', 'car'], streetStyle: 'painted',
   kitchen: v('Raan Ahaan, Khao Gaeng', 'Thai and Lao kitchen', 'green-curry-veg pad-thai tom-yum laap amok lahpet mango-sticky-rice'),
   snacks: v('Street cart, Night market stall', 'Street food', 'mango-sticky-rice fruit goi-cuon-chay moo-ping'),
   lounge: 'Luk thung, mor lam and live bands, open late.',
@@ -360,6 +360,7 @@ const BURMESE = tweak(MAINLAND_SEA, {
   names: n('Aung, Min, Kyaw, Zaw, Htet, Thura, Ko', 'Thida, Su, Nandar, Hnin, May, Ei, Phyu', 'Win, Oo, Naing, Lwin, Htun, Myint, Aye'),
 });
 const VIETNAMESE = tweak(MAINLAND_SEA, {
+  vehicles: ['minibus', 'car'],
   kitchen: v('Quán Cơm, Phở Corner', 'Vietnamese kitchen', 'pho-bo banh-mi-chay com-chay goi-cuon-chay'),
   snacks: v('Bánh mì cart, Street stall', 'Street food', 'banh-mi-chay goi-cuon-chay fruit moo-ping'),
   loungeText: 'V-pop and acoustic sets, open late.',
@@ -378,7 +379,7 @@ const MALAY = style({
 const INDONESIAN = tweak(MALAY, { names: n('Budi, Agus, Dimas, Rizky, Andi, Fajar, Yusuf', 'Siti, Dewi, Putri, Ayu, Rina, Sri, Indah', 'Santoso, Wijaya, Saputra, Hidayat, Kurniawan, Pratama, Setiawan') });
 const BRUNEIAN = tweak(MALAY, { lounge: { names: ['{city} Live'], description: 'Malay pop on a small stage, with teh tarik.' + DRY } });
 const FILIPINO = style({
-  vehicles: 'mixed', streetStyle: 'painted',
+  vehicles: ['jeepney', 'tricycle'], streetStyle: 'painted',
   kitchen: v('Carinderia, Lutong Bahay', 'Filipino kitchen', 'adobo pancit ginataang-gulay monggo turon'),
   snacks: v('Sari-sari store, Taho vendor', 'Street snacks', 'turon taho fruit banh-mi-chay'),
   lounge: 'Live OPM bands and karaoke, open late.',

@@ -96,12 +96,14 @@ describe('generated districts', () => {
     expect(travelOptions(city('kuala-lumpur'), city('singapore')).map((o) => o.mode)).toEqual(['coach', 'flight']);
   });
 
-  it('put cars on plain streets in Europe, minibuses on painted ones in Nigeria, and both in Mexico', () => {
+  it('put cars on plain streets in Europe, minibuses and kekes on painted ones in Nigeria, jeepneys in Manila, and a mix in Mexico', () => {
     const find = (id: string) => DISTRICTS.find((d) => d.city.id === id)!.layout;
     const kinds = (id: string) => new Set([...find(id).vehicles.map((v) => v.kind ?? 'minibus'), ...find(id).traffic.map((l) => l.kind ?? 'minibus')]);
     expect([...kinds('london')]).toEqual(['car']);
     expect(find('london').streetStyle).toBe('plain');
-    expect([...kinds('kano')]).toEqual(['minibus']);
+    expect(kinds('kano')).toEqual(new Set(['tricycle', 'minibus']));
+    expect(kinds('manila')).toEqual(new Set(['jeepney', 'tricycle']));
+    expect(kinds('bangkok').has('tricycle')).toBe(true);
     expect(find('kano').streetStyle).toBe('painted');
     expect(kinds('mexico-city')).toEqual(new Set(['minibus', 'car']));
     expect(districtById('lagos.marina').layout.streetStyle ?? 'painted').toBe('painted');

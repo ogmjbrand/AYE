@@ -42,6 +42,7 @@ const NEEM = 'Neem trees and benches. Busy in the cool of the evening, after the
 const PALMS = 'Palms and flowering trees over the benches, with a breeze in the evening.';
 
 export const SAHEL: RegionStyle = {
+  vehicles: ['minibus', 'tricycle'],
   ...base(OCHRE, NEEM),
   kitchen: { names: ['Le Baobab', 'Chez Fatou', 'Dibiterie du Centre'], kind: 'Senegalese and Sahel kitchen', menu: ['thieboudienne', 'yassa-chicken', 'mafe-vegan', 'ndambe', 'to-gombo', 'fonio-vegetables', 'dibi'] },
   snacks: { names: ['Tangana corner', 'Accara stand'], kind: 'Breakfast and street snacks', menu: ['accara', 'fataya', 'puff-puff', 'fruit', 'bissap', 'ndambe'] },
@@ -97,7 +98,7 @@ export const CENTRAL: RegionStyle = {
 };
 
 export const EAST: RegionStyle = {
-  vehicles: 'mixed',
+  vehicles: ['minibus', 'tricycle', 'car'],
   ...base(WARM, SHADE),
   kitchen: { names: ['Hoteli ya Mama', '{city} Hoteli'], kind: 'Hoteli', menu: ['sukuma-ugali', 'githeri', 'pilau', 'nyama-choma', 'chapati-beans', 'matoke', 'isombe'] },
   snacks: { names: ['Kibanda', 'Mandazi stand'], kind: 'Street snacks', menu: ['mandazi', 'samosa-veg', 'mishkaki', 'rolex', 'fruit', 'mahindi-choma'] },
