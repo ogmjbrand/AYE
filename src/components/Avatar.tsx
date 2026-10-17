@@ -9,6 +9,7 @@ import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
 import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
 import { applyBodyShape } from './bodyShapeSkin';
+import { createRelaxedHands } from './relaxedHands';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
@@ -133,7 +134,12 @@ export function Avatar({ controller, lookId, heightCm, styles, shape }: {
   // Garment maps exist only for the built-in looks, not for a model listed in the asset manifest
   const styledLook = assetManifest().avatar ? null : lookById(lookId).id;
 
-  useFrame(() => updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile));
+  const relaxed = useMemo(() => createRelaxedHands(scene, animations), [scene, animations]);
+
+  useFrame(() => {
+    updateLocomotion(actions, clips, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile);
+    relaxed.update(actions);
+  });
 
   return (
     <group ref={group} dispose={null}>
