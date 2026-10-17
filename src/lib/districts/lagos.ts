@@ -7,7 +7,7 @@ import type { DistrictSpec } from '../geography';
 
 export const LAGOS_MARINA: DistrictSpec = {
   id: 'lagos.marina',
-  city: { id: 'lagos', name: 'Lagos', country: 'NG', timeZone: 'Africa/Lagos', currency: 'NGN' },
+  city: { id: 'lagos', name: 'Lagos', region: 'Lagos', country: 'NG', timeZone: 'Africa/Lagos', currency: 'NGN', lat: 6.45, lon: 3.39 },
   name: 'Marina Boulevard',
   spawn: [1.5, 0, 2],
   layout: {

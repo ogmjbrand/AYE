@@ -236,12 +236,12 @@ function MarketStalls() {
 // ---------------------------------------------------------------- billboard
 
 /** Roadside billboard carrying the real AYE logo artwork. */
-function Billboard({ position }: { position: readonly [number, number, number] }) {
+function Billboard({ position, facing }: { position: readonly [number, number, number]; facing: number }) {
   const logo = useTexture(`${import.meta.env.BASE_URL}assets/brand/aye-logo.webp`);
   // eslint-disable-next-line react-hooks/immutability
   logo.colorSpace = SRGBColorSpace;
   return (
-    <group position={position}>
+    <group position={position} rotation={[0, facing, 0]}>
       {[-1.6, 1.6].map((x) => (
         <mesh key={x} position={[x, 2.6, 0]} castShadow>
           <cylinderGeometry args={[0.12, 0.12, 5.2, 8]} />
@@ -275,7 +275,7 @@ function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
 }
 
 export function Props({ night }: { night: number }) {
-  const { vehicles, billboard } = useLayout();
+  const { vehicles, billboard, crossStreet } = useLayout();
   return (
     <group>
       <Palms />
@@ -287,7 +287,8 @@ export function Props({ night }: { night: number }) {
       <MarketStalls />
       {billboard && (
         <Suspense fallback={null}>
-          <Billboard position={billboard} />
+          {/* Faces the cross street, whichever side of it it stands */}
+          <Billboard position={billboard} facing={billboard[2] < (crossStreet.minZ + crossStreet.maxZ) / 2 ? 0 : Math.PI} />
         </Suspense>
       )}
     </group>

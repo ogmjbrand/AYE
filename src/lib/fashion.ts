@@ -4,6 +4,7 @@
  * person already wears (top, bottom, shoes) or their hair; cut and hairstyle
  * shape need separate clothing/hair meshes (see docs/CHARACTER_PIPELINE.md).
  */
+import { districtById } from './geography';
 
 export type Slot = 'top' | 'bottom' | 'shoes' | 'hair';
 export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair'];
@@ -66,7 +67,7 @@ export interface FashionItem {
   price: number;
   collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon';
   style: Style;
-  /** Districts whose boutique stocks it (lib/geography.ts); everywhere if omitted. */
+  /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
 }
 
@@ -79,8 +80,9 @@ const item = (
   ...(stockedIn ? { stockedIn } : {}),
 });
 
-const LAGOS = ['lagos.marina'] as const;
-const ACCRA = ['accra.osu'] as const;
+// Aso-oke and adire eleko in Nigeria, kente and batakari in Ghana
+const LAGOS = ['NG'] as const;
+const ACCRA = ['GH'] as const;
 
 export const FASHION_ITEMS: readonly FashionItem[] = [
   // Tops
@@ -148,8 +150,11 @@ export interface Wardrobe {
   outfits?: Outfit[];
 }
 
-/** Items a district's boutique sells. */
-export const stockedIn = (districtId: string) => FASHION_ITEMS.filter((i) => !i.stockedIn || i.stockedIn.includes(districtId));
+/** Items a district's boutique sells: the basics, plus what's made in its country. */
+export function stockedIn(districtId: string) {
+  const country = districtById(districtId).city.country;
+  return FASHION_ITEMS.filter((i) => !i.stockedIn || i.stockedIn.includes(country));
+}
 
 export const EMPTY_WARDROBE: Wardrobe = { owned: [], equipped: {} };
 

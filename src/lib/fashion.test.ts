@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
-import { isDistrictId } from './geography';
+import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
   it('has unique ids, valid colours and prices, and items for every slot', () => {
@@ -30,7 +30,10 @@ describe('fashion catalogue', () => {
   });
 
   it('each boutique has its own range, plus the basics everywhere', () => {
-    for (const i of FASHION_ITEMS) for (const d of i.stockedIn ?? []) expect(isDistrictId(d), i.id).toBe(true);
+    for (const i of FASHION_ITEMS) for (const c of i.stockedIn ?? []) expect(COUNTRY_CODES, i.id).toContain(c);
+    // Every Nigerian city stocks aso-oke, not kente
+    expect(stockedIn('kano.sabon-gari').map((i) => i.id)).toContain('top-asooke-champagne');
+    expect(stockedIn('kano.sabon-gari').map((i) => i.id)).not.toContain('top-kente-adweneasa');
     const lagos = stockedIn('lagos.marina').map((i) => i.id);
     const accra = stockedIn('accra.osu').map((i) => i.id);
     expect(lagos).toContain('top-asooke-champagne');

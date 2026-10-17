@@ -77,6 +77,39 @@ export const DISHES: readonly Dish[] = [
   d('kontomire', 'Kontomire stew and boiled yam', 'Ghana', 25, 50, [], 'Cocoyam-leaf stew with palm oil and agushi, with boiled yam.', 'Plant-based: made without egg or fish.'),
   d('kelewele', 'Kelewele and groundnuts', 'Ghana', 10, 20, [], 'Ripe plantain cubes fried with ginger and pepper, with roasted groundnuts.'),
   d('chichinga', 'Chichinga', 'Ghana', 20, 30, ['meat'], 'Spiced beef kebabs grilled over charcoal with suya pepper.'),
+  // Northern Nigeria: tuwo houses and street snacks
+  d('tuwo-miyan-kuka', 'Tuwo shinkafa and miyan kuka', 'Nigeria', 25, 55, [], 'Soft rice swallow with baobab-leaf soup and dawadawa.', 'Plant-based version of a soup often cooked with dried fish or meat.'),
+  d('tuwo-miyan-taushe', 'Tuwo masara and miyan taushe', 'Nigeria', 35, 60, ['meat'], 'Maize swallow with a pumpkin, spinach and groundnut soup cooked with beef.'),
+  d('masa', 'Masa with yaji', 'Nigeria', 12, 30, [], 'Fermented rice cakes fried in a cast-iron pan, with spiced pepper powder.'),
+  d('dan-wake', 'Dan wake', 'Nigeria', 15, 40, [], 'Bean-flour dumplings with groundnut oil, yaji, tomato and onion.', 'Served without egg.'),
+  d('kosai-koko', 'Kosai and koko', 'Nigeria', 12, 30, [], 'Bean fritters with a warm, spiced millet porridge.'),
+  d('awara', 'Awara', 'Nigeria', 10, 25, [], 'Fried soya-bean curd (tofu) with yaji and sliced onion.'),
+  d('kilishi', 'Kilishi', 'Nigeria', 25, 25, ['meat'], 'Thin sheets of beef dried with a groundnut and pepper spice paste.'),
+  d('fura-da-nono', 'Fura da nono', 'Nigeria', 12, 30, ['dairy'], 'Spiced millet balls crumbled into cool fermented milk.'),
+  d('dambu-nama', 'Dambu nama', 'Nigeria', 30, 35, ['meat'], 'Shredded, spiced and fried beef, a Borno speciality.'),
+  // North Central Nigeria
+  d('acha-jollof', 'Acha jollof', 'Nigeria', 25, 45, [], 'Fonio grains cooked jollof-style with tomato, pepper and vegetables, from the Plateau.'),
+  d('pounded-yam-egusi', 'Pounded yam and egusi', 'Nigeria', 40, 60, ['meat', 'fish'], 'Melon-seed and spinach soup with beef and stockfish, served with pounded yam.'),
+  d('egusi-vegan', 'Pounded yam and egusi (plant-based)', 'Nigeria', 30, 55, [], 'Melon-seed and spinach soup with mushrooms, served with pounded yam.', 'Plant-based version, no meat, fish or crayfish.'),
+  d('roast-yam-pepper', 'Roasted yam and pepper sauce', 'Nigeria', 15, 40, [], 'Yam roasted over charcoal with a fresh pepper and palm-oil sauce.'),
+  // South East Nigeria
+  d('okpa', 'Okpa', 'Nigeria', 15, 45, [], 'Steamed Bambara-nut pudding with palm oil and pepper, an Enugu breakfast.'),
+  d('abacha', 'Abacha with fish', 'Nigeria', 30, 45, ['fish'], 'Shredded cassava salad with ugba, garden egg, palm-oil dressing and dried fish.'),
+  d('ofe-onugbu', 'Ofe onugbu and fufu', 'Nigeria', 40, 60, ['meat', 'fish'], 'Bitterleaf soup thickened with cocoyam, with assorted meat and stockfish.'),
+  d('nkwobi', 'Nkwobi', 'Nigeria', 40, 40, ['meat'], 'Cow foot in a spiced palm-oil and utazi sauce, served in a wooden bowl.'),
+  d('ukwa', 'Ukwa', 'Nigeria', 25, 50, [], 'African breadfruit porridge cooked with palm oil and pepper.', 'Plant-based version, no dried fish.'),
+  d('corn-ube', 'Roast corn and ube', 'Nigeria', 8, 20, [], 'Charcoal-roasted maize with softened African pear.'),
+  // South South Nigeria
+  d('banga-starch', 'Banga soup and starch', 'Nigeria', 40, 60, ['fish'], 'Palm-nut soup with fresh fish and beletete spice, served with cassava starch.'),
+  d('bole-fish', 'Bole and fish', 'Nigeria', 35, 50, ['fish'], 'Roasted plantain and yam with grilled fish and a hot pepper sauce, Port Harcourt style.'),
+  d('catfish-pepper-soup', 'Catfish pepper soup', 'Nigeria', 35, 40, ['fish'], 'Fresh catfish in a hot broth spiced with uziza and calabash nutmeg.'),
+  d('edikang-ikong', 'Edikang ikong and fufu', 'Nigeria', 45, 60, ['meat', 'fish'], 'Fluted pumpkin and waterleaf soup with beef and periwinkle, from Calabar and Uyo.'),
+  d('afang', 'Afang soup and garri', 'Nigeria', 40, 60, ['meat', 'fish'], 'Afang and waterleaf soup with meat and dried fish.'),
+  d('ekpang-nkukwo', 'Ekpang nkukwo', 'Nigeria', 30, 50, [], 'Grated cocoyam wrapped in leaves and simmered in a palm-oil sauce.', 'Plant-based version of a dish often cooked with periwinkle and fish.'),
+  d('plantain-chips', 'Plantain chips', 'Nigeria', 6, 15, [], 'Thin, crisp slices of fried unripe plantain.'),
+  // South West Nigeria
+  d('ofada-ayamase', 'Ofada rice and ayamase', 'Nigeria', 40, 60, ['meat', 'egg'], 'Local ofada rice with green-pepper stew, assorted meat and boiled egg.'),
+  d('ikokore', 'Ikokore', 'Nigeria', 30, 50, ['fish'], 'Ijebu water-yam pottage with smoked fish.'),
 ];
 
 export const dishById = (id: string) => DISHES.find((x) => x.id === id);

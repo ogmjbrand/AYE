@@ -27,7 +27,7 @@ import { WAIT_OPTIONS } from './parks';
 
 const MAX_WAIT = Math.max(...WAIT_OPTIONS);
 import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
-import { TRAVEL_OPTIONS, type TravelMode } from './travel';
+import { travelOption, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
 
@@ -252,8 +252,9 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
 
 /** Travels to another district: pays the fare, then the clock runs for the length of the trip. */
 function travel(state: GameState, to: string, mode: TravelMode, career: Career, lifestyle: Lifestyle): GameState {
-  const option = TRAVEL_OPTIONS[mode];
-  if (state.summary || !option || to === state.districtId || !isDistrictId(to) || state.balance < option.fare) return state;
+  if (state.summary || to === state.districtId || !isDistrictId(to)) return state;
+  const option = travelOption(districtById(state.districtId).city, districtById(to).city, mode);
+  if (!option || state.balance < option.fare) return state;
   let next: GameState = {
     ...state,
     balance: state.balance - option.fare,

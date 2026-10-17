@@ -8,7 +8,7 @@ import type { DistrictSpec } from '../geography';
 
 export const ACCRA_OSU: DistrictSpec = {
   id: 'accra.osu',
-  city: { id: 'accra', name: 'Accra', country: 'GH', timeZone: 'Africa/Accra', currency: 'GHS' },
+  city: { id: 'accra', name: 'Accra', region: 'Greater Accra', country: 'GH', timeZone: 'Africa/Accra', currency: 'GHS', lat: 5.6, lon: -0.19 },
   name: 'Oxford Street, Osu',
   spawn: [2, 0, -10],
   layout: {

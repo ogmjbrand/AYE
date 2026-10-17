@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FRIENDSHIP_LEVELS, RESIDENTS, STROLL_PAUSE, STROLL_SPEED, friendshipLevel, residentNear, residentPose, sanitiseRelationships } from './people';
-import { districtById, isDistrictId } from './geography';
+import { DISTRICTS, districtById, isDistrictId } from './geography';
 import { lookById } from './looks';
 import { resolveCollisions } from './world';
 
@@ -19,7 +19,7 @@ describe('residents', () => {
   });
 
   it('every city has people to meet', () => {
-    for (const d of ['lagos.marina', 'accra.osu']) expect(RESIDENTS.filter((r) => r.district === d).length).toBeGreaterThanOrEqual(3);
+    for (const d of DISTRICTS) expect(RESIDENTS.filter((r) => r.district === d.id).length, d.id).toBeGreaterThanOrEqual(3);
   });
 
   it('levels follow points', () => {

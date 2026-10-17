@@ -15,6 +15,8 @@ import type { Park } from './parks';
 import { buildLayout, setActiveLayout, type DistrictLayout, type LayoutSpec } from './world';
 import { LAGOS_MARINA } from './districts/lagos';
 import { ACCRA_OSU } from './districts/accra';
+import { generateDistrict } from './districts/generate';
+import { NIGERIA } from './districts/nigeria';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
@@ -39,6 +41,11 @@ export interface City {
   timeZone: string;
   /** Local currency code; the game itself uses one virtual currency (ⓒ). */
   currency: string;
+  /** State, region or province. */
+  region: string;
+  /** City centre, for travel distances. */
+  lat: number;
+  lon: number;
 }
 
 /** A shop or service counter: where the player stands to use it. */
@@ -95,7 +102,12 @@ function buildDistrict(spec: DistrictSpec): District {
   return { ...spec, layout: buildLayout(spec.layout), places };
 }
 
-export const DISTRICTS: readonly District[] = [buildDistrict(LAGOS_MARINA), buildDistrict(ACCRA_OSU)];
+/** Hand-built districts first (Lagos is where a new life starts), then the generated ones. */
+export const DISTRICTS: readonly District[] = [
+  buildDistrict(LAGOS_MARINA),
+  buildDistrict(ACCRA_OSU),
+  ...NIGERIA.map((c) => buildDistrict(generateDistrict(c))),
+];
 export const DEFAULT_DISTRICT_ID = 'lagos.marina';
 
 export const districtById = (id: string | null | undefined): District =>

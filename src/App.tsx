@@ -56,7 +56,7 @@ import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, residentById, residentNear, type Resident } from './lib/people';
-import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
+import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
@@ -102,7 +102,9 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
     const controls = controlsRef.current;
     if (!controls) return;
     followTarget.set(controller.position.x, CAMERA_TARGET_HEIGHT, controller.position.z);
-    followShift.copy(followTarget).sub(controls.target).multiplyScalar(0.1);
+    followShift.copy(followTarget).sub(controls.target);
+    // Ease after the player as they move; jump straight there after a long move (arriving in a city, a save loading)
+    if (followShift.lengthSq() < 12 * 12) followShift.multiplyScalar(0.1);
     controls.target.add(followShift);
     camera.position.add(followShift);
     controls.update();
@@ -270,8 +272,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return () => clearTimeout(id);
   }, [arrival]);
   const book = (to: District, mode: TravelMode) => {
-    const option = TRAVEL_OPTIONS[mode];
-    if (state.balance < option.fare) return;
+    const option = travelOption(district.city, to.city, mode);
+    if (!option || state.balance < option.fare) return;
     travel(to.id, mode);
     setInside(false);
     setTravelOpen(false);
