@@ -13,7 +13,7 @@ second-hand or disputed, it says so.
 | Presentation | Male only. The library has no dark-skinned adult woman (checked all 17 adult women). | **No.** |
 | Body / face | No morphs. Height is a fixed scale. | **No.** |
 | Hair / clothes | Baked into one texture; not interchangeable. | **No.** |
-| Animation | Rocketbox motion capture: idle, walk, run on the avatar's own skeleton, cadence matched to ground speed. Rocketbox has 417 more clips on the same skeleton (sit, talk, phone, work…). | Yes for locomotion; extensible. |
+| Animation | Rocketbox motion capture: idle, walk, run on the avatar's own skeleton, cadence matched to ground speed. The walk clip holds the fingers still, so its finger rotations were dropped at conversion and the hands showed the open bind pose; `components/handPose.ts` gives such clips the idle clip's relaxed hand at load time. Rocketbox has 417 more clips on the same skeleton (sit, talk, phone, work…). | Yes for locomotion; extensible. |
 | Creation UI | Name, lifestyle, career, diet, outfit colour, with a live 3D preview. | Systems are fine; appearance options are missing. |
 
 Conclusion: the game has a **character file**, not a **character system**.

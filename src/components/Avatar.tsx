@@ -9,6 +9,7 @@ import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
 import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
 import { applyBodyShape } from './bodyShapeSkin';
+import { withRelaxedHands } from './handPose';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
@@ -93,7 +94,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape }: {
   const avatarFile: AvatarFile = assetManifest().avatar ?? lookById(lookId);
   const targetHeight = heightCm ? heightCm / 100 : avatarFile.height;
   const { scene, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
-  const { actions } = useAnimations(animations, group);
+  const clipsWithHands = useMemo(() => withRelaxedHands(animations), [animations]);
+  const { actions } = useAnimations(clipsWithHands, group);
   // Match clips by name (case-insensitive) so downloaded characters work without renaming
   const clips = useMemo(() => {
     const names = animations.map((c) => c.name);

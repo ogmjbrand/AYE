@@ -10,6 +10,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { groundHeightAt } from '../lib/world';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useDistrict } from './DistrictContext';
+import { withRelaxedHands } from '../components/handPose';
 
 /** Name tag above a resident: their name and that they are a computer-controlled resident. */
 function nameTag(name: string) {
@@ -67,7 +68,8 @@ function ResidentFigure({ resident, player }: { resident: Resident; player: Play
     const h = box.max.y - box.min.y;
     return h > 0 ? look.height / h : 1;
   }, [figure, look.height]);
-  const { actions, names } = useAnimations(animations, group);
+  const clipsWithHands = useMemo(() => withRelaxedHands(animations), [animations]);
+  const { actions, names } = useAnimations(clipsWithHands, group);
   const clips = useMemo(() => ({
     idle: names.find((n) => /idle|stand/i.test(n)) ?? names[0],
     walk: names.find((n) => /walk/i.test(n)),
