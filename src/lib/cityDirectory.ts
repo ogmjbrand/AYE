@@ -66,6 +66,10 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
   out.push(
     { id: id('fashion'), name: district.fashionHouse.name, kind: district.fashionHouse.kind, categories: ['shopping'], status: 'open', note: 'Buy clothes, change your hair colour', position: at(district.fashionHouse.position) },
     { id: id('gadgets'), name: district.gadgetHub.name, kind: district.gadgetHub.kind, categories: ['shopping'], status: 'open', note: 'Buy a phone or work kit', position: at(district.gadgetHub.position) },
+    {
+      id: id(`night.${district.nightlife.id}`), name: district.nightlife.name, kind: district.nightlife.kind, categories: ['nightlife'], status: 'open',
+      note: 'Live music 20:00–03:00; nights out with friends', position: at(district.nightlife.position),
+    },
     { id: id('travel'), name: district.travelDesk.name, kind: district.travelDesk.kind, categories: ['transport'], status: 'open', note: 'Book a flight or coach to another city', position: at(district.travelDesk.position) },
   );
   for (const h of district.homes) {
@@ -91,7 +95,6 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
   out.push(
     { id: id('planned.mall'), name: `${city} shopping mall`, kind: 'Shopping mall', categories: ['shopping'], status: 'planned', note: 'Planned, not built yet' },
     { id: id('planned.park'), name: `${city} park`, kind: 'Park and green space', categories: ['parks'], status: 'planned', note: 'Planned, not built yet' },
-    { id: id('planned.nightlife'), name: `${city} nightlife`, kind: 'Bars, lounges and live music', categories: ['nightlife'], status: 'planned', note: 'Planned, not built yet' },
   );
   return out;
 }

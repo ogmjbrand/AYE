@@ -22,7 +22,8 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
-import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
+import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
+import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
 import { TRAVEL_OPTIONS, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
@@ -94,6 +95,7 @@ export type GameAction =
   | { type: 'buyEquipment'; id: string }
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
+  | { type: 'nightOut'; residentId: string }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
@@ -281,6 +283,26 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
 }
 
 /**
+ * A night out at the district's lounge with a friend: open in the evening
+ * only, you pay both covers, it takes two hours and counts as your time
+ * together today. Friends only, like a hang-out.
+ */
+function nightOut(state: GameState, residentId: string, career: Career, lifestyle: Lifestyle): GameState {
+  const resident = residentById(residentId);
+  if (state.summary || !resident || resident.district !== state.districtId || !canStartNightOut(state.time)) return state;
+  const cost = nightOutCost(districtById(state.districtId).nightlife);
+  const rel = state.relationships[residentId] ?? { points: 0, lastDay: -1 };
+  const today = gameDay(state.time.totalMinutes);
+  if (rel.lastDay === today || state.balance < cost || friendshipLevel(rel.points) < HANGOUT_LEVEL) return state;
+  let next: GameState = { ...state, balance: state.balance - cost, today: { ...state.today, expenses: state.today.expenses + cost } };
+  for (let i = 0; i < NIGHT_OUT_MINUTES; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + NIGHT_OUT_POINTS), lastDay: today } },
+  };
+}
+
+/**
  * Answers this hour's work task. Only at the workplace during working hours,
  * once per game hour, and only the task this hour actually offers; the
  * reward is worked out here from the task data.
@@ -386,6 +408,8 @@ export function gameReducer(
       return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
     case 'socialise':
       return socialise(state, action.residentId, action.activity, career, lifestyle);
+    case 'nightOut':
+      return nightOut(state, action.residentId, career, lifestyle);
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':

@@ -9,8 +9,9 @@ const KIND_COLOR: Record<PlaceKind, string> = {
   workplace: '#8ab4d8',
   home: '#7cc4b0',
   public: '#a4a7ad',
+  nightlife: '#d4a3b9',
 };
-const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public' };
+const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public', nightlife: 'Nightlife' };
 
 /** Compass point for a direction on the map (+z is north). */
 function compass(dx: number, dz: number) {

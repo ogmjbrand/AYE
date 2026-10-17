@@ -23,6 +23,7 @@ export const ACCRA_OSU: DistrictSpec = {
       b(-26, 26, 12, 14, 30, 'office', '#c8ccc9', 'Accra Tech Hub'),
       b(-12, -4, 6, 10, 7, 'shop', '#d8cbe6', 'Kente Loft'),
       b(-12, -16, 6, 8, 6, 'shop', '#c9d6c4', 'Osu Gadgets'),
+      b(-12, -23, 6, 4.6, 7, 'shop', '#4f5568', 'Osu Nights'),
       b(-14, -32, 10, 12, 14, 'office', '#d9cfbf', 'Accra Business School'),
       b(-27, -10, 10, 14, 40, 'tower', '#4c6c7c'),
       // East side
@@ -81,6 +82,10 @@ export const ACCRA_OSU: DistrictSpec = {
   fashionHouse: { name: 'Kente Loft', kind: 'Kente, prints & salon', position: [-7, 0, -4] },
   gadgetHub: { name: 'Osu Gadgets', kind: 'Phones, laptops & work kit', position: [-7, 0, -16] },
   travelDesk: { name: 'Osu Travel', kind: 'Flights & coaches', position: [7, 0, 40] },
+  nightlife: {
+    id: 'osu-nights', name: 'Osu Nights', kind: 'Live music lounge', position: [-7, 0, -23], cover: 220,
+    description: 'Highlife and hiplife on a small stage, kelewele from the kitchen, open late.',
+  },
   homes: [
     {
       id: 'labone-court-chamber', district: 'accra.osu', name: 'Labone Court, chamber and hall', kind: 'Chamber and hall', building: 'Labone Court',

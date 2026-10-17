@@ -12,6 +12,7 @@ import { formatHome } from '../lib/places';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
 import { equipmentPay } from '../lib/equipment';
 import { counterAt, type District } from '../lib/geography';
+import { venueAt } from '../lib/nightlife';
 import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
@@ -33,6 +34,8 @@ interface HUDProps {
   /** The district the player is in: its counters, homes and workplaces. */
   district: District;
   onOpenTravel?: () => void;
+  /** Opens the district's lounge (lib/nightlife.ts). */
+  onOpenNightlife?: () => void;
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
@@ -101,6 +104,7 @@ export function HUD({
   onOpenShop,
   district,
   onOpenTravel,
+  onOpenNightlife,
   onTalk,
   workTask,
   insideHome,
@@ -136,7 +140,9 @@ export function HUD({
         ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets }
         : counter === 'travel' && onOpenTravel
           ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel }
-          : null;
+          : venueAt(district.nightlife, px, pz) && onOpenNightlife
+            ? { verb: 'Go out at', place: district.nightlife.name, onOpen: onOpenNightlife }
+            : null;
   const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
   const streetPrompt = prompt ?? (resident && onTalk

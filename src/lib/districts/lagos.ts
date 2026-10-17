@@ -29,6 +29,7 @@ export const LAGOS_MARINA: DistrictSpec = {
       // East side, north of the cross street
       b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
       b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
+      b(11, 20, 6, 3.6, 7, 'shop', '#5b4a5e', 'Lagoon Live'),
       b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
       b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),
       b(25, -2, 10, 10, 24, 'office', '#b9c2c4'),
@@ -88,6 +89,10 @@ export const LAGOS_MARINA: DistrictSpec = {
   fashionHouse: { name: 'Fashion House', kind: 'Boutique & salon', position: [5.5, 0, 39] },
   gadgetHub: { name: 'Gadget Hub', kind: 'Phones, laptops & work kit', position: [-5.5, 0, 38] },
   travelDesk: { name: 'Marina Travel', kind: 'Flights & coaches', position: [5.5, 0, -12] },
+  nightlife: {
+    id: 'lagoon-live', name: 'Lagoon Live', kind: 'Live music lounge', position: [5.5, 0, 20], cover: 250,
+    description: 'Afrobeats and highlife from a house band, small chops at the bar, open late.',
+  },
   homes: [
     {
       id: 'marina-court-room', district: 'lagos.marina', name: 'Marina Court, room 4B', kind: 'Room in a shared flat', building: 'Marina Court',

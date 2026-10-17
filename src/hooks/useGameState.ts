@@ -47,6 +47,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     buyEquipment: (id: string) => dispatch({ type: 'buyEquipment', id }),
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     socialise: (residentId: string, activity: Activity) => dispatch({ type: 'socialise', residentId, activity }),
+    nightOut: (residentId: string) => dispatch({ type: 'nightOut', residentId }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
