@@ -21,12 +21,12 @@ describe('generated districts', () => {
     for (const d of DISTRICTS) for (const h of d.homes) expect(h.district).toBe(d.id);
   });
 
-  it('use both street plans, laid every way', () => {
-    const seen = new Set(NIGERIA.map((c) => {
-      const d = generateDistrict(c);
-      return `${d.layout.buildings.length}:${Math.sign(d.layout.crossStreet.minZ)}:${Math.sign(d.travelDesk.position[0])}`;
-    }));
-    expect(seen.size).toBeGreaterThanOrEqual(6);
+  it('use all three street plans, laid every way', () => {
+    const generated = DISTRICTS.slice(2);
+    const plan = (d: (typeof generated)[number]) => d.layout.buildings.length === 15 && d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' : d.layout.buildings.length === 17 ? 'marina' : 'osu';
+    const seen = new Set(generated.map((d) => `${plan(d)}:${Math.sign(d.layout.crossStreet.minZ)}:${Math.sign(d.travelDesk.position[0])}`));
+    expect(seen.size).toBe(12);
+    expect(generated.filter((d) => plan(d) === 'avenue').length).toBeGreaterThan(40);
   });
 
   it('are the same every time', () => {

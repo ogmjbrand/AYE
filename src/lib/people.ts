@@ -4,7 +4,7 @@
  * time with them builds a relationship, one activity per person per game day.
  * Close friends will put you up on their couch for the night.
  */
-import { hashString, pick, placeIn, planFor, slug, TEMPLATES, type CitySeed, type TemplateId } from './districts/generate';
+import { hashString, pick, placeIn, planFor, slug, TEMPLATES, type CitySeed } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
 import { AFRICA } from './districts/africa';
 import { WORLD } from './districts/world';
@@ -126,7 +126,7 @@ const HAND_BUILT: readonly Resident[] = [
  * Generated cities (lib/districts/generate.ts) get residents in the same spots
  * as their street plan's own residents, with local names and their own looks.
  */
-const TEMPLATE_PEOPLE: Record<TemplateId, readonly { role: string; lines: Resident['lines'] }[]> = {
+const TEMPLATE_PEOPLE: Record<'marina' | 'osu', readonly { role: string; lines: Resident['lines'] }[]> = {
   marina: [
     {
       role: '{bus}',
@@ -207,11 +207,9 @@ const NAIJA_CONDUCTOR = {
 
 function generatedResidents(seed: CitySeed): Resident[] {
   const plan = planFor(seed);
-  const district = TEMPLATES[plan.template].spec;
-  const slots = HAND_BUILT.filter((r) => r.district === district.id);
   const used = new Set<string>();
-  return slots.map((r, i) => {
-    const female = r.lookId.startsWith('female');
+  return TEMPLATES[plan.template].people.map((r, i) => {
+    const female = r.female;
     const pool = female ? seed.style.names.female : seed.style.names.male;
     let k = hashString(`${seed.id}:${i}`);
     while (used.has(pool[k % pool.length])) k++;
@@ -220,7 +218,9 @@ function generatedResidents(seed: CitySeed): Resident[] {
     const family = pick(seed.style.names.family, `${seed.id}:${i}:family`);
     const looks = LOOKS.filter((l) => l.body === (female ? 'feminine' : 'masculine'));
     const { position, facing } = placeIn(seed, r.position, r.facing);
-    const slot = seed.country === 'NG' && plan.template === 'marina' && i === 0 ? NAIJA_CONDUCTOR : TEMPLATE_PEOPLE[plan.template][i];
+    // The avenue has the same three kinds of people as Marina
+    const roles = TEMPLATE_PEOPLE[plan.template === 'osu' ? 'osu' : 'marina'];
+    const slot = seed.country === 'NG' && plan.template !== 'osu' && i === 0 ? NAIJA_CONDUCTOR : roles[i];
     return {
       id: `${seed.id}-${slug(first)}`,
       district: plan.id,

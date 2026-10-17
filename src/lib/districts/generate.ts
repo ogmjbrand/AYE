@@ -21,6 +21,7 @@ import type { Building, LayoutSpec, ParkLayout, TrafficLane, Vehicle } from '../
 import { WORLD_BOUND } from '../world';
 import { LAGOS_MARINA } from './lagos';
 import { ACCRA_OSU } from './accra';
+import { AVENUE } from './avenue';
 
 type Spot = readonly [number, number, number];
 type WorkCareer = Exclude<Career, 'none'>;
@@ -43,7 +44,19 @@ interface Template {
   buildings: Readonly<Record<string, Role>>;
   /** New names for the plan's neighbourhoods (ids stay, workplaces refer to them). */
   neighborhoods: Readonly<Record<string, { name: string; description: string }>>;
+  /** Which set of home kinds its homes take (RegionStyle.homes). */
+  homeSet: 'marina' | 'osu';
+  /** Where its three residents stand and stroll: a bus worker, a nurse or designer, a developer or footballer. */
+  people: readonly ResidentSlot[];
 }
+
+export interface ResidentSlot {
+  position: Spot;
+  facing: number;
+  route: readonly (readonly [number, number])[];
+  female: boolean;
+}
+const slot = (x: number, z: number, facing: number, route: [number, number][], female = false): ResidentSlot => ({ position: [x, 0, z], facing, route, female });
 
 export const TEMPLATES = {
   marina: {
@@ -62,6 +75,12 @@ export const TEMPLATES = {
       industrial: { name: 'Industrial Layout', description: 'Workshops, warehouses and the tech campus' },
       parks: { name: 'Recreation Ground', description: 'Sports fields and open space' },
     },
+    homeSet: 'marina',
+    people: [
+      slot(5.2, 29.5, -Math.PI / 2, [[5.2, 29.5], [5.2, 34.5]]),
+      slot(5.2, -2, -Math.PI / 2, [[5.2, -2], [5.2, -10]], true),
+      slot(-5.2, 14, Math.PI / 2, [[-5.2, 14], [-5.2, 19]]),
+    ],
   },
   osu: {
     spec: ACCRA_OSU,
@@ -79,6 +98,33 @@ export const TEMPLATES = {
       'osu-west': { name: 'Old Town', description: 'Older houses, crafts and colleges' },
       cantonments: { name: 'GRA', description: 'Offices, towers and the sports ground' },
     },
+    homeSet: 'osu',
+    people: [
+      slot(7.2, 32, -Math.PI / 2, [[7.2, 32], [7.2, 36]]),
+      slot(-7, -9, Math.PI / 2, [[-7, -9], [-7.4, -12]], true),
+      slot(19, 1.5, Math.PI, [[19, 1.5], [19, -10]]),
+    ],
+  },
+  avenue: {
+    spec: AVENUE,
+    vendors: ['kitchen', 'snacks', 'second'],
+    buildings: {
+      Kitchen: 'vendor:kitchen', Second: 'vendor:second',
+      'Home A': 'home:0', 'Home B': 'home:1', 'Home C': 'home:2', 'Home D': 'home:3',
+      Tech: 'work:engineer', Gadgets: 'gadgets', College: 'work:student', Hospital: 'work:doctor',
+      Lounge: 'night', Arts: 'work:artist', Fashion: 'fashion', Business: 'work:entrepreneur',
+    },
+    neighborhoods: {
+      avenue: { name: 'Main Avenue', description: 'Shops, kitchens and offices' },
+      east: { name: 'East Side', description: 'Towers and apartments' },
+      west: { name: 'West Side', description: 'Offices, the college and the park' },
+    },
+    homeSet: 'marina',
+    people: [
+      slot(6.2, 33.5, -Math.PI / 2, [[6.2, 33.5], [6.2, 36.5]]),
+      slot(6.2, -4, -Math.PI / 2, [[6.2, -4], [6.2, -9]], true),
+      slot(-18, 30, Math.PI / 2, [[-18, 30], [-18, 35]]),
+    ],
   },
 } as const satisfies Record<string, Template>;
 export type TemplateId = keyof typeof TEMPLATES;
@@ -104,7 +150,7 @@ export interface RegionStyle {
   buses: readonly string[];
   busStripes: boolean;
   /** Home kinds and descriptions by plan slot (marina has 4 homes, osu 3). */
-  homes: Readonly<Record<TemplateId, readonly { kind: string; description: string }[]>>;
+  homes: Readonly<Record<'marina' | 'osu', readonly { kind: string; description: string }[]>>;
   /** Palm trees along the boulevard (off for cold or high cities). Default true. */
   palms?: boolean;
   /** What the person who calls the stops on a minibus is called there. Default "Bus conductor". */
@@ -204,7 +250,9 @@ function layLayout(L: LayoutSpec, f: Frame, id: string): LayoutSpec {
 
 /** Which street plan a city gets, how it's laid, and its district id. */
 export function planFor(seed: CitySeed) {
-  const template: TemplateId = seed.template ?? (hashString(seed.id) % 2 ? 'osu' : 'marina');
+  // A third of the cities get the avenue; the rest keep the plan they had before it existed
+  const h = hashString(seed.id);
+  const template: TemplateId = seed.template ?? ((h >>> 7) % 3 === 0 ? 'avenue' : h % 2 ? 'osu' : 'marina');
   const variant: Variant = seed.variant ?? VARIANTS[(hashString(seed.id) >>> 3) % VARIANTS.length];
   const [sx, sz] = SIGNS[variant];
   const area = seed.area ?? 'City Centre';
@@ -232,7 +280,7 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     return { id: slug(name), name, kind: style.kind, position: at(v.position), menu: style.menu };
   });
 
-  const homeKinds = S.homes[templateId];
+  const homeKinds = S.homes[T.homeSet];
   const homeBuildings = homeNames(seed, area, T.spec.homes.length);
   const homes: Home[] = T.spec.homes.map((h, i) => ({
     id: `${seed.id}-${slug(homeKinds[i].kind)}`,
