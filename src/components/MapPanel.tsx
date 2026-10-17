@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { District, PlaceKind } from '../lib/geography';
 import { WORLD_BOUND } from '../lib/world';
+import { compass } from '../lib/locations';
 
 const KIND_COLOR: Record<PlaceKind, string> = {
   food: '#f0a35e',
@@ -11,14 +12,6 @@ const KIND_COLOR: Record<PlaceKind, string> = {
   public: '#a4a7ad',
 };
 const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public' };
-
-/** Compass point for a direction on the map (+z is north). */
-function compass(dx: number, dz: number) {
-  const names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  // East is -x in this world (the camera looks down +z with +x on the left)
-  const angle = Math.atan2(-dx, dz);
-  return names[(Math.round(angle / (Math.PI / 4)) + 8) % 8];
-}
 
 /**
  * Smartphone map of the district: buildings, roads, every place, your home and

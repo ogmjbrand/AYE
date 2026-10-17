@@ -15,6 +15,7 @@ import { counterAt, type District } from '../lib/geography';
 import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
+import { ARRIVE_RADIUS, compass } from '../lib/locations';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -50,6 +51,11 @@ interface HUDProps {
   workMinutes?: number;
   /** Owned equipment (work kits raise pay). */
   equipment?: readonly string[];
+  /** Opens the city locations directory (the ⋯ button). */
+  onOpenLocations?: () => void;
+  /** The destination being tracked, in district metres. */
+  tracked?: { name: string; position: readonly [number, number, number] } | null;
+  onStopTracking?: () => void;
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -109,6 +115,9 @@ export function HUD({
   onOpenHome,
   workMinutes = 0,
   equipment = [],
+  onOpenLocations,
+  tracked = null,
+  onStopTracking,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -228,6 +237,44 @@ export function HUD({
           <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
             {insideHome ? insideHome.name : neighborhood!.description}
           </p>
+        </div>
+      )}
+
+      {/* City locations: the ⋯ button and the destination being tracked, under the clock on the left */}
+      {onOpenLocations && (
+        <div className="absolute left-3 top-[5.25rem] flex max-w-60 flex-col items-start gap-2 sm:left-5 sm:top-28">
+          <button
+            type="button"
+            onClick={onOpenLocations}
+            aria-label="City locations"
+            title="City locations"
+            className={`${PANEL} pointer-events-auto flex h-10 w-10 items-center justify-center text-lg font-bold leading-none tracking-widest text-ui-ink hover:border-ui-accent focus-visible:outline-2 focus-visible:outline-ui-accent`}
+          >
+            ⋯
+          </button>
+          {tracked && (
+            <div role="status" className={`${PANEL} pointer-events-auto flex items-center gap-2.5 px-3 py-2 text-xs`}>
+              <div className="min-w-0">
+                <p className="m-0 truncate font-semibold">{tracked.name}</p>
+                <p className="m-0 tabular-nums text-ui-muted">
+                  {(() => {
+                    const d = Math.hypot(tracked.position[0] - px, tracked.position[2] - pz);
+                    return d < ARRIVE_RADIUS ? "You're here" : `${Math.round(d)} m ${compass(tracked.position[0] - px, tracked.position[2] - pz)}`;
+                  })()}
+                </p>
+              </div>
+              {onStopTracking && (
+                <button
+                  type="button"
+                  onClick={onStopTracking}
+                  aria-label="Stop tracking"
+                  className="shrink-0 rounded px-1.5 py-0.5 text-ui-muted hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-ui-accent"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -25,6 +25,8 @@ import { FashionStore } from './components/FashionStore';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
+import { CityLocationsPanel } from './components/CityLocationsPanel';
+import { locationsFor, type LocationEntry } from './lib/locations';
 import { hasMap } from './lib/equipment';
 import { counterAt, districtById, type District } from './lib/geography';
 import { DistrictContext } from './world/DistrictContext';
@@ -246,6 +248,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     travel(to.id, mode);
     setInside(false);
     setTravelOpen(false);
+    setTrackedId(null);
     setArrival(`You arrived in ${to.city.name} after ${formatDuration(option.minutes)} by ${option.label.toLowerCase()}.`);
   };
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -287,6 +290,28 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= USE_RADIUS;
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [locationsOpen, setLocationsOpen] = useState(false);
+  const [trackedId, setTrackedId] = useState<string | null>(null);
+  const locations = useMemo(() => locationsFor(district, character.career, state.home), [district, character.career, state.home]);
+  const trackedLocation = locations.find((l) => l.id === trackedId && l.position) ?? null;
+  /** Standing at this location right now, so its existing panel can open. */
+  const canUseNow = (e: LocationEntry) => {
+    const { x, z } = controller.position;
+    if (e.use === 'food') { const v = nearestVendor(district.vendors, x, z); return !!v && `${district.id}.${v.id}` === e.id; }
+    if (e.use === 'shop') return counterAt(district, x, z) === 'fashion';
+    if (e.use === 'gadgets') return counterAt(district, x, z) === 'gadgets';
+    if (e.use === 'travel') return counterAt(district, x, z) === 'travel';
+    if (e.use === 'home') { const h = homeAtDoor(district.id, x, z); return !!h && `${district.id}.home.${h.id}` === e.id; }
+    return false;
+  };
+  const useLocation = (e: LocationEntry) => {
+    setLocationsOpen(false);
+    if (e.use === 'food') { const v = district.vendors.find((v) => `${district.id}.${v.id}` === e.id); if (v) setVendor(v); }
+    else if (e.use === 'shop') setStore('shop');
+    else if (e.use === 'gadgets') setGadgets(true);
+    else if (e.use === 'travel') setTravelOpen(true);
+    else if (e.use === 'home') { const h = district.homes.find((h) => `${district.id}.home.${h.id}` === e.id); if (h) setHomePanel(h); }
+  };
   const phone = hasMap(state.equipment);
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
@@ -317,9 +342,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen]);
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -426,6 +451,19 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           controller={controller}
           homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
           onClose={() => setMapOpen(false)}
+        />
+      )}
+      {locationsOpen && (
+        <CityLocationsPanel
+          district={district}
+          entries={locations}
+          controller={controller}
+          trackedId={trackedId}
+          canUseNow={canUseNow}
+          onTrack={(e) => { setTrackedId(e.id); setLocationsOpen(false); }}
+          onStopTracking={() => setTrackedId(null)}
+          onUse={useLocation}
+          onClose={() => setLocationsOpen(false)}
         />
       )}
       {homePanel && (
@@ -563,6 +601,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}
         onOpenMap={phone ? () => setMapOpen(true) : undefined}
+        onOpenLocations={() => setLocationsOpen(true)}
+        tracked={trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
+        onStopTracking={() => setTrackedId(null)}
         fullness={state.fullness}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
