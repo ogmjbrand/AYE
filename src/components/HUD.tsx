@@ -383,7 +383,7 @@ export function HUD({
 
       {/* Keyboard hint: desktop only, hidden on touch screens */}
       <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block pointer-coarse:hidden">
-        <p className="m-0"><span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
+        <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
         <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
       </div>
     </div>

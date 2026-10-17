@@ -113,6 +113,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                     Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.slice(1).map((d) => d.city.name).join(' and ')}.
                   </p>
                   <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                    <Key k="Click">Click or tap the ground to walk there (Shift-click to stroll)</Key>
                     <Key k="W / S">Move forward / back</Key>
                     <Key k="A / D">Turn</Key>
                     <Key k="Shift">Hold to walk instead of jog</Key>

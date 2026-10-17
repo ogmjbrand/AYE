@@ -36,6 +36,7 @@ import { careerLevel } from './lib/progression';
 import { equipmentPay } from './lib/equipment';
 import { HOURLY_WAGE, isWorkingHours, type GameTime } from './lib/gameState';
 import { Residents } from './world/Residents';
+import { ClickToMove } from './world/ClickToMove';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
@@ -60,6 +61,8 @@ interface CityProps {
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
   district: District;
+  /** The resident the player is talking with, if any. */
+  talkingTo: string | null;
 }
 
 interface CameraFollowProps {
@@ -118,7 +121,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -130,10 +133,10 @@ function City({ controller, character, gameTime, tryOn, homeId, district }: City
       <Props night={night} />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
-      <Residents player={controller} />
+      <Residents player={controller} talkingTo={talkingTo} />
       <Traffic player={controller} />
       {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player controller={controller} character={character} tryOn={tryOn} />
+      <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} />
     </>
   );
 }
@@ -476,6 +479,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
+          <ClickToMove player={controller} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time}>
@@ -483,7 +487,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (

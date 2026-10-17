@@ -13,6 +13,8 @@ interface PlayerProps {
   character?: Character;
   /** Items being tried on in the shop, shown instead of what's equipped (null = original). */
   tryOn?: Partial<Record<Slot, string | null>>;
+  /** Talking with a resident (gestures in turns). */
+  conversing?: boolean;
 }
 
 /** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
@@ -31,7 +33,7 @@ function CapsuleFigure({ color }: { color: string }) {
   );
 }
 
-export function Player({ controller, character, tryOn }: PlayerProps) {
+export function Player({ controller, character, tryOn, conversing = false }: PlayerProps) {
   const groupRef = useRef<Group>(null);
 
   const bodyColor = character
@@ -61,7 +63,7 @@ export function Player({ controller, character, tryOn }: PlayerProps) {
     <group ref={groupRef}>
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} />
+          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} conversing={conversing} />
         </Suspense>
       </ErrorBoundary>
     </group>
