@@ -6,6 +6,7 @@
  */
 import { hashString, pick, placeIn, planFor, slug, TEMPLATES, type CitySeed, type TemplateId } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
+import { AFRICA } from './districts/africa';
 import { LOOKS } from './looks';
 
 export type Activity = 'chat' | 'treat' | 'hangout';
@@ -225,7 +226,7 @@ function generatedResidents(seed: CitySeed): Resident[] {
 }
 
 /** Everyone, in every district. Always computer-controlled, and labelled so. */
-export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...NIGERIA.flatMap(generatedResidents)];
+export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...[...NIGERIA, ...AFRICA].flatMap(generatedResidents)];
 
 export const residentById = (id: string) => RESIDENTS.find((r) => r.id === id);
 export const residentsIn = (districtId: string) => RESIDENTS.filter((r) => r.district === districtId);

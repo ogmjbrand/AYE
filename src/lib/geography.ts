@@ -17,6 +17,7 @@ import { LAGOS_MARINA } from './districts/lagos';
 import { ACCRA_OSU } from './districts/accra';
 import { generateDistrict } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
+import { AFRICA } from './districts/africa';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
@@ -46,6 +47,8 @@ export interface City {
   /** City centre, for travel distances. */
   lat: number;
   lon: number;
+  /** Island cities have their own landmass: no coaches to or from them. */
+  landmass?: string;
 }
 
 /** A shop or service counter: where the player stands to use it. */
@@ -106,7 +109,7 @@ function buildDistrict(spec: DistrictSpec): District {
 export const DISTRICTS: readonly District[] = [
   buildDistrict(LAGOS_MARINA),
   buildDistrict(ACCRA_OSU),
-  ...NIGERIA.map((c) => buildDistrict(generateDistrict(c))),
+  ...[...NIGERIA, ...AFRICA].map((c) => buildDistrict(generateDistrict(c))),
 ];
 export const DEFAULT_DISTRICT_ID = 'lagos.marina';
 

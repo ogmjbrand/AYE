@@ -56,9 +56,12 @@ describe('city directory', () => {
     for (const d of DISTRICTS) {
       const grid = walkGridFor(d.layout.obstacles);
       const from = { x: d.spawn[0], z: d.spawn[2] };
+      // The same destination comes up for every career: find its route once
+      const routes = new Map<string, ReturnType<typeof findPath>>();
       for (const career of ['doctor', 'student', 'athlete', 'pilot', 'artist', 'engineer', 'entrepreneur'] as Career[]) {
         for (const dest of cityDirectory(d, career, null).filter((x) => x.position)) {
-          const path = findPath(grid, from, dest.position!);
+          if (!routes.has(dest.id)) routes.set(dest.id, findPath(grid, from, dest.position!));
+          const path = routes.get(dest.id)!;
           expect(path, `${dest.id}`).not.toBeNull();
           const end = path![path!.length - 1];
           // Within 0.35 m of the route's end is where the walk stops

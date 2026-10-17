@@ -19,6 +19,8 @@ export interface Located {
   lat: number;
   lon: number;
   country: string;
+  /** Coaches only run within one landmass; mainland if omitted. */
+  landmass?: string;
 }
 
 /** Great-circle distance between two cities, in km. */
@@ -52,7 +54,7 @@ export function travelOptions(from: Located, to: Located): TravelOption[] {
   if (km < 1) return [];
   const abroad = from.country !== to.country;
   const out: TravelOption[] = [];
-  if (km <= MAX_COACH_KM) {
+  if (km <= MAX_COACH_KM && (from.landmass ?? 'mainland') === (to.landmass ?? 'mainland')) {
     out.push({
       mode: 'coach',
       label: 'Coach',

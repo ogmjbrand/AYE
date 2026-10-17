@@ -3,6 +3,8 @@ import { DISTRICTS } from '../geography';
 import { SUBDIVISIONS } from '../places';
 import { generateDistrict, TEMPLATES } from './generate';
 import { NIGERIA, SOUTH_WEST } from './nigeria';
+import { districtById } from '../geography';
+import { travelOptions } from '../travel';
 
 describe('generated districts', () => {
   it('cover every Nigerian state, the Federal Capital Territory included', () => {
@@ -51,5 +53,20 @@ describe('generated districts', () => {
     expect(abuja.travelDesk.name).toBe('Abuja Travel');
     expect(abuja.layout.buildings.some((b) => b.name === abuja.nightlife.name)).toBe(true);
     expect(Math.max(...abuja.homes.map((h) => h.rentPerNight))).toBeGreaterThan(Math.max(...yenagoa.homes.map((h) => h.rentPerNight)));
+  });
+
+  it('reach every African country, and island capitals by air only', () => {
+    const AFRICA = ['DZ', 'AO', 'BJ', 'BW', 'BF', 'BI', 'CV', 'CM', 'CF', 'TD', 'KM', 'CG', 'CD', 'CI', 'DJ', 'EG', 'GQ', 'ER', 'SZ', 'ET', 'GA', 'GM', 'GH',
+      'GN', 'GW', 'KE', 'LS', 'LR', 'LY', 'MG', 'MW', 'ML', 'MR', 'MU', 'MA', 'MZ', 'NA', 'NE', 'NG', 'RW', 'ST', 'SN', 'SC', 'SL', 'SO', 'ZA', 'SS', 'SD', 'TZ', 'TG', 'TN', 'UG', 'ZM', 'ZW'];
+    expect(AFRICA).toHaveLength(54);
+    const countries = new Set(DISTRICTS.map((d) => d.city.country));
+    for (const c of AFRICA) expect(countries.has(c), c).toBe(true);
+    const lagos = districtById('lagos.marina').city;
+    const city = (id: string) => DISTRICTS.find((d) => d.city.id === id)!.city;
+    expect(travelOptions(lagos, city('porto-novo')).map((o) => o.mode)).toEqual(['coach']);
+    expect(travelOptions(lagos, city('lome')).map((o) => o.mode)).toEqual(['coach', 'flight']);
+    expect(travelOptions(lagos, city('nairobi')).map((o) => o.mode)).toEqual(['flight']);
+    expect(travelOptions(city('maputo'), city('antananarivo')).map((o) => o.mode)).toEqual(['flight']);
+    expect(travelOptions(city('yaounde'), city('malabo')).map((o) => o.mode)).toEqual(['flight']);
   });
 });

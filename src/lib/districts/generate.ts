@@ -124,6 +124,8 @@ export interface CitySeed {
   style: RegionStyle;
   /** Rents and cover charges compared with Lagos (1). */
   cost: number;
+  /** Islands have their own; coaches only run within one. Mainland Africa, Europe and Asia if omitted. */
+  landmass?: string;
   /** Pick the street plan and how it's laid instead of deriving them from the id. */
   template?: TemplateId;
   variant?: Variant;
@@ -213,7 +215,7 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
   const { template: templateId, frame: f, area, id } = planFor(seed);
   const T: Template = TEMPLATES[templateId];
   const S = seed.style;
-  const city: City = { id: seed.id, name: seed.name, region: seed.region, country: seed.country, timeZone: seed.timeZone, currency: seed.currency, lat: seed.lat, lon: seed.lon };
+  const city: City = { id: seed.id, name: seed.name, region: seed.region, country: seed.country, timeZone: seed.timeZone, currency: seed.currency, lat: seed.lat, lon: seed.lon, ...(seed.landmass ? { landmass: seed.landmass } : {}) };
   const at = (p: Spot) => pt(f, p);
 
   const vendorStyle = { kitchen: S.kitchen, snacks: S.snacks, second: S.second };
