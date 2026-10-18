@@ -10,11 +10,17 @@ import type { CareerLocation } from './careers';
 import type { FoodVendor } from './food';
 import type { Home } from './homes';
 import type { Neighborhood } from './neighborhoods';
+import type { Venue } from './nightlife';
+import type { Park } from './parks';
 import { buildLayout, setActiveLayout, type DistrictLayout, type LayoutSpec } from './world';
 import { LAGOS_MARINA } from './districts/lagos';
 import { ACCRA_OSU } from './districts/accra';
+import { generateDistrict } from './districts/generate';
+import { NIGERIA } from './districts/nigeria';
+import { AFRICA } from './districts/africa';
+import { WORLD } from './districts/world';
 
-export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public';
+export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
 
 export interface Place {
@@ -37,6 +43,13 @@ export interface City {
   timeZone: string;
   /** Local currency code; the game itself uses one virtual currency (ⓒ). */
   currency: string;
+  /** State, region or province. */
+  region: string;
+  /** City centre, for travel distances. */
+  lat: number;
+  lon: number;
+  /** Island cities have their own landmass: no coaches to or from them. */
+  landmass?: string;
 }
 
 /** A shop or service counter: where the player stands to use it. */
@@ -61,6 +74,10 @@ export interface DistrictSpec {
   travelDesk: Counter;
   homes: readonly Home[];
   workplaces: Record<Exclude<Career, 'none'>, CareerLocation>;
+  /** The district's live-music lounge (lib/nightlife.ts). */
+  nightlife: Venue;
+  /** The district's public park: benches where you can sit and let time pass (lib/parks.ts). */
+  park: Park;
 }
 
 export interface District extends Omit<DistrictSpec, 'layout'> {
@@ -79,6 +96,8 @@ function buildDistrict(spec: DistrictSpec): District {
     { id: id('fashion'), kind: 'shop', name: spec.fashionHouse.name, position: spec.fashionHouse.position },
     { id: id('gadgets'), kind: 'shop', name: spec.gadgetHub.name, position: spec.gadgetHub.position },
     { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
+    { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
+    { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,
@@ -87,7 +106,12 @@ function buildDistrict(spec: DistrictSpec): District {
   return { ...spec, layout: buildLayout(spec.layout), places };
 }
 
-export const DISTRICTS: readonly District[] = [buildDistrict(LAGOS_MARINA), buildDistrict(ACCRA_OSU)];
+/** Hand-built districts first (Lagos is where a new life starts), then the generated ones. */
+export const DISTRICTS: readonly District[] = [
+  buildDistrict(LAGOS_MARINA),
+  buildDistrict(ACCRA_OSU),
+  ...[...NIGERIA, ...AFRICA, ...WORLD].map((c) => buildDistrict(generateDistrict(c))),
+];
 export const DEFAULT_DISTRICT_ID = 'lagos.marina';
 
 export const districtById = (id: string | null | undefined): District =>

@@ -5,6 +5,7 @@ import { seeded, type Building, type BuildingStyle } from '../lib/world';
 import { useLayout } from './DistrictContext';
 import { BAY_WIDTH, FACADE_TILE, FLOOR_HEIGHT, signTexture } from './textures';
 import { materials } from './materials';
+import { facadeOffset, floorBandsOf, windowsOf } from './facadeDetail';
 
 /** Collects quads into one BufferGeometry with tile-unit UVs and vertex colours. */
 class QuadBuilder {
@@ -15,7 +16,7 @@ class QuadBuilder {
   idx: number[] = [];
 
   /** Quad from origin o, spanning vectors a (u direction) and b (v direction). */
-  quad(o: Vector3, a: Vector3, b: Vector3, uv0: [number, number], uvScale: [number, number], color: Color) {
+  quad(o: Vector3, a: Vector3, b: Vector3, uv0: [number, number], uvScale: [number, number], color: Color, bottomColor: Color = color) {
     const n = new Vector3().crossVectors(a, b).normalize();
     const base = this.pos.length / 3;
     const corners = [o, o.clone().add(a), o.clone().add(a).add(b), o.clone().add(b)];
@@ -24,16 +25,26 @@ class QuadBuilder {
       this.pos.push(p.x, p.y, p.z);
       this.nrm.push(n.x, n.y, n.z);
       this.uv.push(uv0[0] + uvs[i][0] * uvScale[0], uv0[1] + uvs[i][1] * uvScale[1]);
-      this.col.push(color.r, color.g, color.b);
+      const c = i < 2 ? bottomColor : color;
+      this.col.push(c.r, c.g, c.b);
     });
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
   /** Axis-aligned box sides (and optionally top). */
-  box(min: Vector3, max: Vector3, tileW: number, tileH: number, color: Color, uOffset = 0, top = false) {
+  box(min: Vector3, max: Vector3, tileW: number, tileH: number, color: Color, uOffset = 0, top = false, grime = 0) {
     const w = max.x - min.x, h = max.y - min.y, d = max.z - min.z;
-    const side = (o: Vector3, a: Vector3, len: number) =>
-      this.quad(o, a, new Vector3(0, h, 0), [uOffset, min.y / tileH], [len / tileW, h / tileH], color);
+    // Street grime: the bottom few metres darken towards the pavement (splash-back, dust, hands)
+    const band = grime > 0 ? Math.min(3, h) : 0;
+    const dirty = color.clone().multiplyScalar(1 - grime);
+    const side = (o: Vector3, a: Vector3, len: number) => {
+      if (band > 0) {
+        this.quad(o, a, new Vector3(0, band, 0), [uOffset, min.y / tileH], [len / tileW, band / tileH], color, dirty);
+        this.quad(o.clone().setY(min.y + band), a, new Vector3(0, h - band, 0), [uOffset, (min.y + band) / tileH], [len / tileW, (h - band) / tileH], color);
+      } else {
+        this.quad(o, a, new Vector3(0, h, 0), [uOffset, min.y / tileH], [len / tileW, h / tileH], color);
+      }
+    };
     side(new Vector3(min.x, min.y, max.z), new Vector3(w, 0, 0), w); // +Z
     side(new Vector3(max.x, min.y, max.z), new Vector3(0, 0, -d), d); // +X
     side(new Vector3(max.x, min.y, min.z), new Vector3(-w, 0, 0), w); // -Z
@@ -74,8 +85,7 @@ function bounds(b: Building) {
 const streetSide = (b: Building) => (b.position[0] < 0 ? 1 : -1);
 
 /** Merged facade and roof geometry, one mesh per facade style, for any list of buildings. */
-function facadeGeometries(buildings: readonly Building[], seed: number) {
-  const rand = seeded(seed);
+function facadeGeometries(buildings: readonly Building[]) {
   const facades = Object.fromEntries(STYLES.map((s) => [s, new QuadBuilder()])) as Record<BuildingStyle, QuadBuilder>;
   const roofs = new QuadBuilder();
   for (const b of buildings) {
@@ -83,11 +93,13 @@ function facadeGeometries(buildings: readonly Building[], seed: number) {
     const tileW = BAY_WIDTH[b.style] * FACADE_TILE.bays;
     const tileH = FLOOR_HEIGHT[b.style] * FACADE_TILE.floors;
     const color = tint(b);
-    facades[b.style].box(min, max, tileW, tileH, color, Math.floor(rand() * 4) / 4);
+    facades[b.style].box(min, max, tileW, tileH, color, facadeOffset(b), false, b.style === 'tower' ? 0.12 : 0.28);
     // Parapet wall around the roof, in the facade's plain band, plus the roof slab
     const pMin = new Vector3(min.x, max.y, min.z);
     const pMax = new Vector3(max.x, max.y + PARAPET, max.z);
     roofs.box(pMin, pMax, 6, 6, new Color(color).multiplyScalar(0.9));
+    // Concrete coping along the top of the parapet, overhanging slightly
+    roofs.box(new Vector3(min.x - 0.12, max.y + PARAPET, min.z - 0.12), new Vector3(max.x + 0.12, max.y + PARAPET + 0.14, max.z + 0.12), 6, 6, new Color('#bdb6a9'), 0, true);
     roofs.quad(new Vector3(min.x, max.y + 0.05, max.z), new Vector3(max.x - min.x, 0, 0), new Vector3(0, 0, min.z - max.z), [0, 0], [(max.x - min.x) / 6, (max.z - min.z) / 6], new Color('#ffffff'));
     if (b.style === 'tower') {
       // Set-back crown on top of towers
@@ -176,7 +188,23 @@ function useDetails(buildings: readonly Building[]) {
         }
       }
     }
-    return { tanks, acUnits, slabs, railings, awnings };
+    // Window glass, sills and lintels on every painted window; floor bands between floors
+    const glass: Placement[] = [];
+    const sills: Placement[] = [];
+    const lintels: Placement[] = [];
+    const bands: Placement[] = [];
+    for (const b of buildings) {
+      for (const w of windowsOf(b)) {
+        const out = (d: number) => w.center.clone().addScaledVector(w.normal, d);
+        glass.push({ position: out(0.012), scale: new Vector3(w.width, w.height, 1), rotationY: w.rotationY });
+        sills.push({ position: out(0.07).setY(w.center.y - w.height / 2 - 0.05), scale: new Vector3(w.width + 0.2, 0.08, 0.16), rotationY: w.rotationY });
+        lintels.push({ position: out(0.03).setY(w.center.y + w.height / 2 + 0.07), scale: new Vector3(w.width + 0.16, 0.12, 0.07), rotationY: w.rotationY });
+      }
+      for (const band of floorBandsOf(b)) {
+        bands.push({ position: band.center.clone().addScaledVector(band.normal, 0.05), scale: new Vector3(band.length, 0.16, 0.1), rotationY: band.rotationY });
+      }
+    }
+    return { tanks, acUnits, slabs, railings, awnings, glass, sills, lintels, bands };
   }, [buildings]);
 }
 
@@ -218,7 +246,7 @@ function Signs() {
 export function Buildings() {
   const m = materials();
   const { buildings } = useLayout();
-  const geo = useMemo(() => facadeGeometries(buildings, 7), [buildings]);
+  const geo = useMemo(() => facadeGeometries(buildings), [buildings]);
   const details = useDetails(buildings);
   return (
     <group>
@@ -232,6 +260,10 @@ export function Buildings() {
       <Instances items={details.slabs} material={m.concrete} geometry={<boxGeometry args={[1, 0.18, 1]} />} />
       <Instances items={details.railings} material={m.darkMetal} geometry={<boxGeometry args={[1, 1, 1]} />} />
       <Instances items={details.awnings} material={m.canvas} geometry={<AwningGeometry />} />
+      <Instances items={details.glass} material={m.windowGlass} geometry={<planeGeometry args={[1, 1]} />} castShadow={false} />
+      <Instances items={details.sills} material={m.trim} geometry={<boxGeometry args={[1, 1, 1]} />} />
+      <Instances items={details.lintels} material={m.trim} geometry={<boxGeometry args={[1, 1, 1]} />} />
+      <Instances items={details.bands} material={m.trim} geometry={<boxGeometry args={[1, 1, 1]} />} />
       <Signs />
     </group>
   );
@@ -246,7 +278,7 @@ export function Buildings() {
 export function Skyline() {
   const m = materials();
   const { skylineBuildings } = useLayout();
-  const geo = useMemo(() => facadeGeometries(skylineBuildings, 23), [skylineBuildings]);
+  const geo = useMemo(() => facadeGeometries(skylineBuildings), [skylineBuildings]);
   return (
     <group>
       {geo.facades.map(([style, g]) => (

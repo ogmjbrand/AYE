@@ -236,12 +236,12 @@ function MarketStalls() {
 // ---------------------------------------------------------------- billboard
 
 /** Roadside billboard carrying the real AYE logo artwork. */
-function Billboard({ position }: { position: readonly [number, number, number] }) {
+function Billboard({ position, facing }: { position: readonly [number, number, number]; facing: number }) {
   const logo = useTexture(`${import.meta.env.BASE_URL}assets/brand/aye-logo.webp`);
   // eslint-disable-next-line react-hooks/immutability
   logo.colorSpace = SRGBColorSpace;
   return (
-    <group position={position}>
+    <group position={position} rotation={[0, facing, 0]}>
       {[-1.6, 1.6].map((x) => (
         <mesh key={x} position={[x, 2.6, 0]} castShadow>
           <cylinderGeometry args={[0.12, 0.12, 5.2, 8]} />
@@ -260,8 +260,132 @@ function Billboard({ position }: { position: readonly [number, number, number] }
   );
 }
 
-/** A listed danfo model if there is one; the built-in danfo while loading or if it fails. */
+/** An ordinary hatchback, built from boxes, for cities where cars outnumber minibuses. */
+export function Car({ vehicle }: { vehicle: Vehicle }) {
+  const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.3, metalness: 0.4 }), [vehicle.color]);
+  const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
+  const dark = useMemo(() => new MeshStandardMaterial({ color: '#191919', roughness: 0.85 }), []);
+  const w = 1.8, l = 4.2;
+  return (
+    <group position={vehicle.position} rotation={[0, vehicle.heading, 0]}>
+      {/* lower body */}
+      <mesh position={[0, 0.62, 0]} material={paint} castShadow receiveShadow>
+        <boxGeometry args={[w, 0.62, l]} />
+      </mesh>
+      {/* cabin with glass all round */}
+      <mesh position={[0, 1.18, -0.2]} material={glass} castShadow>
+        <boxGeometry args={[w - 0.12, 0.5, l * 0.52]} />
+      </mesh>
+      <mesh position={[0, 1.45, -0.2]} material={paint} castShadow>
+        <boxGeometry args={[w - 0.1, 0.06, l * 0.54]} />
+      </mesh>
+      {/* bumpers */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[0, 0.42, s * (l / 2 + 0.04)]} material={dark}>
+          <boxGeometry args={[w, 0.18, 0.1]} />
+        </mesh>
+      ))}
+      {/* wheels */}
+      {[-1, 1].flatMap((sx) =>
+        [-1, 1].map((sz) => (
+          <mesh key={`${sx}${sz}`} position={[sx * (w / 2 - 0.02), 0.32, sz * (l / 2 - 0.75)]} rotation={[0, 0, Math.PI / 2]} material={dark} castShadow>
+            <cylinderGeometry args={[0.32, 0.32, 0.22, 14]} />
+          </mesh>
+        )),
+      )}
+    </group>
+  );
+}
+
+/** A motor tricycle: keke napep in Nigeria, tuk-tuk in Thailand, bajaj in East Africa. */
+export function Tricycle({ vehicle }: { vehicle: Vehicle }) {
+  const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.4, metalness: 0.25 }), [vehicle.color]);
+  const canopy = useMemo(() => new MeshStandardMaterial({ color: '#23262a', roughness: 0.7 }), []);
+  const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
+  const dark = useMemo(() => new MeshStandardMaterial({ color: '#191919', roughness: 0.85 }), []);
+  return (
+    <group position={vehicle.position} rotation={[0, vehicle.heading, 0]}>
+      {/* tub with the bench seat, and the nose over the front wheel */}
+      <mesh position={[0, 0.62, -0.25]} material={paint} castShadow receiveShadow>
+        <boxGeometry args={[1.3, 0.55, 1.9]} />
+      </mesh>
+      <mesh position={[0, 0.8, 0.95]} material={paint} castShadow>
+        <boxGeometry args={[0.9, 0.9, 0.55]} />
+      </mesh>
+      <mesh position={[0, 1.45, 1.05]} material={glass}>
+        <boxGeometry args={[1.0, 0.5, 0.04]} />
+      </mesh>
+      {/* canopy on four posts */}
+      <mesh position={[0, 1.85, -0.05]} material={canopy} castShadow>
+        <boxGeometry args={[1.42, 0.07, 2.25]} />
+      </mesh>
+      {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+        <mesh key={`${sx}${sz}`} position={[sx * 0.66, 1.3, sz > 0 ? 1.05 : -1.1]} material={canopy}>
+          <boxGeometry args={[0.05, 1.1, 0.05]} />
+        </mesh>
+      )))}
+      {/* one wheel in front, two behind */}
+      {([[0, 1.0], [-0.62, -0.8], [0.62, -0.8]] as const).map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, 0.26, z]} rotation={[0, 0, Math.PI / 2]} material={dark} castShadow>
+          <cylinderGeometry args={[0.26, 0.26, 0.16, 12]} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** A Philippine jeepney: long open-backed body, bonnet, chrome trim and painted bands. */
+export function Jeepney({ vehicle }: { vehicle: Vehicle }) {
+  const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.35, metalness: 0.3 }), [vehicle.color]);
+  const chrome = useMemo(() => new MeshStandardMaterial({ color: '#b9bcc0', roughness: 0.15, metalness: 0.95 }), []);
+  const band = useMemo(() => new MeshStandardMaterial({ color: '#c9a24f', roughness: 0.4, metalness: 0.4 }), []);
+  const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
+  const dark = useMemo(() => new MeshStandardMaterial({ color: '#191919', roughness: 0.85 }), []);
+  return (
+    <group position={vehicle.position} rotation={[0, vehicle.heading, 0]}>
+      {/* bonnet and grille */}
+      <mesh position={[0, 0.95, 1.85]} material={paint} castShadow>
+        <boxGeometry args={[1.6, 0.75, 1.2]} />
+      </mesh>
+      <mesh position={[0, 0.95, 2.47]} material={chrome}>
+        <boxGeometry args={[1.5, 0.6, 0.05]} />
+      </mesh>
+      {/* passenger body with window band, roof and painted bands */}
+      <mesh position={[0, 1.15, -0.6]} material={paint} castShadow receiveShadow>
+        <boxGeometry args={[1.95, 1.2, 3.9]} />
+      </mesh>
+      <mesh position={[0, 1.55, -0.6]} material={glass}>
+        <boxGeometry args={[1.97, 0.42, 3.5]} />
+      </mesh>
+      <mesh position={[0, 2.2, -0.45]} material={chrome} castShadow>
+        <boxGeometry args={[2.05, 0.08, 4.3]} />
+      </mesh>
+      {[0.85, 1.0].map((y) => (
+        <mesh key={y} position={[0, y, -0.6]} material={band}>
+          <boxGeometry args={[1.97, 0.05, 3.92]} />
+        </mesh>
+      ))}
+      {/* wheels */}
+      {[-1, 1].flatMap((sx) => [1.75, -1.6].map((z) => (
+        <mesh key={`${sx}${z}`} position={[sx * 0.9, 0.36, z]} rotation={[0, 0, Math.PI / 2]} material={dark} castShadow>
+          <cylinderGeometry args={[0.36, 0.36, 0.24, 14]} />
+        </mesh>
+      )))}
+    </group>
+  );
+}
+
+/** The right built-in vehicle for its kind. */
+export function BuiltInVehicle({ vehicle }: { vehicle: Vehicle }) {
+  if (vehicle.kind === 'car') return <Car vehicle={vehicle} />;
+  if (vehicle.kind === 'tricycle') return <Tricycle vehicle={vehicle} />;
+  if (vehicle.kind === 'jeepney') return <Jeepney vehicle={vehicle} />;
+  return <Danfo vehicle={vehicle} />;
+}
+
+/** A listed danfo model if there is one; the built-in danfo while loading or if it fails. Other kinds are always built in. */
 function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
+  if (vehicle.kind && vehicle.kind !== 'minibus') return <BuiltInVehicle vehicle={vehicle} />;
   const file = assetManifest().vehicles.danfo;
   if (!file) return <Danfo vehicle={vehicle} />;
   const fallback = <Danfo vehicle={vehicle} />;
@@ -275,7 +399,7 @@ function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
 }
 
 export function Props({ night }: { night: number }) {
-  const { vehicles, billboard } = useLayout();
+  const { vehicles, billboard, crossStreet } = useLayout();
   return (
     <group>
       <Palms />
@@ -287,7 +411,8 @@ export function Props({ night }: { night: number }) {
       <MarketStalls />
       {billboard && (
         <Suspense fallback={null}>
-          <Billboard position={billboard} />
+          {/* Faces the cross street, whichever side of it it stands */}
+          <Billboard position={billboard} facing={billboard[2] < (crossStreet.minZ + crossStreet.maxZ) / 2 ? 0 : Math.PI} />
         </Suspense>
       )}
     </group>

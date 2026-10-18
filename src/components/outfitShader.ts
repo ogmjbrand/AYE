@@ -12,6 +12,10 @@ import { PATTERNS, type Slot, type Style } from '../lib/fashion';
 
 interface SlotUniforms {
   on: { value: number };
+  /** Fabric finish: roughness (-1 keeps the original), weave kind, metalness. */
+  rough: { value: number };
+  weave: { value: number };
+  metal: { value: number };
   pattern: { value: number };
   scale: { value: number };
   a: { value: Color };
@@ -34,6 +38,17 @@ const HEAD_SLOTS: readonly (readonly [Slot, string])[] = [['hair', 'r']];
 
 const PATTERN_GLSL = /* glsl */ `
 float ayeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// Fine thread texture: 0 none, 1 plain weave, 2 twill, 3 handwoven rib. Fades out when the threads
+// get smaller than a pixel, so distant clothes don't shimmer.
+float ayeWeave(float kind, vec2 uv) {
+  if (kind < 0.5) return 0.0;
+  vec2 q = uv * 1400.0;
+  float fade = clamp(1.0 - max(fwidth(q.x), fwidth(q.y)) * 0.8, 0.0, 1.0);
+  float v = kind < 1.5 ? sin(q.x) * sin(q.y)
+    : kind < 2.5 ? sin(q.x + q.y)
+    : sin(q.x * 0.5) * 0.6 + sin(q.y * 3.0) * 0.4;
+  return v * fade;
+}
 // p: ${Object.entries(PATTERNS).map(([k, v]) => `${v}=${k}`).join(', ')}
 vec3 ayePattern(float p, vec2 uv, float s, vec3 a, vec3 b, vec3 c) {
   vec2 q = uv * s;
@@ -108,7 +123,13 @@ function slotGlsl(slot: Slot, channel: string) {
     float w = ayeMask.${channel} * uAye_${slot}_on;
     if (w > 0.001) {
       vec3 fabric = ayePattern(uAye_${slot}_pattern, vMapUv, uAye_${slot}_scale, uAye_${slot}_a, uAye_${slot}_b, uAye_${slot}_c);
+      fabric *= 1.0 + ayeWeave(uAye_${slot}_weave, vMapUv) * 0.09;
       diffuseColor.rgb = mix(diffuseColor.rgb, fabric * ayeShade, w);
+      if (uAye_${slot}_rough >= 0.0) {
+        ayeRough = mix(ayeRough, uAye_${slot}_rough, w);
+        ayeMetal = mix(ayeMetal, uAye_${slot}_metal, w);
+        ayeFinish = max(ayeFinish, w);
+      }
     }
   }`;
 }
@@ -129,7 +150,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   const uniforms: StyleUniforms = {};
   for (const [slot] of slots) {
     uniforms[slot] = {
-      on: { value: 0 }, pattern: { value: 0 }, scale: { value: 16 },
+      on: { value: 0 }, pattern: { value: 0 }, scale: { value: 16 }, rough: { value: -1 }, weave: { value: 0 }, metal: { value: 0 },
       a: { value: new Color() }, b: { value: new Color() }, c: { value: new Color() },
     };
   }
@@ -142,6 +163,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       const u = uniforms[slot]!;
       for (const [key, val] of Object.entries(u)) shader.uniforms[`uAye_${slot}_${key}`] = val;
       decl += `uniform float uAye_${slot}_on; uniform float uAye_${slot}_pattern; uniform float uAye_${slot}_scale;\n`;
+      decl += `uniform float uAye_${slot}_rough; uniform float uAye_${slot}_weave; uniform float uAye_${slot}_metal;\n`;
       decl += `uniform vec3 uAye_${slot}_a; uniform vec3 uAye_${slot}_b; uniform vec3 uAye_${slot}_c;\n`;
     }
     shader.fragmentShader = shader.fragmentShader
@@ -149,6 +171,10 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
+        // Fabric finish for the restyled areas, applied after the material's own roughness and metalness
+        float ayeRough = 0.0;
+        float ayeMetal = 0.0;
+        float ayeFinish = 0.0;
         {
           vec4 ayeMask = texture2D(uAyeMask, vMapUv);
           // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
@@ -156,9 +182,11 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
-      );
+      )
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v2-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }
@@ -171,6 +199,9 @@ export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot
     if (!s) continue;
     u.pattern.value = PATTERNS[s.pattern];
     u.scale.value = s.scale;
+    u.rough.value = s.fabric ? s.fabric.roughness : -1;
+    u.weave.value = s.fabric ? s.fabric.weave : 0;
+    u.metal.value = s.fabric ? s.fabric.metalness : 0;
     u.a.value.set(s.colors[0]);
     u.b.value.set(s.colors[1]);
     u.c.value.set(s.colors[2]);

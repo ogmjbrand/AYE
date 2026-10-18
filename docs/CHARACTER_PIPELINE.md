@@ -13,7 +13,7 @@ second-hand or disputed, it says so.
 | Presentation | Male only. The library has no dark-skinned adult woman (checked all 17 adult women). | **No.** |
 | Body / face | No morphs. Height is a fixed scale. | **No.** |
 | Hair / clothes | Baked into one texture; not interchangeable. | **No.** |
-| Animation | Rocketbox motion capture: idle, walk, run on the avatar's own skeleton, cadence matched to ground speed. Rocketbox has 417 more clips on the same skeleton (sit, talk, phone, work…). | Yes for locomotion; extensible. |
+| Animation | Rocketbox motion capture: idle, walk, run on the avatar's own skeleton, cadence matched to ground speed. The walk clip holds the fingers still, so its finger rotations were dropped at conversion and the hands showed the open bind pose; `components/handPose.ts` gives such clips the idle clip's relaxed hand at load time. Rocketbox has 417 more clips on the same skeleton (sit, talk, phone, work…). | Yes for locomotion; extensible. |
 | Creation UI | Name, lifestyle, career, diet, outfit colour, with a live 3D preview. | Systems are fine; appearance options are missing. |
 
 Conclusion: the game has a **character file**, not a **character system**.
@@ -155,3 +155,26 @@ to Reallusion naming AYE as a browser game. I can draft that request.
   competitor's account) and Ryan Schultz, December 2025
 - Daz interactive licences: Daz store product pages and forum guidance
 - Rocketbox: github.com/microsoft/Microsoft-Rocketbox (MIT)
+
+
+## Status update: MakeHuman targets received (October 2026)
+
+The project owner uploaded four CC0 MakeHuman target packs (now in
+`assets-src/makehuman/`): **faceunits01** (52 ARKit facial expressions),
+**nose01**, **ears01** and **hands01**. They were checked on the real MakeHuman
+base mesh (fetched from the MPFB repository, CC0): smile, blink, surprise, nose
+and ear targets all deform correctly as glTF morph targets in three.js.
+
+What this unlocks once the MakeHuman pipeline is built: blinking, smiling and
+talking faces, and far finer face and body customisation than the 12 fixed
+Rocketbox people allow.
+
+What is still missing before MakeHuman people can replace Rocketbox in the game:
+
+1. **MakeHuman system assets** (CC0): skins, eyes, eyebrows, eyelashes, hair and
+   clothes. Without them a MakeHuman person has no skin texture, hair or
+   clothing, which would look worse than today's characters.
+2. **Animations for the MakeHuman game-engine skeleton** (idle, walk, run), or a
+   retarget of the Rocketbox clips onto it.
+3. A build step (MPFB in headless Blender, or a Node script) that bakes body
+   shape, skin and clothes into optimised GLBs.

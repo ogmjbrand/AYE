@@ -11,6 +11,15 @@ import {
   type LocationCategory,
   type LocationEntry,
 } from '../lib/locations';
+import {
+  CATEGORIES,
+  categoryCounts,
+  filterDirectory,
+  type Category,
+  type Destination,
+} from '../lib/cityDirectory';
+import { ArrowLeft, Check, Map as MapIcon, MapPin, Navigation, Search, X } from 'lucide-react';
+import { DirectoryIcon } from './DirectoryIcon';
 
 interface CityLocationsPanelProps {
   district: District;
@@ -22,6 +31,12 @@ interface CityLocationsPanelProps {
   onTrack: (entry: LocationEntry) => void;
   onStopTracking: () => void;
   onUse: (entry: LocationEntry) => void;
+  destinations: readonly Destination[];
+  from: { x: number; z: number };
+  showRoute: boolean;
+  onShowRouteChange: (show: boolean) => void;
+  /** Starts walking there; returns why not if there's no way there. */
+  onGo: (destination: Destination) => string | null;
   onClose: () => void;
 }
 
@@ -35,19 +50,33 @@ const categoryColor = (id: LocationCategory) => LOCATION_CATEGORIES.find((c) => 
 const categoryIndex = (e: LocationEntry) => LOCATION_CATEGORIES.findIndex((c) => c.id === e.category);
 
 function Tile({ category, size = 'sm' }: { category: LocationCategory; size?: 'sm' | 'lg' }) {
-  const label = CATEGORY_LABEL[category];
   return (
     <span
       aria-hidden
-      className={`${size === 'lg' ? 'h-20 w-20 text-3xl' : 'h-12 w-12 text-lg'} flex shrink-0 items-center justify-center rounded-lg font-display font-bold text-black/70`}
+      className={`${size === 'lg' ? 'h-20 w-20' : 'h-12 w-12'} flex shrink-0 items-center justify-center rounded-lg text-black/70`}
       style={{ background: `linear-gradient(135deg, ${categoryColor(category)}, ${categoryColor(category)}99)` }}
     >
-      {label.charAt(0)}
+      <DirectoryIcon category={category} size={size === 'lg' ? 30 : 21} />
     </span>
   );
 }
 
-export function CityLocationsPanel({ district, entries, controller, trackedId, canUseNow, onTrack, onStopTracking, onUse, onClose }: CityLocationsPanelProps) {
+export function CityLocationsPanel({
+  district,
+  entries,
+  controller,
+  trackedId,
+  canUseNow,
+  onTrack,
+  onStopTracking,
+  onUse,
+  destinations,
+  from,
+  showRoute,
+  onShowRouteChange,
+  onGo,
+  onClose,
+}: CityLocationsPanelProps) {
   const [shown, setShown] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<LocationCategory | 'all'>('all');
@@ -119,14 +148,14 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
         <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
           <div className="min-w-0">
             <p className="m-0 text-xs uppercase tracking-[0.16em] text-ui-muted">{district.city.name} · {district.name}</p>
-            <h2 id="locations-title" className="m-0 mt-1 font-display text-2xl font-bold">City locations</h2>
+            <h2 id="locations-title" className="m-0 mt-1 flex items-center gap-2 font-display text-2xl font-bold"><MapPin size={23} className="text-ui-accent-strong" />City locations</h2>
           </div>
           <button
             type="button"
             onClick={close}
             className="shrink-0 rounded-lg border border-ui-line px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ui-muted hover:border-ui-accent hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-ui-accent"
           >
-            Close
+            <span className="flex items-center gap-1.5"><X size={14} />Close</span>
           </button>
         </header>
 
@@ -137,7 +166,7 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
               onClick={() => setSelectedId(null)}
               className="text-xs uppercase tracking-[0.14em] text-ui-muted hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-ui-accent"
             >
-              ← All locations
+              <span className="flex items-center gap-1"><ArrowLeft size={14} />All locations</span>
             </button>
             <div className="flex items-start gap-4">
               <Tile category={selected.category} size="lg" />
@@ -186,16 +215,16 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
             <div className="flex flex-col gap-2 sm:flex-row">
               {selected.built && selected.position && (selected.id === trackedId ? (
                 <button type="button" onClick={onStopTracking} className="flex-1 rounded-lg border border-ui-line px-4 py-2.5 text-sm font-semibold hover:border-ui-accent">
-                  Stop tracking
+                  <span className="inline-flex items-center justify-center gap-1.5"><X size={15} />Stop tracking</span>
                 </button>
               ) : (
                 <button type="button" onClick={() => onTrack(selected)} className="flex-1 rounded-lg border border-ui-accent bg-ui-accent/20 px-4 py-2.5 text-sm font-semibold hover:bg-ui-accent/30">
-                  Track on the way
+                  <span className="inline-flex items-center justify-center gap-1.5"><Navigation size={15} />Track on the way</span>
                 </button>
               ))}
               {selected.built && selected.use && canUseNow(selected) && (
                 <button type="button" onClick={() => onUse(selected)} className="flex-1 rounded-lg border border-ui-accent px-4 py-2.5 text-sm font-semibold hover:bg-ui-accent/20">
-                  Use it now
+                  <span className="inline-flex items-center justify-center gap-1.5"><Check size={15} />Use it now</span>
                 </button>
               )}
               {!selected.built && (
@@ -206,21 +235,24 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
             </div>
             {selected.built && selected.position && (
               <p className="m-0 text-xs text-ui-muted">
-                Tracking shows a straight-line direction and distance. Roads and routing are not in this build.
+                Tracking shows a straight-line direction and distance; use the route finder to walk there.
               </p>
             )}
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="space-y-3 border-b border-ui-line p-4">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name, area or activity"
-                aria-label="Search locations"
-                className="w-full rounded-lg border border-ui-line bg-black/30 px-3 py-2.5 text-sm text-ui-ink placeholder:text-ui-faint focus-visible:outline-2 focus-visible:outline-ui-accent"
-              />
+              <label className="relative block">
+                <Search size={16} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-ui-muted" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by name, area or activity"
+                  aria-label="Search locations"
+                  className="w-full rounded-lg border border-ui-line bg-black/30 py-2.5 pl-9 pr-3 text-sm text-ui-ink placeholder:text-ui-faint focus-visible:outline-2 focus-visible:outline-ui-accent"
+                />
+              </label>
               <div role="group" aria-label="Filter by category" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <button
                   type="button"
@@ -228,7 +260,7 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
                   onClick={() => setCategory('all')}
                   className={`${CHIP} ${category === 'all' ? 'border-ui-accent bg-ui-accent/20 text-ui-accent-strong' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}
                 >
-                  All · {sorted.length}
+                  <span className="inline-flex items-center gap-1.5"><MapIcon size={14} />All · {sorted.length}</span>
                 </button>
                 {LOCATION_CATEGORIES.filter((c) => counts.has(c.id)).map((c) => (
                   <button
@@ -238,7 +270,7 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
                     onClick={() => setCategory(c.id)}
                     className={`${CHIP} ${category === c.id ? 'border-ui-accent bg-ui-accent/20 text-ui-accent-strong' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}
                   >
-                    {c.label} · {counts.get(c.id)}
+                    <span className="inline-flex items-center gap-1.5"><DirectoryIcon category={c.id} size={14} />{c.label} · {counts.get(c.id)}</span>
                   </button>
                 ))}
               </div>
@@ -274,7 +306,110 @@ export function CityLocationsPanel({ district, entries, controller, trackedId, c
             </div>
           </div>
         )}
+        <details className="mx-4 mb-3 rounded-xl border border-ui-line">
+          <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-ui-accent">
+          <Navigation size={15} aria-hidden="true" className="text-ui-accent-strong" />Route finder
+          </summary>
+          <RouteFinder destinations={destinations} from={from} onGo={onGo} />
+        </details>
+
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-ui-line p-4 text-xs text-ui-muted sm:px-5">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={showRoute} onChange={(e) => onShowRouteChange(e.target.checked)} className="accent-[#8ab4d8]" />
+            Show the route on the ground
+          </label>
+          <span>Places in other cities appear when you travel there.</span>
+        </footer>
       </div>
+    </div>
+  );
+}
+
+function RouteFinder({
+  destinations,
+  from,
+  onGo,
+}: {
+  destinations: readonly Destination[];
+  from: { x: number; z: number };
+  onGo: (destination: Destination) => string | null;
+}) {
+  const [category, setCategory] = useState<Category | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [problem, setProblem] = useState<{ id: string; message: string } | null>(null);
+  const counts = useMemo(() => categoryCounts(destinations), [destinations]);
+  const shown = filterDirectory(destinations, category, query, from);
+
+  const go = (destination: Destination) => {
+    const message = onGo(destination);
+    setProblem(message ? { id: destination.id, message } : null);
+  };
+
+  return (
+    <div className="space-y-3 border-t border-ui-line p-4">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search places, food, shops…"
+        aria-label="Search destinations"
+        className="w-full rounded-lg border border-ui-line bg-black/20 px-3 py-2 text-sm text-ui-ink placeholder:text-ui-muted focus:border-ui-accent focus:outline-none"
+      />
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Destination categories">
+        {[{ id: 'all' as const, label: 'All', count: destinations.length }, ...CATEGORIES.map((c) => ({ ...c, count: counts[c.id] }))].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={category === item.id}
+            onClick={() => setCategory(item.id)}
+            className={`${CHIP} ${category === item.id ? 'border-ui-accent bg-ui-accent/20 text-ui-ink' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}
+          >
+            <span className="inline-flex items-center gap-1.5">{item.id === 'all' ? <MapIcon size={14} /> : <DirectoryIcon category={item.id} size={14} />}{item.label} <span className="tabular-nums opacity-70">{item.count}</span></span>
+          </button>
+        ))}
+      </div>
+      <ul className="m-0 max-h-64 list-none space-y-2 overflow-y-auto p-0" aria-label="Destinations">
+        {shown.length === 0 && <li className="py-6 text-center text-sm text-ui-muted">No places match “{query}”.</li>}
+        {shown.map((destination) => (
+          <li key={destination.id} className={`rounded-xl border p-3 ${destination.status === 'planned' ? 'border-dashed border-ui-line opacity-75' : 'border-ui-line'}`}>
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-ui-line/70 bg-ui-panel text-ui-accent-strong">
+                <DirectoryIcon category={destination.categories[0]} size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  {destination.name}
+                  <span className={`rounded-full border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider ${
+                    destination.status === 'open'
+                      ? 'border-ui-accent/60 text-ui-accent'
+                      : destination.status === 'visit'
+                        ? 'border-ui-line text-ui-muted'
+                        : 'border-dashed border-ui-line text-ui-muted'
+                  }`}>
+                    {destination.status === 'open' ? 'Open' : destination.status === 'visit' ? 'Visit only' : 'Planned'}
+                  </span>
+                </p>
+                <p className="m-0 text-xs text-ui-muted">{destination.kind}</p>
+                <p className="m-0 mt-1 text-xs">{destination.note}</p>
+              </div>
+              {destination.position && (
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-xs tabular-nums text-ui-muted">{Math.round(destination.distance ?? 0)} m</span>
+                  <button
+                    type="button"
+                    onClick={() => go(destination)}
+                    aria-label={`Go to ${destination.name}`}
+                    className="rounded-md border border-ui-accent bg-ui-accent/20 px-3 py-1.5 text-xs font-semibold hover:bg-ui-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+                  >
+                    <span className="inline-flex items-center gap-1"><Navigation size={14} />Go</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            {problem?.id === destination.id && <p role="alert" className="m-0 mt-2 rounded-md bg-ui-warn/10 px-2 py-1 text-xs text-ui-warn">{problem.message}</p>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -103,7 +103,8 @@ function useKerbsAndMarkings(ROAD_HALF_WIDTH: number, CROSS_STREET: { minZ: numb
 
 export function Streets() {
   const m = materials();
-  const { roadHalfWidth: ROAD_HALF_WIDTH, pavementWidth: PAVEMENT_WIDTH, crossStreet: CROSS_STREET } = useLayout();
+  const { roadHalfWidth: ROAD_HALF_WIDTH, pavementWidth: PAVEMENT_WIDTH, crossStreet: CROSS_STREET, streetStyle } = useLayout();
+  const plain = streetStyle === 'plain';
   const PAVE_OUT = ROAD_HALF_WIDTH + PAVEMENT_WIDTH;
   const k = useKerbsAndMarkings(ROAD_HALF_WIDTH, CROSS_STREET);
   return (
@@ -142,9 +143,9 @@ export function Streets() {
         );
       })}
 
-      <Instances items={k.kerbs} material={m.kerb} geometry={<boxGeometry args={[1, 1, 1]} />} castShadow={false} />
+      <Instances items={k.kerbs} material={plain ? m.plainKerb : m.kerb} geometry={<boxGeometry args={[1, 1, 1]} />} castShadow={false} />
       <Instances items={k.dashes} material={m.marking} geometry={<boxGeometry args={[1, 0.01, 1]} />} castShadow={false} />
-      <Instances items={k.edges} material={m.yellowMarking} geometry={<boxGeometry args={[1, 0.01, 1]} />} castShadow={false} />
+      <Instances items={k.edges} material={plain ? m.marking : m.yellowMarking} geometry={<boxGeometry args={[1, 0.01, 1]} />} castShadow={false} />
       <Instances items={k.zebra} material={m.marking} geometry={<boxGeometry args={[1, 0.01, 1]} />} castShadow={false} />
     </group>
   );

@@ -8,7 +8,7 @@ import type { DistrictSpec } from '../geography';
 
 export const ACCRA_OSU: DistrictSpec = {
   id: 'accra.osu',
-  city: { id: 'accra', name: 'Accra', country: 'GH', timeZone: 'Africa/Accra', currency: 'GHS' },
+  city: { id: 'accra', name: 'Accra', region: 'Greater Accra', country: 'GH', timeZone: 'Africa/Accra', currency: 'GHS', lat: 5.6, lon: -0.19 },
   name: 'Oxford Street, Osu',
   spawn: [2, 0, -10],
   layout: {
@@ -23,8 +23,8 @@ export const ACCRA_OSU: DistrictSpec = {
       b(-26, 26, 12, 14, 30, 'office', '#c8ccc9', 'Accra Tech Hub'),
       b(-12, -4, 6, 10, 7, 'shop', '#d8cbe6', 'Kente Loft'),
       b(-12, -16, 6, 8, 6, 'shop', '#c9d6c4', 'Osu Gadgets'),
+      b(-12, -23, 6, 4.6, 7, 'shop', '#4f5568', 'Osu Nights'),
       b(-14, -32, 10, 12, 14, 'office', '#d9cfbf', 'Accra Business School'),
-      b(-27, -10, 10, 14, 40, 'tower', '#4c6c7c'),
       // East side
       b(13, 30, 8, 10, 12, 'office', '#e9e4da', 'Osu Clinic'),
       b(26, 32, 10, 10, 20, 'residential', '#e4d3b5', 'Osu Heights'),
@@ -51,6 +51,18 @@ export const ACCRA_OSU: DistrictSpec = {
     // Kelewele and kebab stalls on the west pavement
     stalls: [[-7.8, 0, 40], [-7.8, 0, 43]],
     billboard: [-20, 0, 2],
+    // Two chairs either side of Osu Nights' door, facing the street
+    terraceChairs: [{ x: -8.6, z: -24.6, facing: Math.PI / 2 }, { x: -8.6, z: -21.4, facing: Math.PI / 2 }],
+    // Osu Green, behind Kente Loft: in from the cross street, or along the lane beside Osu Gadgets
+    park: {
+      area: { minX: -34, maxX: -19, minZ: -19, maxZ: 0 },
+      trees: [[-32.5, -1.5], [-21, -2], [-32, -6], [-20.5, -6.5], [-31.5, -15], [-21, -15.5], [-32.5, -18], [-24, -18], [-29.5, -3], [-22.5, -12.5]],
+      benches: [
+        { x: -27.6, z: -6, facing: Math.PI / 2 }, { x: -24.4, z: -6, facing: -Math.PI / 2 },
+        { x: -27.6, z: -14.5, facing: Math.PI / 2 }, { x: -24.4, z: -14.5, facing: -Math.PI / 2 },
+      ],
+      paths: [{ x0: -27, x1: -25, z0: -19, z1: 2.5 }, { x0: -34, x1: -8.5, z0: -11.5, z1: -9.5 }],
+    },
     skyline: {
       seed: 977,
       warm: ['#e6d3b3', '#d9c09a', '#efe1c7', '#cdb48f', '#e2c7a4', '#c7beb0'],
@@ -81,6 +93,14 @@ export const ACCRA_OSU: DistrictSpec = {
   fashionHouse: { name: 'Kente Loft', kind: 'Kente, prints & salon', position: [-7, 0, -4] },
   gadgetHub: { name: 'Osu Gadgets', kind: 'Phones, laptops & work kit', position: [-7, 0, -16] },
   travelDesk: { name: 'Osu Travel', kind: 'Flights & coaches', position: [7, 0, 40] },
+  park: {
+    id: 'osu-green', name: 'Osu Green', kind: 'Public park', position: [-26, 0, -10.5],
+    description: 'A patch of green behind Oxford Street with neem trees and benches. Quiet in the day, busy with chatter in the evening.',
+  },
+  nightlife: {
+    id: 'osu-nights', name: 'Osu Nights', kind: 'Live music lounge', position: [-7, 0, -23], cover: 220,
+    description: 'Highlife and hiplife on a small stage, kelewele from the kitchen, open late.',
+  },
   homes: [
     {
       id: 'labone-court-chamber', district: 'accra.osu', name: 'Labone Court, chamber and hall', kind: 'Chamber and hall', building: 'Labone Court',

@@ -37,7 +37,12 @@ export interface Vehicle {
   color: string;
   /** Black side stripes (Lagos danfos have them; Accra tro-tros don't). Default true. */
   stripes?: boolean;
+  /** A minibus (default) or an ordinary car. Both take up DANFO_SIZE for collisions. */
+  kind?: VehicleKind;
 }
+
+/** Minibus (danfo, tro-tro, matatu), car, motor tricycle (keke, tuk-tuk, bajaj) or Philippine jeepney. */
+export type VehicleKind = 'minibus' | 'car' | 'tricycle' | 'jeepney';
 
 /** One lane of moving traffic: its centre line, direction along Z and how many vehicles use it. */
 export interface TrafficLane {
@@ -46,6 +51,8 @@ export interface TrafficLane {
   count: number;
   colors: readonly string[];
   stripes: boolean;
+  /** Minibuses (default) or cars. */
+  kind?: VehicleKind;
 }
 
 type Spot = readonly [number, number, number];
@@ -73,9 +80,26 @@ export interface LayoutSpec {
   traffic: readonly TrafficLane[];
   /** Roadside billboard with the AYE logo, if the district has one. */
   billboard: Spot | null;
+  /** A small public park: lawn, paths, shade trees and benches (trees and benches are solid). */
+  park: ParkLayout | null;
+  /** Chairs on the pavement outside the lounge (solid), facing the street. */
+  terraceChairs: readonly { x: number; z: number; facing: number }[];
+  /** Painted black-and-yellow kerbs and yellow edge lines (default), or plain grey kerbs and white lines. */
+  streetStyle?: 'painted' | 'plain';
   /** Distant city massing: seed and colours. */
   skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
 }
+
+export interface ParkLayout {
+  area: { minX: number; maxX: number; minZ: number; maxZ: number };
+  trees: readonly (readonly [number, number])[];
+  /** Benches: centre and facing (0 = facing +z, π/2 = facing +x). */
+  benches: readonly { x: number; z: number; facing: number }[];
+  /** Footpaths (drawn only, nothing solid): rectangles on the ground, which may lead out to the street. */
+  paths: readonly { x0: number; x1: number; z0: number; z1: number }[];
+}
+export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
+export const CHAIR_SIZE = 0.62;
 
 export interface DistrictLayout extends LayoutSpec {
   palmSpots: Spot[];
@@ -165,6 +189,13 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...palmSpots.map((p) => ({ position: p, size: [0.5, 1, 0.5] as const })),
     ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
+    ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
+    ...spec.terraceChairs.map((c) => ({ position: [c.x, 0, c.z] as const, size: [CHAIR_SIZE, 1, CHAIR_SIZE] as const })),
+    ...(spec.park?.benches ?? []).map((b) => {
+      // Benches face along an axis; their footprint swaps width and depth when turned sideways
+      const sideways = Math.abs(Math.sin(b.facing)) > 0.5;
+      return { position: [b.x, 0, b.z] as const, size: (sideways ? [BENCH_SIZE[2], 1, BENCH_SIZE[0]] : [BENCH_SIZE[0], 1, BENCH_SIZE[2]]) as readonly [number, number, number] };
+    }),
   ];
   return { ...spec, palmSpots, lampSpots, obstacles, skylineBuildings: skylineFor(spec) };
 }

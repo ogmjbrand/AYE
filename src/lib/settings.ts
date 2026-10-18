@@ -8,15 +8,20 @@ export type QualityMode = 'auto' | 'high' | 'low';
 export interface Settings {
   /** 'auto' starts high and drops to low on sustained low frame rates. */
   quality: QualityMode;
+  /** Dotted line on the ground along a click-to-move route. */
+  showRoute: boolean;
 }
 
 const SETTINGS_KEY = 'aye_settings';
-export const DEFAULT_SETTINGS: Settings = { quality: 'auto' };
+export const DEFAULT_SETTINGS: Settings = { quality: 'auto', showRoute: true };
 export const QUALITY_MODES: readonly QualityMode[] = ['auto', 'high', 'low'];
 
 export function parseSettings(data: unknown): Settings {
   const s = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
-  return { quality: QUALITY_MODES.includes(s.quality as QualityMode) ? (s.quality as QualityMode) : DEFAULT_SETTINGS.quality };
+  return {
+    quality: QUALITY_MODES.includes(s.quality as QualityMode) ? (s.quality as QualityMode) : DEFAULT_SETTINGS.quality,
+    showRoute: typeof s.showRoute === 'boolean' ? s.showRoute : DEFAULT_SETTINGS.showRoute,
+  };
 }
 
 export function loadSettings(storage: Storage = localStorage): Settings {

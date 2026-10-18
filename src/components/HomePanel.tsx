@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MOVE_IN_NIGHTS, homeById, moveInFee, type Home } from '../lib/homes';
+import { BedDouble, DoorOpen, House, LogOut, Wallet, X } from 'lucide-react';
 
 interface HomePanelProps {
   home: Home;
@@ -43,16 +44,16 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
       >
         <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
           <div>
-            <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{mine ? 'Your home' : `To let · ${home.kind}`}</p>
+            <p className="m-0 flex items-center gap-1.5 text-xs uppercase tracking-widest text-ui-muted"><House size={14} />{mine ? 'Your home' : `To let · ${home.kind}`}</p>
             <h2 id="home-title" className="m-0 mt-1 font-display text-2xl font-bold">{home.name}</h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
+          <button type="button" onClick={onClose} aria-label="Close home panel" title="Close" className="rounded p-2 text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"><X size={16} /></button>
         </header>
 
         <div className="space-y-4 p-5">
           <p className="m-0 text-sm text-ui-muted">{home.description}</p>
           <dl className="m-0 grid grid-cols-2 gap-y-1.5 rounded-lg bg-black/20 p-3 text-sm">
-            <dt className="text-ui-muted">Rent</dt>
+            <dt className="flex items-center gap-1.5 text-ui-muted"><Wallet size={14} />Rent</dt>
             <dd className="m-0 text-right tabular-nums">{home.rentPerNight.toLocaleString()} ⓒ a night</dd>
             {!mine && (
               <>
@@ -60,7 +61,7 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
                 <dd className="m-0 text-right tabular-nums">{fee.toLocaleString()} ⓒ</dd>
               </>
             )}
-            <dt className="text-ui-muted">Your balance</dt>
+            <dt className="flex items-center gap-1.5 text-ui-muted"><Wallet size={14} />Your balance</dt>
             <dd className="m-0 text-right tabular-nums">{balance.toLocaleString()} ⓒ</dd>
           </dl>
 
@@ -68,20 +69,21 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
             confirmLeave ? (
               <div className="space-y-3">
                 <p className="m-0 text-sm">Give up {home.name}? The move-in fee isn't refunded, and you'll sleep rough until you rent again.</p>
-                <button type="button" className={SECONDARY} onClick={() => { onMoveOut(); onClose(); }}>Yes, move out</button>
+                <button type="button" className={`${SECONDARY} inline-flex items-center justify-center gap-2`} onClick={() => { onMoveOut(); onClose(); }}><LogOut size={16} />Yes, move out</button>
                 <button type="button" className={PRIMARY} onClick={() => setConfirmLeave(false)}>Stay</button>
               </div>
             ) : (
               <div className="space-y-3">
-                {onGoInside && <button type="button" autoFocus className={PRIMARY} onClick={onGoInside}>Go inside</button>}
-                <button type="button" className={onGoInside ? SECONDARY : PRIMARY} onClick={onSleep}>Sleep here until 07:00</button>
-                <button type="button" className={SECONDARY} onClick={() => setConfirmLeave(true)}>Move out</button>
+                {onGoInside && <button type="button" autoFocus className={`${PRIMARY} inline-flex items-center justify-center gap-2`} onClick={onGoInside}><DoorOpen size={17} />Go inside</button>}
+                <button type="button" className={`${onGoInside ? SECONDARY : PRIMARY} inline-flex items-center justify-center gap-2`} onClick={onSleep}><BedDouble size={17} />Sleep here until 07:00</button>
+                <button type="button" className={`${SECONDARY} inline-flex items-center justify-center gap-2`} onClick={() => setConfirmLeave(true)}><LogOut size={16} />Move out</button>
                 <p className="m-0 text-xs text-ui-muted">Rent is paid each night you sleep, wherever you sleep. If you can't pay, you lose the home.</p>
               </div>
             )
           ) : (
             <div className="space-y-3">
-              <button type="button" autoFocus className={PRIMARY} disabled={!affordable} onClick={onMoveIn}>
+              <button type="button" autoFocus className={`${PRIMARY} inline-flex items-center justify-center gap-2`} disabled={!affordable} onClick={onMoveIn}>
+                <House size={17} />
                 {current ? `Move here for ${fee.toLocaleString()} ⓒ` : `Rent it for ${fee.toLocaleString()} ⓒ`}
               </button>
               {!affordable && <p className="m-0 text-xs text-ui-warn">You need {(fee - balance).toLocaleString()} ⓒ more for the move-in fee.</p>}

@@ -7,7 +7,7 @@ import type { DistrictSpec } from '../geography';
 
 export const LAGOS_MARINA: DistrictSpec = {
   id: 'lagos.marina',
-  city: { id: 'lagos', name: 'Lagos', country: 'NG', timeZone: 'Africa/Lagos', currency: 'NGN' },
+  city: { id: 'lagos', name: 'Lagos', region: 'Lagos', country: 'NG', timeZone: 'Africa/Lagos', currency: 'NGN', lat: 6.45, lon: 3.39 },
   name: 'Marina Boulevard',
   spawn: [1.5, 0, 2],
   layout: {
@@ -29,9 +29,9 @@ export const LAGOS_MARINA: DistrictSpec = {
       // East side, north of the cross street
       b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
       b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
+      b(11, 20, 6, 3.6, 7, 'shop', '#5b4a5e', 'Lagoon Live'),
       b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
       b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),
-      b(25, -2, 10, 10, 24, 'office', '#b9c2c4'),
       b(11, 3, 6, 5, 6, 'shop', '#e9d3b0', 'Taste of Africa'),
       b(11, 39, 6, 8, 6, 'shop', '#d7c4e0', 'Fashion House'),
       // East side, south of the cross street
@@ -57,6 +57,18 @@ export const LAGOS_MARINA: DistrictSpec = {
     // Market stalls with umbrellas on the pavement outside the shop row
     stalls: [[-6.2, 0, -10.5], [-6.2, 0, -7.5], [-6.2, 0, -1.5]],
     billboard: [-14, 0, -28.6],
+    // Two chairs either side of Lagoon Live's door, facing the street
+    terraceChairs: [{ x: 7.6, z: 18.75, facing: -Math.PI / 2 }, { x: 7.6, z: 21.25, facing: -Math.PI / 2 }],
+    // Uptown Gardens, behind the hospital: in from the cross street, paths crossing at the middle
+    park: {
+      area: { minX: 20, maxX: 33, minZ: -13, maxZ: 4 },
+      trees: [[21.5, -11.5], [31.5, -11.5], [22, -7], [30.5, -7.5], [21.5, -1.5], [31, -1], [22.5, 2.5], [30, 2.5], [29.5, -10.5], [23, -10]],
+      benches: [
+        { x: 24.6, z: -7, facing: Math.PI / 2 }, { x: 27.4, z: -7, facing: -Math.PI / 2 },
+        { x: 24.6, z: 0, facing: Math.PI / 2 }, { x: 27.4, z: 0, facing: -Math.PI / 2 },
+      ],
+      paths: [{ x0: 25, x1: 27, z0: -13, z1: 4 }, { x0: 20, x1: 33, z0: -4.5, z1: -2.5 }],
+    },
     skyline: {
       seed: 311,
       warm: ['#d8c4a2', '#e3d2b4', '#c9b08c', '#d9a982', '#e8dcc6', '#bfb6a6'],
@@ -88,6 +100,14 @@ export const LAGOS_MARINA: DistrictSpec = {
   fashionHouse: { name: 'Fashion House', kind: 'Boutique & salon', position: [5.5, 0, 39] },
   gadgetHub: { name: 'Gadget Hub', kind: 'Phones, laptops & work kit', position: [-5.5, 0, 38] },
   travelDesk: { name: 'Marina Travel', kind: 'Flights & coaches', position: [5.5, 0, -12] },
+  park: {
+    id: 'uptown-gardens', name: 'Uptown Gardens', kind: 'Public park', position: [26, 0, -3.5],
+    description: 'Shade trees, benches and a breeze off the lagoon. Locals come here to sit out the heat of the afternoon.',
+  },
+  nightlife: {
+    id: 'lagoon-live', name: 'Lagoon Live', kind: 'Live music lounge', position: [5.5, 0, 20], cover: 250,
+    description: 'Afrobeats and highlife from a house band, small chops at the bar, open late.',
+  },
   homes: [
     {
       id: 'marina-court-room', district: 'lagos.marina', name: 'Marina Court, room 4B', kind: 'Room in a shared flat', building: 'Marina Court',

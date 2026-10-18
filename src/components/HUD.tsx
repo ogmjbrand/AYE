@@ -12,10 +12,33 @@ import { formatHome } from '../lib/places';
 import { homeAtDoor, homeById, type Home } from '../lib/homes';
 import { equipmentPay } from '../lib/equipment';
 import { counterAt, type District } from '../lib/geography';
+import { venueAt } from '../lib/nightlife';
+import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
+import {
+  Apple,
+  BedDouble,
+  BriefcaseBusiness,
+  House as HouseIcon,
+  Map,
+  MapPin,
+  Menu,
+  Music2,
+  Package,
+  Settings2,
+  Shirt,
+  ShoppingBag,
+  Smartphone,
+  TreePine,
+  Utensils,
+  UserRound,
+  Wallet,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -34,16 +57,29 @@ interface HUDProps {
   /** The district the player is in: its counters, homes and workplaces. */
   district: District;
   onOpenTravel?: () => void;
+  /** Opens the district's lounge (lib/nightlife.ts). */
+  onOpenNightlife?: () => void;
+  /** Opens the park bench (lib/parks.ts). */
+  onOpenPark?: () => void;
+  /** Sitting down or on the way to a seat: no place prompts. */
+  busy?: boolean;
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
   /** Set while inside your home: replaces the street prompts. */
-  insideHome?: { name: string; prompt: { verb: string; place: string; onOpen: () => void } | null };
+  insideHome?: {
+    name: string;
+    interactionAt: (x: number, z: number) => Prompt | null;
+  };
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
   /** Opens the smartphone map (only passed once you own a phone). */
   onOpenMap?: () => void;
+  /** Routes to the assigned home and enters after reaching its front door. */
+  onGoHome?: () => void;
+  /** The ⋯ city locations directory. */
+  onOpenLocations?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
@@ -51,19 +87,19 @@ interface HUDProps {
   workMinutes?: number;
   /** Owned equipment (work kits raise pay). */
   equipment?: readonly string[];
-  /** Opens the city locations directory (the ⋯ button). */
-  onOpenLocations?: () => void;
   /** The destination being tracked, in district metres. */
   tracked?: { name: string; position: readonly [number, number, number] } | null;
   onStopTracking?: () => void;
 }
+
+type Prompt = { verb: string; place: string; onOpen: () => void; icon?: LucideIcon };
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** Opaque enough to stay readable over a bright midday sky, without a costly backdrop blur. */
 const PANEL = 'rounded-xl border border-ui-line/70 bg-ui-panel/85 shadow-[0_8px_24px_rgba(0,0,0,0.35)]';
 const BUTTON =
-  'pointer-events-auto rounded-lg border border-ui-line bg-ui-panel/85 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] sm:px-3 sm:tracking-[0.14em] text-ui-ink transition hover:border-ui-accent hover:text-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent';
+  'pointer-events-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-ui-line bg-ui-panel/85 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ui-ink transition hover:border-ui-accent hover:text-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent sm:px-3 sm:tracking-[0.14em]';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -75,13 +111,14 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** "E — do something here" prompt for food vendors and shops. */
-function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onOpen: () => void }) {
+function PlacePrompt({ verb, place, onOpen, icon: Icon }: Prompt) {
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
     >
+      {Icon && <Icon size={17} aria-hidden="true" className="shrink-0 text-ui-accent-strong" strokeWidth={1.8} />}
       <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
       <span>
         {verb} <span className="font-semibold">{place}</span>
@@ -105,17 +142,21 @@ export function HUD({
   onOpenShop,
   district,
   onOpenTravel,
+  onOpenNightlife,
+  onOpenPark,
+  busy = false,
   onTalk,
   workTask,
   insideHome,
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
+  onGoHome,
+  onOpenLocations,
   homeId = null,
   onOpenHome,
   workMinutes = 0,
   equipment = [],
-  onOpenLocations,
   tracked = null,
   onStopTracking,
 }: HUDProps) {
@@ -135,22 +176,26 @@ export function HUD({
   const counter = counterAt(district, px, pz);
   // One prompt at a time: a food vendor, then a shop or desk, then a front door
   const prompt = vendor && onOpenVendor
-    ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
+    ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor), icon: Utensils }
     : counter === 'fashion' && onOpenShop
-      ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop }
+      ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop, icon: ShoppingBag }
       : counter === 'gadgets' && onOpenGadgets
-        ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets }
+        ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets, icon: Smartphone }
         : counter === 'travel' && onOpenTravel
-          ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel }
-          : null;
+          ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel, icon: MapPin }
+          : venueAt(district.nightlife, px, pz) && onOpenNightlife
+            ? { verb: 'Go out at', place: district.nightlife.name, onOpen: onOpenNightlife, icon: Music2 }
+            : parkAt(district.park, px, pz) && onOpenPark
+              ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark, icon: TreePine }
+              : null;
   const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
   const streetPrompt = prompt ?? (resident && onTalk
-    ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
-    : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
-    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
+    ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident), icon: UserRound }
+    : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen, icon: BriefcaseBusiness } : null) ?? (door && onOpenHome
+    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door), icon: HouseIcon }
     : null);
-  const placePrompt = insideHome ? insideHome.prompt : streetPrompt;
+  const placePrompt = busy ? null : insideHome ? insideHome.interactionAt(px, pz) : streetPrompt;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
@@ -188,37 +233,67 @@ export function HUD({
           </div>
         </div>
 
+        {controller.trafficWarning && (
+          <p role="status" className="absolute left-1/2 top-24 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg sm:top-20 sm:text-sm">
+            <TriangleAlert size={16} aria-hidden="true" />
+            Vehicle approaching — waiting for a safe gap.
+          </p>
+        )}
+
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+            {onOpenLocations && (
+              <button type="button" onClick={onOpenLocations} className={BUTTON} title="City locations: restaurants, shops, homes, workplaces" aria-label="Locations">
+                <MapPin size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Locations</span>
+              </button>
+            )}
             {onOpenMap && (
-              <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the map on your phone (M)">
-                Map
+              <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the city map on your phone (M)" aria-label="Phone map">
+                <Smartphone size={15} aria-hidden="true" strokeWidth={1.8} />
+                <Map size={15} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Map</span>
+              </button>
+            )}
+            {onGoHome && (
+              <button type="button" onClick={onGoHome} className={BUTTON} title="Walk to your assigned home and go inside" aria-label="Go Home">
+                <HouseIcon size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Go Home</span>
               </button>
             )}
             {onOpenWardrobe && (
-              <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own">
-                Wardrobe
+              <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own" aria-label="Wardrobe">
+                <Shirt size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Wardrobe</span>
               </button>
             )}
-            {onRest && (
-              <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00">
-                Rest
-              </button>
-            )}
+            <button type="button" disabled className={`${BUTTON} cursor-not-allowed opacity-50`} title="Inventory is not implemented yet" aria-label="Inventory unavailable">
+              <Package size={16} aria-hidden="true" strokeWidth={1.8} />
+              <span className="hidden sm:inline">Inventory · soon</span>
+            </button>
             {onCycleQuality && (
               <button
                 type="button"
                 onClick={onCycleQuality}
-                title="Graphics quality: Auto lowers detail if the frame rate drops"
+                title="Settings: graphics quality; Auto lowers detail if the frame rate drops"
+                aria-label={`Settings, graphics quality ${qualityLabel}`}
                 className={BUTTON}
               >
-                <span className="hidden sm:inline">Quality: </span>
+                <Settings2 size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Settings · </span>
                 <span className="capitalize">{qualityLabel}</span>
               </button>
             )}
+            {onRest && (
+              <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00" aria-label="Rest">
+                <BedDouble size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Rest</span>
+              </button>
+            )}
             {onExitToMenu && (
-              <button type="button" onClick={onExitToMenu} className={BUTTON} title="Back to the main menu (your life is saved)">
-                Menu
+              <button type="button" onClick={onExitToMenu} className={BUTTON} title="Back to the main menu (your life is saved)" aria-label="Main menu">
+                <Menu size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Menu</span>
               </button>
             )}
           </div>
@@ -323,9 +398,10 @@ export function HUD({
               <>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
-                    <p className="m-0 mt-0.5 truncate text-xs text-ui-muted">
-                      {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
+                            <p className="m-0 flex items-center gap-1.5 truncate text-sm font-semibold"><UserRound size={14} aria-hidden="true" className="shrink-0 text-ui-accent-strong" />{character.name}</p>
+                            <p className="m-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-ui-muted">
+                              <BriefcaseBusiness size={13} aria-hidden="true" className="shrink-0" />
+                              {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
                     </p>
                   </div>
                   <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
@@ -336,14 +412,14 @@ export function HUD({
 
                 <div className="mt-3 flex items-end justify-between gap-3">
                   <div>
-                    <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
+                    <p className="m-0 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-ui-faint"><Wallet size={13} aria-hidden="true" />Balance</p>
                     <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
                       {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
                     </p>
                   </div>
                   {character.career !== 'none' && !insideHome && (
                     <p className="m-0 text-right text-xs text-ui-muted">
-                      Workplace
+                      <span className="flex items-center justify-end gap-1"><BriefcaseBusiness size={13} aria-hidden="true" />Workplace</span>
                       <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
                         {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
                       </span>
@@ -353,7 +429,7 @@ export function HUD({
 
                 <div className="mt-3">
                   <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-ui-muted">Hunger</span>
+                    <span className="flex items-center gap-1.5 text-ui-muted"><Apple size={13} aria-hidden="true" />Hunger</span>
                     <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
                   </div>
                   <div
@@ -377,7 +453,7 @@ export function HUD({
               aria-expanded={showDetails}
               className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
             >
-              Details
+              <span className="flex items-center gap-1.5"><UserRound size={14} aria-hidden="true" />Profile & details</span>
               <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
             </button>
             {showDetails && (
@@ -430,7 +506,7 @@ export function HUD({
 
       {/* Keyboard hint: desktop only, hidden on touch screens */}
       <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block pointer-coarse:hidden">
-        <p className="m-0"><span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
+        <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
         <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
       </div>
     </div>

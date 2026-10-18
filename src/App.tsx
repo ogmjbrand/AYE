@@ -1,12 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { placePlayer, setMovementBlocked, usePlayerController } from './hooks/usePlayerController';
+import { getTrip, placePlayer, setMovementBlocked, setMoveTarget, subscribeTrip, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { activeLayout, groundHeightAt, setActiveLayout } from './lib/world';
+import { activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -27,6 +27,17 @@ import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
 import { CityLocationsPanel } from './components/CityLocationsPanel';
 import { locationsFor, type LocationEntry } from './lib/locations';
+import { TripStatus } from './components/TripStatus';
+import { NightlifePanel } from './components/NightlifePanel';
+import { venueAt } from './lib/nightlife';
+import { parkAt } from './lib/parks';
+import { ParkPanel } from './components/ParkPanel';
+import { SitBar } from './components/SitBar';
+import { useSitSession } from './hooks/useSitSession';
+import { benchSeats, chairSeats, nearestSeat, type Seat } from './lib/seating';
+import type { WaitMinutes } from './lib/parks';
+import { cityDirectory, type Destination } from './lib/cityDirectory';
+import { makeTarget } from './lib/clickToMove';
 import { hasMap } from './lib/equipment';
 import { counterAt, districtById, type District } from './lib/geography';
 import { DistrictContext } from './world/DistrictContext';
@@ -38,18 +49,25 @@ import { careerLevel } from './lib/progression';
 import { equipmentPay } from './lib/equipment';
 import { HOURLY_WAGE, isWorkingHours, type GameTime } from './lib/gameState';
 import { Residents } from './world/Residents';
+import { ClickToMove } from './world/ClickToMove';
+import { VenueFront } from './world/VenueFront';
+import { Park } from './world/Park';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
-import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
+import { doorSpot, homeInteractionAt, interiorFor, interiorLayout, type HomeAction } from './lib/interiors';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
-import { gameDay, residentNear, type Resident } from './lib/people';
-import { TRAVEL_OPTIONS, formatDuration, type TravelMode } from './lib/travel';
+import { gameDay, isAdultResident, residentById, residentNear, residentPosition, type Resident } from './lib/people';
+import { canResidentAcceptHug, hugTargets, type HugSession } from './lib/hug';
+import { pedestrianInTrafficPath, trafficSnapshot } from './lib/traffic';
+import { clearLine, walkGridFor } from './lib/pathfinding';
+import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
-import { loadSettings, nextQualityMode, saveSettings, type QualityMode } from './lib/settings';
+import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
+import { BedDouble, CookingPot, DoorOpen, ScanEye, ShowerHead, Shirt, Sofa, Tv } from 'lucide-react';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -62,6 +80,10 @@ interface CityProps {
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
   district: District;
+  /** The resident the player is talking with, if any. */
+  talkingTo: string | null;
+  hugSession: HugSession | null;
+  onHugComplete: (residentId: string) => void;
 }
 
 interface CameraFollowProps {
@@ -87,7 +109,9 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
     const controls = controlsRef.current;
     if (!controls) return;
     followTarget.set(controller.position.x, CAMERA_TARGET_HEIGHT, controller.position.z);
-    followShift.copy(followTarget).sub(controls.target).multiplyScalar(0.1);
+    followShift.copy(followTarget).sub(controls.target);
+    // Ease after the player as they move; jump straight there after a long move (arriving in a city, a save loading)
+    if (followShift.lengthSq() < 12 * 12) followShift.multiplyScalar(0.1);
     controls.target.add(followShift);
     camera.position.add(followShift);
     controls.update();
@@ -120,7 +144,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo, hugSession, onHugComplete }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -130,12 +154,22 @@ function City({ controller, character, gameTime, tryOn, homeId, district }: City
       <Buildings />
       <Skyline />
       <Props night={night} />
+      <VenueFront hour={gameTime.hour} night={night} />
+      <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
-      <Residents player={controller} />
+      <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} />
       <Traffic player={controller} />
       {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player controller={controller} character={character} tryOn={tryOn} />
+      <Player
+        controller={controller}
+        character={character}
+        tryOn={tryOn}
+        conversing={talkingTo !== null}
+        conversationTarget={talkingTo}
+        hugSession={hugSession}
+        onHugComplete={onHugComplete}
+      />
     </>
   );
 }
@@ -144,12 +178,14 @@ export default function App() {
   // The entry screen comes first; 'create' is character creation; a character means playing
   const [screen, setScreen] = useState<'entry' | 'create' | 'play'>('entry');
   const [character, setCharacter] = useState<Character | null>(() => loadCharacter());
-  const [quality, setQuality] = useState<QualityMode>(() => loadSettings().quality);
-
-  const changeQuality = (next: QualityMode) => {
-    setQuality(next);
-    saveSettings({ quality: next });
+  const [settings, setSettings] = useState<Settings>(() => loadSettings());
+  const quality = settings.quality;
+  const changeSettings = (patch: Partial<Settings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    saveSettings(next);
   };
+  const changeQuality = (next: QualityMode) => changeSettings({ quality: next });
   // In-game changes to the character (e.g. new clothes) are saved straight away
   const handleCharacterUpdate = (next: Character) => {
     saveCharacter(next);
@@ -183,6 +219,8 @@ export default function App() {
       character={character}
       quality={quality}
       onQualityChange={changeQuality}
+      showRoute={settings.showRoute}
+      onShowRouteChange={(showRoute) => changeSettings({ showRoute })}
       onExitToMenu={() => setScreen('entry')}
       onCharacterUpdate={handleCharacterUpdate}
     />
@@ -193,6 +231,9 @@ interface GameProps {
   character: Character;
   quality: QualityMode;
   onQualityChange: (quality: QualityMode) => void;
+  /** Dotted route line on the ground for click-to-move trips. */
+  showRoute: boolean;
+  onShowRouteChange: (show: boolean) => void;
   /** Back to the entry screen; the game is already saved. */
   onExitToMenu: () => void;
   onCharacterUpdate: (character: Character) => void;
@@ -201,13 +242,13 @@ interface GameProps {
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
 let placedIn: string | null = null;
 
-function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, onCharacterUpdate }: GameProps) {
+function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, onExitToMenu, onCharacterUpdate }: GameProps) {
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, workTask } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -234,7 +275,11 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   }, [district]);
   const neighborhood = useCurrentNeighborhood(controller, district.neighborhoods);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [locationsOpen, setLocationsOpen] = useState(false);
+  const [nightOpen, setNightOpen] = useState(false);
+  const [parkOpen, setParkOpen] = useState(false);
   const [talking, setTalking] = useState<Resident | null>(null);
+  const [hugging, setHugging] = useState<HugSession | null>(null);
   const [task, setTask] = useState<WorkTask | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
   useEffect(() => {
@@ -243,13 +288,67 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     return () => clearTimeout(id);
   }, [arrival]);
   const book = (to: District, mode: TravelMode) => {
-    const option = TRAVEL_OPTIONS[mode];
-    if (state.balance < option.fare) return;
+    const option = travelOption(district.city, to.city, mode);
+    if (!option || state.balance < option.fare) return;
     travel(to.id, mode);
     setInside(false);
     setTravelOpen(false);
     setTrackedId(null);
     setArrival(`You arrived in ${to.city.name} after ${formatDuration(option.minutes)} by ${option.label.toLowerCase()}.`);
+  };
+  const requestHug = (resident: Resident): string | null => {
+    const relationship = state.relationships[resident.id];
+    const points = relationship?.points ?? 0;
+    const today = gameDay(state.time.totalMinutes);
+    if (!isAdultResident(resident) || !canResidentAcceptHug(isAdultResident(resident), points)) {
+      return `${resident.name.split(' ')[0]} would like to know you better before sharing a hug.`;
+    }
+    if ((relationship?.lastHugDay ?? -1) === today) {
+      return `You and ${resident.name.split(' ')[0]} have already shared a hug today.`;
+    }
+
+    const currentResident = residentPosition(resident);
+    const targets = hugTargets(controller.position, currentResident);
+    const obstacles = [...activeLayout().obstacles, ...movingObstacles];
+    const approachGrid = walkGridFor(obstacles);
+    if (
+      !clearLine(approachGrid, controller.position, targets.player)
+      || !clearLine(approachGrid, currentResident, targets.resident)
+    ) {
+      return 'We cannot reach a clear, unobstructed position to share a hug here.';
+    }
+    const playerClear = resolveCollisions(targets.player.x, targets.player.z, 0.32, obstacles);
+    const residentClear = resolveCollisions(targets.resident.x, targets.resident.z, 0.32, obstacles);
+    if (
+      Math.hypot(playerClear.x - targets.player.x, playerClear.z - targets.player.z) > 0.08
+      || Math.hypot(residentClear.x - targets.resident.x, residentClear.z - targets.resident.z) > 0.08
+    ) {
+      return 'There is not enough clear space here to share a hug safely.';
+    }
+    const traffic = trafficSnapshot();
+    if (
+      pedestrianInTrafficPath({ x: playerClear.x, z: playerClear.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
+      || pedestrianInTrafficPath({ x: residentClear.x, z: residentClear.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
+    ) {
+      return 'Traffic is too close right now. Try again when the area is clear.';
+    }
+
+    setHugging({
+      residentId: resident.id,
+      playerFrom: { x: controller.position.x, z: controller.position.z, facing: controller.direction },
+      residentFrom: { x: currentResident.x, z: currentResident.z, facing: resident.facing },
+      playerTarget: { ...targets.player, x: playerClear.x, z: playerClear.z },
+      residentTarget: { ...targets.resident, x: residentClear.x, z: residentClear.z },
+      startedAt: Date.now(),
+    });
+    setTalking(null);
+    return null;
+  };
+  const finishHug = (residentId: string) => {
+    const hugged = residentById(residentId);
+    hug(residentId);
+    setHugging(null);
+    if (hugged) setArrival(`You and ${hugged.name.split(' ')[0]} share a friendly hug.`);
   };
   const controlsRef = useRef<OrbitControls | null>(null);
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
@@ -257,7 +356,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
   const [homePanel, setHomePanel] = useState<Home | null>(null);
   /** Puts the camera straight behind the player after a jump (going in or out of a building). */
-  const snapCamera = () => {
+  const snapCamera = useCallback(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const { x, z } = controller.position;
@@ -265,19 +364,60 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     controls.target.set(x, CAMERA_TARGET_HEIGHT, z);
     controls.object.position.set(x - Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 1.6, z - Math.cos(d) * 4.2);
     controls.update();
-  };
-  const goInside = () => {
+  }, [controller]);
+  const snapIndoorCamera = useCallback(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const { x, z } = controller.position;
+    const d = controller.direction + 0.45;
+    controls.target.set(x, CAMERA_TARGET_HEIGHT, z);
+    controls.object.position.set(x + Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 5.3, z + Math.cos(d) * 4.2);
+    controls.update();
+  }, [controller]);
+  const goInside = useCallback(() => {
     if (!interior) return;
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
-    snapCamera();
-  };
+    snapIndoorCamera();
+  }, [interior, snapIndoorCamera, setHomePanel, setInside]);
   const goOutside = () => {
     setInside(false);
     if (home) placePlayer(home.door, Math.PI);
     snapCamera();
   };
+  const homeDestinationId = home ? `${home.district}.home.${home.id}` : null;
+  const goHome = () => {
+    if (!home || indoors || !interior) return;
+    if (home.district !== district.id) {
+      setTravelOpen(true);
+      return;
+    }
+    setMovementBlocked(false);
+    setHomePanel(null);
+    if (distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS) {
+      goInside();
+      return;
+    }
+    const [x, , z] = home.door;
+    const started = setMoveTarget(
+      makeTarget(controller.position.x, controller.position.z, x, z, false),
+      { destinationId: homeDestinationId ?? undefined, label: home.name },
+    );
+    if (!started) setArrival(`Couldn't find a clear route to ${home.name}.`);
+  };
+  useEffect(() => {
+    const onTrip = () => {
+      const trip = getTrip();
+      if (trip?.status !== 'arrived' || trip.destinationId !== homeDestinationId || !home || !interior) return;
+      if (home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS) {
+        goInside();
+      } else {
+        setArrival(`You reached the street near ${home.name}, but not its entrance.`);
+      }
+    };
+    return subscribeTrip(onTrip);
+  }, [homeDestinationId, home, interior, district.id, controller, goInside]);
   /** This hour's work task, if you're at your workplace during working hours and haven't done it yet. */
   const taskOnOffer = (): WorkTask | null => {
     if (indoors || character.career === 'none' || !isWorkingHours(state.time) || state.summary) return null;
@@ -286,11 +426,8 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
     return taskForHour(character.career, state.time.totalMinutes);
   };
   const hourlyPay = Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, state.workMinutes).pay * equipmentPay(state.equipment, character.career));
-  const nearSpot = (spot: readonly [number, number]) =>
-    Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= USE_RADIUS;
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [locationsOpen, setLocationsOpen] = useState(false);
   const [trackedId, setTrackedId] = useState<string | null>(null);
   const locations = useMemo(() => locationsFor(district, character.career, state.home), [district, character.career, state.home]);
   const trackedLocation = locations.find((l) => l.id === trackedId && l.position) ?? null;
@@ -316,13 +453,41 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
 
+  // Sitting down somewhere (park benches, the lounge terrace): see sitInPark and sitOnTerrace below
+  const sit = useSitSession(controller, wait);
+  const sofaSeat = (): Seat | null => {
+    const sofa = interior?.furniture.find((f) => f.kind === 'sofa');
+    return sofa ? { id: 'home-sofa', x: sofa.at[0], z: sofa.at[1], facing: Math.PI, height: 0.45 } : null;
+  };
+  const interactAtHome = (action: HomeAction) => {
+    if (!interior || !home) return;
+    if (action === 'door') goOutside();
+    else if (action === 'bed') rest(true);
+    else if (action === 'wardrobe' || action === 'mirror') setStore('wardrobe');
+    else if (action === 'sofa' || action === 'tv') {
+      const seat = sofaSeat();
+      if (seat) sit.start({ seat, place: action === 'tv' ? `Watching TV at ${home.name}` : `Sitting at ${home.name}`, minutes: 30 });
+    } else if (action === 'kitchen') {
+      wait(15);
+      setArrival('You spend 15 minutes in the kitchen.');
+    } else if (action === 'bathroom') {
+      wait(15);
+      setArrival('You spend 15 minutes in the bathroom.');
+    }
+  };
+
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      // E on a seat gets you up; on the way to one it does nothing
+      if (sit.session) {
+        if (sit.session.phase === 'seated') sit.cancel();
+        return;
+      }
       if (indoors && interior) {
-        if (nearSpot(bedSpot(interior))) rest(true);
-        else if (nearSpot(doorSpot(interior))) goOutside();
+        const action = homeInteractionAt(interior, controller.position.x, controller.position.z);
+        if (action) interactAtHome(action);
         return;
       }
       const { x, z } = controller.position;
@@ -333,6 +498,8 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       else if (counter === 'fashion') setStore('shop');
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
+      else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
+      else if (parkAt(district.park, x, z)) setParkOpen(true);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
       else if (taskOnOffer()) setTask(taskOnOffer());
       else if (door) setHomePanel(door);
@@ -342,9 +509,45 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen]);
+
+  // The ⋯ directory: real places in this district; Go walks there with the route finder
+  const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
+  const goTo = (d: Destination): string | null => {
+    if (!d.position) return 'This place isn’t in the city yet.';
+    setMovementBlocked(false); // the panel is closing; let the trip start
+    const { x, z } = controller.position;
+    if (Math.hypot(d.position.x - x, d.position.z - z) < 1) return 'You’re already here.';
+    const ok = setMoveTarget(makeTarget(x, z, d.position.x, d.position.z, false), { destinationId: d.id, label: d.name });
+    if (!ok) {
+      setMovementBlocked(true);
+      return 'There’s no way to walk there from where you are.';
+    }
+    setLocationsOpen(false);
+    return null;
+  };
+
+  // Sitting: walk to the nearest free bench (or a terrace chair) and sit; waits pass in steps through the usual rules
+  const sitInPark = (minutes: WaitMinutes) => {
+    const seat = nearestSeat(benchSeats(district.layout.park), controller.position.x, controller.position.z);
+    setParkOpen(false);
+    setMovementBlocked(false); // the panel is closing; let the walk start
+    if (seat) sit.start({ seat, place: district.park.name, minutes });
+  };
+  const sitOnTerrace = (place: string, holdSeconds?: number) => {
+    const seat = nearestSeat(chairSeats(district.layout.terraceChairs), controller.position.x, controller.position.z);
+    setNightOpen(false);
+    setMovementBlocked(false);
+    if (seat) sit.start({ seat, place, minutes: 0, holdSeconds });
+  };
+  // A night out is charged once, as before; afterwards you sit outside with your friend's name for a moment
+  const goOutWith = (residentId: string) => {
+    nightOut(residentId);
+    const first = residentById(residentId)?.name.split(' ')[0];
+    sitOnTerrace(`${district.nightlife.name}${first ? ` after a night out with ${first}` : ''}`, 6);
+  };
 
   // M opens the phone map once you own a phone
   useEffect(() => {
@@ -445,15 +648,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onClose={() => setGadgets(false)}
         />
       )}
-      {mapOpen && phone && (
-        <MapPanel
-          district={district}
-          controller={controller}
-          homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
-          onClose={() => setMapOpen(false)}
-        />
-      )}
-      {locationsOpen && (
+      {locationsOpen && !indoors && (
         <CityLocationsPanel
           district={district}
           entries={locations}
@@ -463,7 +658,37 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           onTrack={(e) => { setTrackedId(e.id); setLocationsOpen(false); }}
           onStopTracking={() => setTrackedId(null)}
           onUse={useLocation}
+          destinations={destinations}
+          from={{ x: controller.position.x, z: controller.position.z }}
+          showRoute={showRoute}
+          onShowRouteChange={onShowRouteChange}
+          onGo={goTo}
           onClose={() => setLocationsOpen(false)}
+        />
+      )}
+      {!indoors && <TripStatus destinations={destinations} />}
+      {parkOpen && (
+        <ParkPanel park={district.park} time={state.time} onSit={sitInPark} onClose={() => setParkOpen(false)} />
+      )}
+      {sit.session && <SitBar session={sit.session} onStand={sit.cancel} />}
+      {nightOpen && (
+        <NightlifePanel
+          venue={district.nightlife}
+          districtId={district.id}
+          time={state.time}
+          balance={state.balance}
+          relationships={state.relationships}
+          onNightOut={goOutWith}
+          onSitOutside={() => sitOnTerrace(district.nightlife.name)}
+          onClose={() => setNightOpen(false)}
+        />
+      )}
+      {mapOpen && phone && (
+        <MapPanel
+          district={district}
+          controller={controller}
+          homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
+          onClose={() => setMapOpen(false)}
         />
       )}
       {homePanel && (
@@ -514,14 +739,26 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
+          <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time}>
+              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} doorOpen>
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} />
+              <City
+                key={district.id}
+                controller={controller}
+                character={character}
+                gameTime={state.time}
+                tryOn={tryOn}
+                homeId={state.home}
+                district={district}
+                talkingTo={talking?.id ?? null}
+                hugSession={hugging}
+                onHugComplete={finishHug}
+              />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
@@ -548,6 +785,7 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
           today={gameDay(state.time.totalMinutes)}
           balance={state.balance}
           onActivity={(activity) => socialise(talking.id, activity)}
+          onRequestHug={() => requestHug(talking)}
           onStayOver={() => { setTalking(null); rest(false, true); }}
           onClose={() => setTalking(null)}
         />
@@ -578,6 +816,9 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
       <HUD
         district={district}
         onOpenTravel={() => setTravelOpen(true)}
+        onOpenNightlife={() => setNightOpen(true)}
+        onOpenPark={() => setParkOpen(true)}
+        busy={!!sit.session}
         onTalk={setTalking}
         workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}
@@ -591,17 +832,26 @@ function Game({ character, quality: qualityMode, onQualityChange, onExitToMenu, 
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
           name: home!.name,
-          prompt: nearSpot(bedSpot(interior))
-            ? { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) }
-            : nearSpot(doorSpot(interior))
-              ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside }
-              : null,
+          interactionAt: (x, z) => {
+            const action = homeInteractionAt(interior, x, z);
+            return action ? ({
+            door: { verb: 'Go outside through', place: 'the front door', onOpen: () => interactAtHome('door'), icon: DoorOpen },
+            bed: { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => interactAtHome('bed'), icon: BedDouble },
+            wardrobe: { verb: 'Change clothes at', place: 'the wardrobe', onOpen: () => interactAtHome('wardrobe'), icon: Shirt },
+            mirror: { verb: 'Check your outfit at', place: 'the mirror', onOpen: () => interactAtHome('mirror'), icon: ScanEye },
+            sofa: { verb: 'Sit on the sofa at', place: home!.name, onOpen: () => interactAtHome('sofa'), icon: Sofa },
+            tv: { verb: 'Watch TV at', place: home!.name, onOpen: () => interactAtHome('tv'), icon: Tv },
+            kitchen: { verb: 'Use the kitchen at', place: home!.name, onOpen: () => interactAtHome('kitchen'), icon: CookingPot },
+            bathroom: { verb: 'Use the bathroom at', place: home!.name, onOpen: () => interactAtHome('bathroom'), icon: ShowerHead },
+            })[action] : null;
+          },
         } : undefined}
         workMinutes={state.workMinutes}
         equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}
         onOpenMap={phone ? () => setMapOpen(true) : undefined}
-        onOpenLocations={() => setLocationsOpen(true)}
+        onGoHome={home && !indoors ? goHome : undefined}
+        onOpenLocations={indoors ? undefined : () => setLocationsOpen(true)}
         tracked={trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
         onStopTracking={() => setTrackedId(null)}
         fullness={state.fullness}

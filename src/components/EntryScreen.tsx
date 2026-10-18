@@ -7,6 +7,8 @@ import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { formatHome } from '../lib/places';
 import { DISTRICTS } from '../lib/geography';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
+import { UserRound } from 'lucide-react';
+import { CloudAccountPanel } from './CloudAccountPanel';
 
 interface EntryScreenProps {
   /** The life saved on this device, if any. */
@@ -17,7 +19,7 @@ interface EntryScreenProps {
   onNewLife: () => void;
 }
 
-type Panel = 'menu' | 'confirm-new' | 'help' | 'settings';
+type Panel = 'menu' | 'confirm-new' | 'help' | 'settings' | 'account';
 
 const QUALITY_INFO: Record<QualityMode, { label: string; detail: string }> = {
   auto: { label: 'Automatic', detail: 'Starts on High and switches to Low if the frame rate drops. Recommended.' },
@@ -87,6 +89,10 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                   <button type="button" onClick={startNew} className={saved ? SECONDARY : PRIMARY}>
                     Start a new life
                   </button>
+                  <button type="button" onClick={() => setPanel('account')} className={`${SECONDARY} inline-flex items-center justify-center gap-2`}>
+                    <UserRound size={17} aria-hidden="true" />
+                    AYE Connect account
+                  </button>
                   <div className="mt-1 flex justify-center gap-4">
                     <button type="button" onClick={() => setPanel('help')} className={LINK}>How to play</button>
                     <button type="button" onClick={() => setPanel('settings')} className={LINK}>Settings</button>
@@ -110,9 +116,10 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
               {panel === 'help' && (
                 <PanelBody title="How to play" headingRef={headingRef} onBack={() => setPanel('menu')}>
                   <p className="text-sm text-cc-muted">
-                    Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.slice(1).map((d) => d.city.name).join(' and ')}.
+                    Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.length - 1} other cities: the capital of every country, and every state capital in Nigeria.
                   </p>
                   <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                    <Key k="Click">Click or tap the ground to go there; you find your own way round (Shift-click to stroll)</Key>
                     <Key k="W / S">Move forward / back</Key>
                     <Key k="A / D">Turn</Key>
                     <Key k="Shift">Hold to walk instead of jog</Key>
@@ -124,11 +131,16 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                   <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-cc-muted">
                     <li>Go to your workplace (the glowing ring) between 09:00 and 17:00 to earn wages. Once an hour, press E there for a task from your job: good calls earn a bonus and speed up promotion.</li>
                     <li>Eat before you get hungry: hungry work pays half.</li>
-                    <li>Get to know the residents. They are computer-controlled, never other players. Close friends will put you up for the night.</li>
+                    <li>Get to know the residents. They are computer-controlled, never other players. Close friends will put you up for the night, and friends will come out with you to the lounge in the evening.</li>
+                    <li>The ⋯ button lists every place in the city by category and walks you there. Sit on a park bench to let time pass, e.g. until the lounge opens.</li>
                     <li>Rent a home at a door with a “To let” board. Rent is due each night; sleeping anywhere else is sleeping rough.</li>
                     <li>Rest sleeps until 07:00 and shows how your day went.</li>
                   </ul>
                 </PanelBody>
+              )}
+
+              {panel === 'account' && (
+                <CloudAccountPanel onBack={() => setPanel('menu')} headingRef={headingRef} />
               )}
 
               {panel === 'settings' && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, itemById, resolveStyles, stockedIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
+import { Check, Footprints, Scissors, ScanEye, Shirt, ShoppingBag, Wallet, X, type LucideIcon } from 'lucide-react';
 
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
@@ -21,6 +22,7 @@ interface FashionStoreProps {
 }
 
 const BUTTON = 'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50';
+const SLOT_ICON: Record<Slot, LucideIcon> = { top: Shirt, bottom: Shirt, shoes: Footprints, hair: Scissors };
 
 /**
  * Boutique and wardrobe. A side panel so the player's 3D character stays in
@@ -53,17 +55,20 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
       <header className="flex items-start justify-between gap-3 border-b border-ui-line/70 px-5 pb-3 pt-4">
         <div>
           <p className="m-0 text-[11px] uppercase tracking-[0.18em] text-ui-muted">{mode === 'shop' ? `${shop.name} · ${shop.kind}` : 'Your wardrobe'}</p>
-          <h2 id="store-title" className="m-0 mt-1 font-display text-xl font-semibold">{mode === 'shop' ? 'Find your look' : 'Get dressed'}</h2>
-          <p className="m-0 mt-1 text-xs text-ui-muted">Balance <span className="font-semibold tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
+          <h2 id="store-title" className="m-0 mt-1 flex items-center gap-2 font-display text-xl font-semibold">
+            {mode === 'shop' ? <ShoppingBag size={19} className="text-ui-accent-strong" /> : <Shirt size={19} className="text-ui-accent-strong" />}
+            {mode === 'shop' ? 'Find your look' : 'Get dressed'}
+          </h2>
+          <p className="m-0 mt-1 flex items-center gap-1.5 text-xs text-ui-muted"><Wallet size={14} />Balance <span className="font-semibold tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
         </div>
-        <button type="button" onClick={onClose} className={`${BUTTON} border-ui-line text-ui-muted hover:text-ui-ink`}>Done</button>
+        <button type="button" onClick={onClose} className={`${BUTTON} inline-flex items-center gap-1.5 border-ui-line text-ui-muted hover:text-ui-ink`}><X size={14} />Done</button>
       </header>
 
       <nav className="flex gap-1 overflow-x-auto px-4 pt-3" role="tablist" aria-label="Category">
         {SLOTS.map((s) => (
           <button key={s} type="button" role="tab" aria-selected={slot === s} onClick={() => setSlot(s)}
-            className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs transition ${slot === s ? 'border-ui-accent bg-ui-accent/15 text-ui-ink' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}>
-            {SLOT_LABEL[s]}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs transition ${slot === s ? 'border-ui-accent bg-ui-accent/15 text-ui-ink' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}>
+            {(() => { const Icon = SLOT_ICON[s]; return <Icon size={14} aria-hidden="true" />; })()}{SLOT_LABEL[s]}
           </button>
         ))}
       </nav>
@@ -82,8 +87,8 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
                       {SLOTS.map((s) => <span key={s} className="h-5 w-3 rounded-sm border border-ui-line" style={{ background: looks[s] ? swatchCss(looks[s]!) : '#2a2d33' }} />)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm" title={SLOTS.map((s) => itemById(o.equipped[s])?.name ?? `Original ${s}`).join(', ')}>{o.name}</span>
-                    <button type="button" className={`${BUTTON} border-ui-line hover:border-ui-accent`} onClick={() => onWearOutfit?.(i)}>Wear</button>
-                    <button type="button" className={`${BUTTON} border-ui-line text-ui-muted hover:text-ui-ink`} aria-label={`Delete look ${o.name}`} onClick={() => onDeleteOutfit?.(i)}>✕</button>
+                    <button type="button" className={`${BUTTON} inline-flex items-center gap-1 border-ui-line hover:border-ui-accent`} onClick={() => onWearOutfit?.(i)}><Shirt size={13} />Wear</button>
+                    <button type="button" className={`${BUTTON} border-ui-line text-ui-muted hover:text-ui-ink`} aria-label={`Delete look ${o.name}`} title={`Delete look ${o.name}`} onClick={() => onDeleteOutfit?.(i)}><X size={13} /></button>
                   </li>
                 );
               })}
@@ -93,7 +98,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
                 <label htmlFor="outfit-name" className="sr-only">Name this look</label>
                 <input id="outfit-name" value={outfitName} maxLength={24} onChange={(e) => setOutfitName(e.target.value)} placeholder="Name this look, e.g. Sunday best"
                   className="min-w-0 flex-1 rounded-md border border-ui-line bg-black/20 px-2.5 py-1.5 text-sm text-ui-ink placeholder:text-ui-faint focus:border-ui-accent focus:outline-none" />
-                <button type="submit" disabled={!outfitName.trim()} className={`${BUTTON} border-ui-accent bg-ui-accent/20 text-ui-ink hover:bg-ui-accent/30`}>Save</button>
+                <button type="submit" disabled={!outfitName.trim()} className={`${BUTTON} inline-flex items-center gap-1 border-ui-accent bg-ui-accent/20 text-ui-ink hover:bg-ui-accent/30`}><Check size={13} />Save</button>
               </form>
             )}
           </section>
@@ -103,6 +108,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
           subtitle={slot === 'hair' ? 'Your own hair colour' : 'What you were wearing'}
           swatch="repeating-linear-gradient(45deg, #2a2d33 0 6px, #353a42 6px 12px)"
           active={shownId === null}
+          icon={SLOT_ICON[slot]}
           actions={
             <>
               {mode === 'shop' && <button type="button" className={`${BUTTON} border-ui-line hover:border-ui-accent`} onClick={() => onTryOn(slot, null)}>Try on</button>}
@@ -123,26 +129,29 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
             <ItemRow
               key={item.id}
               title={item.name}
-              subtitle={`${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}`}
+              subtitle={`${item.style.fabric ? `${item.style.fabric.name[0].toUpperCase()}${item.style.fabric.name.slice(1)} · ` : ''}${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}`}
               swatch={swatchCss(item.style)}
               active={shownId === item.id}
+              icon={SLOT_ICON[slot]}
               actions={
                 <>
                   {mode === 'shop' && !wearing && (
-                    <button type="button" className={`${BUTTON} border-ui-line hover:border-ui-accent`} onClick={() => onTryOn(slot, item.id)}>Try on</button>
+                    <button type="button" className={`${BUTTON} inline-flex items-center gap-1 border-ui-line hover:border-ui-accent`} onClick={() => onTryOn(slot, item.id)}><ScanEye size={13} />Try on</button>
                   )}
                   {owned ? (
-                    <button type="button" className={`${BUTTON} border-ui-line hover:border-ui-accent`} disabled={wearing} onClick={() => onEquip(slot, item.id)}>
+                    <button type="button" className={`${BUTTON} inline-flex items-center gap-1 border-ui-line hover:border-ui-accent`} disabled={wearing} onClick={() => onEquip(slot, item.id)}>
+                      <Shirt size={13} />
                       {wearing ? 'Wearing' : 'Wear'}
                     </button>
                   ) : (
                     <button
                       type="button"
-                      className={`${BUTTON} border-ui-accent bg-ui-accent/20 text-ui-ink hover:bg-ui-accent/30`}
+                      className={`${BUTTON} inline-flex items-center gap-1 border-ui-accent bg-ui-accent/20 text-ui-ink hover:bg-ui-accent/30`}
                       disabled={!affordable}
                       title={affordable ? undefined : 'Not enough money'}
                       onClick={() => { onBuy(item); setMessage(`Bought ${item.name}. You're wearing it now.`); }}
                     >
+                      <ShoppingBag size={13} />
                       Buy
                     </button>
                   )}
@@ -162,14 +171,14 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
   );
 }
 
-function ItemRow({ title, subtitle, swatch, active, actions }: {
-  title: string; subtitle: string; swatch: string; active: boolean; actions: React.ReactNode;
+function ItemRow({ title, subtitle, swatch, active, actions, icon: Icon }: {
+  title: string; subtitle: string; swatch: string; active: boolean; actions: React.ReactNode; icon: LucideIcon;
 }) {
   return (
     <div className={`flex items-center gap-3 rounded-xl border p-2.5 ${active ? 'border-ui-accent bg-ui-accent/10' : 'border-ui-line/70 bg-ui-panel'}`}>
       <span className="h-11 w-11 shrink-0 rounded-lg border border-ui-line" style={{ background: swatch }} aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="m-0 truncate text-sm font-medium">{title}</p>
+        <p className="m-0 flex items-center gap-1.5 truncate text-sm font-medium"><Icon size={13} aria-hidden="true" className="shrink-0 text-ui-accent-strong" />{title}</p>
         <p className="m-0 truncate text-xs text-ui-muted">{subtitle}</p>
       </div>
       <div className="flex shrink-0 gap-1.5">{actions}</div>

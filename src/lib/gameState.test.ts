@@ -12,7 +12,8 @@ import {
   type GameState,
 } from './gameState';
 import { ROUGH_SLEEP_FULLNESS_LOSS, allHomes, moveInFee } from './homes';
-import { TRAVEL_OPTIONS } from './travel';
+import { distanceKm, travelOption, travelOptions } from './travel';
+import { districtById } from './geography';
 import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, FRIENDSHIP_LEVELS } from './people';
 
@@ -253,18 +254,36 @@ describe('equipment', () => {
 });
 
 describe('travel', () => {
+  const lagos = districtById('lagos.marina').city;
+  const accra = districtById('accra.osu').city;
+  const flight = travelOption(lagos, accra, 'flight')!;
+
   it('flying to Accra costs the fare, takes the flight time and moves you there', () => {
     const start = createGameState(5000, createTime(9, 0));
     const s = gameReducer(start, { type: 'travel', to: 'accra.osu', mode: 'flight' }, 'none', 'student');
     expect(s.districtId).toBe('accra.osu');
-    expect(s.time.totalMinutes - start.time.totalMinutes).toBe(TRAVEL_OPTIONS.flight.minutes);
-    expect(s.balance).toBe(5000 - TRAVEL_OPTIONS.flight.fare - 3 * HOURLY_LIVING_COST.student);
+    expect(s.time.totalMinutes - start.time.totalMinutes).toBe(flight.minutes);
+    expect(s.balance).toBe(5000 - flight.fare - Math.floor(flight.minutes / 60) * HOURLY_LIVING_COST.student);
     expect(s.fullness).toBeLessThan(100);
   });
 
   it('the coach is cheaper but takes much longer', () => {
-    expect(TRAVEL_OPTIONS.coach.fare).toBeLessThan(TRAVEL_OPTIONS.flight.fare);
-    expect(TRAVEL_OPTIONS.coach.minutes).toBeGreaterThan(TRAVEL_OPTIONS.flight.minutes);
+    const coach = travelOption(lagos, accra, 'coach')!;
+    expect(coach.fare).toBeLessThan(flight.fare);
+    expect(coach.minutes).toBeGreaterThan(flight.minutes);
+  });
+
+  it('fares and times grow with distance, and short hops are by road only', () => {
+    expect(distanceKm(lagos, accra)).toBeGreaterThan(380);
+    expect(distanceKm(lagos, accra)).toBeLessThan(440);
+    const ibadan = districtById('ibadan.dugbe').city;
+    const kano = districtById('kano.sabon-gari').city;
+    expect(travelOptions(lagos, ibadan).map((o) => o.mode)).toEqual(['coach']);
+    expect(travelOption(lagos, kano, 'flight')!.fare).toBeGreaterThan(flight.fare);
+    expect(travelOption(lagos, kano, 'coach')!.minutes).toBeGreaterThan(travelOption(lagos, ibadan, 'coach')!.minutes);
+    expect(travelOptions(lagos, lagos)).toEqual([]);
+    const s = createGameState(9000);
+    expect(gameReducer(s, { type: 'travel', to: 'ibadan.dugbe', mode: 'flight' }, 'none', 'student')).toBe(s);
   });
 
   it('refuses trips you cannot afford, to unknown places or to where you already are', () => {
@@ -311,6 +330,32 @@ describe('relationships', () => {
   it('you can only spend time with people in the city you are in', () => {
     expect(social(lagos(), 'kojo', 'chat').relationships.kojo).toBeUndefined();
     expect(social({ ...lagos(), districtId: 'accra.osu' }, 'kojo', 'chat').relationships.kojo.points).toBe(ACTIVITIES.chat.points);
+  });
+
+  it('only completes an accepted adult hug after acquaintance and limits relationship growth to once a day', () => {
+    const unknown = lagos();
+    expect(gameReducer(unknown, { type: 'hug', residentId: 'tunde' }, 'none', 'student')).toBe(unknown);
+    const known = {
+      ...lagos(),
+      relationships: { tunde: { points: FRIENDSHIP_LEVELS[1].points, lastDay: 0 } },
+    };
+    const hugged = gameReducer(known, { type: 'hug', residentId: 'tunde' }, 'none', 'student');
+    expect(hugged.relationships.tunde).toMatchObject({
+      points: FRIENDSHIP_LEVELS[1].points + 2,
+      lastDay: 0,
+      lastHugDay: 0,
+    });
+    expect(gameReducer(hugged, { type: 'hug', residentId: 'tunde' }, 'none', 'student')).toBe(hugged);
+    expect(gameReducer(known, { type: 'hug', residentId: 'kojo' }, 'none', 'student')).toBe(known);
+    const maxed = {
+      ...known,
+      relationships: { ...known.relationships, tunde: { points: 100, lastDay: -1 } },
+    };
+    expect(gameReducer(maxed, { type: 'hug', residentId: 'tunde' }, 'none', 'student').relationships.tunde)
+      .toMatchObject({ points: 100, lastHugDay: 0 });
+    const tomorrow = { ...hugged, time: { ...hugged.time, totalMinutes: hugged.time.totalMinutes + 1440 } };
+    expect(gameReducer(tomorrow, { type: 'hug', residentId: 'tunde' }, 'none', 'student').relationships.tunde.points)
+      .toBe(FRIENDSHIP_LEVELS[1].points + 4);
   });
 
   it("sleeping on a close friend's couch is not sleeping rough", () => {

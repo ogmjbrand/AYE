@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
-import { isDistrictId } from './geography';
+import { FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
   it('has unique ids, valid colours and prices, and items for every slot', () => {
@@ -30,7 +30,10 @@ describe('fashion catalogue', () => {
   });
 
   it('each boutique has its own range, plus the basics everywhere', () => {
-    for (const i of FASHION_ITEMS) for (const d of i.stockedIn ?? []) expect(isDistrictId(d), i.id).toBe(true);
+    for (const i of FASHION_ITEMS) for (const c of i.stockedIn ?? []) expect(COUNTRY_CODES, i.id).toContain(c);
+    // Every Nigerian city stocks aso-oke, not kente
+    expect(stockedIn('kano.sabon-gari').map((i) => i.id)).toContain('top-asooke-champagne');
+    expect(stockedIn('kano.sabon-gari').map((i) => i.id)).not.toContain('top-kente-adweneasa');
     const lagos = stockedIn('lagos.marina').map((i) => i.id);
     const accra = stockedIn('accra.osu').map((i) => i.id);
     expect(lagos).toContain('top-asooke-champagne');
@@ -58,5 +61,15 @@ describe('fashion catalogue', () => {
     expect(w.outfits![0]).toEqual({ name: 'Sunday best', equipped: { top: 'top-batik-ocean', hair: 'hair-copper' } });
     expect(w.outfits!.length).toBe(MAX_OUTFITS);
     expect(sanitiseWardrobe({ owned: [], equipped: {} }).outfits).toBeUndefined();
+  });
+  it('every garment has a fabric that suits it; hair dye keeps the hair finish', () => {
+    for (const i of FASHION_ITEMS) {
+      if (i.slot === 'hair') expect(i.style.fabric, i.id).toBeUndefined();
+      else expect(i.style.fabric, i.id).toBeDefined();
+    }
+    expect(itemById('top-silk-burgundy')!.style.fabric!.roughness).toBeLessThan(FABRICS.cotton.roughness);
+    expect(itemById('bottom-denim-classic')!.style.fabric!.weave).toBe(2);
+    expect(itemById('top-kente-adweneasa')!.style.fabric!.name).toBe('handwoven');
+    expect(itemById('shoes-metallic-gold')!.style.fabric!.metalness).toBeGreaterThan(0.5);
   });
 });

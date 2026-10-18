@@ -6,7 +6,16 @@
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import type { Home } from './homes';
 
-export type FurnitureKind = 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp' | 'fridge';
+export type FurnitureKind =
+  | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp'
+  | 'fridge' | 'cabinet' | 'mirror' | 'sink' | 'toilet' | 'shower';
+
+export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
+
+export interface InteriorWall {
+  position: readonly [number, number, number];
+  size: readonly [number, number, number];
+}
 
 export interface Furniture {
   kind: FurnitureKind;
@@ -15,6 +24,7 @@ export interface Furniture {
   /** Width (X), height, depth (Z). */
   size: readonly [number, number, number];
   color: string;
+  elevation?: number;
 }
 
 export interface Interior {
@@ -25,6 +35,8 @@ export interface Interior {
   floorColor: string;
   /** Big window on the far wall (penthouse: floor to ceiling). */
   window: 'small' | 'wide' | 'full';
+  /** Non-load-bearing interior walls, with central openings between rooms. */
+  partitions: readonly InteriorWall[];
   furniture: readonly Furniture[];
 }
 
@@ -32,66 +44,63 @@ export const WALL_HEIGHT = 2.9;
 /** Use radius for the bed and the door. */
 export const USE_RADIUS = 1.4;
 
-const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string): Furniture =>
-  ({ kind, at: [x, z], size: [w, h, d], color });
+const f = (
+  kind: FurnitureKind,
+  x: number,
+  z: number,
+  w: number,
+  h: number,
+  d: number,
+  color: string,
+  elevation = 0,
+): Furniture => ({ kind, at: [x, z], size: [w, h, d], color, elevation });
+
+function makeInterior(
+  tier: Interior['tier'],
+  width: number,
+  depth: number,
+  wallColor: string,
+  floorColor: string,
+  window: Interior['window'],
+): Interior {
+  const left = -width / 4;
+  const right = width / 4;
+  const front = -depth / 4;
+  const back = depth / 4;
+  const wallHeight = WALL_HEIGHT - 0.25;
+  const doorway = 1.2;
+  const horizontalLength = width / 2 - doorway / 2;
+  const partitions: InteriorWall[] = [
+    { position: [0, wallHeight / 2, (depth / 2 + doorway) / 2], size: [0.12, wallHeight, depth / 2 - doorway] },
+    { position: [-(width / 2 + doorway / 2) / 2, wallHeight / 2, 0], size: [horizontalLength, wallHeight, 0.12] },
+    { position: [(width / 2 + doorway / 2) / 2, wallHeight / 2, 0], size: [horizontalLength, wallHeight, 0.12] },
+  ];
+  const furniture: Furniture[] = [
+    f('bed', right - 0.1, back - 0.85, 1.8, 0.55, 2.3, '#52677b'),
+    f('wardrobe', width / 2 - 0.75, back + 1.2, 1.1, 2.1, 0.65, '#60452f'),
+    f('mirror', width / 2 - 0.14, back - 0.9, 0.08, 1.65, 0.75, '#9dbac0', 0.15),
+    f('sofa', right, front + 1.3, 2.4, 0.85, 1.0, '#59646b'),
+    f('tv', right, -depth / 2 + 0.45, 1.6, 1.15, 0.38, '#22262b'),
+    f('table', right, front - 0.65, 1.1, 0.42, 0.68, '#74543b'),
+    f('rug', right, front - 0.35, 3.1, 0.01, 2.25, '#a77f52'),
+    f('counter', left, -depth / 2 + 0.55, 2.3, 0.92, 0.72, '#b8aa95'),
+    f('cabinet', left, -depth / 2 + 0.55, 2.0, 0.75, 0.48, '#80674f', 1.45),
+    f('fridge', -width / 2 + 0.7, front - 0.1, 0.78, 1.9, 0.78, '#c9cdce'),
+    f('shower', -width / 2 + 0.8, back + 1.0, 1.15, 2.15, 1.15, '#a8c0c5'),
+    f('sink', left, back + 1.15, 0.85, 0.9, 0.58, '#dedbd2'),
+    f('toilet', left, back - 0.45, 0.62, 0.78, 0.9, '#e5e5e1'),
+    f('plant', width / 2 - 0.55, front - 1.3, 0.48, 1.15, 0.48, '#517247'),
+    f('lamp', right - 1.8, front + 1.0, 0.36, 1.7, 0.36, '#e5d7b8'),
+  ];
+
+  return { tier, width, depth, wallColor, floorColor, window, partitions, furniture };
+}
 
 export const INTERIORS: Record<Interior['tier'], Interior> = {
-  room: {
-    tier: 'room', width: 4.5, depth: 4.5, wallColor: '#d9cdb5', floorColor: '#8a6f55', window: 'small',
-    furniture: [
-      f('bed', -1.25, 1.2, 1.1, 0.5, 2.0, '#4b5d73'),
-      f('wardrobe', 1.65, 1.6, 1.0, 2.0, 0.6, '#6b4a33'),
-      f('table', 1.5, -0.6, 0.8, 0.75, 0.6, '#7a5a3e'),
-      f('rug', -0.2, -0.2, 1.6, 0.01, 1.1, '#a3483a'),
-    ],
-  },
-  flat: {
-    tier: 'flat', width: 6.5, depth: 5.5, wallColor: '#e4d8c2', floorColor: '#9a7b5c', window: 'wide',
-    furniture: [
-      f('bed', -2.1, 1.65, 1.5, 0.55, 2.1, '#3f5a6b'),
-      f('wardrobe', -0.6, 2.4, 1.2, 2.0, 0.6, '#5d4330'),
-      f('sofa', 2.2, 0.6, 1.0, 0.85, 2.0, '#6d6a62'),
-      f('tv', -0.2, -0.2, 1.1, 0.9, 0.35, '#1c1d20'),
-      f('counter', 2.4, -2.1, 1.6, 0.92, 0.65, '#cfc6b6'),
-      f('fridge', 1.25, -2.15, 0.7, 1.8, 0.65, '#d8d9d6'),
-      f('rug', 1.1, 0.6, 1.6, 0.01, 2.0, '#2f6a73'),
-      f('plant', -3.0, -2.3, 0.45, 1.1, 0.45, '#3f6b3a'),
-    ],
-  },
-  apartment: {
-    tier: 'apartment', width: 9, depth: 7, wallColor: '#ece4d6', floorColor: '#b08d68', window: 'wide',
-    furniture: [
-      f('bed', -3.2, 2.2, 1.8, 0.55, 2.2, '#2d4a5e'),
-      f('wardrobe', -1.3, 3.15, 1.8, 2.1, 0.6, '#4f3a2a'),
-      f('desk', 3.4, 2.9, 1.5, 0.75, 0.7, '#6e5038'),
-      f('sofa', 2.9, -0.2, 2.4, 0.85, 1.0, '#7a3e3a'),
-      f('table', 2.9, 1.25, 1.2, 0.45, 0.7, '#5a4330'),
-      f('tv', 2.9, -2.1, 1.6, 1.0, 0.4, '#18191c'),
-      f('counter', -3.4, -2.6, 1.8, 0.92, 0.7, '#d5ccbb'),
-      f('fridge', -1.95, -3.0, 0.75, 1.85, 0.7, '#dcdcda'),
-      f('rug', 2.9, 0.6, 3.0, 0.01, 2.2, '#c8a96a'),
-      f('plant', 4.1, -3.0, 0.5, 1.3, 0.5, '#3f6b3a'),
-      f('lamp', -0.3, 2.6, 0.4, 1.7, 0.4, '#e8d8b0'),
-    ],
-  },
-  penthouse: {
-    tier: 'penthouse', width: 13, depth: 9, wallColor: '#f1ede6', floorColor: '#d9d4cc', window: 'full',
-    furniture: [
-      f('bed', -4.8, 3.0, 2.2, 0.6, 2.3, '#e7e2d8'),
-      f('wardrobe', -2.3, 4.15, 2.2, 2.2, 0.6, '#3a3a3c'),
-      f('desk', -5.6, -0.4, 0.8, 0.75, 1.8, '#2b2b2d'),
-      f('sofa', 3.5, 1.4, 3.2, 0.85, 1.1, '#3b4250'),
-      f('sofa', 5.6, -0.6, 1.0, 0.85, 2.4, '#3b4250'),
-      f('table', 3.5, -0.4, 1.6, 0.42, 0.9, '#c9c3b8'),
-      f('tv', 3.5, -3.2, 2.2, 1.2, 0.4, '#151517'),
-      f('counter', -3.6, -3.5, 3.0, 0.95, 0.8, '#efece6'),
-      f('fridge', -1.6, -3.95, 0.8, 1.9, 0.75, '#c4c6c8'),
-      f('rug', 3.5, 0.5, 4.0, 0.01, 3.2, '#8a7b66'),
-      f('plant', 6.0, 3.8, 0.6, 1.6, 0.6, '#3f6b3a'),
-      f('plant', 0.6, 3.9, 0.6, 1.6, 0.6, '#3f6b3a'),
-      f('lamp', -6.0, 1.0, 0.4, 1.8, 0.4, '#efe2c0'),
-    ],
-  },
+  room: makeInterior('room', 10, 8, '#d9cdb5', '#8a6f55', 'small'),
+  flat: makeInterior('flat', 12, 9, '#e4d8c2', '#9a7b5c', 'wide'),
+  apartment: makeInterior('apartment', 14, 10, '#ece4d6', '#b08d68', 'wide'),
+  penthouse: makeInterior('penthouse', 16, 12, '#f1ede6', '#d9d4cc', 'full'),
 };
 
 export function interiorFor(home: Home): Interior {
@@ -103,10 +112,41 @@ export function interiorFor(home: Home): Interior {
 
 /** Where you stand just inside the front door. */
 export const doorSpot = (i: Interior) => [0, -i.depth / 2 + 0.7] as const;
-/** Where you stand to get into bed: beside it, on the room side. */
+/** Where you stand to get into bed: in the clear aisle beside its left edge. */
 export function bedSpot(i: Interior): readonly [number, number] {
   const bed = i.furniture.find((x) => x.kind === 'bed')!;
-  return [bed.at[0] + bed.size[0] / 2 + 0.45, bed.at[1]];
+  return [bed.at[0] - bed.size[0] / 2 - 0.45, bed.at[1]];
+}
+
+const ACTION_FOR_FURNITURE: Partial<Record<FurnitureKind, HomeAction>> = {
+  bed: 'bed',
+  wardrobe: 'wardrobe',
+  mirror: 'mirror',
+  sofa: 'sofa',
+  tv: 'tv',
+  counter: 'kitchen',
+  fridge: 'kitchen',
+  cabinet: 'kitchen',
+  shower: 'bathroom',
+  sink: 'bathroom',
+  toilet: 'bathroom',
+};
+
+/** Contextual action for the nearest object, measured from its walkable edge. */
+export function homeInteractionAt(i: Interior, x: number, z: number): HomeAction | null {
+  const [doorX, doorZ] = doorSpot(i);
+  if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
+
+  let nearest: { action: HomeAction; distance: number } | null = null;
+  for (const item of i.furniture) {
+    const action = ACTION_FOR_FURNITURE[item.kind];
+    if (!action) continue;
+    const dx = Math.max(Math.abs(x - item.at[0]) - item.size[0] / 2, 0);
+    const dz = Math.max(Math.abs(z - item.at[1]) - item.size[2] / 2, 0);
+    const distance = Math.hypot(dx, dz);
+    if (distance <= USE_RADIUS && (!nearest || distance < nearest.distance)) nearest = { action, distance };
+  }
+  return nearest?.action ?? null;
 }
 
 const WALL = 0.2;
@@ -120,13 +160,19 @@ export function interiorLayout(i: Interior): DistrictLayout {
     wall(0, d / 2 + WALL / 2, w + 2 * WALL, WALL),
     wall(-w / 2 - WALL / 2, 0, WALL, d),
     wall(w / 2 + WALL / 2, 0, WALL, d),
+    wall(0, -d / 2 - WALL / 2, 1.4, WALL),
     // Front wall, either side of the door opening
     wall(-(w / 4 + 0.35), -d / 2 - WALL / 2, w / 2 - 0.7, WALL),
     wall(w / 4 + 0.35, -d / 2 - WALL / 2, w / 2 - 0.7, WALL),
     // The doorway itself: you leave with E, not by walking out
-    wall(0, -d / 2 - WALL - 0.1, 1.4, WALL),
+    ...i.partitions.map((p): Building => ({
+      position: p.position,
+      size: p.size,
+      color: i.wallColor,
+      style: 'residential',
+    })),
     ...i.furniture
-      .filter((x) => x.kind !== 'rug')
+      .filter((x) => !['rug', 'cabinet', 'mirror'].includes(x.kind))
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];
   return buildLayout({
@@ -143,6 +189,8 @@ export function interiorLayout(i: Interior): DistrictLayout {
     stalls: [],
     traffic: [],
     billboard: null,
+    park: null,
+    terraceChairs: [],
     skyline: { seed: 1, warm: ['#000'], glass: ['#000'], towerChance: 0 },
   });
 }

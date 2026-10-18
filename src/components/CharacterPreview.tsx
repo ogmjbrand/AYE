@@ -12,7 +12,15 @@ import type { BodyShape } from '../lib/bodyShape';
 /** A standing-still controller so the avatar plays its idle animation. */
 function useStillController(): PlayerHandle {
   return useMemo(
-    () => ({ position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} }),
+    () => ({
+      position: new Vector3(),
+      direction: 0,
+      velocity: new Vector3(),
+      trafficWarning: false,
+      applyMovement: () => {},
+      faceTowards: () => {},
+      moveToPose: () => {},
+    }),
     [],
   );
 }

@@ -3,6 +3,8 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { District, PlaceKind } from '../lib/geography';
 import { WORLD_BOUND } from '../lib/world';
 import { compass } from '../lib/locations';
+import { MapPin, X } from 'lucide-react';
+import { DirectoryIcon } from './DirectoryIcon';
 
 const KIND_COLOR: Record<PlaceKind, string> = {
   food: '#f0a35e',
@@ -10,8 +12,11 @@ const KIND_COLOR: Record<PlaceKind, string> = {
   workplace: '#8ab4d8',
   home: '#7cc4b0',
   public: '#a4a7ad',
+  nightlife: '#d4a3b9',
+  park: '#b4a77a',
 };
-const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public' };
+const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public', nightlife: 'Nightlife', park: 'Parks' };
+const KIND_ICON = { food: 'food', shop: 'shopping', workplace: 'workplaces', home: 'stays', public: 'travel', nightlife: 'nightlife', park: 'recreation' } as const;
 
 /**
  * Smartphone map of the district: buildings, roads, every place, your home and
@@ -52,8 +57,10 @@ export function MapPanel({ district, controller, homePlaceId, onClose }: {
       >
         <div className="relative shrink-0 p-4 sm:w-[26rem]">
           <div className="mb-2 flex items-center justify-between">
-            <h2 id="map-title" className="m-0 font-display text-xl font-bold">{district.name}, {district.city.name}</h2>
-            <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
+            <h2 id="map-title" className="m-0 flex items-center gap-2 font-display text-xl font-bold">
+              <MapPin size={20} aria-hidden="true" className="text-ui-accent-strong" />{district.name}, {district.city.name}
+            </h2>
+            <button type="button" onClick={onClose} aria-label="Close map" title="Close map" className="rounded p-2 text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"><X size={16} /></button>
           </div>
           <svg viewBox={`${-B} ${-B} ${2 * B} ${2 * B}`} className="aspect-square w-full rounded-xl bg-[#1d2126]" role="img" aria-label={`Map of ${district.name}. You are the white arrow.`}>
             <rect x={-ROAD_HALF_WIDTH} y={-B} width={ROAD_HALF_WIDTH * 2} height={2 * B} fill="#3a3f46" />
@@ -72,7 +79,7 @@ export function MapPanel({ district, controller, homePlaceId, onClose }: {
           </svg>
           <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-xs text-ui-muted">
             {(Object.keys(KIND_LABEL) as PlaceKind[]).filter((k) => places.some((p) => p.kind === k)).map((k) => (
-              <li key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: KIND_COLOR[k] }} />{KIND_LABEL[k]}</li>
+              <li key={k} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: KIND_COLOR[k] }} /><DirectoryIcon category={KIND_ICON[k]} size={13} />{KIND_LABEL[k]}</li>
             ))}
           </ul>
         </div>
@@ -80,7 +87,7 @@ export function MapPanel({ district, controller, homePlaceId, onClose }: {
           {places.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-1.5 text-sm">
               <span className="flex min-w-0 items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: KIND_COLOR[p.kind] }} aria-hidden />
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-ui-line/70 bg-ui-panel"><DirectoryIcon category={KIND_ICON[p.kind]} size={14} /></span>
                 <span className="truncate">{p.name}{p.id === homePlaceId && <span className="text-ui-muted"> · your home</span>}</span>
               </span>
               <span className="shrink-0 tabular-nums text-ui-muted">{Math.round(p.dist)} m {compass(p.position[0] - x, p.position[2] - z)}</span>

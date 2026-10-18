@@ -4,6 +4,11 @@
  * time with them builds a relationship, one activity per person per game day.
  * Close friends will put you up on their couch for the night.
  */
+import { hashString, pick, placeIn, planFor, slug, TEMPLATES, type CitySeed } from './districts/generate';
+import { NIGERIA } from './districts/nigeria';
+import { AFRICA } from './districts/africa';
+import { WORLD } from './districts/world';
+import { LOOKS } from './looks';
 
 export type Activity = 'chat' | 'treat' | 'hangout';
 
@@ -45,7 +50,8 @@ export const ACTIVITIES: Record<Activity, { label: string; points: number; cost:
 
 export const TALK_RADIUS = 2.2;
 
-export const RESIDENTS: readonly Resident[] = [
+/** The residents of the hand-built districts. */
+const HAND_BUILT: readonly Resident[] = [
   // Lagos, Marina Boulevard
   {
     id: 'tunde', district: 'lagos.marina', name: 'Tunde Bakare', role: 'Danfo conductor', lookId: 'male-adult-04',
@@ -116,13 +122,135 @@ export const RESIDENTS: readonly Resident[] = [
   },
 ];
 
+/**
+ * Generated cities (lib/districts/generate.ts) get residents in the same spots
+ * as their street plan's own residents, with local names and their own looks.
+ */
+const TEMPLATE_PEOPLE: Record<'marina' | 'osu', readonly { role: string; lines: Resident['lines'] }[]> = {
+  marina: [
+    {
+      role: '{bus}',
+      lines: [
+        'Getting on? No? Then mind the door, I am working.',
+        'Ah, you again. This road never sleeps, I tell you.',
+        'Sit down a minute. Traffic this morning was something else.',
+        'You are family now. If you ever need somewhere to sleep, my couch is yours.',
+        'Best person on this whole road. Anything you need, just call me.',
+      ],
+    },
+    {
+      role: 'Nurse at {hospital}',
+      lines: [
+        'Sorry, I am between shifts. Did you need directions?',
+        'Hello again. Remember to drink some water today.',
+        'Night shift was long. Tell me something good that happened today.',
+        'You are welcome at mine any time you need a bed.',
+        'You are the first person I call after a hard shift. Thank you for that.',
+      ],
+    },
+    {
+      role: 'Developer at {tech}',
+      lines: [
+        'Hey. Just getting some air before stand-up.',
+        'Oh hi. Still stuck on the same bug, believe it or not.',
+        'Shipped it! Come, let me show you what we built.',
+        'My flat is small but the sofa is yours if you ever need it.',
+        'Honestly, you are the reason I did not quit last month.',
+      ],
+    },
+  ],
+  osu: [
+    {
+      role: '{bus}',
+      lines: [
+        'Last stop! Ah, you are not going? Okay, okay.',
+        'How far? You are getting used to this place now.',
+        'Come and sit. Let me tell you about the driver who forgot his own bus.',
+        'You are family now. If you need a place to sleep, come, my mother will cook.',
+        'Me and you, we are one. Anything at all.',
+      ],
+    },
+    {
+      role: 'Fashion designer',
+      lines: [
+        'Welcome. The fashion house is just there if you like good fabric.',
+        'Hello again. I am finishing a new outfit for a wedding.',
+        'Look at this pattern. Every colour in it means something.',
+        'If you ever need a bed, my studio has a daybed. You are always welcome.',
+        'I am naming my next design after you. Do not tell anyone.',
+      ],
+    },
+    {
+      role: 'Footballer',
+      lines: [
+        'Training starts soon. You play?',
+        'Hey! Come and watch us on Saturday.',
+        'Coach finally put me in the first team. Let us celebrate.',
+        'My place is near the sports centre. The couch is yours whenever.',
+        'When I go pro, you are coming with me.',
+      ],
+    },
+  ],
+};
+
+/** In Nigeria the conductor speaks pidgin. */
+const NAIJA_CONDUCTOR = {
+  role: 'Bus conductor',
+  lines: [
+    'You dey enter? No? Then shift small, I dey work.',
+    'Ah, you again. This road no dey sleep, I tell you.',
+    'Sit down small. Traffic this morning was something else.',
+    'You be family now. If you ever need where to sleep, my couch dey for you.',
+    'Best person on this whole road. Anything you need, just call me.',
+  ] as Resident['lines'],
+};
+
+function generatedResidents(seed: CitySeed): Resident[] {
+  const plan = planFor(seed);
+  const used = new Set<string>();
+  return TEMPLATES[plan.template].people.map((r, i) => {
+    const female = r.female;
+    const pool = female ? seed.style.names.female : seed.style.names.male;
+    let k = hashString(`${seed.id}:${i}`);
+    while (used.has(pool[k % pool.length])) k++;
+    const first = pool[k % pool.length];
+    used.add(first);
+    const family = pick(seed.style.names.family, `${seed.id}:${i}:family`);
+    const looks = LOOKS.filter((l) => l.body === (female ? 'feminine' : 'masculine'));
+    const { position, facing } = placeIn(seed, r.position, r.facing);
+    // The avenue has the same three kinds of people as Marina
+    const roles = TEMPLATE_PEOPLE[plan.template === 'osu' ? 'osu' : 'marina'];
+    const slot = seed.country === 'NG' && plan.template !== 'osu' && i === 0 ? NAIJA_CONDUCTOR : roles[i];
+    return {
+      id: `${seed.id}-${slug(first)}`,
+      district: plan.id,
+      name: `${first} ${family}`,
+      role: slot.role.replace('{bus}', seed.style.busRole ?? 'Bus conductor').replace('{hospital}', `${seed.name} General Hospital`).replace('{tech}', `${seed.name} Tech Hub`),
+      lookId: pick(looks, `${seed.id}:${i}:look`).id,
+      position,
+      facing,
+      route: r.route?.map(([x, z]) => {
+        const p = placeIn(seed, [x, 0, z]).position;
+        return [p[0], p[2]] as const;
+      }),
+      lines: slot.lines,
+    };
+  });
+}
+
+/** Everyone, in every district. Always computer-controlled, and labelled so. */
+export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...[...NIGERIA, ...AFRICA, ...WORLD].flatMap(generatedResidents)];
+
 export const residentById = (id: string) => RESIDENTS.find((r) => r.id === id);
 export const residentsIn = (districtId: string) => RESIDENTS.filter((r) => r.district === districtId);
+export const isAdultResident = (resident: Resident) => /^(?:female|male)-adult-/i.test(resident.lookId);
 
 export interface Relationship {
   points: number;
   /** Game day (totalMinutes / 1440) of the last activity, or -1. */
   lastDay: number;
+  /** Game day of the last completed hug, or -1 for older saves. */
+  lastHugDay?: number;
 }
 
 export function friendshipLevel(points: number): number {
@@ -180,6 +308,12 @@ export function setLivePosition(id: string, x: number, z: number) {
   livePositions.set(id, { x, z });
 }
 export const residentPosition = (r: Resident) => livePositions.get(r.id) ?? { x: r.position[0], z: r.position[2] };
+export function residentPositionsIn(districtId: string): { x: number; z: number }[] {
+  return residentsIn(districtId).flatMap((resident) => {
+    const position = livePositions.get(resident.id);
+    return position ? [position] : [];
+  });
+}
 
 /** The resident within talking distance in this district, if any. */
 export function residentNear(districtId: string, x: number, z: number): Resident | undefined {
@@ -198,7 +332,8 @@ export function sanitiseRelationships(data: unknown): Record<string, Relationshi
     const r = v as Record<string, unknown>;
     const points = typeof r.points === 'number' && Number.isFinite(r.points) ? Math.max(0, Math.min(MAX_POINTS, Math.round(r.points))) : 0;
     const lastDay = typeof r.lastDay === 'number' && Number.isInteger(r.lastDay) && r.lastDay >= -1 ? r.lastDay : -1;
-    out[id] = { points, lastDay };
+    const lastHugDay = typeof r.lastHugDay === 'number' && Number.isInteger(r.lastHugDay) && r.lastHugDay >= -1 ? r.lastHugDay : -1;
+    out[id] = { points, lastDay, lastHugDay };
   }
   return out;
 }

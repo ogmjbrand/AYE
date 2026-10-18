@@ -22,10 +22,15 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
-import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
-import { TRAVEL_OPTIONS, type TravelMode } from './travel';
+import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
+import { WAIT_OPTIONS } from './parks';
+
+const MAX_WAIT = Math.max(...WAIT_OPTIONS);
+import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
+import { travelOption, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
-import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
+import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, isAdultResident, residentById, type Activity, type Relationship } from './people';
+import { canResidentAcceptHug } from './hug';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -94,6 +99,9 @@ export type GameAction =
   | { type: 'buyEquipment'; id: string }
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
+  | { type: 'hug'; residentId: string }
+  | { type: 'nightOut'; residentId: string }
+  | { type: 'wait'; minutes: number }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
@@ -246,8 +254,9 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
 
 /** Travels to another district: pays the fare, then the clock runs for the length of the trip. */
 function travel(state: GameState, to: string, mode: TravelMode, career: Career, lifestyle: Lifestyle): GameState {
-  const option = TRAVEL_OPTIONS[mode];
-  if (state.summary || !option || to === state.districtId || !isDistrictId(to) || state.balance < option.fare) return state;
+  if (state.summary || to === state.districtId || !isDistrictId(to)) return state;
+  const option = travelOption(districtById(state.districtId).city, districtById(to).city, mode);
+  if (!option || state.balance < option.fare) return state;
   let next: GameState = {
     ...state,
     balance: state.balance - option.fare,
@@ -277,6 +286,46 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   return {
     ...next,
     relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + a.points), lastDay: today } },
+  };
+}
+
+/** A completed consensual hug modestly builds a relationship at most once per game day. */
+function completeHug(state: GameState, residentId: string): GameState {
+  const resident = residentById(residentId);
+  if (state.summary || !resident || resident.district !== state.districtId || !isAdultResident(resident)) return state;
+  const rel = state.relationships[residentId] ?? { points: 0, lastDay: -1, lastHugDay: -1 };
+  const today = gameDay(state.time.totalMinutes);
+  if (!canResidentAcceptHug(isAdultResident(resident), rel.points) || (rel.lastHugDay ?? -1) === today) return state;
+  return {
+    ...state,
+    relationships: {
+      ...state.relationships,
+      [residentId]: {
+        ...rel,
+        points: Math.min(MAX_POINTS, rel.points + 2),
+        lastHugDay: today,
+      },
+    },
+  };
+}
+
+/**
+ * A night out at the district's lounge with a friend: open in the evening
+ * only, you pay both covers, it takes two hours and counts as your time
+ * together today. Friends only, like a hang-out.
+ */
+function nightOut(state: GameState, residentId: string, career: Career, lifestyle: Lifestyle): GameState {
+  const resident = residentById(residentId);
+  if (state.summary || !resident || resident.district !== state.districtId || !canStartNightOut(state.time)) return state;
+  const cost = nightOutCost(districtById(state.districtId).nightlife);
+  const rel = state.relationships[residentId] ?? { points: 0, lastDay: -1 };
+  const today = gameDay(state.time.totalMinutes);
+  if (rel.lastDay === today || state.balance < cost || friendshipLevel(rel.points) < HANGOUT_LEVEL) return state;
+  let next: GameState = { ...state, balance: state.balance - cost, today: { ...state.today, expenses: state.today.expenses + cost } };
+  for (let i = 0; i < NIGHT_OUT_MINUTES; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + NIGHT_OUT_POINTS), lastDay: today } },
   };
 }
 
@@ -386,6 +435,18 @@ export function gameReducer(
       return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
     case 'socialise':
       return socialise(state, action.residentId, action.activity, career, lifestyle);
+    case 'hug':
+      return completeHug(state, action.residentId);
+    case 'nightOut':
+      return nightOut(state, action.residentId, career, lifestyle);
+    case 'wait': {
+      // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work.
+      // A sit is applied in small steps as it plays out, so any whole number of minutes up to the longest option
+      if (state.summary || !Number.isInteger(action.minutes) || action.minutes < 1 || action.minutes > MAX_WAIT) return state;
+      let next = state;
+      for (let i = 0; i < action.minutes; i++) next = tick(next, career, lifestyle, false);
+      return next;
+    }
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':
