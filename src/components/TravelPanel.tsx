@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { DISTRICTS, type District } from '../lib/geography';
 import { homeById } from '../lib/homes';
 import { countryName } from '../lib/places';
-import { distanceKm, formatDuration, travelOptions, type TravelMode } from '../lib/travel';
+import { distanceKm, formatDuration, travelOptions, type TravelMode, type TravelOption } from '../lib/travel';
+import { WorldMap } from './WorldMap';
 
 interface TravelPanelProps {
   from: District;
@@ -20,6 +21,8 @@ export function TravelPanel({ from, balance, homeId, onTravel, onClose }: Travel
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<'list' | 'map'>('list');
+  const [picked, setPicked] = useState<string | null>(null);
 
   const home = homeById(homeId);
   const groups = useMemo(() => {
@@ -34,6 +37,30 @@ export function TravelPanel({ from, balance, homeId, onTravel, onClose }: Travel
     for (const r of rows) byCountry.set(r.d.city.country, [...(byCountry.get(r.d.city.country) ?? []), r]);
     return [...byCountry.entries()].sort(([a], [b]) => (a === from.city.country ? -1 : b === from.city.country ? 1 : 0));
   }, [from, query]);
+
+  // Every destination for the map, whatever the search says
+  const all = useMemo(
+    () => DISTRICTS.filter((d) => d.id !== from.id).map((d) => ({ d, km: distanceKm(from.city, d.city), options: travelOptions(from.city, d.city) })),
+    [from],
+  );
+  const pickedRow = all.find((r) => r.d.id === picked) ?? null;
+
+  const bookButtons = (d: District, options: TravelOption[]) => (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button
+          key={o.mode}
+          type="button"
+          disabled={balance < o.fare}
+          title={balance < o.fare ? 'Not enough money' : o.description}
+          onClick={() => onTravel(d, o.mode)}
+          className="rounded-md border border-ui-accent bg-ui-accent/20 px-3 py-1.5 text-xs font-semibold tabular-nums hover:bg-ui-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {o.label} · {formatDuration(o.minutes)} · {o.fare.toLocaleString()} ⓒ
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
@@ -53,20 +80,55 @@ export function TravelPanel({ from, balance, homeId, onTravel, onClose }: Travel
             </div>
             <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
           </div>
-          <label className="mt-3 block">
-            <span className="sr-only">Find a city</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a city, state or country"
-              className="w-full rounded-md border border-ui-line bg-transparent px-3 py-2 text-sm text-ui-ink placeholder:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-            />
-          </label>
+          <div className="mt-3 flex gap-1" role="tablist" aria-label="How to show destinations">
+            {(['list', 'map'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className={`rounded-md border px-3 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${mode === m ? 'border-ui-accent bg-ui-accent/20 text-ui-ink' : 'border-ui-line text-ui-muted hover:text-ui-ink'}`}
+              >
+                {m === 'list' ? 'List' : 'Map'}
+              </button>
+            ))}
+          </div>
+          {mode === 'list' && (
+            <label className="mt-3 block">
+              <span className="sr-only">Find a city</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Find a city, state or country"
+                className="w-full rounded-md border border-ui-line bg-transparent px-3 py-2 text-sm text-ui-ink placeholder:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
+              />
+            </label>
+          )}
         </header>
         <div className="space-y-5 overflow-y-auto p-5">
-          {groups.length === 0 && <p className="m-0 text-sm text-ui-muted">No city matches “{query}”.</p>}
-          {groups.map(([country, rows]) => (
+          {mode === 'map' && (
+            <div>
+              <WorldMap
+                here={{ id: from.id, name: from.city.name, lat: from.city.lat, lon: from.city.lon, bookable: false }}
+                cities={all.map(({ d, options }) => ({ id: d.id, name: d.city.name, lat: d.city.lat, lon: d.city.lon, bookable: options.some((o) => o.fare <= balance) }))}
+                selected={picked}
+                onSelect={setPicked}
+              />
+              {pickedRow ? (
+                <div className="mt-3 rounded-xl border border-ui-line p-3">
+                  <p className="m-0 font-display text-base font-semibold">{pickedRow.d.city.name}</p>
+                  <p className="m-0 text-xs text-ui-muted">{pickedRow.d.city.region} · {countryName(pickedRow.d.city.country)} · {Math.round(pickedRow.km).toLocaleString()} km</p>
+                  {bookButtons(pickedRow.d, pickedRow.options)}
+                </div>
+              ) : (
+                <p className="m-0 mt-3 text-sm text-ui-muted">Choose a city on the map to see how to get there.</p>
+              )}
+            </div>
+          )}
+          {mode === 'list' && groups.length === 0 && <p className="m-0 text-sm text-ui-muted">No city matches “{query}”.</p>}
+          {mode === 'list' && groups.map(([country, rows]) => (
             <section key={country} aria-labelledby={`country-${country}`}>
               <h3 id={`country-${country}`} className="m-0 text-xs uppercase tracking-widest text-ui-muted">
                 {countryName(country)} · {rows.length} {rows.length === 1 ? 'city' : 'cities'}
@@ -76,20 +138,7 @@ export function TravelPanel({ from, balance, homeId, onTravel, onClose }: Travel
                   <li key={d.id} className="rounded-xl border border-ui-line p-3">
                     <p className="m-0 font-display text-base font-semibold">{d.city.name}</p>
                     <p className="m-0 text-xs text-ui-muted">{d.city.region} · {d.name} · {Math.round(km).toLocaleString()} km</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {options.map((o) => (
-                        <button
-                          key={o.mode}
-                          type="button"
-                          disabled={balance < o.fare}
-                          title={balance < o.fare ? 'Not enough money' : o.description}
-                          onClick={() => onTravel(d, o.mode)}
-                          className="rounded-md border border-ui-accent bg-ui-accent/20 px-3 py-1.5 text-xs font-semibold tabular-nums hover:bg-ui-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {o.label} · {formatDuration(o.minutes)} · {o.fare.toLocaleString()} ⓒ
-                        </button>
-                      ))}
-                    </div>
+                    {bookButtons(d, options)}
                   </li>
                 ))}
               </ul>
