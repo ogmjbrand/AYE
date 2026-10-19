@@ -8,7 +8,8 @@ import type { Home } from './homes';
 
 export type FurnitureKind =
   | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp'
-  | 'fridge' | 'cabinet' | 'mirror' | 'sink' | 'toilet' | 'shower';
+  | 'fridge' | 'cabinet' | 'mirror' | 'sink' | 'toilet' | 'shower'
+  | 'computer' | 'file-cabinet' | 'conference-table' | 'reception' | 'chair' | 'whiteboard';
 
 export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
 
@@ -172,7 +173,7 @@ export function interiorLayout(i: Interior): DistrictLayout {
       style: 'residential',
     })),
     ...i.furniture
-      .filter((x) => !['rug', 'cabinet', 'mirror'].includes(x.kind))
+      .filter((x) => !['rug', 'cabinet', 'mirror', 'computer', 'whiteboard'].includes(x.kind))
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];
   return buildLayout({

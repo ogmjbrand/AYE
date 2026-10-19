@@ -100,7 +100,7 @@ describe('character save', () => {
 describe('progress save', () => {
   it('restores balance and clock for the same character', () => {
     const s = new MemoryStorage();
-    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini' };
+    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini', lastShowcaseDay: 0 };
     saveProgress('abc', state, s);
     expect(loadProgress(character, s)).toEqual(state);
   });
@@ -117,6 +117,51 @@ describe('progress save', () => {
     expect(p.minutesWorkedThisHour).toBe(0);
     expect(p.fullness).toBe(100);
     expect(p.home).toBeNull();
+    expect(p.lastShowcaseDay).toBe(-1);
+    expect(p.fashionMissionItemId).toBeNull();
+    expect(p.fashionMissionCompleted).toBe(false);
+    expect(p.workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 0 });
+  });
+
+  it('persists fashion mission progress and ignores unknown catalogue items', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(100),
+      fashionMissionItemId: 'top-ankara-sunset',
+      fashionMissionCompleted: true,
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s)).toMatchObject({
+      fashionMissionItemId: 'top-ankara-sunset',
+      fashionMissionCompleted: true,
+    });
+
+    saveProgress('abc', { ...state, fashionMissionItemId: 'removed-item' }, s);
+    expect(loadProgress(character, s)).toMatchObject({
+      fashionMissionItemId: null,
+      fashionMissionCompleted: false,
+    });
+  });
+
+  it('persists career performance and sanitises invalid saved counters', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(100),
+      workPerformance: { excellent: 8, reasonable: 3, poor: 2 },
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).workPerformance).toEqual(state.workPerformance);
+    saveProgress('abc', { ...state, workPerformance: { excellent: -1, reasonable: 2.5, poor: 4 } }, s);
+    expect(loadProgress(character, s).workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 4 });
+  });
+
+  it('restores the last attended fashion showcase and rejects future days', () => {
+    const s = new MemoryStorage();
+    const state = { ...createGameState(100, createTime(10, 0, 2)), lastShowcaseDay: 0 };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).lastShowcaseDay).toBe(0);
+    saveProgress('abc', { ...state, lastShowcaseDay: 3 }, s);
+    expect(loadProgress(character, s).lastShowcaseDay).toBe(-1);
   });
 
   it('remembers which city you are in, and falls back to the first for unknown places', () => {

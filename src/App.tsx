@@ -6,7 +6,7 @@ import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
 import { getTrip, placePlayer, setMovementBlocked, setMoveTarget, subscribeTrip, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
+import { activeLayout, groundHeightAt, movingObstacles, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -21,6 +21,8 @@ import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
 import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
 import type { FashionItem, Slot } from './lib/fashion';
+import { fashionShowcaseResult } from './lib/fashionShowcase';
+import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
 import { FashionStore } from './components/FashionStore';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
@@ -55,11 +57,12 @@ import { Park } from './world/Park';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { doorSpot, homeInteractionAt, interiorFor, interiorLayout, type HomeAction } from './lib/interiors';
+import { officeInteractionAt, OFFICE_INTERIOR, OFFICE_WORKPLACE, officeTaskId, type OfficeInteraction } from './lib/officeCareer';
+import { OfficePanel } from './components/OfficePanel';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
-import { gameDay, isAdultResident, residentById, residentNear, residentPosition, type Resident } from './lib/people';
-import { canResidentAcceptHug, hugTargets, type HugSession } from './lib/hug';
+import { gameDay, isAdultResident, residentById, residentFacing, residentNear, residentPosition, type Resident } from './lib/people';
+import { canResidentAcceptHug, findHugPlan, type HugSession } from './lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from './lib/traffic';
-import { clearLine, walkGridFor } from './lib/pathfinding';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
@@ -67,7 +70,7 @@ import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
 import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
-import { BedDouble, CookingPot, DoorOpen, ScanEye, ShowerHead, Shirt, Sofa, Tv } from 'lucide-react';
+import { BedDouble, BriefcaseBusiness, CookingPot, DoorOpen, FileText, Monitor, ScanEye, ShowerHead, Shirt, Sofa, Tv, Users } from 'lucide-react';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -248,7 +251,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask } = useGameState(
+  const { state, rest, dismissSummary, eat, moveIn, moveOut, buyEquipment, travel, socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, officeApply, officeClockIn, officeTask, officeClockOut } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -256,9 +259,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const district = districtById(state.districtId);
   const home = homeById(state.home);
   const [inside, setInside] = useState(false);
-  const interior = home ? interiorFor(home) : null;
-  const roomLayout = useMemo(() => (interior ? interiorLayout(interior) : null), [interior]);
-  const indoors = inside && !!home && home.district === district.id && !!roomLayout;
+  const [insideOffice, setInsideOffice] = useState(false);
+  const interior = insideOffice && district.id === OFFICE_WORKPLACE.districtId
+    ? OFFICE_INTERIOR
+    : home ? interiorFor(home) : null;
+  const roomLayout = useMemo(() => {
+    if (!interior) return null;
+    const layout = interiorLayout(interior);
+    return insideOffice ? { ...layout, id: 'interior.office' } : layout;
+  }, [interior, insideOffice]);
+  const indoors = !!roomLayout && (insideOffice
+    ? district.id === OFFICE_WORKPLACE.districtId
+    : inside && !!home && home.district === district.id);
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : district.layout;
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
@@ -281,6 +293,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [talking, setTalking] = useState<Resident | null>(null);
   const [hugging, setHugging] = useState<HugSession | null>(null);
   const [task, setTask] = useState<WorkTask | null>(null);
+  const [officePanel, setOfficePanel] = useState<'reception' | OfficeInteraction | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
   useEffect(() => {
     if (!arrival) return;
@@ -308,27 +321,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     }
 
     const currentResident = residentPosition(resident);
-    const targets = hugTargets(controller.position, currentResident);
     const obstacles = [...activeLayout().obstacles, ...movingObstacles];
-    const approachGrid = walkGridFor(obstacles);
-    if (
-      !clearLine(approachGrid, controller.position, targets.player)
-      || !clearLine(approachGrid, currentResident, targets.resident)
-    ) {
+    const plan = findHugPlan(controller.position, currentResident, obstacles);
+    if (!plan) {
       return 'We cannot reach a clear, unobstructed position to share a hug here.';
-    }
-    const playerClear = resolveCollisions(targets.player.x, targets.player.z, 0.32, obstacles);
-    const residentClear = resolveCollisions(targets.resident.x, targets.resident.z, 0.32, obstacles);
-    if (
-      Math.hypot(playerClear.x - targets.player.x, playerClear.z - targets.player.z) > 0.08
-      || Math.hypot(residentClear.x - targets.resident.x, residentClear.z - targets.resident.z) > 0.08
-    ) {
-      return 'There is not enough clear space here to share a hug safely.';
     }
     const traffic = trafficSnapshot();
     if (
-      pedestrianInTrafficPath({ x: playerClear.x, z: playerClear.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
-      || pedestrianInTrafficPath({ x: residentClear.x, z: residentClear.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
+      pedestrianInTrafficPath({ x: plan.player.x, z: plan.player.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
+      || pedestrianInTrafficPath({ x: plan.resident.x, z: plan.resident.z, vx: 0, vz: 0 }, traffic.cars, traffic.lanes)
     ) {
       return 'Traffic is too close right now. Try again when the area is clear.';
     }
@@ -336,9 +337,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setHugging({
       residentId: resident.id,
       playerFrom: { x: controller.position.x, z: controller.position.z, facing: controller.direction },
-      residentFrom: { x: currentResident.x, z: currentResident.z, facing: resident.facing },
-      playerTarget: { ...targets.player, x: playerClear.x, z: playerClear.z },
-      residentTarget: { ...targets.resident, x: residentClear.x, z: residentClear.z },
+      residentFrom: { x: currentResident.x, z: currentResident.z, facing: residentFacing(resident) },
+      playerTarget: plan.player,
+      residentTarget: plan.resident,
+      playerPath: plan.playerPath,
+      residentPath: plan.residentPath,
+      approachMs: plan.approachMs,
       startedAt: Date.now(),
     });
     setTalking(null);
@@ -375,15 +379,29 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     controls.update();
   }, [controller]);
   const goInside = useCallback(() => {
-    if (!interior) return;
+    if (!interior || insideOffice) return;
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
     snapIndoorCamera();
-  }, [interior, snapIndoorCamera, setHomePanel, setInside]);
-  const goOutside = () => {
+  }, [interior, insideOffice, snapIndoorCamera, setHomePanel, setInside]);
+  const goIntoOffice = useCallback(() => {
+    if (district.id !== OFFICE_WORKPLACE.districtId || insideOffice) return;
+    setHomePanel(null);
     setInside(false);
-    if (home) placePlayer(home.door, Math.PI);
+    setInsideOffice(true);
+    const [x, z] = doorSpot(OFFICE_INTERIOR);
+    placePlayer([x, 0, z], 0);
+    snapIndoorCamera();
+  }, [district.id, insideOffice, snapIndoorCamera, setHomePanel, setInside, setInsideOffice]);
+  const goOutside = () => {
+    if (insideOffice) {
+      setInsideOffice(false);
+      placePlayer(OFFICE_WORKPLACE.position, Math.PI);
+    } else {
+      setInside(false);
+      if (home) placePlayer(home.door, Math.PI);
+    }
     snapCamera();
   };
   const homeDestinationId = home ? `${home.district}.home.${home.id}` : null;
@@ -460,7 +478,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return sofa ? { id: 'home-sofa', x: sofa.at[0], z: sofa.at[1], facing: Math.PI, height: 0.45 } : null;
   };
   const interactAtHome = (action: HomeAction) => {
-    if (!interior || !home) return;
+    if (!interior || !home || insideOffice) return;
     if (action === 'door') goOutside();
     else if (action === 'bed') rest(true);
     else if (action === 'wardrobe' || action === 'mirror') setStore('wardrobe');
@@ -475,6 +493,30 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       setArrival('You spend 15 minutes in the bathroom.');
     }
   };
+  const officeActionAt = (): OfficeInteraction | null => {
+    if (!insideOffice || !indoors || !interior) return null;
+    return officeInteractionAt(interior, controller.position.x, controller.position.z);
+  };
+  const interactWithOffice = (action: OfficeInteraction) => {
+    if (!insideOffice || !indoors) return;
+    if (action === 'door') {
+      goOutside();
+      return;
+    }
+    if (action === 'reception') {
+      setOfficePanel('reception');
+      return;
+    }
+    if (!state.officeCareer.employed) {
+      setArrival('Visit reception to apply for the Office Assistant position.');
+      return;
+    }
+    if (!state.officeCareer.activeShift) {
+      setArrival('Clock in at reception before starting workplace tasks.');
+      return;
+    }
+    setOfficePanel(action);
+  };
 
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
@@ -486,18 +528,26 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         return;
       }
       if (indoors && interior) {
-        const action = homeInteractionAt(interior, controller.position.x, controller.position.z);
-        if (action) interactAtHome(action);
+        if (insideOffice) {
+          const action = officeActionAt();
+          if (action) interactWithOffice(action);
+        } else {
+          const action = homeInteractionAt(interior, controller.position.x, controller.position.z);
+          if (action) interactAtHome(action);
+        }
         return;
       }
       const { x, z } = controller.position;
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
       const door = homeAtDoor(district.id, x, z);
+      const officeEntrance = district.id === OFFICE_WORKPLACE.districtId
+        && Math.hypot(OFFICE_WORKPLACE.position[0] - x, OFFICE_WORKPLACE.position[2] - z) <= OFFICE_WORKPLACE.radius;
       if (near) setVendor(near);
       else if (counter === 'fashion') setStore('shop');
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
+      else if (officeEntrance) goIntoOffice();
       else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
       else if (parkAt(district.park, x, z)) setParkOpen(true);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
@@ -509,9 +559,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || officePanel !== null || locationsOpen || nightOpen || parkOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, officePanel, locationsOpen, nightOpen, parkOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -583,8 +633,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     });
   };
   const buy = (item: FashionItem) => {
-    if (wardrobe.owned.includes(item.id) || state.balance < item.price) return;
-    purchase(item.price);
+    if (state.summary || wardrobe.owned.includes(item.id) || state.balance < item.price) return;
+    buyFashionItem(item.id);
     onCharacterUpdate({
       ...character,
       wardrobe: { owned: [...wardrobe.owned, item.id], equipped: { ...wardrobe.equipped, [item.slot]: item.id } },
@@ -594,6 +644,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       delete next[item.slot];
       return next;
     });
+  };
+  const attendFashionShowcase = (): string | null => {
+    if (state.summary) return 'The showcase is paused while you review today’s summary.';
+    if (state.lastShowcaseDay === gameDay(state.time.totalMinutes)) return null;
+    const result = fashionShowcaseResult(wardrobe);
+    const missionReady = fashionMissionStage(state.fashionMissionItemId, state.fashionMissionCompleted, wardrobe) === 'showcase';
+    fashionShowcase(wardrobe);
+    return `${result.tier} · ${result.score}/100. You earned ${result.reward.toLocaleString()} ⓒ for the showcase.${missionReady ? ` First Look mission complete · +${FASHION_MISSION_REWARD} ⓒ bonus.` : ''}`;
   };
   const closeStore = () => {
     setStore(null);
@@ -635,6 +693,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}
           onBuy={buy}
           onEquip={wear}
+          today={gameDay(state.time.totalMinutes)}
+          lastShowcaseDay={state.lastShowcaseDay}
+          fashionMissionItemId={state.fashionMissionItemId}
+          fashionMissionCompleted={state.fashionMissionCompleted}
+          onAttendShowcase={attendFashionShowcase}
           onClose={closeStore}
         />
       )}
@@ -703,6 +766,42 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={() => setHomePanel(null)}
         />
       )}
+      {officePanel && (
+        <OfficePanel
+          mode={officeTaskId(officePanel) ? 'task' : 'reception'}
+          career={state.officeCareer}
+          time={state.time}
+          balance={state.balance}
+          taskId={officeTaskId(officePanel) ? officePanel : undefined}
+          onApply={() => {
+            const atReception = officeActionAt() === 'reception';
+            officeApply(atReception);
+            if (atReception && !state.officeCareer.employed) setArrival('You accepted the Office Assistant position.');
+          }}
+          onClockIn={() => {
+            const atReception = officeActionAt() === 'reception';
+            officeClockIn(atReception);
+            if (atReception && !state.officeCareer.activeShift) setArrival('Shift started. Complete the computer, document and meeting tasks.');
+          }}
+          onClockOut={() => {
+            const atReception = officeActionAt() === 'reception';
+            const active = state.officeCareer.activeShift;
+            const completed = active && Object.values(active.tasks).every((item) => item.completed);
+            if (!atReception || !completed || !active) return;
+            const payment = active.tasks.computer.completed && active.tasks.documents.completed && active.tasks.meeting.completed
+              ? state.officeCareer.salaryPerTask * 3
+              : 0;
+            officeClockOut(atReception);
+            setArrival(`Shift complete. ${completed ? 3 : 0} tasks. Gross earnings ${payment.toLocaleString()} ⓒ, deductions 0 ⓒ, final payment ${payment.toLocaleString()} ⓒ.`);
+            setOfficePanel(null);
+          }}
+          onAnswer={(taskId, choice) => {
+            const atStation = officeActionAt() === taskId ? taskId : null;
+            officeTask(taskId, choice, atStation);
+          }}
+          onClose={() => setOfficePanel(null)}
+        />
+      )}
       {state.summary && (
         <DailyLogModal
           income={state.summary.income}
@@ -742,7 +841,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} doorOpen>
+              <HomeInterior key={insideOffice ? 'office' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
@@ -795,6 +894,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           task={task}
           workplace={getCareerLocation(district, character.career)?.name ?? 'Work'}
           hourlyPay={hourlyPay}
+          workPerformance={state.workPerformance}
           onAnswer={(choice) => workTask(task.id, choice)}
           onClose={() => setTask(null)}
         />
@@ -831,8 +931,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
-          name: home!.name,
+          name: insideOffice ? OFFICE_WORKPLACE.name : home!.name,
           interactionAt: (x, z) => {
+            if (insideOffice) {
+              const officeAction = officeInteractionAt(interior, x, z);
+              return officeAction ? ({
+                door: { verb: 'Leave workplace through', place: 'the front door',                 onOpen: () => interactWithOffice('door'), icon: DoorOpen },
+                reception: { verb: 'Talk to', place: 'reception', onOpen: () => interactWithOffice('reception'), icon: BriefcaseBusiness },
+                computer: { verb: 'Work at', place: 'the computer', onOpen: () => interactWithOffice('computer'), icon: Monitor },
+                documents: { verb: 'Process', place: 'the documents', onOpen: () => interactWithOffice('documents'), icon: FileText },
+                meeting: { verb: 'Join', place: 'the team meeting', onOpen: () => interactWithOffice('meeting'), icon: Users },
+              })[officeAction] : null;
+            }
             const action = homeInteractionAt(interior, x, z);
             return action ? ({
             door: { verb: 'Go outside through', place: 'the front door', onOpen: () => interactAtHome('door'), icon: DoorOpen },
@@ -846,6 +956,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             })[action] : null;
           },
         } : undefined}
+        insidePlaceLabel={insideOffice ? `At work · ${district.city.name}` : undefined}
+        outsideOffice={!indoors && district.id === OFFICE_WORKPLACE.districtId
+          && Math.hypot(OFFICE_WORKPLACE.position[0] - controller.position.x, OFFICE_WORKPLACE.position[2] - controller.position.z) <= OFFICE_WORKPLACE.radius
+          ? { name: OFFICE_WORKPLACE.name, onOpen: goIntoOffice }
+          : undefined}
         workMinutes={state.workMinutes}
         equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}

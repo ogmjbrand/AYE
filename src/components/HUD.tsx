@@ -71,6 +71,8 @@ interface HUDProps {
     name: string;
     interactionAt: (x: number, z: number) => Prompt | null;
   };
+  insidePlaceLabel?: string;
+  outsideOffice?: { name: string; onOpen: () => void };
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
@@ -148,6 +150,8 @@ export function HUD({
   onTalk,
   workTask,
   insideHome,
+  insidePlaceLabel,
+  outsideOffice,
   onOpenWardrobe,
   onOpenGadgets,
   onOpenMap,
@@ -194,7 +198,9 @@ export function HUD({
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident), icon: UserRound }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen, icon: BriefcaseBusiness } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door), icon: HouseIcon }
-    : null);
+    : null) ?? (outsideOffice
+      ? { verb: 'Enter workplace', place: outsideOffice.name, onOpen: outsideOffice.onOpen, icon: BriefcaseBusiness }
+      : null);
   const placePrompt = busy ? null : insideHome ? insideHome.interactionAt(px, pz) : streetPrompt;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
@@ -307,7 +313,7 @@ export function HUD({
       {(insideHome || neighborhood) && (
         <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
           <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
-            {insideHome ? `At home · ${district.city.name}` : `${neighborhood!.name} · ${district.city.name}`}
+            {insideHome ? (insidePlaceLabel ?? `At home · ${district.city.name}`) : `${neighborhood!.name} · ${district.city.name}`}
           </p>
           <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
             {insideHome ? insideHome.name : neighborhood!.description}

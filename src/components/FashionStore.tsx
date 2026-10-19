@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, itemById, resolveStyles, stockedIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
-import { Check, Footprints, Scissors, ScanEye, Shirt, ShoppingBag, Wallet, X, type LucideIcon } from 'lucide-react';
+import { fashionShowcaseResult } from '../lib/fashionShowcase';
+import { FASHION_MISSION_REWARD, fashionMissionStage } from '../lib/fashionMission';
+import { Check, Footprints, Scissors, ScanEye, Shirt, ShoppingBag, Sparkles, Wallet, X, type LucideIcon } from 'lucide-react';
 
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
@@ -18,6 +20,11 @@ interface FashionStoreProps {
   onTryOn: (slot: Slot, id: string | null) => void;
   onBuy: (item: FashionItem) => void;
   onEquip: (slot: Slot, id: string | null) => void;
+  today: number;
+  lastShowcaseDay: number;
+  fashionMissionItemId: string | null;
+  fashionMissionCompleted: boolean;
+  onAttendShowcase: () => string | null;
   onClose: () => void;
 }
 
@@ -28,7 +35,7 @@ const SLOT_ICON: Record<Slot, LucideIcon> = { top: Shirt, bottom: Shirt, shoes: 
  * Boutique and wardrobe. A side panel so the player's 3D character stays in
  * view: "Try on" shows an item on the character without buying it.
  */
-export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfit, onDeleteOutfit, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
+export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfit, onDeleteOutfit, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, today, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, onAttendShowcase, onClose }: FashionStoreProps) {
   const [slot, setSlot] = useState<Slot>('top');
   const [message, setMessage] = useState('');
 
@@ -44,6 +51,10 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
   const outfits = wardrobe.outfits ?? [];
   const equippedId = wardrobe.equipped[slot] ?? null;
   const shownId = slot in tryOn ? tryOn[slot] ?? null : equippedId;
+  const showcase = fashionShowcaseResult(wardrobe);
+  const attendedShowcase = lastShowcaseDay === today;
+  const missionStage = fashionMissionStage(fashionMissionItemId, fashionMissionCompleted, wardrobe);
+  const missionItem = itemById(fashionMissionItemId);
 
   return (
     <aside
@@ -74,6 +85,65 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
       </nav>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        <section aria-labelledby="first-look-title" className="mb-3 rounded-xl border border-ui-line/70 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 id="first-look-title" className="m-0 text-sm font-semibold">First Look · style mission</h3>
+              <p className="m-0 mt-1 text-xs text-ui-muted">
+                {missionStage === 'shop' && 'Buy a clothing item, wear it, then enter the City Style Showcase.'}
+                {missionStage === 'wear' && `Wear ${missionItem?.name ?? 'your new piece'} from your wardrobe, then enter the showcase.`}
+                {missionStage === 'showcase' && `Your ${missionItem?.name ?? 'new piece'} is ready. Walk today’s showcase to finish.`}
+                {missionStage === 'complete' && 'Complete · your mission reward has been paid.'}
+              </p>
+            </div>
+            {missionStage === 'complete' && <Check size={17} className="shrink-0 text-ui-accent-strong" aria-label="Mission complete" />}
+          </div>
+          <ol className="m-0 mt-3 grid list-none gap-1.5 p-0 text-xs">
+            {[
+              { label: 'Buy one clothing item', done: missionStage !== 'shop', active: missionStage === 'shop' },
+              { label: `Wear it${missionItem ? ` · ${missionItem.name}` : ''}`, done: missionStage === 'showcase' || missionStage === 'complete', active: missionStage === 'wear' },
+              { label: `Attend the showcase · +${FASHION_MISSION_REWARD} ⓒ`, done: missionStage === 'complete', active: missionStage === 'showcase' },
+            ].map((step, index) => (
+              <li key={step.label} aria-current={step.active ? 'step' : undefined} className={`flex items-center gap-2 ${step.done ? 'text-ui-accent-strong' : step.active ? 'font-semibold text-ui-ink' : 'text-ui-muted'}`}>
+                <span className="w-4 text-center" aria-hidden="true">{step.done ? '✓' : index + 1}</span>
+                <span>{step.label}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+        {mode === 'shop' && (
+          <section aria-labelledby="showcase-title" className="mb-3 rounded-xl border border-ui-accent/50 bg-ui-accent/5 p-3">
+            <div className="flex items-start gap-2">
+              <Sparkles size={17} className="mt-0.5 shrink-0 text-ui-accent-strong" aria-hidden="true" />
+              <div>
+                <h3 id="showcase-title" className="m-0 text-sm font-semibold">City Style Showcase</h3>
+                <p className="m-0 mt-1 text-xs text-ui-muted">
+                  Today&rsquo;s optional in-store runway · 30 game minutes. Dress code: make a look that feels like you.
+                  Entry earns a reward; wearing more pieces and coordinating your top and bottom can raise it.
+                  Item prices and luxury labels never affect your score.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+              <span className="text-ui-muted">
+                Current look · {showcase.wornPieces} owned pieces · {showcase.score}/100 · {showcase.tier}
+                {showcase.coordinated ? ' · coordinated' : ''}
+              </span>
+              <span className="shrink-0 font-semibold text-ui-accent-strong">Current reward {showcase.reward} ⓒ</span>
+            </div>
+            <button
+              type="button"
+              disabled={attendedShowcase}
+              onClick={() => {
+                const response = onAttendShowcase();
+                setMessage(response ?? 'You already attended today. Come back tomorrow for another showcase.');
+              }}
+              className={`${BUTTON} mt-3 w-full border-ui-accent bg-ui-accent/15 text-ui-ink hover:bg-ui-accent/25`}
+            >
+              {attendedShowcase ? 'Showcase attended today' : 'Walk today’s showcase · 30 min'}
+            </button>
+          </section>
+        )}
         {mode === 'wardrobe' && onSaveOutfit && (
           <section aria-labelledby="looks-title" className="mb-3 rounded-xl border border-ui-line/70 p-3">
             <h3 id="looks-title" className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Saved looks</h3>

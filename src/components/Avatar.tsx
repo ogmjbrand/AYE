@@ -15,6 +15,7 @@ import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
+import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 
@@ -91,11 +92,11 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugging = false }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
-  hugging?: boolean;
+  hugSession?: HugSession | null;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
   shape?: BodyShape;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
@@ -162,7 +163,11 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   useFrame((_, delta) => {
     if (conversing && conversationStart.current === null) conversationStart.current = mixer.time;
     if (!conversing) conversationStart.current = null;
-    const gesture = hugging
+    const hugElapsed = hugSession ? Date.now() - hugSession.startedAt : -1;
+    const embracing = hugSession !== null
+      && hugElapsed >= hugSession.approachMs
+      && hugElapsed < hugSession.approachMs + HUG_DURATION_MS;
+    const gesture = embracing
       ? 'Hug'
       : conversationStart.current === null ? null : conversationGesture('player', mixer.time - conversationStart.current);
     const get = (state: State) => {

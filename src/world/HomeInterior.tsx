@@ -158,10 +158,36 @@ function Piece({ f }: { f: Furniture }) {
     }
     case 'table':
     case 'desk':
+    case 'conference-table':
+    case 'reception':
       parts = (
         <>
           {box(w, 0.05, d, h - 0.025, f.color)}
           {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.05, h - 0.05, 0.05, (h - 0.05) / 2, '#2b2b2d', sx * (w / 2 - 0.06), sz * (d / 2 - 0.06), `${sx}${sz}`)))}
+        </>
+      );
+      break;
+    case 'computer':
+      parts = (
+        <>
+          {box(w, 0.06, d, 0.03, f.color)}
+          {box(w * 0.12, h * 0.22, 0.08, h * 0.2, '#252a30', 0, -d * 0.25)}
+          {box(w * 0.72, h * 0.58, 0.08, h * 0.55, '#252a30', 0, -d * 0.25)}
+          {box(w * 0.62, h * 0.43, 0.025, h * 0.56, '#6f9da1', 0, -d * 0.2)}
+          {box(w * 0.5, 0.035, d * 0.32, h * 0.1, '#b8bdc0', 0, d * 0.2)}
+        </>
+      );
+      break;
+    case 'file-cabinet':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, f.color)}
+          {[0.25, 0.5, 0.75].map((p) => (
+            <group key={p}>
+              {box(w * 0.78, 0.015, 0.018, h * p, '#4c5154', 0, d / 2 + 0.012)}
+              {box(w * 0.22, 0.035, 0.04, h * p + 0.12, '#b5b4ad', 0, d / 2 + 0.025)}
+            </group>
+          ))}
         </>
       );
       break;

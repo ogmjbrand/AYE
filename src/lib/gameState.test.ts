@@ -385,6 +385,15 @@ describe('work tasks', () => {
     expect(s.lastTaskHour).toBe(10);
   });
 
+  it('records each accepted decision in the persistent career performance totals', () => {
+    const excellent = answer(atWork(10), 'best');
+    const reasonable = answer(atWork(11), 'ok');
+    const poor = answer(atWork(12), 'poor');
+    expect(excellent.workPerformance).toEqual({ excellent: 1, reasonable: 0, poor: 0 });
+    expect(reasonable.workPerformance).toEqual({ excellent: 0, reasonable: 1, poor: 0 });
+    expect(poor.workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 1 });
+  });
+
   it('one task per hour, only at work, only in working hours, only the task on offer', () => {
     const once = answer(atWork(), 'best');
     expect(answer(once, 'best')).toBe(once);
@@ -394,5 +403,67 @@ describe('work tasks', () => {
     expect(answer(night, 'best')).toBe(night);
     const s = atWork();
     expect(gameReducer(s, { type: 'workTask', taskId: 'pil-weather', choice: 0, atWorkplace: true }, 'doctor', 'ordinary')).toBe(s);
+  });
+});
+
+describe('fashion showcase', () => {
+  const attend = (state: GameState, owned: string[] = [], equipped: Partial<Record<'top' | 'bottom' | 'shoes' | 'hair', string>> = {}) =>
+    gameReducer(state, { type: 'fashionShowcase', owned, equipped }, 'none', 'ordinary');
+
+  it('awards and records an optional showcase visit with a game-time cost', () => {
+    const start = createGameState(5000, createTime(10, 0, 2));
+    const attended = attend(start, ['top-ankara-sunset', 'bottom-ankara-sunset'], {
+      top: 'top-ankara-sunset',
+      bottom: 'bottom-ankara-sunset',
+    });
+
+    expect(attended.time.totalMinutes - start.time.totalMinutes).toBe(30);
+    expect(attended.balance).toBeGreaterThan(start.balance);
+    expect(attended.today.income).toBe(attended.balance - start.balance);
+    expect(attended.lastShowcaseDay).toBe(0);
+    expect(attend(attended, ['top-ankara-sunset'], { top: 'top-ankara-sunset' })).toBe(attended);
+  });
+
+  it('allows a new visit the next game day and blocks the paused day summary', () => {
+    const attended = attend(createGameState(5000, createTime(10, 0, 2)));
+    const tomorrow = { ...attended, time: { ...attended.time, totalMinutes: attended.time.totalMinutes + 1440 } };
+    expect(attend(tomorrow).time.totalMinutes).toBe(tomorrow.time.totalMinutes + 30);
+    const paused = { ...tomorrow, summary: { income: 0, expenses: 0, minutesWorked: 0, netChange: 0, wakeDayOfWeek: 2, rent: 0, rough: false, atFriend: false, evicted: false, promotedTo: null } };
+    expect(attend(paused)).toBe(paused);
+  });
+
+  it('connects a boutique purchase and wearing the item to a one-time mission reward', () => {
+    const start = createGameState(5000, createTime(10, 0, 2));
+    const purchased = gameReducer(start, { type: 'buyFashionItem', id: 'top-ankara-sunset' }, 'none', 'ordinary');
+    expect(purchased).toMatchObject({
+      balance: 4550,
+      today: { expenses: 450 },
+      fashionMissionItemId: 'top-ankara-sunset',
+      fashionMissionCompleted: false,
+    });
+
+    const attendedWithoutWearing = attend(purchased, ['top-ankara-sunset'], {});
+    expect(attendedWithoutWearing.fashionMissionCompleted).toBe(false);
+    expect(attendedWithoutWearing.balance).toBe(purchased.balance + 135);
+
+    const dressed = { ...purchased, lastShowcaseDay: -1 };
+    const attended = attend(dressed, ['top-ankara-sunset'], { top: 'top-ankara-sunset' });
+    expect(attended.fashionMissionCompleted).toBe(true);
+    expect(attended.balance).toBe(dressed.balance + 180 + 300);
+    expect(attended.today.income).toBe(480);
+    expect(attend(attended, ['top-ankara-sunset'], { top: 'top-ankara-sunset' })).toBe(attended);
+  });
+
+  it('rejects unknown and unaffordable clothing purchases without recording mission progress', () => {
+    const state = createGameState(100);
+    expect(gameReducer(state, { type: 'buyFashionItem', id: 'unknown-item' }, 'none', 'ordinary')).toBe(state);
+    expect(gameReducer(state, { type: 'buyFashionItem', id: 'top-ankara-sunset' }, 'none', 'ordinary')).toBe(state);
+  });
+
+  it('does not treat salon hair dye as the mission clothing purchase', () => {
+    const dyed = gameReducer(createGameState(1000), { type: 'buyFashionItem', id: 'hair-natural-black' }, 'none', 'ordinary');
+    expect(dyed.fashionMissionItemId).toBeNull();
+    const dressed = gameReducer(dyed, { type: 'buyFashionItem', id: 'top-ankara-sunset' }, 'none', 'ordinary');
+    expect(dressed.fashionMissionItemId).toBe('top-ankara-sunset');
   });
 });

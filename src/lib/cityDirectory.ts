@@ -11,6 +11,7 @@
  */
 import type { Career } from '../components/CharacterCreation';
 import type { District } from './geography';
+import { OFFICE_WORKPLACE } from './officeCareer';
 
 export type Category =
   | 'restaurants' | 'shopping' | 'universities' | 'hospitals' | 'gyms'
@@ -92,6 +93,17 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
       status: mine ? 'open' : 'visit',
       note: mine ? 'Your workplace: paid 09:00–17:00, hourly tasks' : `Workplace for ${CAREER_WORD[career]}; nothing for you to do here yet`,
       position: at(w.position),
+    });
+  }
+  if (district.id === OFFICE_WORKPLACE.districtId) {
+    out.push({
+      id: `${district.id}.office-worker`,
+      name: OFFICE_WORKPLACE.name,
+      kind: 'Office Worker career',
+      categories: ['workplaces'],
+      status: 'open',
+      note: 'Apply, clock in, complete workplace tasks and collect payroll',
+      position: { x: OFFICE_WORKPLACE.position[0], z: OFFICE_WORKPLACE.position[2] },
     });
   }
   // Not in the world yet: listed so players know they're coming, never with a Go button

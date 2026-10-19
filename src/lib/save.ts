@@ -8,12 +8,13 @@ import { DIETS, type Diet } from './food';
 import { GENDERS, HERITAGES, type Gender } from './identity';
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
-import { sanitiseWardrobe } from './fashion';
+import { itemById, sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
+import { sanitiseOfficeCareer } from './officeCareer';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -96,6 +97,10 @@ export function loadProgress(character: Character, storage: Storage = localStora
   const p = data as Record<string, unknown>;
   const time = p.time as Record<string, unknown> | undefined;
   const today = p.today as Record<string, unknown> | undefined;
+  const performanceData = typeof p.workPerformance === 'object' && p.workPerformance !== null
+    ? p.workPerformance as Record<string, unknown>
+    : {};
+  const performanceCount = (value: unknown) => isInt(value, 0, 1_000_000_000) ? value : 0;
   if (
     p.characterId !== character.id ||
     !isNum(p.balance, 0) ||
@@ -133,10 +138,23 @@ export function loadProgress(character: Character, storage: Storage = localStora
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
     lastTaskHour: isInt(p.lastTaskHour, -1, Number.MAX_SAFE_INTEGER) ? p.lastTaskHour : -1,
+    lastShowcaseDay: isInt(p.lastShowcaseDay, -1, Math.floor(time.totalMinutes / 1440)) ? p.lastShowcaseDay : -1,
+    fashionMissionItemId: typeof p.fashionMissionItemId === 'string' && itemById(p.fashionMissionItemId)
+      ? p.fashionMissionItemId
+      : null,
+    fashionMissionCompleted: p.fashionMissionCompleted === true
+      && typeof p.fashionMissionItemId === 'string'
+      && !!itemById(p.fashionMissionItemId),
+    workPerformance: {
+      excellent: performanceCount(performanceData.excellent),
+      reasonable: performanceCount(performanceData.reasonable),
+      poor: performanceCount(performanceData.poor),
+    },
+    officeCareer: sanitiseOfficeCareer(p.officeCareer),
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer }));
 }

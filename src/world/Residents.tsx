@@ -6,6 +6,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import { NOTICE_RADIUS, STROLL_SPEED, residentPose, residentsIn, setLivePosition, type Resident } from '../lib/people';
+import { HUG_DURATION_MS, hugPathPose, hugPositionBlend } from '../lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from '../lib/traffic';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { groundHeightAt } from '../lib/world';
@@ -14,7 +15,7 @@ import { useDistrict } from './DistrictContext';
 import { withRelaxedHands } from '../components/handPose';
 import { Gestures, type GestureActions } from '../components/Gestures';
 import { conversationGesture, shouldWave, type Gesture } from '../lib/bodyLanguage';
-import { hugBlend, type HugSession } from '../lib/hug';
+import type { HugSession } from '../lib/hug';
 
 /** Name tag above a resident: their name and that they are a computer-controlled resident. */
 function nameTag(name: string) {
@@ -119,12 +120,20 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
       vz: (next.z - here.z) / step,
     }, traffic.cars, traffic.lanes);
     if (!near && !threatened && !activeHug) clock.current += step;
+    const hugElapsed = activeHug ? Date.now() - activeHug.startedAt : 0;
+    const hugBlend = activeHug ? hugPositionBlend(hugElapsed, activeHug.approachMs) : 0;
+    const hugReleasing = activeHug !== null && hugElapsed >= activeHug.approachMs + HUG_DURATION_MS;
+    const hugWalking = activeHug !== null && (hugElapsed < activeHug.approachMs || hugReleasing);
     const pose = activeHug
       ? {
-        x: activeHug.residentFrom.x + (activeHug.residentTarget.x - activeHug.residentFrom.x) * hugBlend(Date.now() - activeHug.startedAt),
-        z: activeHug.residentFrom.z + (activeHug.residentTarget.z - activeHug.residentFrom.z) * hugBlend(Date.now() - activeHug.startedAt),
-        facing: activeHug.residentTarget.facing,
-        moving: false,
+        ...hugPathPose(
+          activeHug.residentFrom,
+          activeHug.residentTarget,
+          activeHug.residentPath,
+          hugBlend,
+          hugReleasing,
+        ),
+        moving: hugWalking,
       }
       : near ? { ...here, moving: false } : residentPose(resident, clock.current);
     const want = activeHug ? pose.facing : near ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
@@ -133,7 +142,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
     heading.current += diff * Math.min(1, step * 6);
     root.current?.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
     if (group.current) group.current.rotation.y = heading.current;
-    setLivePosition(resident.id, pose.x, pose.z);
+    setLivePosition(resident.id, pose.x, pose.z, heading.current);
     // Body language: a wave when you come over, then talking and listening in turns while you chat
     const inConversation = talkingTo === resident.id;
     if (inConversation && conversationStart.current === null) conversationStart.current = mixer.time;
@@ -144,7 +153,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
       lastWave.current = mixer.time;
       waveUntil.current = mixer.time + gestures.Wave.getClip().duration;
     }
-    const gesture: Gesture | null = activeHug
+    const gesture: Gesture | null = activeHug && !hugWalking
       ? 'Hug'
       : conversationStart.current !== null
       ? conversationGesture('resident', mixer.time - conversationStart.current)

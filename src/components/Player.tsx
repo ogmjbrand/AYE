@@ -9,7 +9,7 @@ import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
 import { resolveStyles, type Slot } from '../lib/fashion';
 import { residentById, residentPosition } from '../lib/people';
-import { HUG_DURATION_MS, hugBlend, type HugSession } from '../lib/hug';
+import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -63,14 +63,27 @@ export function Player({
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
     if (hugSession) {
+      const elapsed = Date.now() - hugSession.startedAt;
+      const blend = hugPositionBlend(elapsed, hugSession.approachMs);
+      const reverse = elapsed >= hugSession.approachMs + HUG_DURATION_MS;
+      const pose = hugPathPose(hugSession.playerFrom, hugSession.playerTarget, hugSession.playerPath, blend, reverse);
+      const previousX = controller.position.x;
+      const previousZ = controller.position.z;
       controller.moveToPose(
-        hugSession.playerTarget.x,
-        hugSession.playerTarget.z,
-        hugSession.playerTarget.facing,
-        hugBlend(Date.now() - hugSession.startedAt),
+        pose.x,
+        pose.z,
+        pose.facing,
+        1,
       );
-      if (Date.now() - hugSession.startedAt >= HUG_DURATION_MS && completedHug.current !== hugSession.residentId) {
+      const seconds = Math.max(0.001, Math.min(delta, 0.1));
+      controller.velocity.set(
+        (controller.position.x - previousX) / seconds,
+        0,
+        (controller.position.z - previousZ) / seconds,
+      );
+      if (elapsed >= hugSessionDurationMs(hugSession.approachMs) && completedHug.current !== hugSession.residentId) {
         completedHug.current = hugSession.residentId;
+        controller.velocity.set(0, 0, 0);
         onHugComplete?.(hugSession.residentId);
       }
     } else {
@@ -119,7 +132,7 @@ export function Player({
             styles={styles}
             shape={character?.shape}
             conversing={conversing}
-            hugging={hugSession !== null}
+            hugSession={hugSession}
           />
         </Suspense>
       </ErrorBoundary>

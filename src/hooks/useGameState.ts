@@ -4,6 +4,8 @@ import { gameReducer, type GameAction, type GameState } from '../lib/gameState';
 import { loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
+import type { Wardrobe } from '../lib/fashion';
+import type { OfficeTaskId } from '../lib/officeCareer';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -48,9 +50,20 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     socialise: (residentId: string, activity: Activity) => dispatch({ type: 'socialise', residentId, activity }),
     hug: (residentId: string) => dispatch({ type: 'hug', residentId }),
+    fashionShowcase: (wardrobe: Wardrobe) => dispatch({
+      type: 'fashionShowcase',
+      owned: wardrobe.owned,
+      equipped: wardrobe.equipped,
+    }),
+    buyFashionItem: (id: string) => dispatch({ type: 'buyFashionItem', id }),
     nightOut: (residentId: string) => dispatch({ type: 'nightOut', residentId }),
     wait: (minutes: number) => dispatch({ type: 'wait', minutes }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
+    officeApply: (atReception: boolean) => dispatch({ type: 'officeApply', atReception }),
+    officeClockIn: (atReception: boolean) => dispatch({ type: 'officeClockIn', atReception }),
+    officeTask: (taskId: OfficeTaskId, choice: number, atStation: OfficeTaskId | null) =>
+      dispatch({ type: 'officeTask', taskId, choice, atStation }),
+    officeClockOut: (atReception: boolean) => dispatch({ type: 'officeClockOut', atReception }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),

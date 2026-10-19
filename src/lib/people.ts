@@ -303,11 +303,13 @@ export function residentPose(r: Resident, t: number): Pose {
 }
 
 // Where each resident is right now (written by the 3D world each frame), so talking uses their real spot
-const livePositions = new Map<string, { x: number; z: number }>();
-export function setLivePosition(id: string, x: number, z: number) {
-  livePositions.set(id, { x, z });
+const livePositions = new Map<string, { x: number; z: number; facing: number }>();
+export function setLivePosition(id: string, x: number, z: number, facing?: number) {
+  const resident = residentById(id);
+  livePositions.set(id, { x, z, facing: facing ?? resident?.facing ?? 0 });
 }
 export const residentPosition = (r: Resident) => livePositions.get(r.id) ?? { x: r.position[0], z: r.position[2] };
+export const residentFacing = (r: Resident) => livePositions.get(r.id)?.facing ?? r.facing;
 export function residentPositionsIn(districtId: string): { x: number; z: number }[] {
   return residentsIn(districtId).flatMap((resident) => {
     const position = livePositions.get(resident.id);

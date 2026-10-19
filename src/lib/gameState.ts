@@ -31,6 +31,18 @@ import { travelOption, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, isAdultResident, residentById, type Activity, type Relationship } from './people';
 import { canResidentAcceptHug } from './hug';
+import { fashionShowcaseResult } from './fashionShowcase';
+import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
+import { itemById, type Slot } from './fashion';
+import {
+  OFFICE_TASK_MINUTES,
+  createOfficeCareer,
+  officeShiftClockIn,
+  officeShiftClockOut,
+  officeTaskAnswer,
+  type OfficeCareerState,
+  type OfficeTaskId,
+} from './officeCareer';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -48,6 +60,12 @@ export interface DayLedger {
   expenses: number;
   /** Game minutes spent at the workplace during working hours. */
   minutesWorked: number;
+}
+
+export interface WorkPerformance {
+  excellent: number;
+  reasonable: number;
+  poor: number;
 }
 
 export interface DaySummary extends DayLedger {
@@ -89,6 +107,16 @@ export interface GameState {
   relationships: Record<string, Relationship>;
   /** Game hour (totalMinutes / 60) of the last work task, or -1: one task per hour. */
   lastTaskHour: number;
+  /** Game day of the last fashion showcase, or -1 if none. */
+  lastShowcaseDay: number;
+  /** First clothing item bought for the persistent first-look mission. */
+  fashionMissionItemId: string | null;
+  /** Whether the first-look mission has paid out. */
+  fashionMissionCompleted: boolean;
+  /** Career decision record, retained across days and browser sessions. */
+  workPerformance: WorkPerformance;
+  /** Separate Office Worker career, paid only by completing and clocking out of a shift. */
+  officeCareer: OfficeCareerState;
 }
 
 export type GameAction =
@@ -100,9 +128,15 @@ export type GameAction =
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'hug'; residentId: string }
+  | { type: 'fashionShowcase'; owned: string[]; equipped: Partial<Record<Slot, string>> }
+  | { type: 'buyFashionItem'; id: string }
   | { type: 'nightOut'; residentId: string }
   | { type: 'wait'; minutes: number }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
+  | { type: 'officeApply'; atReception: boolean }
+  | { type: 'officeClockIn'; atReception: boolean }
+  | { type: 'officeTask'; taskId: OfficeTaskId; choice: number; atStation: OfficeTaskId | null }
+  | { type: 'officeClockOut'; atReception: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
   | { type: 'dismissSummary' };
@@ -199,7 +233,13 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1 };
+  return {
+    time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null,
+    workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1,
+    lastShowcaseDay: -1, fashionMissionItemId: null, fashionMissionCompleted: false,
+    workPerformance: { excellent: 0, reasonable: 0, poor: 0 },
+    officeCareer: createOfficeCareer(),
+  };
 }
 
 export function emptyLedger(): DayLedger {
@@ -343,12 +383,52 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   const reward = TASK_REWARD[option.quality];
   const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
   const bonus = Math.round(hourly * reward.payShare);
+  const performanceKey = option.quality === 'best' ? 'excellent' : option.quality === 'ok' ? 'reasonable' : 'poor';
   return {
     ...state,
     balance: state.balance + bonus,
     today: { ...state.today, income: state.today.income + bonus },
     workMinutes: state.workMinutes + reward.xpMinutes,
     lastTaskHour: hour,
+    workPerformance: {
+      ...state.workPerformance,
+      [performanceKey]: state.workPerformance[performanceKey] + 1,
+    },
+  };
+}
+
+/** Attend the daily boutique showcase; the reward is recalculated from owned, equipped items. */
+function fashionShowcase(
+  state: GameState,
+  owned: string[],
+  equipped: Partial<Record<Slot, string>>,
+  career: Career,
+  lifestyle: Lifestyle,
+): GameState {
+  const today = gameDay(state.time.totalMinutes);
+  if (state.summary || state.lastShowcaseDay === today) return state;
+  const result = fashionShowcaseResult({ owned, equipped });
+  const completesMission = fashionMissionStage(state.fashionMissionItemId, state.fashionMissionCompleted, { owned, equipped }) === 'showcase';
+  const missionReward = completesMission ? FASHION_MISSION_REWARD : 0;
+  let next = state;
+  for (let minute = 0; minute < 30; minute++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    balance: next.balance + result.reward + missionReward,
+    today: { ...next.today, income: next.today.income + result.reward + missionReward },
+    lastShowcaseDay: today,
+    fashionMissionCompleted: state.fashionMissionCompleted || completesMission,
+  };
+}
+
+function buyFashionItem(state: GameState, id: string): GameState {
+  const item = itemById(id);
+  if (!item || state.balance < item.price || state.summary) return state;
+  return {
+    ...state,
+    balance: state.balance - item.price,
+    today: { ...state.today, expenses: state.today.expenses + item.price },
+    fashionMissionItemId: state.fashionMissionItemId ?? (item.slot === 'hair' ? null : item.id),
   };
 }
 
@@ -433,10 +513,51 @@ export function gameReducer(
     }
     case 'workTask':
       return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
+    case 'officeApply':
+      if (!action.atReception || state.summary || state.officeCareer.employed || state.officeCareer.activeShift) return state;
+      return { ...state, officeCareer: { ...state.officeCareer, employed: true } };
+    case 'officeClockIn': {
+      if (state.summary || !action.atReception) return state;
+      const result = officeShiftClockIn(
+        state.officeCareer,
+        Math.floor(state.time.totalMinutes / 1440),
+        state.time.totalMinutes,
+        state.time,
+        action.atReception,
+      );
+      return result.result === 'ok' ? { ...state, officeCareer: result.career } : state;
+    }
+    case 'officeTask': {
+      if (state.summary || action.atStation !== action.taskId) return state;
+      const result = officeTaskAnswer(state.officeCareer, action.taskId, action.choice, true);
+      if (result.result === 'wrong-place' || result.result === 'no-shift' || result.result === 'task-completed' || result.result === 'task-unavailable') return state;
+      let next = state;
+      if (result.result === 'ok') {
+        for (let minute = 0; minute < OFFICE_TASK_MINUTES; minute++) {
+          next = tick(next, career, lifestyle, false);
+        }
+      }
+      return { ...next, officeCareer: result.career };
+    }
+    case 'officeClockOut': {
+      if (state.summary || !action.atReception) return state;
+      const result = officeShiftClockOut(state.officeCareer, state.time.totalMinutes, action.atReception);
+      if (result.result !== 'ok') return state;
+      return {
+        ...state,
+        officeCareer: result.career,
+        balance: state.balance + result.payment,
+        today: { ...state.today, income: state.today.income + result.payment },
+      };
+    }
     case 'socialise':
       return socialise(state, action.residentId, action.activity, career, lifestyle);
     case 'hug':
       return completeHug(state, action.residentId);
+    case 'fashionShowcase':
+      return fashionShowcase(state, action.owned, action.equipped, career, lifestyle);
+    case 'buyFashionItem':
+      return buyFashionItem(state, action.id);
     case 'nightOut':
       return nightOut(state, action.residentId, career, lifestyle);
     case 'wait': {
