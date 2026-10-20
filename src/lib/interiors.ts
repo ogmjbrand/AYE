@@ -26,6 +26,7 @@ export interface Furniture {
   size: readonly [number, number, number];
   color: string;
   elevation?: number;
+  rotation?: number;
 }
 
 export interface Interior {
@@ -54,7 +55,8 @@ const f = (
   d: number,
   color: string,
   elevation = 0,
-): Furniture => ({ kind, at: [x, z], size: [w, h, d], color, elevation });
+  rotation = 0,
+): Furniture => ({ kind, at: [x, z], size: [w, h, d], color, elevation, rotation });
 
 function makeInterior(
   tier: Interior['tier'],
@@ -77,7 +79,7 @@ function makeInterior(
     { position: [(width / 2 + doorway / 2) / 2, wallHeight / 2, 0], size: [horizontalLength, wallHeight, 0.12] },
   ];
   const furniture: Furniture[] = [
-    f('bed', right - 0.1, back - 0.85, 1.8, 0.55, 2.3, '#52677b'),
+    f('bed', right - 0.15, back - 0.9, 1.85, 0.55, 2.2, '#52677b'),
     f('wardrobe', width / 2 - 0.75, back + 1.2, 1.1, 2.1, 0.65, '#60452f'),
     f('mirror', width / 2 - 0.14, back - 0.9, 0.08, 1.65, 0.75, '#9dbac0', 0.15),
     f('sofa', right, front + 1.3, 2.4, 0.85, 1.0, '#59646b'),
