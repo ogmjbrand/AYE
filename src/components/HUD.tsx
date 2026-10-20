@@ -1,7 +1,7 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
 import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
@@ -19,6 +19,7 @@ import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/
 import { HOURLY_WAGE } from '../lib/gameState';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
 import { assetUrl } from '../lib/assetManifest';
+import { PhonePanel, type PhoneApp } from './PhonePanel';
 import {
   Apple,
   Armchair,
@@ -180,6 +181,8 @@ export function HUD({
   const [showDetails, setShowDetails] = useState(false);
   // Phones start with a slim one-row panel so the street stays visible
   const [expanded, setExpanded] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const closePhone = useCallback(() => setPhoneOpen(false), []);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
   const { x: px, z: pz } = controller.position;
@@ -228,7 +231,7 @@ export function HUD({
     ?? (character && character.career !== 'none' ? onOpenLocations : undefined);
   const dockItems: { label: string; icon: LucideIcon; onClick?: () => void; active?: boolean }[] = [
     { label: 'Home', icon: HouseIcon, onClick: homeScene ? undefined : onGoHome, active: homeScene },
-    { label: 'Phone', icon: Smartphone, onClick: onOpenMap },
+    { label: 'Phone', icon: Smartphone, onClick: onOpenMap ? () => setPhoneOpen(true) : undefined },
     { label: 'Map', icon: Map, onClick: onOpenLocations },
     { label: 'Wardrobe', icon: ShoppingBag, onClick: onOpenWardrobe },
     { label: 'Career', icon: BriefcaseBusiness, onClick: careerAction },
@@ -238,9 +241,26 @@ export function HUD({
   if (insidePlaceLabel?.startsWith('Dining') && onOpenRestaurantPanel) {
     dockItems.splice(4, 0, { label: 'Restaurant', icon: Utensils, onClick: onOpenRestaurantPanel, active: true });
   }
+  const phoneApps: PhoneApp[] = [
+    { label: 'Map', detail: 'Open the district map', icon: Map, onOpen: onOpenMap },
+    { label: 'Places', detail: 'Browse city locations', icon: MapPin, onOpen: onOpenLocations },
+    { label: 'Style', detail: 'Open wardrobe and clothing', icon: Shirt, onOpen: onOpenWardrobe },
+    { label: 'Career', detail: 'Open your current work task or workplace directory', icon: BriefcaseBusiness, onOpen: careerAction },
+    { label: 'Home', detail: homeId ? 'Go to your home' : 'Rent a home to enable this app', icon: HouseIcon, onOpen: onGoHome },
+    { label: 'Social', detail: resident ? `Talk to ${resident.name}` : 'Find someone nearby to talk to', icon: Users, onOpen: resident && onTalk ? () => onTalk(resident) : undefined },
+  ];
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
+      {phoneOpen && (
+        <PhonePanel
+          characterName={character?.name ?? 'AYE'}
+          balance={balance}
+          gameTime={gameTime}
+          apps={phoneApps}
+          onClose={closePhone}
+        />
+      )}
       {/* Identity, location, and account stay visible while the world remains open. */}
       <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4">
         <div className={`${PANEL} flex min-w-0 items-center gap-2.5 px-3 py-2 sm:min-w-[10rem]`}>
