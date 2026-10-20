@@ -23,7 +23,7 @@ const EAT_FOREARM = new Quaternion().setFromEuler(new Euler(-0.08, 0, -1.05));
 const EAT_HAND = new Quaternion().setFromEuler(new Euler(0, 0, -0.22));
 
 /** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
-function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
+export function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
   const uniforms = useMemo(() => {
     const list: StyleUniforms[] = [];

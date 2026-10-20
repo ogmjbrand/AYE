@@ -302,10 +302,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [restaurantStage, setRestaurantStage] = useState<'host' | 'walking' | 'menu' | 'ordered' | 'served' | 'eating' | 'finished'>('host');
   const [restaurantTableId, setRestaurantTableId] = useState<string | null>(null);
   const [restaurantOrder, setRestaurantOrder] = useState<Dish | null>(null);
+  const [restaurantDeliveryReady, setRestaurantDeliveryReady] = useState(false);
   const restaurantTransaction = useRef<ReturnType<typeof createDiningTransaction> | null>(null);
   const restaurantOrderSequence = useRef(0);
   const restaurantAnimationTimer = useRef<number | null>(null);
   const [eating, setEating] = useState(false);
+  const completeRestaurantDelivery = useCallback(() => setRestaurantDeliveryReady(true), []);
   const persistedDecor = character.homeDecor ?? EMPTY_HOME_DECOR;
   const interior = useMemo(() => {
     const baseInterior = insideFashionHouse ? FASHION_HOUSE_INTERIOR
@@ -469,6 +471,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setRestaurantStage('host');
     setRestaurantTableId(null);
     setRestaurantOrder(null);
+    setRestaurantDeliveryReady(false);
     restaurantTransaction.current = cancelDiningTransaction(restaurantTransaction.current);
     restaurantTransaction.current = null;
     setMovementBlocked(false);
@@ -669,6 +672,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         ? candidate : nearest,
     );
     setRestaurantTableId(tableId);
+    setRestaurantDeliveryReady(false);
     setRestaurantStage('walking');
     setVendor(null);
     setMovementBlocked(false);
@@ -688,6 +692,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       `restaurant-order-${restaurantOrderSequence.current}`,
       dish.id,
     );
+    setRestaurantDeliveryReady(false);
     setRestaurantOrder(dish);
     setRestaurantStage('ordered');
   };
@@ -695,7 +700,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const transaction = restaurantTransaction.current;
     if (
       !transaction || transaction.status !== 'ordered' || restaurantStage !== 'ordered'
-      || !restaurantOrder || state.summary
+      || !restaurantOrder || state.summary || restaurantDeliveryReady
     ) return;
     const served = transitionDiningTransaction(transaction, 'served');
     if (!served) return;
@@ -707,7 +712,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const transaction = restaurantTransaction.current;
     if (
       !transaction || transaction.status !== 'served' || restaurantStage !== 'served' || !restaurantOrder
-      || state.summary || state.balance < restaurantOrder.price || !suitsDiet(restaurantOrder, character.diet)
+      || !restaurantDeliveryReady || state.summary || state.balance < restaurantOrder.price || !suitsDiet(restaurantOrder, character.diet)
     ) return;
     const eatingTransaction = transitionDiningTransaction(transaction, 'eating');
     if (!eatingTransaction) return;
@@ -735,6 +740,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const leaveRestaurant = () => {
     if (restaurantStage !== 'finished') return;
     setVendor(null);
+    setRestaurantDeliveryReady(false);
     sit.cancel();
     goOutside();
   };
@@ -1069,6 +1075,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     <main className="game">
       {vendor && (
         <FoodMenu
+          key={vendor.id}
           vendor={vendor}
           diet={character.diet}
           balance={state.balance}
@@ -1077,6 +1084,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           tableChoices={restaurantTableChoices}
           selectedTable={restaurantTableId}
           orderedDish={restaurantOrder}
+          mealDelivered={restaurantDeliveryReady}
           onChooseTable={chooseRestaurantTable}
           onOrder={orderRestaurantMeal}
           onWaitForService={waitForRestaurantMeal}
@@ -1278,12 +1286,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
-                {insideFashionHouse && <FashionHouseScene />}
+                {insideFashionHouse && <FashionHouseScene player={controller} />}
                 {insideRestaurant && <RestaurantScene
                   tableId={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantTableId : null}
                   dish={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantOrder : null}
+                  player={controller}
+                  onMealDelivered={completeRestaurantDelivery}
+                  mealDelivered={restaurantDeliveryReady}
                 />}
-                {insideOffice && <OfficeScene />}
+                {insideOffice && <OfficeScene player={controller} />}
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
                 {inside && home && decorPlacement && decorPlacementItem && (
@@ -1434,6 +1445,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenShop={enterFashionHouse}
         onOpenWardrobe={() => setStore('wardrobe')}
         onOpenDecor={inside && home ? () => setStore('decor') : undefined}
+        onOpenRestaurantPanel={insideRestaurant && restaurantVendor ? () => setVendor(restaurantVendor) : undefined}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
         onCycleQuality={() => onQualityChange(nextQualityMode(qualityMode))}
       />

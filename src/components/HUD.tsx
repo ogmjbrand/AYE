@@ -18,6 +18,7 @@ import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
+import { assetUrl } from '../lib/assetManifest';
 import {
   Apple,
   Armchair,
@@ -38,6 +39,7 @@ import {
   UserRound,
   Wallet,
   TriangleAlert,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -76,6 +78,7 @@ interface HUDProps {
   outsideOffice?: { name: string; onOpen: () => void };
   onOpenWardrobe?: () => void;
   onOpenDecor?: () => void;
+  onOpenRestaurantPanel?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
   /** Opens the smartphone map (only passed once you own a phone). */
@@ -156,6 +159,7 @@ export function HUD({
   outsideOffice,
   onOpenWardrobe,
   onOpenDecor,
+  onOpenRestaurantPanel,
   onOpenGadgets,
   onOpenMap,
   onGoHome,
@@ -195,7 +199,7 @@ export function HUD({
             : parkAt(district.park, px, pz) && onOpenPark
               ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark, icon: TreePine }
               : null;
-  const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const resident = !prompt && !insideHome && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
   const streetPrompt = prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident), icon: UserRound }
@@ -219,28 +223,63 @@ export function HUD({
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
   const speed = Math.sqrt(controller.velocity.x ** 2 + controller.velocity.z ** 2).toFixed(1);
+  const homeScene = !!insideHome && !insidePlaceLabel;
+  const careerAction = workTask?.onOpen ?? outsideOffice?.onOpen
+    ?? (character && character.career !== 'none' ? onOpenLocations : undefined);
+  const dockItems: { label: string; icon: LucideIcon; onClick?: () => void; active?: boolean }[] = [
+    { label: 'Home', icon: HouseIcon, onClick: homeScene ? undefined : onGoHome, active: homeScene },
+    { label: 'Phone', icon: Smartphone, onClick: onOpenMap },
+    { label: 'Map', icon: Map, onClick: onOpenLocations },
+    { label: 'Wardrobe', icon: ShoppingBag, onClick: onOpenWardrobe },
+    { label: 'Career', icon: BriefcaseBusiness, onClick: careerAction },
+    { label: 'Social', icon: Users, onClick: resident && onTalk ? () => onTalk(resident) : undefined },
+  ];
+  if (homeScene && onOpenDecor) dockItems.splice(4, 0, { label: 'Decor', icon: Armchair, onClick: onOpenDecor });
+  if (insidePlaceLabel?.startsWith('Dining') && onOpenRestaurantPanel) {
+    dockItems.splice(4, 0, { label: 'Restaurant', icon: Utensils, onClick: onOpenRestaurantPanel, active: true });
+  }
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
-      {/* Top bar: identity and clock on the left, system actions on the right */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-5">
-        <div className={`${PANEL} flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3`}>
-          <h1 className="m-0 shrink-0">
+      {/* Identity, location, and account stay visible while the world remains open. */}
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4">
+        <div className={`${PANEL} flex min-w-0 items-center gap-2.5 px-3 py-2 sm:min-w-[10rem]`}>
+          {character ? (
             <img
-              src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`}
-              alt="AYE"
-              className="h-8 w-auto sm:h-11"
+              src={assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`)}
+              alt=""
+              className="size-10 shrink-0 rounded-full object-cover"
             />
-          </h1>
+          ) : (
+            <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="" className="h-8 w-auto shrink-0" />
+          )}
           <div className="min-w-0">
-            <p className="m-0 font-display text-xl font-semibold leading-none tabular-nums sm:text-2xl">
-              {formatGameTime(gameTime)}
+            <p className="m-0 truncate font-display text-sm font-semibold leading-tight sm:text-base">
+              {character?.name ?? 'AYE'}
             </p>
-            <p className="m-0 mt-1 whitespace-nowrap text-[11px] uppercase tracking-[0.06em] text-ui-muted sm:tracking-[0.14em]">
-              {DAY_SHORT[gameTime.dayOfWeek]} · <span className="capitalize">{gameTime.period}</span>
+            <p className="m-0 mt-0.5 whitespace-nowrap text-[10px] text-ui-muted">
+              {DAY_SHORT[gameTime.dayOfWeek]} {formatGameTime(gameTime)}
             </p>
           </div>
         </div>
+
+        {(insideHome || neighborhood) && (
+          <div className={`${PANEL} absolute left-1/2 top-3 flex max-w-[min(24rem,50vw)] -translate-x-1/2 items-center gap-3 px-4 py-2 text-center`}>
+            {insidePlaceLabel?.startsWith('Dining')
+              ? <Utensils size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />
+              : insidePlaceLabel?.startsWith('At work')
+                ? <BriefcaseBusiness size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />
+                : <HouseIcon size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />}
+            <div className="min-w-0">
+              <p className="m-0 truncate text-xs font-semibold uppercase tracking-[0.1em] text-white">
+                {insideHome ? insideHome.name : neighborhood!.name}
+              </p>
+              <p className="m-0 mt-0.5 truncate text-[10px] uppercase tracking-[0.12em] text-[#e3bd70]">
+                {insidePlaceLabel ?? (insideHome ? district.name : district.city.name)}
+              </p>
+            </div>
+          </div>
+        )}
 
         {controller.trafficWarning && (
           <p role="status" className="absolute left-1/2 top-24 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg sm:top-20 sm:text-sm">
@@ -250,7 +289,20 @@ export function HUD({
         )}
 
         <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+          <div className={`${PANEL} flex items-center gap-2 px-2 py-1.5`}>
+            <span className="whitespace-nowrap px-1 text-xs font-semibold tabular-nums text-white">GHAI {balance.toLocaleString()}</span>
+            {(insideHome ? [onRest && homeScene ? {
+              label: 'Rest', icon: BedDouble, action: onRest,
+            } : null] : [
+              onCycleQuality ? { label: `Settings, graphics quality ${qualityLabel}`, icon: Settings2, action: onCycleQuality } : null,
+              onExitToMenu ? { label: 'Main menu', icon: Menu, action: onExitToMenu } : null,
+            ]).filter((item): item is { label: string; icon: LucideIcon; action: () => void } => item !== null).map(({ label, icon: Icon, action }) => (
+              <button key={label} type="button" onClick={action} aria-label={label} title={label} className="pointer-events-auto grid size-8 place-items-center rounded-full border border-white/10 text-white/80 hover:border-[#d2b36f] hover:text-[#f0d797]">
+                <Icon size={16} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+          <div className={`flex flex-wrap justify-end gap-1.5 sm:gap-2 ${insideHome ? 'hidden' : ''}`}>
             {onOpenLocations && (
               <button type="button" onClick={onOpenLocations} className={BUTTON} title="City locations: restaurants, shops, homes, workplaces" aria-label="Locations">
                 <MapPin size={16} aria-hidden="true" strokeWidth={1.8} />
@@ -312,23 +364,11 @@ export function HUD({
               </button>
             )}
           </div>
-          <p className="m-0 rounded-md bg-ui-panel/70 px-2 py-0.5 font-mono text-[11px] text-ui-muted" aria-label="Frames per second">
+          <p className={`m-0 rounded-md bg-ui-panel/70 px-2 py-0.5 font-mono text-[11px] text-ui-muted ${insideHome ? 'hidden' : ''}`} aria-label="Frames per second">
             {perfStats.fps} FPS
           </p>
         </div>
       </div>
-
-      {/* Where you are: under the top bar, centred */}
-      {(insideHome || neighborhood) && (
-        <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
-          <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
-            {insideHome ? (insidePlaceLabel ?? `At home · ${district.city.name}`) : `${neighborhood!.name} · ${district.city.name}`}
-          </p>
-          <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
-            {insideHome ? insideHome.name : neighborhood!.description}
-          </p>
-        </div>
-      )}
 
       {/* City locations: the ⋯ button and the destination being tracked, under the clock on the left */}
       {onOpenLocations && (
@@ -370,7 +410,7 @@ export function HUD({
 
       {/* Prompt when standing at a vendor or shop (desktop: bottom centre) */}
       {placePrompt && (
-        <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
+        <div className={`absolute left-1/2 hidden -translate-x-1/2 sm:block ${insideHome ? 'top-20' : 'bottom-24'}`}>
           <PlacePrompt {...placePrompt} />
         </div>
       )}
@@ -386,7 +426,7 @@ export function HUD({
             </div>
           )}
         </div>
-        <section className={`${PANEL} w-full sm:w-72`} aria-label="Player status">
+        <section className={`${PANEL} w-full sm:w-72 ${insideHome ? 'hidden' : ''}`} aria-label="Player status">
           {character && !expanded && (
             <button
               type="button"
@@ -424,6 +464,29 @@ export function HUD({
                     {status.label}
                   </span>
                 </div>
+
+                {insideHome && (
+                  <nav
+                    aria-label="Quick navigation"
+                    className="pointer-events-auto fixed bottom-3 left-1/2 z-30 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-x-auto rounded-2xl border border-white/10 bg-[#111418]/95 px-1.5 py-1.5 shadow-2xl backdrop-blur-sm"
+                  >
+                    {dockItems.map(({ label, icon: Icon, onClick, active }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={onClick}
+                        disabled={!onClick}
+                        aria-current={active ? 'page' : undefined}
+                        aria-label={label}
+                        title={label}
+                        className={`flex min-w-[4.1rem] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d2b36f] ${active ? 'bg-[#d2b36f]/15 text-[#f0d797]' : 'text-white/70 hover:bg-white/5 hover:text-white'} disabled:cursor-default disabled:opacity-90`}
+                      >
+                        <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
+                        <span className="whitespace-nowrap">{label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                )}
 
                 <div className="mt-3 flex items-end justify-between gap-3">
                   <div>

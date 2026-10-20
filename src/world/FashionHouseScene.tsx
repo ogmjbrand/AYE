@@ -1,26 +1,18 @@
-function Cashier() {
-  return (
-    <group position={[0, 0, 5.35]}>
-      <mesh position={[0, 0.82, 0]} castShadow>
-        <capsuleGeometry args={[0.19, 0.62, 3, 8]} />
-        <meshStandardMaterial color="#211f20" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 1.31, 0.02]} castShadow>
-        <sphereGeometry args={[0.15, 16, 12]} />
-        <meshStandardMaterial color="#754d3c" roughness={0.88} />
-      </mesh>
-      <mesh position={[0, 1.18, -0.05]} castShadow>
-        <sphereGeometry args={[0.155, 16, 12]} />
-        <meshStandardMaterial color="#211816" roughness={0.92} />
-      </mesh>
-    </group>
-  );
-}
+import type { PlayerHandle } from '../hooks/usePlayerController';
+import { WorldNPC } from './WorldNPC';
+import { NPC_UNIFORMS } from './npcUniforms';
 
-export function FashionHouseScene() {
+export function FashionHouseScene({ player }: { player: PlayerHandle }) {
   return (
     <>
-      <Cashier />
+      <WorldNPC
+        lookId="female-adult-08"
+        position={[0, 0, 5.45]}
+        facing={Math.PI}
+        player={player}
+        greetPlayer
+        styles={NPC_UNIFORMS.fashion}
+      />
       <mesh position={[0, 2.76, 0.7]}>
         <boxGeometry args={[5.8, 0.035, 0.035]} />
         <meshStandardMaterial color="#c9a35e" metalness={0.7} roughness={0.28} emissive="#c9a35e" emissiveIntensity={0.16} />

@@ -149,6 +149,8 @@ export const RESTAURANT_INTERIOR: Interior = {
   partitions: [],
   furniture: [
     f('host-stand', 0, -3, 2.2, 1.05, 0.75, '#4a3324'),
+    f('counter', -7, 6.1, 3.2, 0.92, 0.9, '#49372a'),
+    f('cabinet', -7, 6.1, 3.0, 0.78, 0.82, '#49372a', 0.98),
     ...RESTAURANT_TABLES.map(({ id, at }): Furniture => ({
       kind: 'dining-table',
       at,

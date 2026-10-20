@@ -1,66 +1,8 @@
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import type { Group } from 'three';
 import type { Dish } from '../lib/food';
 import { RESTAURANT_TABLES, restaurantTableById } from '../lib/interiors';
-
-const DINER_COLORS = ['#7b3f32', '#315b56', '#a47a38', '#4a506d'];
-
-function Diner({ x, z, facing, color, phase }: { x: number; z: number; facing: number; color: string; phase: number }) {
-  const body = useRef<Group>(null);
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime + phase;
-    if (body.current) body.current.position.y = Math.sin(t * 1.6) * 0.012;
-  });
-  return (
-    <group position={[x, 0.45, z]} rotation={[0, facing, 0]}>
-      <group ref={body}>
-        <mesh position={[0, 0.32, 0]} castShadow>
-          <capsuleGeometry args={[0.19, 0.36, 3, 8]} />
-          <meshStandardMaterial color={color} roughness={0.82} />
-        </mesh>
-        <mesh position={[0, 0.72, 0.01]} castShadow>
-          <sphereGeometry args={[0.15, 12, 10]} />
-          <meshStandardMaterial color="#855b45" roughness={0.9} />
-        </mesh>
-        {[-1, 1].map((side) => (
-          <mesh key={side} position={[side * 0.23, 0.29, 0.06]} rotation={[0, 0, side * -0.2]} castShadow>
-            <capsuleGeometry args={[0.055, 0.28, 3, 6]} />
-            <meshStandardMaterial color={color} roughness={0.82} />
-          </mesh>
-        ))}
-      </group>
-    </group>
-  );
-}
-
-function Waiter() {
-  const person = useRef<Group>(null);
-  useFrame(({ clock }) => {
-    const t = (clock.elapsedTime * 0.42) % 1;
-    const z = -4.1 + t * 9;
-    if (person.current) {
-      person.current.position.set(0, 0, z);
-      person.current.rotation.y = t < 0.5 ? 0 : Math.PI;
-    }
-  });
-  return (
-    <group ref={person}>
-      <mesh position={[0, 0.88, 0]} castShadow>
-        <capsuleGeometry args={[0.18, 0.65, 3, 8]} />
-        <meshStandardMaterial color="#252321" roughness={0.75} />
-      </mesh>
-      <mesh position={[0, 1.37, 0]} castShadow>
-        <sphereGeometry args={[0.14, 12, 10]} />
-        <meshStandardMaterial color="#79543e" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.25, 0.94, 0.12]} castShadow>
-        <boxGeometry args={[0.34, 0.035, 0.25]} />
-        <meshStandardMaterial color="#c9a86a" metalness={0.15} roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
+import type { PlayerHandle } from '../hooks/usePlayerController';
+import { WorldNPC, type NPCPath } from './WorldNPC';
+import { NPC_UNIFORMS } from './npcUniforms';
 
 function MealPlate({ tableId, dish }: { tableId: string; dish: Dish }) {
   const table = restaurantTableById(tableId);
@@ -91,8 +33,34 @@ function MealPlate({ tableId, dish }: { tableId: string; dish: Dish }) {
   );
 }
 
-export function RestaurantScene({ tableId, dish }: { tableId: string | null; dish: Dish | null }) {
-  const reservedSeats = [RESTAURANT_TABLES[1].seats[0], RESTAURANT_TABLES[1].seats[1], RESTAURANT_TABLES[3].seats[0], RESTAURANT_TABLES[3].seats[1]];
+export function RestaurantScene({
+  tableId,
+  dish,
+  player,
+  onMealDelivered,
+  mealDelivered,
+}: {
+  tableId: string | null;
+  dish: Dish | null;
+  player: PlayerHandle;
+  onMealDelivered: () => void;
+  mealDelivered: boolean;
+}) {
+  const occupiedSeats = [
+    { table: RESTAURANT_TABLES[1], seatIndex: 0, lookId: 'male-adult-18' },
+    { table: RESTAURANT_TABLES[1], seatIndex: 1, lookId: 'female-adult-11' },
+    { table: RESTAURANT_TABLES[3], seatIndex: 0, lookId: 'female-adult-03' },
+    { table: RESTAURANT_TABLES[3], seatIndex: 1, lookId: 'male-adult-10' },
+  ];
+  const deliveryTable = tableId ? restaurantTableById(tableId) : undefined;
+  const deliveryZ = deliveryTable ? deliveryTable.at[1] - 1.25 : 0;
+  const deliveryPath: NPCPath | undefined = deliveryTable ? [
+    [0, 0, 4.9],
+    [0, 0, deliveryZ - 0.6],
+    [deliveryTable.at[0], 0, deliveryZ - 0.6],
+    [deliveryTable.at[0], 0, deliveryZ],
+  ] : undefined;
+  const servicePath: NPCPath = [[0, 0, -1.3], [0, 0, 4.9], [0, 0, -1.3]];
   return (
     <>
       {RESTAURANT_TABLES.map((table) => (
@@ -109,11 +77,69 @@ export function RestaurantScene({ tableId, dish }: { tableId: string | null; dis
         </group>
       ))}
       <ambientLight intensity={0.12} color="#e7c69a" />
-      {reservedSeats.map((seat, index) => (
-        <Diner key={seat.id} x={seat.x} z={seat.z} facing={seat.facing} color={DINER_COLORS[index]} phase={index * 1.2} />
-      ))}
-      <Waiter />
-      {dish && tableId && <MealPlate tableId={tableId} dish={dish} />}
+      <group position={[-7, 0, 6.1]}>
+        <mesh position={[0, 1.52, -0.43]} receiveShadow>
+          <boxGeometry args={[3.25, 1.05, 0.08]} />
+          <meshStandardMaterial color="#59483b" roughness={0.8} />
+        </mesh>
+        <mesh position={[0, 2.17, -0.37]}>
+          <boxGeometry args={[2.6, 0.12, 0.45]} />
+          <meshStandardMaterial color="#342d28" roughness={0.45} />
+        </mesh>
+        <mesh position={[0, 1.0, -0.04]}>
+          <boxGeometry args={[1.3, 0.08, 0.66]} />
+          <meshStandardMaterial color="#262729" metalness={0.2} roughness={0.4} />
+        </mesh>
+        {[-0.42, 0.42].map((x) => [-0.2, 0.2].map((z) => (
+          <mesh key={`${x}-${z}`} position={[x, 1.055, z - 0.04]}>
+            <torusGeometry args={[0.105, 0.018, 6, 16]} />
+            <meshStandardMaterial color="#a9a59d" metalness={0.75} roughness={0.28} />
+          </mesh>
+        )))}
+        <mesh position={[-0.85, 1.18, 0.04]} castShadow>
+          <cylinderGeometry args={[0.22, 0.19, 0.22, 24]} />
+          <meshStandardMaterial color="#827d75" metalness={0.65} roughness={0.3} />
+        </mesh>
+      </group>
+      {occupiedSeats.map(({ table, seatIndex, lookId }) => {
+        const seat = table.seats[seatIndex];
+        return (
+          <WorldNPC
+            key={seat.id}
+            lookId={lookId}
+            position={[seat.x, seat.height, seat.z]}
+            facing={seat.facing}
+            seat={seat}
+          />
+        );
+      })}
+      <WorldNPC
+        lookId="female-adult-06"
+        position={[-0.55, 0, -4.05]}
+        facing={0}
+        player={player}
+        greetPlayer
+        styles={NPC_UNIFORMS.host}
+      />
+      <WorldNPC
+        lookId="male-adult-04"
+        position={[0, 0, -1.3]}
+        path={deliveryPath ?? servicePath}
+        pathKey={deliveryTable ? `delivery-${deliveryTable.id}` : 'service-patrol'}
+        loopPath={!deliveryTable}
+        walkSpeed={1.15}
+        styles={NPC_UNIFORMS.waiter}
+        onArrive={deliveryTable ? onMealDelivered : undefined}
+      />
+      <WorldNPC
+        lookId="male-adult-18"
+        position={[-7, 0, 5.1]}
+        facing={Math.PI}
+        styles={NPC_UNIFORMS.chef}
+      />
+      {deliveryTable && dish && mealDelivered && (
+        <MealPlate tableId={deliveryTable.id} dish={dish} />
+      )}
     </>
   );
 }

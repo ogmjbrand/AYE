@@ -3,7 +3,7 @@ import type { Furniture, FurnitureKind, Interior } from './interiors';
 export interface DecorItem {
   id: string;
   name: string;
-  room: 'Living Room' | 'Bedroom' | 'Kitchen' | 'Outdoors';
+  room: 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom';
   price: number;
   kind: FurnitureKind;
   size: readonly [number, number, number];
@@ -28,6 +28,11 @@ export const HOME_DECOR_ITEMS: readonly DecorItem[] = [
   { id: 'decor-wall-art', name: 'Wall Art', room: 'Bedroom', price: 2_400, kind: 'wall-art', size: [1.15, 0.85, 0.08], color: '#c9a35e' },
   { id: 'decor-rug', name: 'Rug', room: 'Living Room', price: 4_000, kind: 'rug', size: [2.4, 0.02, 1.7], color: '#5d5148' },
   { id: 'decor-indoor-plant', name: 'Indoor Plant', room: 'Living Room', price: 2_200, kind: 'plant', size: [0.58, 1.2, 0.58], color: '#496c46' },
+  { id: 'decor-tv-console', name: 'TV Console', room: 'Living Room', price: 9_500, kind: 'tv', size: [1.8, 1.1, 0.5], color: '#4b392c' },
+  { id: 'decor-bathroom-mirror', name: 'Bathroom Mirror', room: 'Bathroom', price: 3_200, kind: 'mirror', size: [0.9, 1.2, 0.08], color: '#b9c8c8' },
+  { id: 'decor-bathroom-sink', name: 'Bathroom Sink', room: 'Bathroom', price: 4_600, kind: 'sink', size: [0.9, 0.9, 0.58], color: '#dedbd2' },
+  { id: 'decor-toilet', name: 'Toilet', room: 'Bathroom', price: 5_000, kind: 'toilet', size: [0.62, 0.78, 0.9], color: '#e5e5e1' },
+  { id: 'decor-shower', name: 'Shower', room: 'Bathroom', price: 8_500, kind: 'shower', size: [1.15, 2.15, 1.15], color: '#a8c0c5' },
 ];
 
 export const decorItemById = (id: string | null | undefined) =>

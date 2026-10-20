@@ -113,7 +113,7 @@ export function FashionStore({
   const [slot, setSlot] = useState<Slot>(CATEGORY_SLOT[category] ?? 'top');
   const [message, setMessage] = useState('');
   const [outfitName, setOutfitName] = useState('');
-  const [decorRoom, setDecorRoom] = useState<'All' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Outdoors'>('All');
+  const [decorRoom, setDecorRoom] = useState<'All' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom'>('All');
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -165,7 +165,7 @@ export function FashionStore({
         role="dialog"
         aria-modal="false"
         aria-labelledby="fashion-title"
-        className={`pointer-events-auto absolute right-4 top-24 flex flex-col overflow-hidden border border-white/15 bg-[#12151b]/95 shadow-2xl backdrop-blur-sm max-sm:inset-x-3 max-sm:bottom-24 max-sm:top-auto max-sm:max-h-[54dvh] ${isShop ? 'bottom-24 w-[29rem] max-w-[calc(100vw-2rem)]' : 'bottom-20 w-[27rem] max-w-[calc(100vw-2rem)]'}`}
+        className={`pointer-events-auto absolute right-3 top-16 flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#101317]/95 shadow-2xl backdrop-blur-sm max-sm:inset-x-2 max-sm:bottom-24 max-sm:top-auto max-sm:max-h-[60dvh] ${isShop ? 'bottom-20 w-[21rem] max-w-[calc(100vw-1.5rem)]' : 'bottom-16 w-[21rem] max-w-[calc(100vw-1.5rem)]'}`}
       >
         <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="min-w-0">
@@ -177,7 +177,7 @@ export function FashionStore({
                   : 'Your wardrobe'}
             </p>
             <h2 id="fashion-title" className="m-0 mt-0.5 text-lg font-semibold">
-              {category === 'fitting-room' ? 'Fitting Room' : CATEGORY_LABELS[category]}
+              {category === 'fitting-room' ? 'Fitting Room' : category === 'decor' ? 'Home Decor' : CATEGORY_LABELS[category]}
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-3">
@@ -248,7 +248,7 @@ export function FashionStore({
           {category === 'decor' ? (
             <>
               <nav className="mb-3 flex gap-1 overflow-x-auto" aria-label="Home décor room">
-                {(['All', 'Living Room', 'Bedroom', 'Kitchen', 'Outdoors'] as const).map((room) => (
+                {(['All', 'Living Room', 'Bedroom', 'Kitchen', 'Bathroom'] as const).map((room) => (
                   <button
                     key={room}
                     type="button"
@@ -265,39 +265,36 @@ export function FashionStore({
                   Choose a home before purchasing furniture. Items can be previewed and placed in your own interior.
                 </p>
               )}
-              {decorRoom === 'Outdoors' ? (
-                <p className="m-0 py-8 text-center text-sm text-white/65">Outdoor furnishing is not available yet.</p>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-2">
-                  {visibleDecorItems.map((item) => {
-                    const owned = homeDecorItems.filter((placement) => placement.itemId === item.id).length;
-                    return (
-                      <article key={item.id} className="min-w-0 border border-white/10 bg-[#232730] p-2">
-                        <div
-                          className="mb-2 flex h-20 items-center justify-center border border-white/10"
-                          style={{ background: `linear-gradient(145deg, ${item.color}, #1a1b1e)` }}
-                          role="img"
-                          aria-label={`${item.name} 3D preview available in your home`}
-                        >
-                          <Armchair size={28} className="text-white/75" aria-hidden="true" />
-                        </div>
-                        <h3 className="m-0 truncate text-xs font-semibold">{item.name}</h3>
-                        <p className="m-0 mt-1 truncate text-[10px] text-white/55">
-                          {owned ? `${owned} owned` : `${item.price.toLocaleString()} ⓒ`}
-                        </p>
-                        <button
-                          type="button"
-                          disabled={!homeId}
-                          onClick={() => setMessage(onPreviewDecor(item.id) ?? `Traveling to your home to preview ${item.name}.`)}
-                          className={`${BUTTON} mt-2 w-full border-white/20 text-white/80 hover:border-[#c9a35e]`}
-                        >
-                          Preview
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-2">
+                {visibleDecorItems.map((item) => {
+                  const owned = homeDecorItems.filter((placement) => placement.itemId === item.id).length;
+                  return (
+                    <article key={item.id} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#181c21] p-2">
+                      <div
+                        className="mb-2 flex h-20 items-center justify-center rounded-lg border border-white/10"
+                        style={{ background: `linear-gradient(145deg, ${item.color}, #1a1b1e)` }}
+                        role="img"
+                        aria-label={`Illustrated preview of ${item.name}`}
+                      >
+                        <Armchair size={28} className="text-white/75" aria-hidden="true" />
+                      </div>
+                      <h3 className="m-0 truncate text-xs font-semibold">{item.name}</h3>
+                      <p className="m-0 mt-1 truncate text-[10px] text-white/55">
+                        {owned ? `${owned} owned` : `${item.price.toLocaleString()} ⓒ`}
+                      </p>
+                      <button
+                        type="button"
+                        disabled={!homeId}
+                        onClick={() => setMessage(onPreviewDecor(item.id) ?? `Traveling to your home to preview ${item.name}.`)}
+                        className={`${BUTTON} mt-2 w-full border-white/20 text-white/80 hover:border-[#c9a35e]`}
+                      >
+                        Preview
+                      </button>
+                    </article>
+                  );
+                })}
+                {visibleDecorItems.length === 0 && <p className="col-span-3 py-8 text-center text-sm text-white/65">No furniture in this room yet.</p>}
+              </div>
               {homeDecorItems.length > 0 && (
                 <section className="mt-4 border-t border-white/10 pt-3">
                   <h3 className="m-0 text-sm font-semibold">Your home furnishings</h3>
