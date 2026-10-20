@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { INTERIORS, bedSpot, doorSpot, homeInteractionAt, interiorFor, interiorLayout } from './interiors';
+import {
+  INTERIORS,
+  RESTAURANT_INTERIOR,
+  RESTAURANT_TABLES,
+  bedSpot,
+  doorSpot,
+  homeInteractionAt,
+  interiorFor,
+  interiorLayout,
+  restaurantInteractionAt,
+} from './interiors';
 import { allHomes } from './homes';
 import { PLAYER_RADIUS, resolveCollisions } from './world';
 import { standSpot } from './seating';
@@ -84,5 +94,33 @@ describe('homes have interiors', () => {
       .sort((a, b) => a.rentPerNight - b.rentPerNight)
       .map((h) => { const i = interiorFor(h); return i.width * i.depth; });
     for (let k = 1; k < sizes.length; k++) expect(sizes[k]).toBeGreaterThanOrEqual(sizes[k - 1]);
+  });
+});
+
+describe('restaurant interior', () => {
+  const layout = interiorLayout(RESTAURANT_INTERIOR);
+  const free = (x: number, z: number) => {
+    const resolved = resolveCollisions(x, z, PLAYER_RADIUS, layout.obstacles);
+    return Math.hypot(resolved.x - x, resolved.z - z) < 0.01;
+  };
+
+  it('has a walkable entrance and a host point that requires approaching the stand', () => {
+    const door = doorSpot(RESTAURANT_INTERIOR);
+    const host = RESTAURANT_INTERIOR.furniture.find((item) => item.kind === 'host-stand')!;
+    expect(free(...door)).toBe(true);
+    expect(restaurantInteractionAt(...door)).toBe('door');
+    expect(restaurantInteractionAt(...host.at)).toBe('host');
+    expect(restaurantInteractionAt(0, -4.8)).toBeNull();
+  });
+
+  it('keeps every dining chair inside the room and its approach spot clear of tables', () => {
+    for (const table of RESTAURANT_TABLES) {
+      for (const seat of table.seats) {
+        expect(Math.abs(seat.x)).toBeLessThan(RESTAURANT_INTERIOR.width / 2);
+        expect(Math.abs(seat.z)).toBeLessThan(RESTAURANT_INTERIOR.depth / 2);
+        const stand = standSpot(seat);
+        expect(free(stand.x, stand.z), `${seat.id} approach`).toBe(true);
+      }
+    }
   });
 });

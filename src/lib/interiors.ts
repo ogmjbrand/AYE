@@ -9,7 +9,8 @@ import type { Home } from './homes';
 export type FurnitureKind =
   | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp'
   | 'fridge' | 'cabinet' | 'mirror' | 'sink' | 'toilet' | 'shower'
-  | 'computer' | 'file-cabinet' | 'conference-table' | 'reception' | 'chair' | 'whiteboard';
+  | 'computer' | 'file-cabinet' | 'conference-table' | 'reception' | 'chair' | 'whiteboard'
+  | 'dining-table' | 'dining-chair' | 'host-stand';
 
 export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
 
@@ -106,6 +107,82 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
   penthouse: makeInterior('penthouse', 16, 12, '#f1ede6', '#d9d4cc', 'full'),
 };
 
+export interface RestaurantTable {
+  id: string;
+  at: readonly [number, number];
+  seats: readonly {
+    id: string;
+    x: number;
+    z: number;
+    facing: number;
+    height: number;
+  }[];
+}
+
+export const RESTAURANT_TABLES: readonly RestaurantTable[] = [
+  { id: 'table-1', at: [-4, 0.5], seats: [
+    { id: 'table-1-west', x: -6, z: 0.5, facing: Math.PI / 2, height: 0.45 },
+    { id: 'table-1-east', x: -2, z: 0.5, facing: -Math.PI / 2, height: 0.45 },
+  ] },
+  { id: 'table-2', at: [4, 0.5], seats: [
+    { id: 'table-2-west', x: 2, z: 0.5, facing: Math.PI / 2, height: 0.45 },
+    { id: 'table-2-east', x: 6, z: 0.5, facing: -Math.PI / 2, height: 0.45 },
+  ] },
+  { id: 'table-3', at: [-4, 4.5], seats: [
+    { id: 'table-3-west', x: -6, z: 4.5, facing: Math.PI / 2, height: 0.45 },
+    { id: 'table-3-east', x: -2, z: 4.5, facing: -Math.PI / 2, height: 0.45 },
+  ] },
+  { id: 'table-4', at: [4, 4.5], seats: [
+    { id: 'table-4-west', x: 2, z: 4.5, facing: Math.PI / 2, height: 0.45 },
+    { id: 'table-4-east', x: 6, z: 4.5, facing: -Math.PI / 2, height: 0.45 },
+  ] },
+];
+
+export const RESTAURANT_INTERIOR: Interior = {
+  tier: 'flat',
+  width: 18,
+  depth: 14,
+  wallColor: '#302721',
+  floorColor: '#b7a98f',
+  window: 'wide',
+  partitions: [],
+  furniture: [
+    f('host-stand', 0, -3, 2.2, 1.05, 0.75, '#4a3324'),
+    ...RESTAURANT_TABLES.map(({ id, at }): Furniture => ({
+      kind: 'dining-table',
+      at,
+      size: [1.65, 0.78, 0.95],
+      color: id === 'table-1' || id === 'table-4' ? '#684a31' : '#795a3b',
+      rotation: 0,
+    })),
+    ...RESTAURANT_TABLES.flatMap(({ seats }) => seats.map((seat): Furniture => ({
+      kind: 'dining-chair',
+      at: [seat.x, seat.z],
+      size: [0.68, 0.92, 0.68],
+      color: '#47362c',
+      rotation: seat.facing,
+    }))),
+    f('plant', -7.4, -4.2, 0.65, 1.5, 0.65, '#55734b'),
+    f('plant', 7.4, 5.8, 0.65, 1.5, 0.65, '#55734b'),
+  ],
+};
+
+export type RestaurantInteraction = 'door' | 'host';
+
+export function restaurantInteractionAt(x: number, z: number): RestaurantInteraction | null {
+  const [doorX, doorZ] = doorSpot(RESTAURANT_INTERIOR);
+  if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
+  const host = RESTAURANT_INTERIOR.furniture.find((item) => item.kind === 'host-stand');
+  if (!host) return null;
+  const dx = Math.max(Math.abs(x - host.at[0]) - host.size[0] / 2, 0);
+  const dz = Math.max(Math.abs(z - host.at[1]) - host.size[2] / 2, 0);
+  return Math.hypot(dx, dz) <= USE_RADIUS ? 'host' : null;
+}
+
+export function restaurantTableById(id: string): RestaurantTable | undefined {
+  return RESTAURANT_TABLES.find((table) => table.id === id);
+}
+
 export function interiorFor(home: Home): Interior {
   if (home.rentPerNight < 120) return INTERIORS.room;
   if (home.rentPerNight < 300) return INTERIORS.flat;
@@ -175,7 +252,7 @@ export function interiorLayout(i: Interior): DistrictLayout {
       style: 'residential',
     })),
     ...i.furniture
-      .filter((x) => !['rug', 'cabinet', 'mirror', 'computer', 'whiteboard'].includes(x.kind))
+      .filter((x) => !['rug', 'cabinet', 'mirror', 'computer', 'whiteboard', 'chair', 'dining-chair'].includes(x.kind))
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];
   return buildLayout({

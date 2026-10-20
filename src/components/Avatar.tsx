@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, NoColorSpace, type AnimationAction, type Group, type Mesh, type Object3D } from 'three';
+import { Box3, Euler, NoColorSpace, Quaternion, type AnimationAction, type Group, type Mesh, type Object3D } from 'three';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
 
@@ -18,6 +18,9 @@ import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
+const EAT_UPPER_ARM = new Quaternion().setFromEuler(new Euler(-0.16, 0.05, -0.82));
+const EAT_FOREARM = new Quaternion().setFromEuler(new Euler(-0.08, 0, -1.05));
+const EAT_HAND = new Quaternion().setFromEuler(new Euler(0, 0, -0.22));
 
 /** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
 function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
@@ -92,11 +95,12 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   hugSession?: HugSession | null;
+  eating?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
   shape?: BodyShape;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
@@ -153,6 +157,17 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   const styledLook = assetManifest().avatar ? null : lookById(lookId).id;
 
   const relaxed = useMemo(() => createRelaxedHands(scene, clipsWithHands), [scene, clipsWithHands]);
+  const eatingBones = useMemo(() => ({
+    upperArm: scene.getObjectByName('Bip01 R UpperArm'),
+    forearm: scene.getObjectByName('Bip01 R Forearm'),
+    hand: scene.getObjectByName('Bip01 R Hand'),
+  }), [scene]);
+  const eatingStart = useRef<number | null>(null);
+  const eatingWasActive = useRef(false);
+  const eatingWeight = useRef(0);
+  const eatingOffset = useRef(new Quaternion());
+  const forearmOffset = useRef(new Quaternion());
+  const handOffset = useRef(new Quaternion());
 
   // Gestures (talk, listen) arrive in their own file after the person is on screen
   const [gestures, setGestures] = useState<GestureActions>({});
@@ -187,6 +202,22 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
       g.position.y += (drop - g.position.y) * Math.min(1, delta * 5);
     }
     relaxed.update(actions);
+    if (eating && !eatingWasActive.current) eatingStart.current = mixer.time;
+    if (!eating) eatingStart.current = null;
+    eatingWasActive.current = eating;
+    const targetEatingWeight = eating && eatingStart.current !== null
+      ? 0.18 + 0.82 * (0.5 - 0.5 * Math.cos(((mixer.time - eatingStart.current) / 0.9) * Math.PI * 2))
+      : 0;
+    eatingWeight.current += (targetEatingWeight - eatingWeight.current) * Math.min(1, delta * 8);
+    const cycle = eatingWeight.current;
+    if (cycle > 0) {
+      eatingOffset.current.identity().slerp(EAT_UPPER_ARM, cycle);
+      forearmOffset.current.identity().slerp(EAT_FOREARM, cycle);
+      handOffset.current.identity().slerp(EAT_HAND, cycle);
+      eatingBones.upperArm?.quaternion.multiply(eatingOffset.current);
+      eatingBones.forearm?.quaternion.multiply(forearmOffset.current);
+      eatingBones.hand?.quaternion.multiply(handOffset.current);
+    }
   });
 
   return (

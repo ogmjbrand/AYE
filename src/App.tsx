@@ -19,7 +19,13 @@ import { HUD } from './components/HUD';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
-import { nearestVendor, suitsDiet, type FoodVendor } from './lib/food';
+import { nearestVendor, suitsDiet, type Dish, type FoodVendor } from './lib/food';
+import {
+  cancelDiningTransaction,
+  createDiningTransaction,
+  settleDiningTransaction,
+  transitionDiningTransaction,
+} from './lib/restaurant';
 import type { FashionItem, Slot } from './lib/fashion';
 import { fashionShowcaseResult } from './lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
@@ -56,8 +62,20 @@ import { VenueFront } from './world/VenueFront';
 import { Park } from './world/Park';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
-import { doorSpot, homeInteractionAt, interiorFor, interiorLayout, type HomeAction } from './lib/interiors';
-import { officeInteractionAt, OFFICE_INTERIOR, OFFICE_WORKPLACE, officeTaskId, type OfficeInteraction } from './lib/officeCareer';
+import { RestaurantScene } from './world/RestaurantScene';
+import { OfficeScene } from './world/OfficeScene';
+import {
+  RESTAURANT_INTERIOR,
+  RESTAURANT_TABLES,
+  doorSpot,
+  homeInteractionAt,
+  interiorFor,
+  interiorLayout,
+  restaurantInteractionAt,
+  restaurantTableById,
+  type HomeAction,
+} from './lib/interiors';
+import { officeInteractionAt, OFFICE_INTERIOR, OFFICE_TASK_SEATS, OFFICE_WORKPLACE, officeTaskId, type OfficeInteraction } from './lib/officeCareer';
 import { OfficePanel } from './components/OfficePanel';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, isAdultResident, residentById, residentFacing, residentNear, residentPosition, type Resident } from './lib/people';
@@ -256,21 +274,37 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
   );
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
   const district = districtById(state.districtId);
   const home = homeById(state.home);
   const [inside, setInside] = useState(false);
   const [insideOffice, setInsideOffice] = useState(false);
+  const [insideRestaurant, setInsideRestaurant] = useState(false);
+  const [restaurantVendor, setRestaurantVendor] = useState<FoodVendor | null>(null);
+  const [restaurantStage, setRestaurantStage] = useState<'host' | 'walking' | 'menu' | 'ordered' | 'served' | 'eating' | 'finished'>('host');
+  const [restaurantTableId, setRestaurantTableId] = useState<string | null>(null);
+  const [restaurantOrder, setRestaurantOrder] = useState<Dish | null>(null);
+  const restaurantTransaction = useRef<ReturnType<typeof createDiningTransaction> | null>(null);
+  const restaurantOrderSequence = useRef(0);
+  const restaurantAnimationTimer = useRef<number | null>(null);
+  const [eating, setEating] = useState(false);
   const interior = insideOffice && district.id === OFFICE_WORKPLACE.districtId
     ? OFFICE_INTERIOR
-    : home ? interiorFor(home) : null;
+    : insideRestaurant && restaurantVendor ? RESTAURANT_INTERIOR
+      : home ? interiorFor(home) : null;
   const roomLayout = useMemo(() => {
     if (!interior) return null;
     const layout = interiorLayout(interior);
-    return insideOffice ? { ...layout, id: 'interior.office' } : layout;
-  }, [interior, insideOffice]);
+    if (insideOffice) return { ...layout, id: 'interior.office' };
+    if (insideRestaurant) return { ...layout, id: 'interior.restaurant' };
+    return layout;
+  }, [interior, insideOffice, insideRestaurant]);
   const indoors = !!roomLayout && (insideOffice
     ? district.id === OFFICE_WORKPLACE.districtId
-    : inside && !!home && home.district === district.id);
+    : insideRestaurant
+      ? !!restaurantVendor
+      : inside && !!home && home.district === district.id);
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : district.layout;
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
@@ -294,12 +328,16 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [hugging, setHugging] = useState<HugSession | null>(null);
   const [task, setTask] = useState<WorkTask | null>(null);
   const [officePanel, setOfficePanel] = useState<'reception' | OfficeInteraction | null>(null);
+  const [officeSeatRequested, setOfficeSeatRequested] = useState<'computer' | 'meeting' | null>(null);
   const [arrival, setArrival] = useState<string | null>(null);
   useEffect(() => {
     if (!arrival) return;
     const id = setTimeout(() => setArrival(null), 6000);
     return () => clearTimeout(id);
   }, [arrival]);
+  useEffect(() => () => {
+    if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
+  }, []);
   const book = (to: District, mode: TravelMode) => {
     const option = travelOption(district.city, to.city, mode);
     if (!option || state.balance < option.fare) return;
@@ -378,13 +416,32 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     controls.object.position.set(x + Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 5.3, z + Math.cos(d) * 4.2);
     controls.update();
   }, [controller]);
+  const enterRestaurant = (foodVendor: FoodVendor) => {
+    if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
+    restaurantAnimationTimer.current = null;
+    setEating(false);
+    setVendor(null);
+    setRestaurantVendor(foodVendor);
+    setInsideRestaurant(true);
+    setInside(false);
+    setInsideOffice(false);
+    setRestaurantStage('host');
+    setRestaurantTableId(null);
+    setRestaurantOrder(null);
+    restaurantTransaction.current = cancelDiningTransaction(restaurantTransaction.current);
+    restaurantTransaction.current = null;
+    setMovementBlocked(false);
+    const [x, z] = doorSpot(RESTAURANT_INTERIOR);
+    placePlayer([x, 0, z], 0);
+    snapIndoorCamera();
+  };
   const goInside = useCallback(() => {
-    if (!interior || insideOffice) return;
+    if (!interior || insideOffice || insideRestaurant) return;
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
     snapIndoorCamera();
-  }, [interior, insideOffice, snapIndoorCamera, setHomePanel, setInside]);
+  }, [interior, insideOffice, insideRestaurant, snapIndoorCamera, setHomePanel, setInside]);
   const goIntoOffice = useCallback(() => {
     if (district.id !== OFFICE_WORKPLACE.districtId || insideOffice) return;
     setHomePanel(null);
@@ -397,7 +454,24 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const goOutside = () => {
     if (insideOffice) {
       setInsideOffice(false);
+      setOfficeSeatRequested(null);
+      sit.cancel();
       placePlayer(OFFICE_WORKPLACE.position, Math.PI);
+    } else if (insideRestaurant && restaurantVendor) {
+      const exterior = restaurantVendor.position;
+      if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
+      restaurantAnimationTimer.current = null;
+      setEating(false);
+      setInsideRestaurant(false);
+      setVendor(null);
+      setRestaurantVendor(null);
+      setRestaurantStage('host');
+      setRestaurantTableId(null);
+      setRestaurantOrder(null);
+      restaurantTransaction.current = cancelDiningTransaction(restaurantTransaction.current);
+      restaurantTransaction.current = null;
+      sit.cancel();
+      placePlayer(exterior, Math.PI);
     } else {
       setInside(false);
       if (home) placePlayer(home.door, Math.PI);
@@ -461,7 +535,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   const useLocation = (e: LocationEntry) => {
     setLocationsOpen(false);
-    if (e.use === 'food') { const v = district.vendors.find((v) => `${district.id}.${v.id}` === e.id); if (v) setVendor(v); }
+    if (e.use === 'food') { const v = district.vendors.find((v) => `${district.id}.${v.id}` === e.id); if (v) enterRestaurant(v); }
     else if (e.use === 'shop') setStore('shop');
     else if (e.use === 'gadgets') setGadgets(true);
     else if (e.use === 'travel') setTravelOpen(true);
@@ -472,7 +546,140 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
 
   // Sitting down somewhere (park benches, the lounge terrace): see sitInPark and sitOnTerrace below
-  const sit = useSitSession(controller, wait);
+  const onInteriorSeat = useCallback((seat: Seat) => {
+    if (insideRestaurant && restaurantVendor && restaurantStage === 'walking') {
+      setRestaurantStage('menu');
+      setVendor(restaurantVendor);
+    }
+    if (insideOffice && officeSeatRequested && OFFICE_TASK_SEATS[officeSeatRequested]?.id === seat.id) {
+      setOfficePanel(officeSeatRequested);
+      setOfficeSeatRequested(null);
+    }
+  }, [
+    insideRestaurant,
+    restaurantVendor,
+    restaurantStage,
+    insideOffice,
+    officeSeatRequested,
+    setRestaurantStage,
+    setVendor,
+    setOfficePanel,
+    setOfficeSeatRequested,
+  ]);
+  const onInteriorSeatInterrupted = useCallback(() => {
+    if (insideRestaurant && restaurantStage === 'finished') {
+      setRestaurantTableId(null);
+    } else if (insideRestaurant && restaurantStage !== 'host') {
+      if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
+      restaurantAnimationTimer.current = null;
+      setEating(false);
+      restaurantTransaction.current = cancelDiningTransaction(restaurantTransaction.current);
+      restaurantTransaction.current = null;
+      setRestaurantStage('host');
+      setRestaurantTableId(null);
+      setRestaurantOrder(null);
+      setVendor(null);
+      setArrival('Your meal was interrupted. The table is available again and no payment was taken.');
+    }
+    if (insideOffice && officeSeatRequested) {
+      setOfficeSeatRequested(null);
+      setArrival('Your walk to the workstation was interrupted. Try the station again when ready.');
+    }
+  }, [
+    insideRestaurant,
+    restaurantStage,
+    insideOffice,
+    officeSeatRequested,
+    setEating,
+    setRestaurantStage,
+    setRestaurantTableId,
+    setRestaurantOrder,
+    setVendor,
+    setOfficeSeatRequested,
+    setArrival,
+  ]);
+  const sit = useSitSession(controller, wait, onInteriorSeat, onInteriorSeatInterrupted);
+  const restaurantTableChoices = RESTAURANT_TABLES
+    .filter((table) => table.id !== 'table-2' && table.id !== 'table-4' && table.id !== restaurantTableId)
+    .map((table, index) => ({ id: table.id, label: index === 0 ? 'Window table' : 'Garden table' }));
+  const chooseRestaurantTable = (tableId: string) => {
+    const table = restaurantTableById(tableId);
+    if (!table || !restaurantVendor || !insideRestaurant) return;
+    const seat = table.seats.reduce((nearest, candidate) =>
+      Math.hypot(candidate.x - controller.position.x, candidate.z - controller.position.z)
+        < Math.hypot(nearest.x - controller.position.x, nearest.z - controller.position.z)
+        ? candidate : nearest,
+    );
+    setRestaurantTableId(tableId);
+    setRestaurantStage('walking');
+    setVendor(null);
+    setMovementBlocked(false);
+    if (!sit.start({ seat, place: `${restaurantVendor.name} · ${tableId.replace('-', ' ')}`, minutes: 0 })) {
+      setRestaurantStage('host');
+      setArrival('There is no clear path to that table. Please choose another one.');
+      setVendor(restaurantVendor);
+    }
+  };
+  const orderRestaurantMeal = (dish: Dish) => {
+    if (
+      restaurantTransaction.current || !insideRestaurant || restaurantStage !== 'menu'
+      || !suitsDiet(dish, character.diet) || state.balance < dish.price
+    ) return;
+    restaurantOrderSequence.current += 1;
+    restaurantTransaction.current = createDiningTransaction(
+      `restaurant-order-${restaurantOrderSequence.current}`,
+      dish.id,
+    );
+    setRestaurantOrder(dish);
+    setRestaurantStage('ordered');
+  };
+  const waitForRestaurantMeal = () => {
+    const transaction = restaurantTransaction.current;
+    if (
+      !transaction || transaction.status !== 'ordered' || restaurantStage !== 'ordered'
+      || !restaurantOrder || state.summary
+    ) return;
+    const served = transitionDiningTransaction(transaction, 'served');
+    if (!served) return;
+    restaurantTransaction.current = served;
+    wait(5);
+    setRestaurantStage('served');
+  };
+  const eatRestaurantMeal = () => {
+    const transaction = restaurantTransaction.current;
+    if (
+      !transaction || transaction.status !== 'served' || restaurantStage !== 'served' || !restaurantOrder
+      || state.summary || state.balance < restaurantOrder.price || !suitsDiet(restaurantOrder, character.diet)
+    ) return;
+    const eatingTransaction = transitionDiningTransaction(transaction, 'eating');
+    if (!eatingTransaction) return;
+    restaurantTransaction.current = eatingTransaction;
+    setRestaurantStage('eating');
+    setEating(true);
+    restaurantAnimationTimer.current = window.setTimeout(() => {
+      restaurantAnimationTimer.current = null;
+      setEating(false);
+      const currentTransaction = restaurantTransaction.current;
+      if (!currentTransaction || currentTransaction.status !== 'eating') return;
+      if (!insideRestaurant || stateRef.current.summary || stateRef.current.balance < restaurantOrder.price) {
+        restaurantTransaction.current = transitionDiningTransaction(currentTransaction, 'served');
+        setRestaurantStage('served');
+        setArrival('You could not complete the meal. The order is still on the table; payment has not been taken.');
+        return;
+      }
+      const settlement = settleDiningTransaction(currentTransaction, restaurantOrder.price);
+      if (settlement.payment === 0) return;
+      restaurantTransaction.current = settlement.transaction;
+      eat(settlement.payment, restaurantOrder.fullness);
+      setRestaurantStage('finished');
+    }, 2800);
+  };
+  const leaveRestaurant = () => {
+    if (restaurantStage !== 'finished') return;
+    setVendor(null);
+    sit.cancel();
+    goOutside();
+  };
   const sofaSeat = (): Seat | null => {
     const sofa = interior?.furniture.find((f) => f.kind === 'sofa');
     return sofa ? { id: 'home-sofa', x: sofa.at[0], z: sofa.at[1], facing: Math.PI, height: 0.45 } : null;
@@ -515,6 +722,20 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       setArrival('Clock in at reception before starting workplace tasks.');
       return;
     }
+    if (action === 'computer' || action === 'meeting') {
+      const seat = OFFICE_TASK_SEATS[action];
+      if (!seat) return;
+      if (sit.session?.phase !== 'seated' || sit.session.seat.id !== seat.id) {
+        setOfficeSeatRequested(action);
+        setOfficePanel(null);
+        setMovementBlocked(false);
+        if (!sit.start({ seat, place: action === 'computer' ? 'Your assigned workstation' : 'The team meeting table', minutes: 0 })) {
+          setOfficeSeatRequested(null);
+          setArrival('There is no clear route to that workstation.');
+        }
+        return;
+      }
+    }
     setOfficePanel(action);
   };
 
@@ -528,7 +749,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         return;
       }
       if (indoors && interior) {
-        if (insideOffice) {
+        if (insideRestaurant && restaurantVendor) {
+          const action = restaurantInteractionAt(controller.position.x, controller.position.z);
+          if (action === 'door') goOutside();
+          else if (action === 'host') setVendor(restaurantVendor);
+        } else if (insideOffice) {
           const action = officeActionAt();
           if (action) interactWithOffice(action);
         } else {
@@ -543,7 +768,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const door = homeAtDoor(district.id, x, z);
       const officeEntrance = district.id === OFFICE_WORKPLACE.districtId
         && Math.hypot(OFFICE_WORKPLACE.position[0] - x, OFFICE_WORKPLACE.position[2] - z) <= OFFICE_WORKPLACE.radius;
-      if (near) setVendor(near);
+      if (near) enterRestaurant(near);
       else if (counter === 'fashion') setStore('shop');
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
@@ -669,9 +894,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           diet={character.diet}
           balance={state.balance}
           fullness={state.fullness}
-          onEat={(dish) => {
-            if (suitsDiet(dish, character.diet)) eat(dish.price, dish.fullness);
-          }}
+          phase={restaurantStage}
+          tableChoices={restaurantTableChoices}
+          selectedTable={restaurantTableId}
+          orderedDish={restaurantOrder}
+          onChooseTable={chooseRestaurantTable}
+          onOrder={orderRestaurantMeal}
+          onWaitForService={waitForRestaurantMeal}
+          onEatMeal={eatRestaurantMeal}
+          onLeave={leaveRestaurant}
           onClose={() => setVendor(null)}
         />
       )}
@@ -841,9 +1072,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={insideOffice ? 'office' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
+              <HomeInterior key={insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
+                {insideRestaurant && <RestaurantScene
+                  tableId={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantTableId : null}
+                  dish={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantOrder : null}
+                />}
+                {insideOffice && <OfficeScene />}
                 <InteriorLighting gameTime={state.time} player={controller} />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
               </HomeInterior>
             ) : (
               <City
@@ -931,8 +1167,16 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
-          name: insideOffice ? OFFICE_WORKPLACE.name : home!.name,
+          name: insideOffice ? OFFICE_WORKPLACE.name : insideRestaurant ? restaurantVendor?.name ?? 'Restaurant' : home!.name,
           interactionAt: (x, z) => {
+            if (insideRestaurant) {
+              const action = restaurantInteractionAt(x, z);
+              if (!action) return null;
+              return ({
+                door: { verb: 'Leave through', place: 'the restaurant entrance', onOpen: goOutside, icon: DoorOpen },
+                host: { verb: restaurantStage === 'host' ? 'Check in with' : 'Speak to', place: 'the host', onOpen: () => { if (restaurantVendor) setVendor(restaurantVendor); }, icon: Users },
+              })[action];
+            }
             if (insideOffice) {
               const officeAction = officeInteractionAt(interior, x, z);
               return officeAction ? ({
@@ -956,7 +1200,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             })[action] : null;
           },
         } : undefined}
-        insidePlaceLabel={insideOffice ? `At work · ${district.city.name}` : undefined}
+        insidePlaceLabel={insideOffice ? `At work · ${district.city.name}` : insideRestaurant ? `Dining · ${district.city.name}` : undefined}
         outsideOffice={!indoors && district.id === OFFICE_WORKPLACE.districtId
           && Math.hypot(OFFICE_WORKPLACE.position[0] - controller.position.x, OFFICE_WORKPLACE.position[2] - controller.position.z) <= OFFICE_WORKPLACE.radius
           ? { name: OFFICE_WORKPLACE.name, onOpen: goIntoOffice }
@@ -970,7 +1214,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         tracked={trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
         onStopTracking={() => setTrackedId(null)}
         fullness={state.fullness}
-        onOpenVendor={setVendor}
+        onOpenVendor={enterRestaurant}
         onOpenShop={() => setStore('shop')}
         onOpenWardrobe={() => setStore('wardrobe')}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}

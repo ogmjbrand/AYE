@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   OFFICE_TASK_MINUTES,
   officeChallenge,
+  officeJobTitle,
   type OfficeCareerState,
   type OfficeTaskId,
 } from '../lib/officeCareer';
@@ -55,6 +56,7 @@ export function OfficePanel({
     : 0;
   const task = taskId && shift ? shift.tasks[taskId] : null;
   const challenge = taskId ? officeChallenge(taskId) : null;
+  const nextPromotion = [5, 15, 30, 60].find((count) => career.completedShifts.length < count);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 sm:items-center" onClick={onClose}>
@@ -81,6 +83,11 @@ export function OfficePanel({
 
         {mode === 'task' && challenge && taskId && shift ? (
           <div className="space-y-4">
+            {taskId && (
+              <p className="m-0 border-l-2 border-ui-accent pl-3 text-xs text-ui-muted">
+                {taskId === 'computer' ? 'You are seated at your assigned workstation.' : taskId === 'meeting' ? 'You are seated with the team at the meeting table.' : 'You are at the document station.'}
+              </p>
+            )}
             <p className="m-0 text-sm leading-relaxed text-ui-ink/90">{challenge.prompt}</p>
             <p className="m-0 text-sm font-semibold">{challenge.instruction}</p>
             {task?.completed ? (
@@ -115,6 +122,7 @@ export function OfficePanel({
               <div className="flex justify-between gap-4"><dt className="text-ui-muted">Balance</dt><dd className="m-0">{balance.toLocaleString()} ⓒ</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ui-muted">Position</dt><dd className="m-0">{career.employed ? career.jobTitle : 'Available position'}</dd></div>
               {career.employed && <div className="flex justify-between gap-4"><dt className="text-ui-muted">Salary</dt><dd className="m-0">{career.salaryPerTask.toLocaleString()} ⓒ per task</dd></div>}
+              {career.employed && nextPromotion && <div className="flex justify-between gap-4"><dt className="text-ui-muted">Next role</dt><dd className="m-0 text-right">{officeJobTitle(nextPromotion)} · {nextPromotion - career.completedShifts.length} shifts</dd></div>}
             </dl>
 
             {!career.employed ? (

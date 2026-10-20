@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   OFFICE_TASK_PAY,
+  OFFICE_INTERIOR,
+  OFFICE_TASK_SEATS,
   canClockIntoOffice,
   createOfficeCareer,
   officeChallenge,
+  officeInteractionAt,
   officeShiftClockIn,
   officeShiftClockOut,
   officeTaskAnswer,
@@ -11,6 +14,8 @@ import {
 } from './officeCareer';
 import { createGameState, createTime, gameReducer } from './gameState';
 import { loadProgress, saveProgress } from './save';
+import { interiorLayout } from './interiors';
+import { PLAYER_RADIUS, resolveCollisions } from './world';
 import type { Character } from '../components/CharacterCreation';
 
 const character: Character = {
@@ -33,6 +38,17 @@ class MemoryStorage implements Storage {
 }
 
 describe('Office Worker shift rules', () => {
+  it('requires seated workstations to be clear and in interaction range of the assigned station', () => {
+    const layout = interiorLayout(OFFICE_INTERIOR);
+    for (const [taskId, seat] of Object.entries(OFFICE_TASK_SEATS)) {
+      expect(seat).toBeDefined();
+      const position = seat!;
+      const resolved = resolveCollisions(position.x, position.z, PLAYER_RADIUS, layout.obstacles);
+      expect(Math.hypot(resolved.x - position.x, resolved.z - position.z), taskId).toBeLessThan(0.01);
+      expect(officeInteractionAt(OFFICE_INTERIOR, position.x, position.z)).toBe(taskId);
+    }
+  });
+
   it('only permits clock-in between 09:00 and 15:00', () => {
     expect(canClockIntoOffice(createTime(8, 59))).toBe(false);
     expect(canClockIntoOffice(createTime(9, 0))).toBe(true);
@@ -92,6 +108,20 @@ describe('Office Worker shift rules', () => {
     }
     expect(career).toMatchObject({ jobTitle: 'Office Coordinator', careerLevel: 3, salaryPerTask: 350 });
     expect(career.achievements).toEqual(['first-shift', 'administrative-associate', 'office-coordinator']);
+  });
+
+  it('continues promotions into management and executive roles', () => {
+    let career = { ...createOfficeCareer(), employed: true };
+    for (let day = 0; day < 60; day++) {
+      career = officeShiftClockIn(career, day, day * 1_440 + 540, createTime(9), true).career;
+      for (const id of ['computer', 'documents', 'meeting'] as const) {
+        career = officeTaskAnswer(career, id, officeChallenge(id).correctIndex, true).career;
+      }
+      career = officeShiftClockOut(career, day * 1_440 + 585, true).career;
+      if (day === 29) expect(career).toMatchObject({ jobTitle: 'Operations Manager', careerLevel: 4, salaryPerTask: 425 });
+    }
+    expect(career).toMatchObject({ jobTitle: 'Executive Director', careerLevel: 5, salaryPerTask: 525 });
+    expect(career.achievements).toContain('executive-director');
   });
 
   it('deduplicates and validates saved office-career data', () => {

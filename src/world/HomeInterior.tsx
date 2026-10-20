@@ -160,10 +160,30 @@ function Piece({ f }: { f: Furniture }) {
     case 'desk':
     case 'conference-table':
     case 'reception':
+    case 'host-stand':
       parts = (
         <>
           {box(w, 0.05, d, h - 0.025, f.color)}
           {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.05, h - 0.05, 0.05, (h - 0.05) / 2, '#2b2b2d', sx * (w / 2 - 0.06), sz * (d / 2 - 0.06), `${sx}${sz}`)))}
+        </>
+      );
+      break;
+    case 'dining-table':
+      parts = (
+        <>
+          {box(w, 0.1, d, h - 0.05, f.color)}
+          {box(w * 0.16, h - 0.12, d * 0.16, (h - 0.12) / 2, '#3c3027')}
+          {box(w * 0.88, 0.025, d * 0.82, h + 0.012, '#c9a86a')}
+        </>
+      );
+      break;
+    case 'chair':
+    case 'dining-chair':
+      parts = (
+        <>
+          {box(w * 0.9, 0.12, d * 0.88, 0.45, f.color)}
+          {box(w * 0.88, h * 0.52, 0.12, 0.66, f.color, 0, -d * 0.4)}
+          {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.06, 0.4, 0.06, 0.2, '#332a25', sx * w * 0.36, sz * d * 0.34, `${sx}${sz}`)))}
         </>
       );
       break;
@@ -299,5 +319,5 @@ function Piece({ f }: { f: Furniture }) {
       // Wardrobe, counter, fridge: a solid unit
       parts = box(w, h, d, h / 2, f.color);
   }
-  return <group position={[x, f.elevation ?? 0, z]}>{parts}</group>;
+  return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}>{parts}</group>;
 }

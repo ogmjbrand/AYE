@@ -180,7 +180,7 @@ export function HUD({
   const counter = counterAt(district, px, pz);
   // One prompt at a time: a food vendor, then a shop or desk, then a front door
   const prompt = vendor && onOpenVendor
-    ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor), icon: Utensils }
+    ? { verb: 'Enter', place: vendor.name, onOpen: () => onOpenVendor(vendor), icon: Utensils }
     : counter === 'fashion' && onOpenShop
       ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop, icon: ShoppingBag }
       : counter === 'gadgets' && onOpenGadgets

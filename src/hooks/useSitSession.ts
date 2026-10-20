@@ -14,7 +14,12 @@ const STEP_SECONDS = 0.25;
  * Sitting down somewhere (lib/sitSession.ts has the rules): walk to the seat,
  * sit, let the chosen time pass in steps through the game reducer, get up.
  */
-export function useSitSession(player: PlayerHandle, onWait: (minutes: number) => void) {
+export function useSitSession(
+  player: PlayerHandle,
+  onWait: (minutes: number) => void,
+  onSeated?: (seat: SitPlan['seat']) => void,
+  onInterrupted?: () => void,
+) {
   const [runner] = useState(() => new SitRunner({ onWait, sitAt, standUp }));
   useEffect(() => { runner.setOnWait(onWait); }, [runner, onWait]);
   const [session, setSession] = useState<SitSession | null>(null);
@@ -23,10 +28,17 @@ export function useSitSession(player: PlayerHandle, onWait: (minutes: number) =>
   useEffect(() => {
     const offTrip = subscribeTrip(() => {
       const t = getTrip();
-      if (t && t.status !== 'moving' && runner.tripEnded(t.seq, t.status)) sync();
+      if (t && t.status !== 'moving' && runner.tripEnded(t.seq, t.status)) {
+        if (runner.state?.phase === 'seated') onSeated?.(runner.state.seat);
+        else onInterrupted?.();
+        sync();
+      }
     });
     const offSeat = subscribeSeated(() => {
-      if (getSeated() === null && runner.stoodUp()) sync();
+      if (getSeated() === null && runner.stoodUp()) {
+        onInterrupted?.();
+        sync();
+      }
     });
     const id = window.setInterval(() => {
       if (runner.state?.phase !== 'seated') return;
@@ -34,7 +46,7 @@ export function useSitSession(player: PlayerHandle, onWait: (minutes: number) =>
       sync();
     }, STEP_SECONDS * 1000);
     return () => { offTrip(); offSeat(); window.clearInterval(id); };
-  }, [runner, sync]);
+  }, [runner, sync, onSeated, onInterrupted]);
 
   const start = useCallback((plan: SitPlan): boolean => {
     runner.cancel();

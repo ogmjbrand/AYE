@@ -1,6 +1,7 @@
 import type { GameTime } from './gameState';
 import type { Furniture, Interior } from './interiors';
 import { USE_RADIUS } from './interiors';
+import type { Seat } from './seating';
 
 export const OFFICE_WORKPLACE = {
   districtId: 'lagos.marina',
@@ -18,26 +19,38 @@ const furniture = (
   depth: number,
   color: string,
   elevation = 0,
-): Furniture => ({ kind, at: [x, z], size: [width, height, depth], color, elevation });
+  rotation = 0,
+): Furniture => ({ kind, at: [x, z], size: [width, height, depth], color, elevation, rotation });
 
 export const OFFICE_INTERIOR: Interior = {
   tier: 'flat',
   width: 14,
   depth: 10,
-  wallColor: '#d8d9d4',
-  floorColor: '#8c867b',
+  wallColor: '#dedbd2',
+  floorColor: '#8d8171',
   window: 'wide',
   partitions: [],
   furniture: [
     furniture('reception', 0, -2.65, 1.8, 1.05, 0.8, '#534a3d'),
     furniture('desk', -3.1, 1.85, 2.5, 0.76, 1.35, '#755a43'),
     furniture('computer', -3.1, 1.85, 1, 0.68, 0.72, '#343b3e', 0.76),
+    furniture('chair', -3.1, 3.8, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
     furniture('file-cabinet', -3.1, -0.55, 0.95, 1.25, 0.8, '#778087'),
     furniture('conference-table', 2.7, 1.6, 3.4, 0.78, 1.55, '#765b43'),
-    furniture('chair', 2.7, 0.25, 0.65, 0.9, 0.65, '#49545c'),
+    furniture('chair', 2.7, -0.4, 0.68, 0.92, 0.68, '#49545c', 0, 0),
+    furniture('chair', 1.2, 2.85, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
+    furniture('chair', 4.2, 2.85, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
     furniture('whiteboard', 0, 4.65, 3.4, 1.45, 0.12, '#e9e8df'),
     furniture('plant', 5.35, 3.8, 0.65, 1.35, 0.65, '#52784b'),
+    furniture('counter', 5.25, -2.1, 1.65, 0.92, 0.78, '#c7c2b6'),
+    furniture('sofa', 4.95, -3.75, 2.25, 0.82, 0.9, '#465255'),
+    furniture('table', 3.25, -3.15, 0.9, 0.42, 0.6, '#735b45'),
   ],
+};
+
+export const OFFICE_TASK_SEATS: Readonly<Partial<Record<OfficeTaskId, Seat>>> = {
+  computer: { id: 'office-computer-chair', x: -3.1, z: 3.8, facing: Math.PI, height: 0.45 },
+  meeting: { id: 'office-meeting-chair', x: 2.7, z: -0.4, facing: 0, height: 0.45 },
 };
 
 export type OfficeInteraction = 'door' | 'reception' | OfficeTaskId;
@@ -69,7 +82,7 @@ export const OFFICE_SHIFT_START_MINUTE = 9 * 60;
 export const OFFICE_LAST_CLOCK_IN_MINUTE = 15 * 60;
 export const OFFICE_TASK_MINUTES = 15;
 export const OFFICE_TASK_PAY = 250;
-export const OFFICE_SALARY_BY_LEVEL = [OFFICE_TASK_PAY, 300, 350] as const;
+export const OFFICE_SALARY_BY_LEVEL = [OFFICE_TASK_PAY, 300, 350, 425, 525] as const;
 export const OFFICE_DEDUCTIONS = 0;
 
 export type OfficeTaskId = 'computer' | 'documents' | 'meeting';
@@ -169,12 +182,16 @@ export function createOfficeCareer(): OfficeCareerState {
 }
 
 export function officeJobTitle(completedShiftCount: number): string {
+  if (completedShiftCount >= 60) return 'Executive Director';
+  if (completedShiftCount >= 30) return 'Operations Manager';
   if (completedShiftCount >= 15) return 'Office Coordinator';
   if (completedShiftCount >= 5) return 'Administrative Associate';
   return 'Office Assistant';
 }
 
 export function officeCareerLevel(completedShiftCount: number): number {
+  if (completedShiftCount >= 60) return 5;
+  if (completedShiftCount >= 30) return 4;
   if (completedShiftCount >= 15) return 3;
   if (completedShiftCount >= 5) return 2;
   return 1;
@@ -204,10 +221,10 @@ export function sanitiseOfficeCareer(value: unknown): OfficeCareerState {
   const activeShift = isValidShift(data.activeShift) && !paidShiftIds.includes(data.activeShift.id)
     ? data.activeShift
     : null;
-  const careerLevel = Math.max(1, Math.min(3, savedLevel || officeCareerLevel(completedShifts.length)));
+  const careerLevel = Math.max(1, Math.min(5, savedLevel || officeCareerLevel(completedShifts.length)));
   return {
     employed: data.employed === true,
-    jobTitle: careerLevel === 3 ? 'Office Coordinator' : careerLevel === 2 ? 'Administrative Associate' : 'Office Assistant',
+    jobTitle: officeJobTitle(careerLevel === 5 ? 60 : careerLevel === 4 ? 30 : careerLevel === 3 ? 15 : careerLevel === 2 ? 5 : 0),
     careerLevel,
     salaryPerTask: typeof data.salaryPerTask === 'number' && Number.isInteger(data.salaryPerTask)
       && data.salaryPerTask >= 1 && data.salaryPerTask <= 100_000
@@ -352,6 +369,8 @@ export function officeShiftClockOut(
         ...(career.completedShifts.length === 0 ? ['first-shift'] : []),
         ...(career.completedShifts.length + 1 === 5 ? ['administrative-associate'] : []),
         ...(career.completedShifts.length + 1 === 15 ? ['office-coordinator'] : []),
+        ...(career.completedShifts.length + 1 === 30 ? ['operations-manager'] : []),
+        ...(career.completedShifts.length + 1 === 60 ? ['executive-director'] : []),
       ])],
       activeShift: null,
       completedShifts: [...career.completedShifts, completed].slice(-60),

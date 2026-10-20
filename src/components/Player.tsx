@@ -21,6 +21,7 @@ interface PlayerProps {
   conversationTarget?: string | null;
   hugSession?: HugSession | null;
   onHugComplete?: (residentId: string) => void;
+  eating?: boolean;
 }
 
 /** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
@@ -47,6 +48,7 @@ export function Player({
   conversationTarget = null,
   hugSession = null,
   onHugComplete,
+  eating = false,
 }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
@@ -133,6 +135,7 @@ export function Player({
             shape={character?.shape}
             conversing={conversing}
             hugSession={hugSession}
+            eating={eating}
           />
         </Suspense>
       </ErrorBoundary>
