@@ -20,6 +20,7 @@ import { HOURLY_WAGE } from '../lib/gameState';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
 import {
   Apple,
+  Armchair,
   BedDouble,
   BriefcaseBusiness,
   House as HouseIcon,
@@ -74,6 +75,7 @@ interface HUDProps {
   insidePlaceLabel?: string;
   outsideOffice?: { name: string; onOpen: () => void };
   onOpenWardrobe?: () => void;
+  onOpenDecor?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
   /** Opens the smartphone map (only passed once you own a phone). */
@@ -153,6 +155,7 @@ export function HUD({
   insidePlaceLabel,
   outsideOffice,
   onOpenWardrobe,
+  onOpenDecor,
   onOpenGadgets,
   onOpenMap,
   onGoHome,
@@ -271,6 +274,12 @@ export function HUD({
               <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own" aria-label="Wardrobe">
                 <Shirt size={16} aria-hidden="true" strokeWidth={1.8} />
                 <span className="hidden sm:inline">Wardrobe</span>
+              </button>
+            )}
+            {onOpenDecor && (
+              <button type="button" onClick={onOpenDecor} className={BUTTON} title="Preview and place furniture in this home" aria-label="Decorate home">
+                <Armchair size={16} aria-hidden="true" strokeWidth={1.8} />
+                <span className="hidden sm:inline">Decorate</span>
               </button>
             )}
             <button type="button" disabled className={`${BUTTON} cursor-not-allowed opacity-50`} title="Inventory is not implemented yet" aria-label="Inventory unavailable">

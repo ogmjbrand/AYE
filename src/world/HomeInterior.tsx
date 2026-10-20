@@ -92,7 +92,7 @@ export function HomeInterior({ interior, gameTime, doorOpen = false, children }:
         <pointLight position={[0, windowY, d / 2 - 0.4]} intensity={night > 0.5 ? 0.5 : 2.2} distance={w * 0.8} color={sky} />
       )}
 
-      {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
+      {interior.furniture.map((f, i) => <InteriorFurniturePiece key={i} f={f} />)}
 
       {/* Warm practical lights make each room legible without flattening the daylight. */}
       <ambientLight intensity={0.55} />
@@ -126,7 +126,7 @@ const box = (w: number, h: number, d: number, y: number, color: string, x = 0, z
 );
 
 /** One piece of furniture, built from simple shapes. */
-function Piece({ f }: { f: Furniture }) {
+export function InteriorFurniturePiece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
   let parts: ReactNode;
@@ -139,6 +139,19 @@ function Piece({ f }: { f: Furniture }) {
           {box(w - 0.05, 0.06, d * 0.6, 0.55, f.color, 0, -d * 0.18)}
           {box(w * 0.8, 0.12, 0.35, 0.58, '#ffffff', 0, d / 2 - 0.3)}
           {box(w, 0.9, 0.08, 0.45, '#3b2c22', 0, d / 2 - 0.04)}
+        </>
+      );
+      break;
+    case 'wall-art':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, '#5a3f2b')}
+          {box(w - 0.12, h - 0.12, 0.025, h / 2, '#c9a35e', 0, d / 2 + 0.014)}
+          {box(w - 0.22, h - 0.22, 0.025, h / 2, '#1e2936', 0, d / 2 + 0.03)}
+          <mesh position={[0, h / 2, d / 2 + 0.05]}>
+            <circleGeometry args={[Math.min(w, h) * 0.18, 20]} />
+            <meshStandardMaterial color="#d2b36f" roughness={0.6} />
+          </mesh>
         </>
       );
       break;
@@ -184,6 +197,85 @@ function Piece({ f }: { f: Furniture }) {
           {box(w * 0.9, 0.12, d * 0.88, 0.45, f.color)}
           {box(w * 0.88, h * 0.52, 0.12, 0.66, f.color, 0, -d * 0.4)}
           {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.06, 0.4, 0.06, 0.2, '#332a25', sx * w * 0.36, sz * d * 0.34, `${sx}${sz}`)))}
+        </>
+      );
+      break;
+    case 'clothing-rack':
+      parts = (
+        <>
+          {box(w, 0.045, d, h - 0.08, f.color)}
+          {[-1, 1].map((side) => box(0.055, h - 0.08, 0.055, (h - 0.08) / 2, '#302823', side * (w / 2 - 0.08), 0, `upright-${side}`))}
+          {box(0.045, 0.06, d, h - 0.06, '#d7d1c6')}
+          {[-0.38, -0.13, 0.13, 0.38].map((offset, index) => (
+            <group key={offset} position={[offset * w, 0, 0]}>
+              <mesh position={[0, h * 0.52, 0]} castShadow>
+                <capsuleGeometry args={[0.14, 0.42, 3, 8]} />
+                <meshStandardMaterial color={['#8b292c', '#315a60', '#d0b382', '#24252b'][index]} roughness={0.88} />
+              </mesh>
+              <mesh position={[0, h * 0.78, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <torusGeometry args={[0.095, 0.012, 6, 12, Math.PI]} />
+                <meshStandardMaterial color="#c9a35e" metalness={0.65} roughness={0.3} />
+              </mesh>
+            </group>
+          ))}
+        </>
+      );
+      break;
+    case 'mannequin':
+      parts = (
+        <>
+          {box(0.08, 0.7, 0.08, 0.35, '#9c835e')}
+          <mesh position={[0, h * 0.68, 0]} castShadow>
+            <capsuleGeometry args={[w * 0.32, h * 0.28, 4, 10]} />
+            <meshStandardMaterial color={f.color} roughness={0.8} />
+          </mesh>
+          <mesh position={[0, h * 0.9, 0]} castShadow>
+            <sphereGeometry args={[w * 0.23, 16, 12]} />
+            <meshStandardMaterial color={f.color} roughness={0.8} />
+          </mesh>
+          {[-1, 1].map((side) => (
+            <mesh key={side} position={[side * w * 0.38, h * 0.66, 0]} rotation={[0, 0, side * 0.1]} castShadow>
+              <capsuleGeometry args={[w * 0.09, h * 0.27, 3, 8]} />
+              <meshStandardMaterial color={f.color} roughness={0.8} />
+            </mesh>
+          ))}
+          {[-1, 1].map((side) => (
+            <mesh key={side} position={[side * w * 0.18, h * 0.28, 0]} castShadow>
+              <capsuleGeometry args={[w * 0.11, h * 0.28, 3, 8]} />
+              <meshStandardMaterial color={f.color} roughness={0.8} />
+            </mesh>
+          ))}
+        </>
+      );
+      break;
+    case 'display-shelf':
+      parts = (
+        <>
+          {box(w, 0.08, d, 0.04, '#c9a35e')}
+          {box(0.08, h, d, h / 2, f.color, -w / 2 + 0.04, 0)}
+          {box(0.08, h, d, h / 2, f.color, w / 2 - 0.04, 0)}
+          {[0.58, 1.13, 1.7].map((height) => (
+            <group key={height}>
+              {box(w, 0.055, d, height, '#c9a35e')}
+              {[-1, 0, 1].map((side) => (
+                <mesh key={side} position={[side * w * 0.28, height + 0.12, 0]} castShadow>
+                  <boxGeometry args={[0.34, 0.2, 0.27]} />
+                  <meshStandardMaterial color={['#8b292c', '#d7c8ad', '#315a60'][(side + 1)]} roughness={0.9} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+          {box(0.08, h, d, h / 2, f.color, 0, -d / 2 + 0.04)}
+        </>
+      );
+      break;
+    case 'checkout-counter':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, f.color)}
+          {box(w + 0.08, 0.06, d + 0.08, h, '#c9a35e')}
+          {box(w * 0.9, h * 0.48, 0.035, h * 0.43, '#514035', 0, d / 2 + 0.02)}
+          {box(w * 0.38, h * 0.18, 0.12, h + 0.11, '#191b1d', 0, -d * 0.1)}
         </>
       );
       break;

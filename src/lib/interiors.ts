@@ -10,7 +10,8 @@ export type FurnitureKind =
   | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp'
   | 'fridge' | 'cabinet' | 'mirror' | 'sink' | 'toilet' | 'shower'
   | 'computer' | 'file-cabinet' | 'conference-table' | 'reception' | 'chair' | 'whiteboard'
-  | 'dining-table' | 'dining-chair' | 'host-stand';
+  | 'dining-table' | 'dining-chair' | 'host-stand' | 'clothing-rack' | 'mannequin' | 'display-shelf' | 'checkout-counter'
+  | 'wall-art';
 
 export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
 
@@ -169,6 +170,48 @@ export const RESTAURANT_INTERIOR: Interior = {
 
 export type RestaurantInteraction = 'door' | 'host';
 
+export const FASHION_HOUSE_INTERIOR: Interior = {
+  tier: 'flat',
+  width: 18,
+  depth: 14,
+  wallColor: '#211b19',
+  floorColor: '#d2c9bb',
+  window: 'wide',
+  partitions: [
+    { position: [-5.8, 1.25, -4.05], size: [2.1, 2.5, 0.12] },
+    { position: [5.8, 1.25, -4.05], size: [2.1, 2.5, 0.12] },
+  ],
+  furniture: [
+    f('checkout-counter', 0, 4.45, 3.1, 1.0, 0.82, '#332a25'),
+    f('clothing-rack', -4.1, -0.7, 2.7, 1.7, 0.7, '#c9a35e'),
+    f('clothing-rack', 4.1, -0.7, 2.7, 1.7, 0.7, '#c9a35e'),
+    f('clothing-rack', -4.1, 3.5, 2.7, 1.7, 0.7, '#c9a35e'),
+    f('mannequin', -7.1, 1.8, 0.62, 1.9, 0.62, '#d8c7b2'),
+    f('mannequin', 7.1, 1.8, 0.62, 1.9, 0.62, '#d8c7b2'),
+    f('display-shelf', 0, 6.2, 5.2, 2.15, 0.54, '#3c3028'),
+    f('mirror', -8.15, -1.15, 0.1, 2.35, 1.25, '#c9a35e', 0.08),
+    f('plant', -7.7, -5.1, 0.55, 1.3, 0.55, '#486b45'),
+    f('plant', 7.7, -5.1, 0.55, 1.3, 0.55, '#486b45'),
+  ],
+};
+
+export type FashionHouseInteraction = 'door' | 'catalogue';
+
+export function fashionHouseInteractionAt(x: number, z: number): FashionHouseInteraction | null {
+  const [doorX, doorZ] = doorSpot(FASHION_HOUSE_INTERIOR);
+  if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
+  const fixtures = FASHION_HOUSE_INTERIOR.furniture.filter((item) =>
+    item.kind === 'clothing-rack' || item.kind === 'checkout-counter',
+  );
+  let nearest = Infinity;
+  for (const item of fixtures) {
+    const dx = Math.max(Math.abs(x - item.at[0]) - item.size[0] / 2, 0);
+    const dz = Math.max(Math.abs(z - item.at[1]) - item.size[2] / 2, 0);
+    nearest = Math.min(nearest, Math.hypot(dx, dz));
+  }
+  return nearest <= USE_RADIUS ? 'catalogue' : null;
+}
+
 export function restaurantInteractionAt(x: number, z: number): RestaurantInteraction | null {
   const [doorX, doorZ] = doorSpot(RESTAURANT_INTERIOR);
   if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
@@ -252,7 +295,7 @@ export function interiorLayout(i: Interior): DistrictLayout {
       style: 'residential',
     })),
     ...i.furniture
-      .filter((x) => !['rug', 'cabinet', 'mirror', 'computer', 'whiteboard', 'chair', 'dining-chair'].includes(x.kind))
+      .filter((x) => !['rug', 'cabinet', 'mirror', 'computer', 'whiteboard', 'chair', 'dining-chair', 'wall-art'].includes(x.kind))
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];
   return buildLayout({

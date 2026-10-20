@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   INTERIORS,
+  FASHION_HOUSE_INTERIOR,
   RESTAURANT_INTERIOR,
   RESTAURANT_TABLES,
   bedSpot,
   doorSpot,
+  fashionHouseInteractionAt,
   homeInteractionAt,
   interiorFor,
   interiorLayout,
@@ -111,6 +113,46 @@ describe('restaurant interior', () => {
     expect(restaurantInteractionAt(...door)).toBe('door');
     expect(restaurantInteractionAt(...host.at)).toBe('host');
     expect(restaurantInteractionAt(0, -4.8)).toBeNull();
+  });
+
+  describe('Fashion House interior', () => {
+    const layout = interiorLayout(FASHION_HOUSE_INTERIOR);
+    const free = (x: number, z: number) => {
+      const resolved = resolveCollisions(x, z, PLAYER_RADIUS, layout.obstacles);
+      return Math.hypot(resolved.x - x, resolved.z - z) < 0.01;
+    };
+
+    it('keeps the boutique fixtures inside the room and the walkways clear', () => {
+      for (const fixture of FASHION_HOUSE_INTERIOR.furniture) {
+        expect(Math.abs(fixture.at[0]) + fixture.size[0] / 2, fixture.kind).toBeLessThanOrEqual(FASHION_HOUSE_INTERIOR.width / 2);
+        expect(Math.abs(fixture.at[1]) + fixture.size[2] / 2, fixture.kind).toBeLessThanOrEqual(FASHION_HOUSE_INTERIOR.depth / 2);
+      }
+      const entry = doorSpot(FASHION_HOUSE_INTERIOR);
+      expect(free(...entry)).toBe(true);
+      expect(fashionHouseInteractionAt(...entry)).toBe('door');
+      expect(fashionHouseInteractionAt(-4.1, -0.7)).toBe('catalogue');
+    });
+
+    it('allows the player to walk from the entrance to a clothing display', () => {
+      const start = doorSpot(FASHION_HOUSE_INTERIOR);
+      const goal = [-6.2, -0.7] as const;
+      expect(fashionHouseInteractionAt(...goal)).toBe('catalogue');
+      const step = 0.25;
+      const key = (x: number, z: number) => `${Math.round(x / step)},${Math.round(z / step)}`;
+      const seen = new Set([key(...start)]);
+      const queue: [number, number][] = [[start[0], start[1]]];
+      while (queue.length) {
+        const [x, z] = queue.shift()!;
+        if (Math.hypot(x - goal[0], z - goal[1]) < step) return;
+        for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+          const nx = x + dx, nz = z + dz;
+          if (seen.has(key(nx, nz)) || Math.abs(nx) > FASHION_HOUSE_INTERIOR.width / 2 || Math.abs(nz) > FASHION_HOUSE_INTERIOR.depth / 2 || !free(nx, nz)) continue;
+          seen.add(key(nx, nz));
+          queue.push([nx, nz]);
+        }
+      }
+      expect.fail('The clothing display cannot be reached from the boutique entrance.');
+    });
   });
 
   it('keeps every dining chair inside the room and its approach spot clear of tables', () => {

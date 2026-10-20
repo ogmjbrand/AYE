@@ -7,6 +7,7 @@ import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, looksFor, type BodyType } from '../lib/looks';
 import type { Slot, Style, Wardrobe } from '../lib/fashion';
+import type { HomeDecorPlacement } from '../lib/homeDecor';
 import { AVERAGE_SHAPE, SHAPE_PRESETS, SHAPE_SLIDERS, presetFor, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
@@ -40,6 +41,8 @@ export interface Character {
   shape: BodyShape;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
+  /** Furniture owned and placed in the player's homes. Older saves omit this. */
+  homeDecor?: HomeDecorPlacement[];
   lifestyle: Lifestyle;
   career: Career;
   diet: Diet;
@@ -112,6 +115,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
       heightCm,
       shape,
       wardrobe: { owned: [], equipped: {} },
+      homeDecor: [],
       colorR,
       colorG,
       colorB,

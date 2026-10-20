@@ -19,6 +19,7 @@ const character: Character = {
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
   body: 'feminine', lookId: 'female-adult-10', heightCm: 168, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15 },
   wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
+  homeDecor: [],
 };
 
 describe('character save', () => {
@@ -56,6 +57,12 @@ describe('character save', () => {
     const { wardrobe, ...old } = character;
     void wardrobe;
     expect(parseCharacter(old)!.wardrobe).toEqual({ owned: [], equipped: {} });
+  });
+
+  it('characters saved before home décor existed retain a valid empty furniture list', () => {
+    const { homeDecor, ...old } = { ...character, homeDecor: [{ id: 'old', itemId: 'decor-rug', homeId: 'test-home', at: [0, 0] as const, rotation: 0 }] };
+    void homeDecor;
+    expect(parseCharacter(old)!.homeDecor).toEqual([]);
   });
 
   it('characters saved before body shape existed are average', () => {

@@ -64,10 +64,14 @@ import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { RestaurantScene } from './world/RestaurantScene';
 import { OfficeScene } from './world/OfficeScene';
+import { FashionHouseScene } from './world/FashionHouseScene';
+import { DecorPlacementPreview } from './world/DecorPlacementPreview';
 import {
+  FASHION_HOUSE_INTERIOR,
   RESTAURANT_INTERIOR,
   RESTAURANT_TABLES,
   doorSpot,
+  fashionHouseInteractionAt,
   homeInteractionAt,
   interiorFor,
   interiorLayout,
@@ -75,6 +79,7 @@ import {
   restaurantTableById,
   type HomeAction,
 } from './lib/interiors';
+import { canPlaceDecor, decorItemById, furnitureForHome, type HomeDecorPlacement } from './lib/homeDecor';
 import { officeInteractionAt, OFFICE_INTERIOR, OFFICE_TASK_SEATS, OFFICE_WORKPLACE, officeTaskId, type OfficeInteraction } from './lib/officeCareer';
 import { OfficePanel } from './components/OfficePanel';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
@@ -260,6 +265,15 @@ interface GameProps {
   onCharacterUpdate: (character: Character) => void;
 }
 
+interface DecorPlacementSession {
+  itemId: string;
+  placementId: string | null;
+  previewOnly: boolean;
+  rotation: number;
+}
+
+const EMPTY_HOME_DECOR: HomeDecorPlacement[] = [];
+
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
 let placedIn: string | null = null;
 
@@ -269,7 +283,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, moveIn, moveOut, buyEquipment, travel, socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, officeApply, officeClockIn, officeTask, officeClockOut } = useGameState(
+  const { state, rest, dismissSummary, eat, moveIn, moveOut, buyEquipment, travel, socialise, hug, fashionShowcase, buyFashionItem, purchase, nightOut, wait, workTask, officeApply, officeClockIn, officeTask, officeClockOut } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -281,6 +295,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [inside, setInside] = useState(false);
   const [insideOffice, setInsideOffice] = useState(false);
   const [insideRestaurant, setInsideRestaurant] = useState(false);
+  const [insideFashionHouse, setInsideFashionHouse] = useState(false);
+  const [decorPlacement, setDecorPlacement] = useState<DecorPlacementSession | null>(null);
+  const decorCommitInProgress = useRef(false);
   const [restaurantVendor, setRestaurantVendor] = useState<FoodVendor | null>(null);
   const [restaurantStage, setRestaurantStage] = useState<'host' | 'walking' | 'menu' | 'ordered' | 'served' | 'eating' | 'finished'>('host');
   const [restaurantTableId, setRestaurantTableId] = useState<string | null>(null);
@@ -289,19 +306,34 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const restaurantOrderSequence = useRef(0);
   const restaurantAnimationTimer = useRef<number | null>(null);
   const [eating, setEating] = useState(false);
-  const interior = insideOffice && district.id === OFFICE_WORKPLACE.districtId
-    ? OFFICE_INTERIOR
-    : insideRestaurant && restaurantVendor ? RESTAURANT_INTERIOR
-      : home ? interiorFor(home) : null;
+  const persistedDecor = character.homeDecor ?? EMPTY_HOME_DECOR;
+  const interior = useMemo(() => {
+    const baseInterior = insideFashionHouse ? FASHION_HOUSE_INTERIOR
+      : insideOffice && district.id === OFFICE_WORKPLACE.districtId
+        ? OFFICE_INTERIOR
+        : insideRestaurant && restaurantVendor ? RESTAURANT_INTERIOR
+          : home ? interiorFor(home) : null;
+    if (!baseInterior || !home || insideFashionHouse || insideOffice || insideRestaurant) return baseInterior;
+    return {
+      ...baseInterior,
+      furniture: [
+        ...baseInterior.furniture,
+        ...furnitureForHome(persistedDecor.filter((item) => item.id !== decorPlacement?.placementId), home.id),
+      ],
+    };
+  }, [insideFashionHouse, insideOffice, district.id, insideRestaurant, restaurantVendor, home, persistedDecor, decorPlacement?.placementId]);
   const roomLayout = useMemo(() => {
     if (!interior) return null;
     const layout = interiorLayout(interior);
+    if (insideFashionHouse) return { ...layout, id: 'interior.fashion-house' };
     if (insideOffice) return { ...layout, id: 'interior.office' };
     if (insideRestaurant) return { ...layout, id: 'interior.restaurant' };
     return layout;
-  }, [interior, insideOffice, insideRestaurant]);
-  const indoors = !!roomLayout && (insideOffice
-    ? district.id === OFFICE_WORKPLACE.districtId
+  }, [interior, insideFashionHouse, insideOffice, insideRestaurant]);
+  const indoors = !!roomLayout && (insideFashionHouse
+    ? true
+    : insideOffice
+      ? district.id === OFFICE_WORKPLACE.districtId
     : insideRestaurant
       ? !!restaurantVendor
       : inside && !!home && home.district === district.id);
@@ -394,7 +426,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   const controlsRef = useRef<OrbitControls | null>(null);
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
-  const [store, setStore] = useState<'shop' | 'wardrobe' | null>(null);
+  const [store, setStore] = useState<'shop' | 'wardrobe' | 'decor' | null>(null);
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
   const [homePanel, setHomePanel] = useState<Home | null>(null);
   /** Puts the camera straight behind the player after a jump (going in or out of a building). */
@@ -416,6 +448,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     controls.object.position.set(x + Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 5.3, z + Math.cos(d) * 4.2);
     controls.update();
   }, [controller]);
+  const snapFashionCamera = useCallback(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const { x, z } = controller.position;
+    const d = controller.direction;
+    controls.target.set(x, CAMERA_TARGET_HEIGHT, z + Math.cos(d) * 1.35);
+    controls.object.position.set(x - Math.sin(d) * 3.4, CAMERA_TARGET_HEIGHT + 1.35, z - Math.cos(d) * 3.4);
+    controls.update();
+  }, [controller]);
   const enterRestaurant = (foodVendor: FoodVendor) => {
     if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
     restaurantAnimationTimer.current = null;
@@ -435,13 +476,24 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     placePlayer([x, 0, z], 0);
     snapIndoorCamera();
   };
+  const enterFashionHouse = () => {
+    setInside(false);
+    setInsideOffice(false);
+    setInsideRestaurant(false);
+    setInsideFashionHouse(true);
+    setHomePanel(null);
+    const [x, doorZ] = doorSpot(FASHION_HOUSE_INTERIOR);
+    placePlayer([x, 0, doorZ + 1.6], 0);
+    setStore('shop');
+    snapFashionCamera();
+  };
   const goInside = useCallback(() => {
-    if (!interior || insideOffice || insideRestaurant) return;
+    if (!interior || insideOffice || insideRestaurant || insideFashionHouse) return;
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
     snapIndoorCamera();
-  }, [interior, insideOffice, insideRestaurant, snapIndoorCamera, setHomePanel, setInside]);
+  }, [interior, insideOffice, insideRestaurant, insideFashionHouse, snapIndoorCamera, setHomePanel, setInside]);
   const goIntoOffice = useCallback(() => {
     if (district.id !== OFFICE_WORKPLACE.districtId || insideOffice) return;
     setHomePanel(null);
@@ -452,7 +504,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     snapIndoorCamera();
   }, [district.id, insideOffice, snapIndoorCamera, setHomePanel, setInside, setInsideOffice]);
   const goOutside = () => {
-    if (insideOffice) {
+    if (insideFashionHouse) {
+      setInsideFashionHouse(false);
+      setStore(null);
+      setTryOn({});
+      placePlayer(district.fashionHouse.position, Math.PI);
+    } else if (insideOffice) {
       setInsideOffice(false);
       setOfficeSeatRequested(null);
       sit.cancel();
@@ -474,6 +531,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       placePlayer(exterior, Math.PI);
     } else {
       setInside(false);
+      setDecorPlacement(null);
       if (home) placePlayer(home.door, Math.PI);
     }
     snapCamera();
@@ -536,7 +594,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const useLocation = (e: LocationEntry) => {
     setLocationsOpen(false);
     if (e.use === 'food') { const v = district.vendors.find((v) => `${district.id}.${v.id}` === e.id); if (v) enterRestaurant(v); }
-    else if (e.use === 'shop') setStore('shop');
+    else if (e.use === 'shop') enterFashionHouse();
     else if (e.use === 'gadgets') setGadgets(true);
     else if (e.use === 'travel') setTravelOpen(true);
     else if (e.use === 'home') { const h = district.homes.find((h) => `${district.id}.home.${h.id}` === e.id); if (h) setHomePanel(h); }
@@ -742,6 +800,23 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (decorPlacement && e.target instanceof HTMLInputElement) return;
+      if (decorPlacement && e.key.toLowerCase() === 'r') {
+        setDecorPlacement((current) => current && ({
+          ...current,
+          rotation: (current.rotation + Math.PI / 2) % (Math.PI * 2),
+        }));
+        return;
+      }
+      if (decorPlacement && (e.key === 'Enter' || e.key.toLowerCase() === 'e')) {
+        e.preventDefault();
+        placeSelectedDecor();
+        return;
+      }
+      if (decorPlacement && e.key === 'Escape') {
+        setDecorPlacement(null);
+        return;
+      }
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
       // E on a seat gets you up; on the way to one it does nothing
       if (sit.session) {
@@ -756,6 +831,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         } else if (insideOffice) {
           const action = officeActionAt();
           if (action) interactWithOffice(action);
+        } else if (insideFashionHouse) {
+          const action = fashionHouseInteractionAt(controller.position.x, controller.position.z);
+          if (action === 'door') goOutside();
+          else if (action === 'catalogue') setStore('shop');
         } else {
           const action = homeInteractionAt(interior, controller.position.x, controller.position.z);
           if (action) interactAtHome(action);
@@ -769,7 +848,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const officeEntrance = district.id === OFFICE_WORKPLACE.districtId
         && Math.hypot(OFFICE_WORKPLACE.position[0] - x, OFFICE_WORKPLACE.position[2] - z) <= OFFICE_WORKPLACE.radius;
       if (near) enterRestaurant(near);
-      else if (counter === 'fashion') setStore('shop');
+      else if (counter === 'fashion') enterFashionHouse();
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
       else if (officeEntrance) goIntoOffice();
@@ -837,7 +916,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // While dressing, swing the camera round to the front of the player so the clothes are visible
   useEffect(() => {
     const controls = controlsRef.current;
-    if (!store || !controls) return;
+    if (store !== 'wardrobe' || !controls) return;
     const { x, z } = controller.position;
     const d = controller.direction;
     controls.object.position.set(x + Math.sin(d) * 3.2, CAMERA_TARGET_HEIGHT + 0.6, z + Math.cos(d) * 3.2);
@@ -882,9 +961,109 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setStore(null);
     setTryOn({});
   };
+  const startDecorPlacement = (itemId: string, placementId: string | null = null): string | null => {
+    const item = decorItemById(itemId);
+    if (!item) return 'That furniture item is no longer available.';
+    if (!home) return 'Move into a home before buying or placing furniture.';
+    if (home.district !== district.id) {
+      return `Travel to ${home.name} in ${districtById(home.district).city.name} to preview and place furniture.`;
+    }
+    const existing = placementId ? persistedDecor.find((entry) => entry.id === placementId) : null;
+    if (placementId && (!existing || existing.itemId !== itemId || existing.homeId !== home.id)) {
+      return 'That furniture is not available in this home.';
+    }
+    if (!(inside && !insideFashionHouse && !insideOffice && !insideRestaurant)) {
+      setInside(false);
+      setInsideOffice(false);
+      setInsideRestaurant(false);
+      setInsideFashionHouse(false);
+      setInside(true);
+      const homeRoom = interiorFor(home);
+      const [x, z] = doorSpot(homeRoom);
+      placePlayer([x, 0, z + 1.6], 0);
+      snapIndoorCamera();
+    }
+    setStore(null);
+    setTryOn({});
+    decorCommitInProgress.current = false;
+    setDecorPlacement({
+      itemId,
+      placementId,
+      previewOnly: placementId === null,
+      rotation: existing?.rotation ?? 0,
+    });
+    return null;
+  };
+  const rotateDecorPreview = () => {
+    setDecorPlacement((current) => current && ({
+      ...current,
+      rotation: (current.rotation + Math.PI / 2) % (Math.PI * 2),
+    }));
+  };
+  const cancelDecorPlacement = () => setDecorPlacement(null);
+  function placeSelectedDecor() {
+    if (!decorPlacement || decorCommitInProgress.current) return;
+    if (!home || home.district !== district.id || !inside) {
+      setArrival('Furniture can only be placed inside your current home.');
+      setDecorPlacement(null);
+      return;
+    }
+    if (state.summary) {
+      setArrival('Furniture placement is paused while you review today’s summary.');
+      return;
+    }
+    const item = decorItemById(decorPlacement.itemId);
+    if (!item) {
+      setArrival('That furniture item is no longer available.');
+      setDecorPlacement(null);
+      return;
+    }
+    if (decorPlacement.previewOnly && state.balance < item.price) {
+      setArrival(`You need ${item.price.toLocaleString()} ⓒ to buy the ${item.name}.`);
+      return;
+    }
+    const { x, z } = controller.position;
+    const at = [
+      x + Math.sin(controller.direction) * 1.35,
+      z + Math.cos(controller.direction) * 1.35,
+    ] as const;
+    const existingPlacements = persistedDecor.filter((entry) =>
+      entry.homeId === home.id && entry.id !== decorPlacement.placementId,
+    );
+    const existingFurniture = [
+      ...interiorFor(home).furniture,
+      ...furnitureForHome(existingPlacements, home.id),
+    ];
+    if (!canPlaceDecor(interiorFor(home), item, at, decorPlacement.rotation, existingFurniture)) {
+      setArrival('There is not enough clear space there. Walk to an open spot and try again.');
+      return;
+    }
+    decorCommitInProgress.current = true;
+    if (decorPlacement.previewOnly) {
+      purchase(item.price);
+      const placement: HomeDecorPlacement = {
+        id: crypto.randomUUID(),
+        itemId: item.id,
+        homeId: home.id,
+        at,
+        rotation: decorPlacement.rotation,
+      }
+      onCharacterUpdate({ ...character, homeDecor: [...persistedDecor, placement] });
+    } else {
+      onCharacterUpdate({
+        ...character,
+        homeDecor: persistedDecor.map((entry) => entry.id === decorPlacement.placementId
+          ? { ...entry, at, rotation: decorPlacement.rotation }
+          : entry),
+      });
+    }
+    setDecorPlacement(null);
+    setArrival(`${item.name} placed in ${home.name}.`);
+  };
   // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
   const [autoQuality, setAutoQuality] = useState<Quality>('high');
   const settings = settingsFor(qualityMode === 'auto' ? autoQuality : qualityMode);
+  const decorPlacementItem = decorPlacement ? decorItemById(decorPlacement.itemId) : undefined;
 
   return (
     <main className="game">
@@ -919,6 +1098,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onDeleteOutfit={(i) => onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, outfits: (wardrobe.outfits ?? []).filter((_, k) => k !== i) } })}
           mode={store}
           wardrobe={wardrobe}
+          homeId={home?.id ?? null}
+          homeDecor={persistedDecor}
           balance={state.balance}
           tryOn={tryOn}
           onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}
@@ -929,8 +1110,32 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           fashionMissionItemId={state.fashionMissionItemId}
           fashionMissionCompleted={state.fashionMissionCompleted}
           onAttendShowcase={attendFashionShowcase}
+          onPreviewDecor={(itemId) => startDecorPlacement(itemId)}
+          onMoveDecor={(placementId) => {
+            const placement = persistedDecor.find((entry) => entry.id === placementId);
+            return placement ? startDecorPlacement(placement.itemId, placement.id) : 'That furniture is not available.';
+          }}
+          onRemoveDecor={(placementId) => onCharacterUpdate({
+            ...character,
+            homeDecor: persistedDecor.map((entry) => entry.id === placementId ? { ...entry, at: null } : entry),
+          })}
           onClose={closeStore}
         />
+      )}
+      {decorPlacement && decorPlacementItem && (
+        <aside role="status" className="pointer-events-auto fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 border border-[#c9a35e]/70 bg-[#171615]/95 px-4 py-3 text-white shadow-xl">
+          <div className="mr-2 min-w-36">
+            <p className="m-0 text-sm font-semibold">{decorPlacementItem.name}</p>
+            <p className="m-0 text-[10px] text-white/65">
+              Move with WASD · rotate with R · {decorPlacement.previewOnly ? `place & buy · ${decorPlacementItem.price.toLocaleString()} ⓒ` : 'place to save'}
+            </p>
+          </div>
+          <button type="button" onClick={rotateDecorPreview} className="border border-white/20 px-3 py-2 text-xs hover:border-[#c9a35e]">Rotate</button>
+          <button type="button" onClick={cancelDecorPlacement} className="border border-white/20 px-3 py-2 text-xs hover:border-white/50">Cancel</button>
+          <button type="button" onClick={placeSelectedDecor} className="border border-[#c9a35e] bg-[#d2b36f]/15 px-3 py-2 text-xs text-[#f0d797] hover:bg-[#d2b36f]/25">
+            {decorPlacement.previewOnly ? 'Buy & place' : 'Place here'}
+          </button>
+        </aside>
       )}
       {gadgets && (
         <GadgetStore
@@ -1072,7 +1277,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
+              <HomeInterior key={insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
+                {insideFashionHouse && <FashionHouseScene />}
                 {insideRestaurant && <RestaurantScene
                   tableId={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantTableId : null}
                   dish={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantOrder : null}
@@ -1080,6 +1286,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 {insideOffice && <OfficeScene />}
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
+                {inside && home && decorPlacement && decorPlacementItem && (
+                  <DecorPlacementPreview controller={controller} item={decorPlacementItem} rotation={decorPlacement.rotation} />
+                )}
               </HomeInterior>
             ) : (
               <City
@@ -1167,8 +1376,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
-          name: insideOffice ? OFFICE_WORKPLACE.name : insideRestaurant ? restaurantVendor?.name ?? 'Restaurant' : home!.name,
+          name: insideFashionHouse ? district.fashionHouse.name : insideOffice ? OFFICE_WORKPLACE.name : insideRestaurant ? restaurantVendor?.name ?? 'Restaurant' : home!.name,
           interactionAt: (x, z) => {
+            if (insideFashionHouse) {
+              const action = fashionHouseInteractionAt(x, z);
+              return action ? ({
+                door: { verb: 'Leave through', place: 'the boutique entrance', onOpen: goOutside, icon: DoorOpen },
+                catalogue: { verb: 'Browse', place: 'the collection', onOpen: () => setStore('shop'), icon: Shirt },
+              })[action] : null;
+            }
             if (insideRestaurant) {
               const action = restaurantInteractionAt(x, z);
               if (!action) return null;
@@ -1200,7 +1416,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             })[action] : null;
           },
         } : undefined}
-        insidePlaceLabel={insideOffice ? `At work · ${district.city.name}` : insideRestaurant ? `Dining · ${district.city.name}` : undefined}
+        insidePlaceLabel={insideFashionHouse ? `Fashion House · ${district.city.name}` : insideOffice ? `At work · ${district.city.name}` : insideRestaurant ? `Dining · ${district.city.name}` : undefined}
         outsideOffice={!indoors && district.id === OFFICE_WORKPLACE.districtId
           && Math.hypot(OFFICE_WORKPLACE.position[0] - controller.position.x, OFFICE_WORKPLACE.position[2] - controller.position.z) <= OFFICE_WORKPLACE.radius
           ? { name: OFFICE_WORKPLACE.name, onOpen: goIntoOffice }
@@ -1215,8 +1431,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onStopTracking={() => setTrackedId(null)}
         fullness={state.fullness}
         onOpenVendor={enterRestaurant}
-        onOpenShop={() => setStore('shop')}
+        onOpenShop={enterFashionHouse}
         onOpenWardrobe={() => setStore('wardrobe')}
+        onOpenDecor={inside && home ? () => setStore('decor') : undefined}
         qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
         onCycleQuality={() => onQualityChange(nextQualityMode(qualityMode))}
       />
