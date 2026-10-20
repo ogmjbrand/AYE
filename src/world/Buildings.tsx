@@ -32,7 +32,17 @@ class QuadBuilder {
   }
 
   /** Axis-aligned box sides (and optionally top). */
-  box(min: Vector3, max: Vector3, tileW: number, tileH: number, color: Color, uOffset = 0, top = false, grime = 0) {
+  box(
+    min: Vector3,
+    max: Vector3,
+    tileW: number,
+    tileH: number,
+    color: Color,
+    uOffset = 0,
+    top = false,
+    grime = 0,
+    westOpening?: { center: number; width: number; height: number },
+  ) {
     const w = max.x - min.x, h = max.y - min.y, d = max.z - min.z;
     // Street grime: the bottom few metres darken towards the pavement (splash-back, dust, hands)
     const band = grime > 0 ? Math.min(3, h) : 0;
@@ -48,7 +58,27 @@ class QuadBuilder {
     side(new Vector3(min.x, min.y, max.z), new Vector3(w, 0, 0), w); // +Z
     side(new Vector3(max.x, min.y, max.z), new Vector3(0, 0, -d), d); // +X
     side(new Vector3(max.x, min.y, min.z), new Vector3(-w, 0, 0), w); // -Z
-    side(new Vector3(min.x, min.y, min.z), new Vector3(0, 0, d), d); // -X
+    if (!westOpening) {
+      side(new Vector3(min.x, min.y, min.z), new Vector3(0, 0, d), d); // -X
+    } else {
+      const start = Math.max(min.z, westOpening.center - westOpening.width / 2);
+      const end = Math.min(max.z, westOpening.center + westOpening.width / 2);
+      const openingHeight = Math.min(max.y - min.y, westOpening.height);
+      const leftWidth = start - min.z;
+      const rightWidth = max.z - end;
+      if (leftWidth > 0) side(new Vector3(min.x, min.y, min.z), new Vector3(0, 0, leftWidth), leftWidth);
+      if (rightWidth > 0) side(new Vector3(min.x, min.y, end), new Vector3(0, 0, rightWidth), rightWidth);
+      if (end > start && openingHeight < max.y - min.y) {
+        this.quad(
+          new Vector3(min.x, min.y + openingHeight, start),
+          new Vector3(0, 0, end - start),
+          new Vector3(0, max.y - min.y - openingHeight, 0),
+          [uOffset + leftWidth / tileW, (min.y + openingHeight) / tileH],
+          [(end - start) / tileW, (max.y - min.y - openingHeight) / tileH],
+          color,
+        );
+      }
+    }
     if (top) {
       this.quad(new Vector3(min.x, max.y, max.z), new Vector3(w, 0, 0), new Vector3(0, 0, -d), [0, 0], [w / tileW, d / tileW], color);
     }
@@ -93,7 +123,21 @@ function facadeGeometries(buildings: readonly Building[]) {
     const tileW = BAY_WIDTH[b.style] * FACADE_TILE.bays;
     const tileH = FLOOR_HEIGHT[b.style] * FACADE_TILE.floors;
     const color = tint(b);
-    facades[b.style].box(min, max, tileW, tileH, color, facadeOffset(b), false, b.style === 'tower' ? 0.12 : 0.28);
+    facades[b.style].box(
+      min,
+      max,
+      tileW,
+      tileH,
+      color,
+      facadeOffset(b),
+      false,
+      b.style === 'tower' ? 0.12 : 0.28,
+      b.entry?.side === 'west' ? {
+        center: b.position[2] + b.entry.offset,
+        width: b.entry.width,
+        height: b.entry.height,
+      } : undefined,
+    );
     // Parapet wall around the roof, in the facade's plain band, plus the roof slab
     const pMin = new Vector3(min.x, max.y, min.z);
     const pMax = new Vector3(max.x, max.y + PARAPET, max.z);

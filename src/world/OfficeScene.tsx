@@ -4,8 +4,9 @@ import { WorldNPC } from './WorldNPC';
 import { NPC_UNIFORMS } from './npcUniforms';
 
 const MEETING_SEATS: readonly { seat: Seat; lookId: string }[] = [
-  { seat: { id: 'office-colleague-a', x: 1.2, z: 2.85, facing: Math.PI, height: 0.45 }, lookId: 'female-adult-03' },
+  { seat: { id: 'office-colleague-a', x: 1.2, z: 2.85, facing: Math.PI, height: 0.45 }, lookId: 'female-adult-06' },
   { seat: { id: 'office-colleague-b', x: 4.2, z: 2.85, facing: Math.PI, height: 0.45 }, lookId: 'male-adult-18' },
+  { seat: { id: 'office-workstation-colleague', x: -5.25, z: -2.65, facing: 0, height: 0.45 }, lookId: 'female-adult-11' },
 ];
 
 export function OfficeScene({ player }: { player: PlayerHandle }) {
@@ -26,6 +27,7 @@ export function OfficeScene({ player }: { player: PlayerHandle }) {
           position={[seat.x, seat.height, seat.z]}
           facing={seat.facing}
           seat={seat}
+          styles={lookId.startsWith('female-') ? NPC_UNIFORMS.receptionist : undefined}
         />
       ))}
       <WorldNPC

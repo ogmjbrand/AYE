@@ -3,6 +3,7 @@ import {
   OFFICE_TASK_PAY,
   OFFICE_INTERIOR,
   OFFICE_TASK_SEATS,
+  OFFICE_WORKPLACE,
   canClockIntoOffice,
   createOfficeCareer,
   officeChallenge,
@@ -14,7 +15,8 @@ import {
 } from './officeCareer';
 import { createGameState, createTime, gameReducer } from './gameState';
 import { loadProgress, saveProgress } from './save';
-import { interiorLayout } from './interiors';
+import { doorSpot, interiorLayout } from './interiors';
+import { DISTRICTS } from './geography';
 import { PLAYER_RADIUS, resolveCollisions } from './world';
 import type { Character } from '../components/CharacterCreation';
 
@@ -38,6 +40,34 @@ class MemoryStorage implements Storage {
 }
 
 describe('Office Worker shift rules', () => {
+  it('uses a complete office interior and keeps the entrance and aligned workstation seats usable', () => {
+    expect(OFFICE_INTERIOR.architecture).toBe('office');
+    expect(OFFICE_INTERIOR.partitions.some((partition) => partition.material === 'glass')).toBe(true);
+    expect(OFFICE_WORKPLACE.exteriorDoor[0]).toBe(OFFICE_WORKPLACE.position[0] + 1.3);
+    const exteriorBuilding = DISTRICTS.find((district) => district.id === OFFICE_WORKPLACE.districtId)
+      ?.layout.buildings.find((building) => building.name === 'Marina Heights');
+    expect(exteriorBuilding?.entry?.side).toBe('west');
+    expect(exteriorBuilding!.position[0] - exteriorBuilding!.size[0] / 2).toBe(OFFICE_WORKPLACE.exteriorDoor[0]);
+    expect(exteriorBuilding!.position[2] + exteriorBuilding!.entry!.offset).toBe(OFFICE_WORKPLACE.exteriorDoor[2]);
+
+    const layout = interiorLayout(OFFICE_INTERIOR);
+    const entry = doorSpot(OFFICE_INTERIOR);
+    const resolvedEntry = resolveCollisions(entry[0], entry[1], PLAYER_RADIUS, layout.obstacles);
+    expect(Math.hypot(resolvedEntry.x - entry[0], resolvedEntry.z - entry[1])).toBeLessThan(0.01);
+
+    for (const [taskId, seat] of Object.entries(OFFICE_TASK_SEATS)) {
+      const desk = OFFICE_INTERIOR.furniture.find((item) => (item.kind === 'desk' || item.kind === 'conference-table')
+        && Math.abs(item.at[0] - seat!.x) < 0.01);
+      expect(desk, `${taskId} has a desk`).toBeDefined();
+      const towardDesk = Math.atan2(desk!.at[0] - seat!.x, desk!.at[1] - seat!.z);
+      const facingError = Math.atan2(Math.sin(towardDesk - seat!.facing), Math.cos(towardDesk - seat!.facing));
+      expect(Math.abs(facingError), `${taskId} chair faces its desk`).toBeLessThan(0.05);
+      expect(Math.hypot(desk!.at[0] - seat!.x, desk!.at[1] - seat!.z), `${taskId} chair reaches desk`).toBeLessThan(1.4);
+      const resolved = resolveCollisions(seat!.x, seat!.z, PLAYER_RADIUS, layout.obstacles);
+      expect(Math.hypot(resolved.x - seat!.x, resolved.z - seat!.z), `${taskId} chair is clear`).toBeLessThan(0.01);
+    }
+  });
+
   it('requires seated workstations to be clear and in interaction range of the assigned station', () => {
     const layout = interiorLayout(OFFICE_INTERIOR);
     for (const [taskId, seat] of Object.entries(OFFICE_TASK_SEATS)) {

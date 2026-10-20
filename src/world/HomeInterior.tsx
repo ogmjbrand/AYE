@@ -1,4 +1,6 @@
-import { DoubleSide } from 'three';
+import { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { DoubleSide, type Group, type MeshStandardMaterial } from 'three';
 import type { ReactNode } from 'react';
 import type { Furniture, Interior } from '../lib/interiors';
 import { WALL_HEIGHT } from '../lib/interiors';
@@ -6,11 +8,12 @@ import { lightingAt } from './timeOfDay';
 import type { GameTime } from '../lib/gameState';
 
 /**
- * Inside the player's home. The walls face inwards only, so from the camera
- * (often behind the front wall) you look straight into the room, like a
- * dolls' house; there is no ceiling for the same reason.
+ * Shared enclosed interior shell for homes and public venues. Roof and wall
+ * visibility adapt to the indoor camera so the architecture remains built
+ * without blocking the player's view.
  */
 export function HomeInterior({ interior, gameTime, doorOpen = false, children }: { interior: Interior; gameTime: GameTime; doorOpen?: boolean; children: ReactNode }) {
+  const ceiling = useRef<Group>(null);
   const { width: w, depth: d } = interior;
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const H = WALL_HEIGHT;
@@ -22,22 +25,38 @@ export function HomeInterior({ interior, gameTime, doorOpen = false, children }:
   const windowSide = (w - windowWidth) / 2;
   const windowTop = H - (windowY + windowHeight / 2);
   const windowBottom = windowY - windowHeight / 2;
+  const windowFrame = interior.architecture === 'office' ? '#343a3d'
+    : interior.architecture === 'boutique' ? '#b99658'
+      : interior.architecture === 'restaurant' ? '#4b3829' : '#60452f';
+  const ceilingColor = interior.architecture === 'restaurant' ? '#382d26'
+    : interior.architecture === 'boutique' ? '#24201e'
+      : interior.architecture === 'office' ? '#e1e0dc' : '#eeeae2';
   // Daylight or a night city outside the window
   const sky = night > 0.5 ? '#1b2536' : night > 0.1 ? '#e0a46c' : '#bcd6e8';
 
+  useFrame(({ camera }) => {
+    if (!ceiling.current) return;
+    const cameraIsAboveTheRoom = camera.position.y > H
+      && Math.abs(camera.position.x) < w / 2
+      && Math.abs(camera.position.z) < d / 2;
+    ceiling.current.visible = !cameraIsAboveTheRoom;
+  });
+
   return (
     <group>
-      {/* Ground around the building, so there is no void below */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[120, 120]} />
-        <meshStandardMaterial color="#2a2c2f" roughness={1} />
+      <mesh position={[0, -0.09, 0]} receiveShadow castShadow>
+        <boxGeometry args={[w + 0.36, 0.18, d + 0.36]} />
+        <meshStandardMaterial color={interior.architecture === 'office' ? '#4e504d' : '#403b35'} roughness={0.86} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color={interior.floorColor} roughness={0.75} />
+        <meshStandardMaterial
+          color={interior.floorColor}
+          roughness={interior.architecture === 'office' ? 0.38 : interior.architecture === 'boutique' ? 0.32 : 0.75}
+          metalness={interior.architecture === 'office' || interior.architecture === 'boutique' ? 0.08 : 0}
+        />
       </mesh>
 
-      {/* Walls, with a real opening for the rear window */}
       <Wall color={interior.wallColor} position={[-(w + windowWidth) / 4, H / 2, d / 2]} rotationY={Math.PI} size={[windowSide, H]} />
       <Wall color={interior.wallColor} position={[(w + windowWidth) / 4, H / 2, d / 2]} rotationY={Math.PI} size={[windowSide, H]} />
       <Wall color={interior.wallColor} position={[0, windowY + windowHeight / 2 + windowTop / 2, d / 2]} rotationY={Math.PI} size={[windowWidth, windowTop]} />
@@ -59,62 +78,159 @@ export function HomeInterior({ interior, gameTime, doorOpen = false, children }:
         </mesh>
       </group>
 
-      {/* Glazed rear window with timber surround and a central mullion. */}
-      <mesh position={[0, windowY, d / 2 - 0.04]} rotation={[0, Math.PI, 0]}>
+      <mesh position={[0, windowY, d / 2 - 0.09]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[windowWidth - 0.12, windowHeight - 0.12]} />
-        <meshStandardMaterial color={sky} emissive={sky} emissiveIntensity={night > 0.5 ? 0.5 : 0.9} roughness={0.18} metalness={0.08} />
+        <meshStandardMaterial
+          color={sky}
+          emissive={sky}
+          emissiveIntensity={night > 0.5 ? 0.28 : 0.14}
+          roughness={0.16}
+          metalness={0.28}
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+        />
       </mesh>
-      <mesh position={[0, windowY, d / 2 - 0.065]} castShadow>
-        <boxGeometry args={[0.07, windowHeight, 0.07]} />
-        <meshStandardMaterial color="#60452f" roughness={0.7} />
+      <mesh position={[0, windowY, d / 2 - 0.14]} castShadow>
+        <boxGeometry args={[0.055, windowHeight - 0.08, 0.08]} />
+        <meshStandardMaterial color={windowFrame} roughness={0.42} metalness={interior.architecture === 'office' || interior.architecture === 'boutique' ? 0.65 : 0.12} />
       </mesh>
       {[-1, 1].map((sideSign) => (
-        <mesh key={sideSign} position={[sideSign * (windowWidth / 2 - 0.035), windowY, d / 2 - 0.065]} castShadow>
-          <boxGeometry args={[0.07, windowHeight, 0.07]} />
-          <meshStandardMaterial color="#60452f" roughness={0.7} />
+        <mesh key={sideSign} position={[sideSign * (windowWidth / 2 - 0.035), windowY, d / 2 - 0.14]} castShadow>
+          <boxGeometry args={[0.07, windowHeight, 0.09]} />
+          <meshStandardMaterial color={windowFrame} roughness={0.42} metalness={interior.architecture === 'office' || interior.architecture === 'boutique' ? 0.65 : 0.12} />
         </mesh>
       ))}
       {[-1, 1].map((verticalSign) => (
-        <mesh key={verticalSign} position={[0, windowY + verticalSign * (windowHeight / 2 - 0.035), d / 2 - 0.065]} castShadow>
-          <boxGeometry args={[windowWidth, 0.07, 0.07]} />
-          <meshStandardMaterial color="#60452f" roughness={0.7} />
+        <mesh key={verticalSign} position={[0, windowY + verticalSign * (windowHeight / 2 - 0.035), d / 2 - 0.14]} castShadow>
+          <boxGeometry args={[windowWidth, 0.07, 0.09]} />
+          <meshStandardMaterial color={windowFrame} roughness={0.42} metalness={interior.architecture === 'office' || interior.architecture === 'boutique' ? 0.65 : 0.12} />
         </mesh>
       ))}
+      <mesh position={[0, windowY, d / 2 - 0.15]} castShadow>
+        <boxGeometry args={[0.045, windowHeight - 0.12, 0.09]} />
+        <meshStandardMaterial color={windowFrame} roughness={0.42} metalness={0.55} />
+      </mesh>
+      <mesh position={[0, windowY, d / 2 - 0.15]} castShadow>
+        <boxGeometry args={[windowWidth - 0.08, 0.045, 0.09]} />
+        <meshStandardMaterial color={windowFrame} roughness={0.42} metalness={0.55} />
+      </mesh>
 
       {interior.partitions.map((wall, i) => (
-        <mesh key={i} position={wall.position} castShadow receiveShadow>
-          <boxGeometry args={wall.size} />
-          <meshStandardMaterial color={interior.wallColor} roughness={0.9} />
-        </mesh>
+        wall.material === 'glass'
+          ? <GlassPartition key={i} wall={wall} frame={windowFrame} />
+          : <mesh key={i} position={wall.position} castShadow receiveShadow>
+              <boxGeometry args={wall.size} />
+              <meshStandardMaterial color={interior.wallColor} roughness={0.9} />
+            </mesh>
       ))}
 
+      <group ref={ceiling}>
+        <mesh position={[0, H + 0.06, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.36, 0.16, d + 0.36]} />
+          <meshStandardMaterial color={ceilingColor} roughness={0.82} />
+        </mesh>
+        <mesh position={[0, H - 0.1, 0]}>
+          <boxGeometry args={[w, 0.035, 0.06]} />
+          <meshStandardMaterial color={interior.architecture === 'boutique' ? '#b99658' : windowFrame} metalness={0.6} roughness={0.36} />
+        </mesh>
+        {interior.architecture === 'office' && (
+          <>
+            {[-w / 3, w / 3].map((x) => (
+              <mesh key={x} position={[x, H - 0.12, 0]}>
+                <boxGeometry args={[0.035, 0.035, d]} />
+                <meshStandardMaterial color="#c4c5c1" roughness={0.82} />
+              </mesh>
+            ))}
+            {[-1, 1].map((sideSign) => (
+              <mesh key={sideSign} position={[sideSign * w / 4, H - 0.1, 0]}>
+                <boxGeometry args={[1.9, 0.045, 0.36]} />
+                <meshStandardMaterial color="#f9f7ef" emissive="#e6dfc7" emissiveIntensity={0.35} roughness={0.32} />
+              </mesh>
+            ))}
+          </>
+        )}
+        {interior.architecture === 'boutique' && (
+          <mesh position={[0, H - 0.1, -d / 4]}>
+            <boxGeometry args={[w - 1, 0.035, 0.045]} />
+            <meshStandardMaterial color="#c9a35e" emissive="#c9a35e" emissiveIntensity={0.35} metalness={0.62} roughness={0.32} />
+          </mesh>
+        )}
+      </group>
+
       {interior.window === 'full' && (
-        <pointLight position={[0, windowY, d / 2 - 0.4]} intensity={night > 0.5 ? 0.5 : 2.2} distance={w * 0.8} color={sky} />
+        <pointLight position={[0, windowY, d / 2 - 0.4]} intensity={night > 0.5 ? 0.5 : 1.4} distance={w * 0.8} color={sky} />
       )}
 
       {interior.furniture.map((f, i) => <InteriorFurniturePiece key={i} f={f} />)}
 
       {/* Warm practical lights make each room legible without flattening the daylight. */}
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={interior.architecture === 'office' ? 0.38 : 0.48} />
       {[
-        [-w / 4, H - 0.18, -d / 4],
-        [w / 4, H - 0.18, -d / 4],
-        [-w / 4, H - 0.18, d / 4],
-        [w / 4, H - 0.18, d / 4],
+        [-w / 4, H - 0.25, -d / 4],
+        [w / 4, H - 0.25, -d / 4],
+        [-w / 4, H - 0.25, d / 4],
+        [w / 4, H - 0.25, d / 4],
       ].map((position, index) => (
-        <pointLight key={index} position={position as [number, number, number]} intensity={2.4 + night * 5} distance={Math.max(w, d) * 0.55} decay={1.7} color="#ffdfb4" />
+        <group key={index} position={position as [number, number, number]}>
+          <mesh>
+            <boxGeometry args={[0.32, 0.035, 0.32]} />
+            <meshStandardMaterial color="#fff8e8" emissive="#ffe3b5" emissiveIntensity={0.55} roughness={0.28} />
+          </mesh>
+          <pointLight position={[0, -0.15, 0]} intensity={interior.architecture === 'office' ? 1.5 + night * 2 : 1.8 + night * 3} distance={Math.max(w, d) * 0.5} decay={1.7} color="#ffdfb4" />
+        </group>
       ))}
       {children}
     </group>
   );
 }
 
-function Wall({ color, position, rotationY, size }: { color: string; position: [number, number, number]; rotationY: number; size: [number, number] }) {
+function Wall({ color, position, rotationY, size }: { color: string; position: readonly [number, number, number]; rotationY: number; size: readonly [number, number] }) {
+  const material = useRef<MeshStandardMaterial>(null);
+  useFrame(({ camera }) => {
+    if (!material.current) return;
+    const rotated = Math.abs(Math.sin(rotationY)) > 0.5;
+    const halfWidthX = (rotated ? 0.08 : size[0] / 2) + 0.55;
+    const halfWidthZ = (rotated ? size[0] / 2 : 0.08) + 0.55;
+    const near = Math.abs(camera.position.x - position[0]) < halfWidthX
+      && Math.abs(camera.position.z - position[2]) < halfWidthZ
+      && camera.position.y > position[1] - size[1] / 2 - 0.35
+      && camera.position.y < position[1] + size[1] / 2 + 0.35;
+    material.current.opacity = near ? 0.14 : 1;
+    material.current.depthWrite = !near;
+  });
   return (
-    <mesh position={position} rotation={[0, rotationY, 0]} receiveShadow>
-      <planeGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={0.9} />
+    <mesh position={position} rotation={[0, rotationY, 0]} receiveShadow castShadow>
+      <boxGeometry args={[size[0], size[1], 0.16]} />
+      <meshStandardMaterial ref={material} color={color} roughness={0.86} transparent />
     </mesh>
+  );
+}
+
+function GlassPartition({ wall, frame }: { wall: Interior['partitions'][number]; frame: string }) {
+  const [width, height, depth] = wall.size;
+  const [x, y, z] = wall.position;
+  return (
+    <group position={[x, y, z]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[width, height, depth]} />
+        <meshStandardMaterial color="#91abb0" transparent opacity={0.18} metalness={0.45} roughness={0.16} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, height / 2 - 0.04, 0]}>
+        <boxGeometry args={[width + 0.04, 0.08, depth + 0.05]} />
+        <meshStandardMaterial color={frame} metalness={0.62} roughness={0.36} />
+      </mesh>
+      <mesh position={[0, -height / 2 + 0.04, 0]}>
+        <boxGeometry args={[width + 0.04, 0.08, depth + 0.05]} />
+        <meshStandardMaterial color={frame} metalness={0.62} roughness={0.36} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[0, 0, side * (depth / 2 - 0.035)]}>
+          <boxGeometry args={[width + 0.04, height, 0.07]} />
+          <meshStandardMaterial color={frame} metalness={0.62} roughness={0.36} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 

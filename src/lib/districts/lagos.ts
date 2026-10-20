@@ -28,7 +28,7 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-26, -36, 10, 10, 13, 'residential', '#e3cf9a'),
       // East side, north of the cross street
       b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
-      b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
+      { ...b(14, 12, 12, 12, 38, 'tower', '#486a7e', 'Marina Heights'), entry: { side: 'west', offset: 0, width: 1.8, height: 2.42 } },
       b(11, 20, 6, 3.6, 7, 'shop', '#5b4a5e', 'Lagoon Live'),
       b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
       b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),

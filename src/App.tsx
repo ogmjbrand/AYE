@@ -4,6 +4,7 @@ import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor 
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
 import { getTrip, placePlayer, setMovementBlocked, setMoveTarget, subscribeTrip, usePlayerController } from './hooks/usePlayerController';
+import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
 import { activeLayout, groundHeightAt, movingObstacles, setActiveLayout } from './lib/world';
@@ -88,6 +89,7 @@ import { canResidentAcceptHug, findHugPlan, type HugSession } from './lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from './lib/traffic';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
+import { signTexture } from './world/textures';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
@@ -164,9 +166,58 @@ function FootShadow({ controller }: { controller: ReturnType<typeof usePlayerCon
 function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   return (
     <mesh position={[position[0], groundHeightAt(position[0], position[2]) + 0.03, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[1.5, 2, 48]} />
-      <meshStandardMaterial color="#8ab4d8" emissive="#8ab4d8" emissiveIntensity={0.7} transparent opacity={0.7} depthWrite={false} />
+      <ringGeometry args={[1.2, 1.55, 48]} />
+      <meshStandardMaterial color="#c9a35e" emissive="#c9a35e" emissiveIntensity={0.65} transparent opacity={0.68} depthWrite={false} />
     </mesh>
+  );
+}
+
+function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
+  const door = useRef<Group>(null);
+  const sign = useMemo(() => signTexture(OFFICE_WORKPLACE.name, '#26343c', '#edcf8c', 512, 128), []);
+  useFrame((_, delta) => {
+    if (!door.current) return;
+    const distance = Math.hypot(
+      player.position.x - OFFICE_WORKPLACE.position[0],
+      player.position.z - OFFICE_WORKPLACE.position[2],
+    );
+    const target = distance < 2.7 ? -Math.PI / 2 : 0;
+    door.current.rotation.y += (target - door.current.rotation.y) * Math.min(1, delta * 4);
+  });
+  return (
+    <group
+      position={OFFICE_WORKPLACE.exteriorDoor}
+      rotation={[0, -Math.PI / 2, 0]}
+    >
+      <mesh position={[0, 2.52, -0.04]} castShadow>
+        <boxGeometry args={[2.05, 0.55, 0.2]} />
+        <meshStandardMaterial color="#253038" metalness={0.55} roughness={0.36} />
+      </mesh>
+      <mesh position={[0, 2.52, 0.075]}>
+        <planeGeometry args={[1.88, 0.4]} />
+        <meshStandardMaterial map={sign} emissiveMap={sign} emissive="#ffffff" emissiveIntensity={0.18} roughness={0.58} />
+      </mesh>
+      {[-0.82, 0.82].map((x) => (
+        <mesh key={x} position={[x, 1.18, 0]} castShadow>
+          <boxGeometry args={[0.12, 2.36, 0.2]} />
+          <meshStandardMaterial color="#59646a" metalness={0.72} roughness={0.34} />
+        </mesh>
+      ))}
+      <mesh position={[0, 2.34, 0]} castShadow>
+        <boxGeometry args={[1.76, 0.12, 0.2]} />
+        <meshStandardMaterial color="#59646a" metalness={0.72} roughness={0.34} />
+      </mesh>
+      <group ref={door} position={[-0.76, 0, 0.12]}>
+        <mesh position={[0.7, 1.1, 0]} castShadow>
+          <boxGeometry args={[1.38, 2.18, 0.07]} />
+          <meshStandardMaterial color="#56666b" metalness={0.48} roughness={0.25} transparent opacity={0.84} />
+        </mesh>
+        <mesh position={[1.26, 1.03, 0.05]}>
+          <sphereGeometry args={[0.045, 10, 8]} />
+          <meshStandardMaterial color="#d3b36e" metalness={0.8} roughness={0.2} />
+        </mesh>
+      </group>
+    </group>
   );
 }
 
@@ -183,6 +234,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <VenueFront hour={gameTime.hour} night={night} />
       <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
+      {district.id === OFFICE_WORKPLACE.districtId && <OfficeExteriorEntrance player={controller} />}
       <HomeMarkers homeId={homeId} />
       <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} />
       <Traffic player={controller} />
@@ -1285,7 +1337,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`} interior={interior} gameTime={state.time} doorOpen>
+              <HomeInterior
+                key={insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`}
+                interior={interior}
+                gameTime={state.time}
+                doorOpen={Math.hypot(controller.position.x, controller.position.z - doorSpot(interior)[1]) < 1.8}
+              >
                 {insideFashionHouse && <FashionHouseScene player={controller} />}
                 {insideRestaurant && <RestaurantScene
                   tableId={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantTableId : null}

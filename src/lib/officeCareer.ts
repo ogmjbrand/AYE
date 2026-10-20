@@ -6,8 +6,9 @@ import type { Seat } from './seating';
 export const OFFICE_WORKPLACE = {
   districtId: 'lagos.marina',
   name: 'Marina Business Centre',
-  position: [5.5, 0, 12] as const,
-  radius: 3.2,
+  position: [6.7, 0, 12] as const,
+  exteriorDoor: [8, 0, 12] as const,
+  radius: 2,
 };
 
 const furniture = (
@@ -24,20 +25,26 @@ const furniture = (
 
 export const OFFICE_INTERIOR: Interior = {
   tier: 'flat',
+  architecture: 'office',
   width: 14,
   depth: 10,
   wallColor: '#dedbd2',
   floorColor: '#8d8171',
   window: 'wide',
-  partitions: [],
+  partitions: [
+    { position: [0, 1.35, 2.25], size: [0.14, 2.7, 5.5], material: 'glass' },
+  ],
   furniture: [
     furniture('reception', 0, -2.65, 1.8, 1.05, 0.8, '#534a3d'),
     furniture('desk', -3.1, 1.85, 2.5, 0.76, 1.35, '#755a43'),
     furniture('computer', -3.1, 1.85, 1, 0.68, 0.72, '#343b3e', 0.76),
-    furniture('chair', -3.1, 3.8, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
+    furniture('chair', -3.1, 2.95, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
+    furniture('desk', -5.25, -1.7, 1.7, 0.76, 1.05, '#755a43'),
+    furniture('computer', -5.25, -1.7, 0.9, 0.65, 0.65, '#343b3e', 0.76),
+    furniture('chair', -5.25, -2.65, 0.68, 0.92, 0.68, '#49545c', 0, 0),
     furniture('file-cabinet', -3.1, -0.55, 0.95, 1.25, 0.8, '#778087'),
     furniture('conference-table', 2.7, 1.6, 3.4, 0.78, 1.55, '#765b43'),
-    furniture('chair', 2.7, -0.4, 0.68, 0.92, 0.68, '#49545c', 0, 0),
+    furniture('chair', 2.7, 0.4, 0.68, 0.92, 0.68, '#49545c', 0, 0),
     furniture('chair', 1.2, 2.85, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
     furniture('chair', 4.2, 2.85, 0.68, 0.92, 0.68, '#49545c', 0, Math.PI),
     furniture('whiteboard', 0, 4.65, 3.4, 1.45, 0.12, '#e9e8df'),
@@ -49,8 +56,8 @@ export const OFFICE_INTERIOR: Interior = {
 };
 
 export const OFFICE_TASK_SEATS: Readonly<Partial<Record<OfficeTaskId, Seat>>> = {
-  computer: { id: 'office-computer-chair', x: -3.1, z: 3.8, facing: Math.PI, height: 0.45 },
-  meeting: { id: 'office-meeting-chair', x: 2.7, z: -0.4, facing: 0, height: 0.45 },
+  computer: { id: 'office-computer-chair', x: -3.1, z: 2.95, facing: Math.PI, height: 0.45 },
+  meeting: { id: 'office-meeting-chair', x: 2.7, z: 0.4, facing: 0, height: 0.45 },
 };
 
 export type OfficeInteraction = 'door' | 'reception' | OfficeTaskId;

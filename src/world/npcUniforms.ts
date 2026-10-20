@@ -7,10 +7,10 @@ const uniform = (top: string, bottom: string, shoes: string): Partial<Record<Slo
 });
 
 export const NPC_UNIFORMS = {
-  host: uniform('#eee8dd', '#292522', '#181715'),
+  host: uniform('#eee8dd', '#eee8dd', '#181715'),
   waiter: uniform('#eee9df', '#252729', '#171819'),
   chef: uniform('#f1eee7', '#34312d', '#1c1b19'),
   office: uniform('#293d4a', '#262b31', '#191919'),
-  receptionist: uniform('#e2d4bc', '#252b31', '#181819'),
-  fashion: uniform('#7b2e3b', '#312b29', '#1a1918'),
+  receptionist: uniform('#e2d4bc', '#e2d4bc', '#181819'),
+  fashion: uniform('#7b2e3b', '#7b2e3b', '#1a1918'),
 } as const;

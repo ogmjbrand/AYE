@@ -18,6 +18,7 @@ export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' 
 export interface InteriorWall {
   position: readonly [number, number, number];
   size: readonly [number, number, number];
+  material?: 'solid' | 'glass';
 }
 
 export interface Furniture {
@@ -33,6 +34,7 @@ export interface Furniture {
 
 export interface Interior {
   tier: 'room' | 'flat' | 'apartment' | 'penthouse';
+  architecture: 'residential' | 'office' | 'restaurant' | 'boutique';
   width: number;
   depth: number;
   wallColor: string;
@@ -62,6 +64,7 @@ const f = (
 
 function makeInterior(
   tier: Interior['tier'],
+  architecture: Interior['architecture'],
   width: number,
   depth: number,
   wallColor: string,
@@ -98,14 +101,14 @@ function makeInterior(
     f('lamp', right - 1.8, front + 1.0, 0.36, 1.7, 0.36, '#e5d7b8'),
   ];
 
-  return { tier, width, depth, wallColor, floorColor, window, partitions, furniture };
+  return { tier, architecture, width, depth, wallColor, floorColor, window, partitions, furniture };
 }
 
 export const INTERIORS: Record<Interior['tier'], Interior> = {
-  room: makeInterior('room', 10, 8, '#d9cdb5', '#8a6f55', 'small'),
-  flat: makeInterior('flat', 12, 9, '#e4d8c2', '#9a7b5c', 'wide'),
-  apartment: makeInterior('apartment', 14, 10, '#ece4d6', '#b08d68', 'wide'),
-  penthouse: makeInterior('penthouse', 16, 12, '#f1ede6', '#d9d4cc', 'full'),
+  room: makeInterior('room', 'residential', 10, 8, '#d9cdb5', '#8a6f55', 'small'),
+  flat: makeInterior('flat', 'residential', 12, 9, '#e4d8c2', '#9a7b5c', 'wide'),
+  apartment: makeInterior('apartment', 'residential', 14, 10, '#ece4d6', '#b08d68', 'wide'),
+  penthouse: makeInterior('penthouse', 'residential', 16, 12, '#f1ede6', '#d9d4cc', 'full'),
 };
 
 export interface RestaurantTable {
@@ -141,6 +144,7 @@ export const RESTAURANT_TABLES: readonly RestaurantTable[] = [
 
 export const RESTAURANT_INTERIOR: Interior = {
   tier: 'flat',
+  architecture: 'restaurant',
   width: 18,
   depth: 14,
   wallColor: '#302721',
@@ -174,6 +178,7 @@ export type RestaurantInteraction = 'door' | 'host';
 
 export const FASHION_HOUSE_INTERIOR: Interior = {
   tier: 'flat',
+  architecture: 'boutique',
   width: 18,
   depth: 14,
   wallColor: '#211b19',

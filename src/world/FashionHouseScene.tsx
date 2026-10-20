@@ -6,7 +6,7 @@ export function FashionHouseScene({ player }: { player: PlayerHandle }) {
   return (
     <>
       <WorldNPC
-        lookId="female-adult-08"
+        lookId="female-adult-10"
         position={[0, 0, 5.45]}
         facing={Math.PI}
         player={player}

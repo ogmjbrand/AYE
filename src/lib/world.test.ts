@@ -58,6 +58,17 @@ describe.each(DISTRICTS.map((d) => [d.id, d.layout] as const))('layout %s', (_, 
     }
   });
 
+  it('keeps facade entries within their building dimensions', () => {
+    for (const building of BUILDINGS) {
+      if (!building.entry) continue;
+      expect(building.entry.width).toBeGreaterThan(0);
+      expect(building.entry.width).toBeLessThanOrEqual(building.size[2]);
+      expect(building.entry.height).toBeGreaterThan(0);
+      expect(building.entry.height).toBeLessThanOrEqual(building.size[1]);
+      expect(Math.abs(building.entry.offset)).toBeLessThanOrEqual(building.size[2] / 2);
+    }
+  });
+
   it('pavements are raised and the road is not', () => {
     expect(groundHeightAt(0, 30, L)).toBe(0);
     expect(groundHeightAt(ROAD_HALF_WIDTH + 1, 40, L)).toBeGreaterThan(0);

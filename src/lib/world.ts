@@ -15,6 +15,8 @@ export interface Building {
   style: BuildingStyle;
   /** Shown on signage for shops and landmark buildings. */
   name?: string;
+  /** Ground-level architectural opening on the west facade, relative to its centre line. */
+  entry?: { side: 'west'; offset: number; width: number; height: number };
 }
 
 /** Any solid, axis-aligned footprint the player cannot walk through. */
