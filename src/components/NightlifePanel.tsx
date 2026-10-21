@@ -39,7 +39,7 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
     const why = level < HANGOUT_LEVEL ? `Not close enough yet (${FRIENDSHIP_LEVELS[level].name})`
       : rel?.lastDay === today ? 'Already spent time together today'
         : !canStart ? (open ? `Last entry is ${hh(LAST_ENTRY_HOUR)}` : `Opens at ${hh(OPENS_HOUR)}`)
-          : balance < cost ? `You need ${cost} ⓒ`
+          : balance < cost ? `You need ${cost} GHAI`
             : null;
     return { r, level, why };
   });
@@ -60,7 +60,7 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
             <h2 id="venue-title" className="m-0 mt-1 font-display text-2xl font-bold">{venue.name}</h2>
             <p className="m-0 mt-1 text-xs text-ui-muted">
               <span className={open ? 'text-ui-accent' : 'text-ui-warn'}>{open ? 'Open now' : 'Closed now'}</span>
-              {' '}· {hh(OPENS_HOUR)}–{hh(CLOSES_HOUR)}, last entry {hh(LAST_ENTRY_HOUR)} · Cover {venue.cover} ⓒ
+              {' '}· {hh(OPENS_HOUR)}–{hh(CLOSES_HOUR)}, last entry {hh(LAST_ENTRY_HOUR)} · Cover {venue.cover} GHAI
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
@@ -76,7 +76,7 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
               <div>
                 <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Night out with a friend</p>
                 <p className="m-0 mt-1 text-xs text-ui-muted">
-                  {NIGHT_OUT_MINUTES / 60} hours · you pay both covers ({cost} ⓒ) · +{NIGHT_OUT_POINTS} friendship. Counts as your time together today.
+                  {NIGHT_OUT_MINUTES / 60} hours · you pay both covers ({cost} GHAI) · +{NIGHT_OUT_POINTS} friendship. Counts as your time together today.
                 </p>
               </div>
               {!anyFriend && (
@@ -112,7 +112,7 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
             <span className="font-semibold">Sit on the terrace</span>
             <span className="block text-xs text-ui-muted">Free. Take one of the chairs outside and watch the street; get up whenever you like.</span>
           </button>
-          <p className="m-0 text-[11px] text-ui-muted">The people here are computer-controlled residents, not other players. Money is virtual (ⓒ).</p>
+          <p className="m-0 text-[11px] text-ui-muted">The people here are computer-controlled residents, not other players. Money is virtual (GHAI).</p>
         </div>
       </div>
     </div>

@@ -87,7 +87,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
             <div>
               <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">Home</p>
               <h2 id="catalogue-title" className="m-0 mt-1 font-display text-2xl font-bold">Furniture</h2>
-              <p className="m-0 mt-1 text-sm text-ui-muted">Balance <span className="tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
+              <p className="m-0 mt-1 text-sm text-ui-muted">Balance <span className="tabular-nums text-ui-ink">{balance.toLocaleString()} GHAI</span></p>
             </div>
             <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
           </div>
@@ -147,7 +147,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
                     </button>
                     <button type="button" disabled={balance < item.price} title={balance < item.price ? 'Not enough money' : undefined} onClick={() => buy(item)}
                       className="mt-auto rounded-md border border-ui-accent bg-ui-accent/20 px-2 py-1.5 text-xs font-semibold tabular-nums hover:bg-ui-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50">
-                      Buy · {item.price.toLocaleString()} ⓒ
+                      Buy · {item.price.toLocaleString()} GHAI
                     </button>
                   </div>
                 </li>
@@ -180,8 +180,8 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
                         </>
                       )}
                       {!o.at && interior && <button type="button" className={SMALL} onClick={() => placeStored(o)}>Place in home</button>}
-                      <button type="button" className={`${SMALL} ml-auto`} onClick={() => { onSell(o.uid); setNote(`Sold the ${item.name.toLowerCase()} for ${resaleValue(item).toLocaleString()} ⓒ.`); }}>
-                        Sell · {resaleValue(item).toLocaleString()} ⓒ
+                      <button type="button" className={`${SMALL} ml-auto`} onClick={() => { onSell(o.uid); setNote(`Sold the ${item.name.toLowerCase()} for ${resaleValue(item).toLocaleString()} GHAI.`); }}>
+                        Sell · {resaleValue(item).toLocaleString()} GHAI
                       </button>
                     </div>
                   </li>

@@ -16,6 +16,8 @@ import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
 import { sanitiseNeeds } from './needs';
 import { sanitiseFurniture } from './furniture';
+import { sanitiseLife } from './lifeState';
+import { recogniseExisting } from './life';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -107,7 +109,7 @@ export function loadProgress(character: Character, storage: Storage = localStora
   ) {
     return fresh;
   }
-  return {
+  const loaded: GameState = {
     time: {
       hour: time.hour,
       minute: time.minute,
@@ -138,10 +140,14 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before needs start with every need met, and own no furniture
     needs: sanitiseNeeds(p.needs),
     furniture: sanitiseFurniture(p.furniture),
+    // Saves from before Life OS start with a fresh profile, skills and goals
+    life: sanitiseLife(p.life),
   };
+  // A save from before Life OS: recognise what was already achieved, without paying for it again
+  return p.life === undefined ? recogniseExisting(loaded, character.career) : loaded;
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture, life } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] } }));
 }

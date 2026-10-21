@@ -55,8 +55,15 @@ import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout, type Furniture } from './lib/interiors';
 import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
+import type { FurnitureKind } from './lib/interiors';
 import { currentMood, type FurnitureTarget } from './lib/gameState';
 import { FurnitureCatalogue } from './components/FurnitureCatalogue';
+import { LifeOS, type OsTab } from './components/os/LifeOS';
+import { Celebrations } from './components/os/Celebrations';
+import type { LifeLink } from './lib/life';
+import { spotToUse } from './lib/furniture';
+import { residentPosition, residentsIn } from './lib/people';
+import { getTrip } from './hooks/usePlayerController';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, residentById, residentNear, type Resident } from './lib/people';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
@@ -236,7 +243,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -252,6 +259,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   );
   const roomLayout = useMemo(() => (interior ? interiorLayout(interior, ownedPieces.map((p) => p.f)) : null), [interior, ownedPieces]);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+  // Life OS: the character's dashboard; the world keeps running (and you can keep walking) while it's open
+  const [osOpen, setOsOpen] = useState(false);
+  const [osTab, setOsTab] = useState<OsTab>('today');
+
   const indoors = inside && !!home && home.district === district.id && !!roomLayout;
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : district.layout;
@@ -346,7 +357,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const u = usableHere();
     if (!u || state.balance < u.cost) return;
     operateFurniture(u.target, true);
-    setArrival(`${u.verb}: ${u.minutes >= 60 ? `${u.minutes / 60} h` : `${u.minutes} min`} pass${u.cost ? `, ${u.cost} ⓒ for ingredients` : ''}.`);
+    setArrival(`${u.verb}: ${u.minutes >= 60 ? `${u.minutes / 60} h` : `${u.minutes} min`} pass${u.cost ? `, ${u.cost} GHAI for ingredients` : ''}.`);
   };
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
@@ -357,7 +368,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       // E on a seat gets you up; on the way to one it does nothing
       if (sit.session) {
         if (sit.session.phase === 'seated') sit.cancel();
@@ -426,6 +437,127 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     nightOut(residentId);
     const first = residentById(residentId)?.name.split(' ')[0];
     sitOnTerrace(`${district.nightlife.name}${first ? ` after a night out with ${first}` : ''}`, 6);
+  };
+
+  // L opens and closes the Life OS
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'l' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) setOsOpen((o) => !o);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Discovering places: reaching any real place in the directory counts once (lib/life.ts checks it's real)
+  const visitedRef = useRef(state.life.visited);
+  useEffect(() => { visitedRef.current = state.life.visited; });
+  useEffect(() => {
+    if (indoors) return;
+    const id = setInterval(() => {
+      const { x, z } = controller.position;
+      for (const d of destinations) {
+        if (d.position && d.status !== 'planned' && !visitedRef.current.includes(d.id) && Math.hypot(d.position.x - x, d.position.z - z) <= 4) visit(d.id);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [destinations, indoors, controller, visit]);
+
+  /** Starts the walk (or opens the panel) a Life OS goal or need asks for. Says honestly when it can't. */
+  const goFor = (link: LifeLink) => {
+    const d = district.id;
+    const say = (msg: string) => setArrival(msg);
+    const walk = (id: string, note?: string) => {
+      const dest = destinations.find((x) => x.id === id);
+      const err = dest ? goTo(dest) : 'That place isn’t in this city.';
+      if (err) say(err);
+      else if (note) say(note);
+    };
+    const nearest = (ids: string[]) => {
+      const { x, z } = controller.position;
+      return destinations.filter((x2) => ids.includes(x2.id) && x2.position).sort((a, b) => Math.hypot(a.position!.x - x, a.position!.z - z) - Math.hypot(b.position!.x - x, b.position!.z - z))[0]?.id;
+    };
+    const myHomeHere = home && home.district === d;
+    switch (link.to) {
+      case 'work':
+        if (character.career === 'none') return say('You don’t have a career, so there’s no workplace.');
+        return walk(`${d}.work.${character.career}`, isWorkingHours(state.time) ? undefined : 'Work hours are 09:00–17:00: you’ll be paid then.');
+      case 'food': return walk(nearest(district.vendors.map((v) => `${d}.${v.id}`)) ?? '', 'Press E at the counter to order.');
+      case 'fashion': return walk(`${d}.fashion`);
+      case 'gadgets': return walk(`${d}.gadgets`);
+      case 'park': return walk(`${d}.park.${district.park.id}`, 'At the park, press E: sit on a bench or go for a run.');
+      case 'nightlife': return walk(`${d}.night.${district.nightlife.id}`);
+      case 'travel': return walk(`${d}.travel`);
+      case 'catalogue': return setCatalogueOpen(true);
+      case 'explore': {
+        const { x, z } = controller.position;
+        const next = destinations
+          .filter((x2) => x2.position && x2.status !== 'planned' && !state.life.visited.includes(x2.id))
+          .sort((a, b) => Math.hypot(a.position!.x - x, a.position!.z - z) - Math.hypot(b.position!.x - x, b.position!.z - z))[0];
+        return next ? walk(next.id, `Heading somewhere new: ${next.name}.`) : say('You’ve discovered everywhere in this district. Try another city.');
+      }
+      case 'homes': {
+        if (myHomeHere) return walk(`${d}.home.${home!.id}`);
+        const cheapest = [...district.homes].sort((a, b) => a.rentPerNight - b.rentPerNight)[0];
+        return walk(`${d}.home.${cheapest.id}`, 'At the door, press E to see the home and rent it.');
+      }
+      case 'home':
+        if (!home) return goFor({ to: 'homes' });
+        if (!myHomeHere) { say(`Your home is in ${districtById(home.district).city.name}. Book a trip at the travel desk.`); return walk(`${d}.travel`); }
+        return walk(`${d}.home.${home.id}`, 'At your door, press E and go inside.');
+      case 'friend': {
+        const here = residentsIn(d);
+        const today = gameDay(state.time.totalMinutes);
+        const who = (link.residentId ? residentById(link.residentId) : undefined)
+          ?? [...here].sort((a, b) => ((state.relationships[b.id]?.lastDay === today ? -1 : state.relationships[b.id]?.points ?? 0) - (state.relationships[a.id]?.lastDay === today ? -1 : state.relationships[a.id]?.points ?? 0)))[0];
+        if (!who || who.district !== d) return say(who ? `${who.name} lives in ${districtById(who.district).city.name}.` : 'Nobody lives in this district yet.');
+        const p = residentPosition(who);
+        const { x, z } = controller.position;
+        const ok = setMoveTarget(makeTarget(x, z, p.x, p.z, false), { label: who.name });
+        return say(ok ? `Walking over to ${who.name}. Press E to talk.` : `Couldn’t find a way to ${who.name}.`);
+      }
+      case 'homeUse': {
+        const fallback: Record<typeof link.use, LifeLink> = { cook: { to: 'food' }, shower: { to: 'homes' }, sleep: { to: 'homes' }, relax: { to: 'park' }, study: { to: 'homes' } };
+        if (!home) return goFor(fallback[link.use]);
+        if (!indoors) return goFor({ to: 'home' });
+        const kinds: Record<typeof link.use, FurnitureKind[]> = {
+          shower: ['shower', 'bathtub'], cook: ['stove', 'counter', 'fridge'], sleep: ['bed'], study: ['desk'],
+          relax: ['tv', 'console', 'sofa', 'armchair', 'bookshelf', 'speaker'],
+        };
+        const all = [...interior!.furniture, ...ownedPieces.map((p) => p.f)];
+        const { x, z } = controller.position;
+        const piece = all.filter((f) => kinds[link.use].includes(f.kind)).sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - z) - Math.hypot(b.at[0] - x, b.at[1] - z))[0];
+        if (!piece) {
+          setCatalogueOpen(true);
+          return say(link.use === 'study' ? 'You don’t have a desk yet. Find one under Tables & desks.' : 'You don’t have anything for that yet.');
+        }
+        const spot = link.use === 'sleep' ? bedSpot(interior!) : spotToUse(piece);
+        const ok = setMoveTarget(makeTarget(x, z, spot[0], spot[1], false), { label: piece.kind });
+        return say(ok ? 'Press E when you get there.' : 'Something is in the way.');
+      }
+    }
+  };
+  /** Outdoor trips from inside your home: step outside first, then go once the street is loaded. */
+  const onGo = (link: LifeLink) => {
+    if (window.innerWidth < 640) setOsOpen(false);
+    const staysIn = link.to === 'catalogue' || (link.to === 'homeUse' && !!home && indoors);
+    // Step outside first; route once the street has replaced the room (next frames)
+    if (indoors && !staysIn) { goOutside(); setTimeout(() => goForRef.current(link), 150); return; }
+    goFor(link);
+  };
+  const goForRef = useRef(goFor);
+  useEffect(() => { goForRef.current = goFor; });
+  const runInPark = (minutes: number) => {
+    setParkOpen(false);
+    const here = parkAt(district.park, controller.position.x, controller.position.z);
+    if (state.needs.energy < 15) { setArrival('You’re too tired to run. Rest first.'); return; }
+    exercise(minutes, !!here);
+    setArrival(`You ran for ${minutes} minutes in ${district.park.name}. Sweaty, tired and happier.`);
+  };
+  const whereabouts = {
+    place: indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
+    activity: sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
+      : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
+        : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
   };
 
   // M opens the phone map once you own a phone
@@ -553,7 +685,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       )}
       {!indoors && <TripStatus destinations={destinations} />}
       {parkOpen && (
-        <ParkPanel park={district.park} time={state.time} onSit={sitInPark} onClose={() => setParkOpen(false)} />
+        <ParkPanel park={district.park} time={state.time} energy={state.needs.energy} onSit={sitInPark} onRun={runInPark} onClose={() => setParkOpen(false)} />
       )}
       {sit.session && <SitBar session={sit.session} onStand={sit.cancel} />}
       {nightOpen && (
@@ -681,6 +813,24 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={() => setTravelOpen(false)}
         />
       )}
+      <Celebrations items={state.life.celebrations} />
+      {osOpen && (
+        <LifeOS
+          state={state}
+          character={character}
+          whereabouts={whereabouts}
+          tab={osTab}
+          onTab={setOsTab}
+          onGo={onGo}
+          onSetProfile={setProfile}
+          onSetDream={setDream}
+          onDismissWish={dismissWish}
+          onSetSavingsGoal={setSavingsGoal}
+          onOpenWardrobe={() => { setOsOpen(false); setStore('wardrobe'); }}
+          settings={{ quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange }}
+          onClose={() => setOsOpen(false)}
+        />
+      )}
       {arrival && (
         <p role="status" className="pointer-events-none fixed left-1/2 top-24 z-40 m-0 -translate-x-1/2 rounded-xl border border-ui-line bg-ui-panel/90 px-4 py-2 text-sm text-ui-ink shadow-xl">
           {arrival}
@@ -708,7 +858,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           prompt: () => {
             const use = usableHere();
             if (nearSpot(bedSpot(interior))) return { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) };
-            if (use) return { verb: use.verb, place: use.cost ? `${use.cost} ⓒ` : 'at home', onOpen: operateHere };
+            if (use) return { verb: use.verb, place: use.cost ? `${use.cost} GHAI` : 'at home', onOpen: operateHere };
             return nearSpot(doorSpot(interior)) ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside } : null;
           },
         } : undefined}
@@ -720,7 +870,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         fullness={state.fullness}
         needs={state.needs}
         mood={currentMood(state)}
-        onOpenCatalogue={() => setCatalogueOpen(true)}
+        onOpenCatalogue={indoors ? () => setCatalogueOpen(true) : undefined}
+        onOpenLife={() => setOsOpen((o) => !o)}
+        lifeOpen={osOpen}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
         onOpenWardrobe={() => setStore('wardrobe')}

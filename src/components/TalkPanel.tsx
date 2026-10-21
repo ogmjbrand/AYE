@@ -77,7 +77,7 @@ export function TalkPanel({ resident, relationship, today, balance, onActivity, 
                         <span className="block text-sm font-semibold">{a.label}</span>
                         <span className="block text-xs text-ui-muted">{locked ? `Once you're friends.` : a.description}</span>
                       </span>
-                      <span className="shrink-0 text-xs tabular-nums text-ui-muted">{a.cost > 0 ? `${a.cost} ⓒ` : 'Free'} · +{a.points}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-ui-muted">{a.cost > 0 ? `${a.cost} GHAI` : 'Free'} · +{a.points}</span>
                     </button>
                   </li>
                 );

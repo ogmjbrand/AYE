@@ -1,12 +1,16 @@
 import { useEffect } from 'react';
 import { WAIT_OPTIONS, type Park, type WaitMinutes } from '../lib/parks';
-import { formatGameTime, type GameTime } from '../lib/gameState';
+import { RUN_EFFECT_PER_30, RUN_OPTIONS, formatGameTime, type GameTime } from '../lib/gameState';
 
 interface ParkPanelProps {
   park: Park;
   time: GameTime;
   /** Walk to a free bench and sit there while this much time passes. */
   onSit: (minutes: WaitMinutes) => void;
+  /** Energy now (0 … 100): too tired, and you can't run. */
+  energy: number;
+  /** Go for a run (minutes). */
+  onRun: (minutes: number) => void;
   onClose: () => void;
 }
 
@@ -17,7 +21,7 @@ const clockAfter = (t: GameTime, m: number) => {
 };
 
 /** A park bench: sit for a while and let time pass. */
-export function ParkPanel({ park, time, onSit, onClose }: ParkPanelProps) {
+export function ParkPanel({ park, time, energy, onSit, onRun, onClose }: ParkPanelProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -57,6 +61,17 @@ export function ParkPanel({ park, time, onSit, onClose }: ParkPanelProps) {
               </li>
             ))}
           </ul>
+          <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">Go for a run</p>
+          <div className="grid grid-cols-2 gap-2">
+            {RUN_OPTIONS.map((m) => (
+              <button key={m} type="button" disabled={energy < 15} onClick={() => onRun(m)}
+                className="rounded-xl border border-ui-line p-3 text-left text-sm hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50">
+                <span className="block font-semibold">{label(m)}</span>
+                <span className="block text-xs text-ui-muted">until {clockAfter(time, m)} · +{(RUN_EFFECT_PER_30.fun * m) / 30} fun, {(RUN_EFFECT_PER_30.energy * m) / 30} energy, builds fitness</span>
+              </button>
+            ))}
+          </div>
+          {energy < 15 && <p className="m-0 text-xs text-ui-danger">Too tired to run. Rest first.</p>}
           <p className="m-0 text-xs text-ui-muted">The clock keeps running while you sit: living costs and hunger carry on, and you aren&rsquo;t paid. Get up any time; you&rsquo;re only charged for the time you sat.</p>
         </div>
       </div>

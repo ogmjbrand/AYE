@@ -54,7 +54,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
         <div>
           <p className="m-0 text-[11px] uppercase tracking-[0.18em] text-ui-muted">{mode === 'shop' ? `${shop.name} · ${shop.kind}` : 'Your wardrobe'}</p>
           <h2 id="store-title" className="m-0 mt-1 font-display text-xl font-semibold">{mode === 'shop' ? 'Find your look' : 'Get dressed'}</h2>
-          <p className="m-0 mt-1 text-xs text-ui-muted">Balance <span className="font-semibold tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
+          <p className="m-0 mt-1 text-xs text-ui-muted">Balance <span className="font-semibold tabular-nums text-ui-ink">{balance.toLocaleString()} GHAI</span></p>
         </div>
         <button type="button" onClick={onClose} className={`${BUTTON} border-ui-line text-ui-muted hover:text-ui-ink`}>Done</button>
       </header>
@@ -123,7 +123,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
             <ItemRow
               key={item.id}
               title={item.name}
-              subtitle={`${item.style.fabric ? `${item.style.fabric.name[0].toUpperCase()}${item.style.fabric.name.slice(1)} · ` : ''}${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}`}
+              subtitle={`${item.style.fabric ? `${item.style.fabric.name[0].toUpperCase()}${item.style.fabric.name.slice(1)} · ` : ''}${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} GHAI`}`}
               swatch={swatchCss(item.style)}
               active={shownId === item.id}
               actions={

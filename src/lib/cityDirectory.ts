@@ -80,7 +80,7 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
     const yours = h.id === homeId;
     out.push({
       id: id(`home.${h.id}`), name: h.name, kind: h.kind, categories: ['residential'], status: 'open',
-      note: yours ? 'Your home: go in, sleep' : `To let, ${h.rentPerNight} ⓒ a night`, position: at(h.door),
+      note: yours ? 'Your home: go in, sleep' : `To let, ${h.rentPerNight} GHAI a night`, position: at(h.door),
     });
   }
   for (const [career, w] of Object.entries(district.workplaces) as [Exclude<Career, 'none'>, District['workplaces'][Exclude<Career, 'none'>]][]) {

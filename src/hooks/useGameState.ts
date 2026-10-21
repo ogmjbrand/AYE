@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
-import { gameReducer, type FurnitureTarget, type GameAction, type GameState } from '../lib/gameState';
+import type { FurnitureTarget, GameState } from '../lib/gameState';
+import { lifeReducer, type AnyAction } from '../lib/life';
+import type { DreamId, TraitId } from '../lib/lifeState';
 import { loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
@@ -21,8 +23,8 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
   });
 
   const reducer = useCallback(
-    (state: GameState, action: GameAction) =>
-      gameReducer(state, action, character.career, character.lifestyle),
+    (state: GameState, action: AnyAction) =>
+      lifeReducer(state, action, character.career, character.lifestyle),
     [character.career, character.lifestyle],
   );
   const [state, dispatch] = useReducer(reducer, character, (c) => loadProgress(c));
@@ -58,5 +60,11 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     placeFurniture: (uid: string, at: readonly [number, number], rot: 0 | 1) => dispatch({ type: 'placeFurniture', uid, at, rot }),
     storeFurniture: (uid: string) => dispatch({ type: 'storeFurniture', uid }),
     operateFurniture: (target: FurnitureTarget, near: boolean) => dispatch({ type: 'useFurniture', target, near }),
+    exercise: (minutes: number, atPark: boolean) => dispatch({ type: 'exercise', minutes, atPark }),
+    visit: (placeId: string) => dispatch({ type: 'visit', placeId }),
+    setProfile: (bio: string, traits: TraitId[]) => dispatch({ type: 'setProfile', bio, traits }),
+    setDream: (dream: DreamId) => dispatch({ type: 'setDream', dream }),
+    dismissWish: (id: string) => dispatch({ type: 'dismissWish', id }),
+    setSavingsGoal: (amount: number | null) => dispatch({ type: 'setSavingsGoal', amount }),
   };
 }

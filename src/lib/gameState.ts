@@ -37,6 +37,9 @@ import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, reside
 import { FULL_NEEDS, MOOD_TASK_MULTIPLIER, SLEEP_ENERGY, TIRED_THRESHOLD, addNeeds, decayNeeds, decayNeedsAsleep, moodLabel, moodScore, type Needs } from './needs';
 import { catalogueItem, findSpot, fits, homeComfort, walkable, nextUid, replaceAll, resaleValue, furnitureUse, type OwnedFurniture } from './furniture';
 import { interiorFor, type Interior } from './interiors';
+import { emptyLife, modifiers, type LifeState } from './lifeState';
+import type { FurnitureKind } from './interiors';
+import type { CatalogueItem } from './furniture';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -99,6 +102,8 @@ export interface GameState {
   needs: Needs;
   /** Furniture you've bought, placed in your home or in storage (lib/furniture.ts). */
   furniture: OwnedFurniture[];
+  /** Profile, skills, missions, wishes, dream, achievements and money history (lib/lifeState.ts, lib/life.ts). */
+  life: LifeState;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -122,6 +127,7 @@ export type GameAction =
   | { type: 'placeFurniture'; uid: string; at: readonly [number, number]; rot: 0 | 1 }
   | { type: 'storeFurniture'; uid: string }
   | { type: 'useFurniture'; target: FurnitureTarget; near: boolean }
+  | { type: 'exercise'; minutes: number; atPark: boolean }
   | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -177,6 +183,7 @@ function eat(state: GameState, price: number, gain: number): GameState {
     ...state,
     balance: state.balance - price,
     fullness: Math.min(100, state.fullness + gain),
+    needs: addNeeds(state.needs, { fun: modifiers(state.life).mealFun }),
     today: { ...state.today, expenses: state.today.expenses + price },
   };
 }
@@ -216,7 +223,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [] };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife() };
 }
 
 export function emptyLedger(): DayLedger {
@@ -247,7 +254,8 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   const pay = worked * (state.fullness < HUNGRY_THRESHOLD || state.needs.energy < TIRED_THRESHOLD ? 0.5 : 1);
   const minutesWorkedThisHour = state.minutesWorkedThisHour + pay;
   const fullness = Math.max(0, state.fullness - FULLNESS_LOSS_PER_MINUTE * hungerRate);
-  const needs = asleep ? decayNeedsAsleep(state.needs) : decayNeeds(state.needs);
+  const mods = modifiers(state.life);
+  const needs = asleep ? decayNeedsAsleep(state.needs) : decayNeeds(state.needs, { energy: mods.energyDecay, social: mods.socialDecay });
   const time = advanceMinute(state.time);
   const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
   const workMinutes = state.workMinutes + worked;
@@ -257,7 +265,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
   const income = Math.round((wage * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
-  const expenses = Math.min(HOURLY_LIVING_COST[lifestyle], afterIncome);
+  const expenses = Math.min(Math.round(HOURLY_LIVING_COST[lifestyle] * mods.livingCost), afterIncome);
 
   return {
     ...state,
@@ -272,9 +280,20 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
 }
 
 /** Mood right now (0 … 100): needs, hunger and the comfort of your home. */
-export function currentMood(state: Pick<GameState, 'needs' | 'fullness' | 'furniture' | 'home'>): number {
-  return moodScore(state.needs, state.fullness, state.home ? homeComfort(state.furniture) : 0);
+export function currentMood(state: Pick<GameState, 'needs' | 'fullness' | 'furniture' | 'home' | 'life' | 'time'>): number {
+  const boost = state.life?.boost && state.life.boost.until > state.time.totalMinutes ? state.life.boost.amount : 0;
+  return moodScore(state.needs, state.fullness, state.home ? homeComfort(state.furniture) : 0, modifiers(state.life).mood + boost);
 }
+
+/** What a catalogue piece costs you (the Negotiator perk takes 10% off). */
+export const furniturePrice = (item: CatalogueItem, state: Pick<GameState, 'life'>) => Math.round(item.price * modifiers(state.life).furniturePrice);
+
+/** Furniture that's fun to use at home; books and music count as reading/listening. */
+const HOME_FUN: readonly FurnitureKind[] = ['sofa', 'armchair', 'tv', 'console', 'bookshelf', 'speaker', 'bathtub'];
+
+/** How long a run takes, and what it does. */
+export const RUN_OPTIONS = [30, 60] as const;
+export const RUN_EFFECT_PER_30 = { energy: -12, hygiene: -20, fun: 12 } as const;
 
 /** Travels to another district: pays the fare, then the clock runs for the length of the trip. */
 function travel(state: GameState, to: string, mode: TravelMode, career: Career, lifestyle: Lifestyle): GameState {
@@ -310,7 +329,7 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   return {
     ...next,
     needs: addNeeds(next.needs, SOCIAL_GAINS[activity]),
-    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + a.points), lastDay: today } },
+    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + Math.round(a.points * modifiers(state.life).friendship)), lastDay: today } },
   };
 }
 
@@ -341,7 +360,7 @@ function nightOut(state: GameState, residentId: string, career: Career, lifestyl
   return {
     ...next,
     needs: addNeeds(next.needs, NIGHT_OUT_GAINS),
-    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + NIGHT_OUT_POINTS), lastDay: today } },
+    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + Math.round(NIGHT_OUT_POINTS * modifiers(state.life).friendship)), lastDay: today } },
   };
 }
 
@@ -358,7 +377,7 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   if (!option) return state;
   const reward = TASK_REWARD[option.quality];
   const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
-  const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))]);
+  const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))] * modifiers(state.life).taskBonus);
   return {
     ...state,
     balance: state.balance + bonus,
@@ -394,14 +413,15 @@ function homeInterior(state: GameState): Interior | null {
 /** Buys a piece from the catalogue: delivered into your home if there's room, otherwise into storage. */
 function buyFurniture(state: GameState, itemId: string): GameState {
   const piece = catalogueItem(itemId);
-  if (!piece || state.summary || state.balance < piece.price) return state;
+  const price = piece ? furniturePrice(piece, state) : 0;
+  if (!piece || state.summary || state.balance < price) return state;
   const interior = homeInterior(state);
   const spot = interior ? findSpot(interior, state.furniture, piece) : null;
   const owned: OwnedFurniture = { uid: nextUid(state.furniture), itemId, at: spot?.at ?? null, rot: spot?.rot ?? 0 };
   return {
     ...state,
-    balance: state.balance - piece.price,
-    today: { ...state.today, expenses: state.today.expenses + piece.price },
+    balance: state.balance - price,
+    today: { ...state.today, expenses: state.today.expenses + price },
     furniture: [...state.furniture, owned],
   };
 }
@@ -453,12 +473,26 @@ function operateFurniture(state: GameState, target: FurnitureTarget, near: boole
   if (state.balance < cost) return state;
   let next: GameState = cost > 0 ? { ...state, balance: state.balance - cost, today: { ...state.today, expenses: state.today.expenses + cost } } : state;
   for (let i = 0; i < use.minutes; i++) next = tick(next, career, lifestyle, false);
+  const mods = modifiers(state.life);
+  const cooking = kind === 'stove' || kind === 'counter';
+  const funScale = HOME_FUN.includes(kind!) ? mods.homeFun * (kind === 'bookshelf' || kind === 'speaker' ? mods.readingFun : 1) : 1;
+  const gains = { ...use.gains, fun: (use.gains.fun ?? 0) > 0 ? Math.round(use.gains.fun! * funScale) : use.gains.fun };
+  if (cooking) gains.fun = (gains.fun ?? 0) + mods.mealFun;
   return {
     ...next,
-    needs: addNeeds(next.needs, use.gains),
-    fullness: Math.min(100, next.fullness + (use.fullness ?? 0)),
-    workMinutes: next.workMinutes + (career !== 'none' ? use.xpMinutes ?? 0 : 0),
+    needs: addNeeds(next.needs, gains),
+    fullness: Math.min(100, next.fullness + Math.round((use.fullness ?? 0) * (cooking ? mods.cookFullness : 1))),
+    workMinutes: next.workMinutes + (career !== 'none' ? Math.round((use.xpMinutes ?? 0) * mods.studyXp) : 0),
   };
+}
+
+/** A run in the park: tiring and sweaty, but fun (fitness grows through lib/life.ts). */
+function exercise(state: GameState, minutes: number, atPark: boolean, career: Career, lifestyle: Lifestyle): GameState {
+  if (state.summary || !atPark || !(RUN_OPTIONS as readonly number[]).includes(minutes) || state.needs.energy < 15) return state;
+  let next = state;
+  for (let i = 0; i < minutes; i++) next = tick(next, career, lifestyle, false);
+  const k = minutes / 30;
+  return { ...next, needs: addNeeds(next.needs, { energy: RUN_EFFECT_PER_30.energy * k, hygiene: RUN_EFFECT_PER_30.hygiene * k, fun: RUN_EFFECT_PER_30.fun * k }) };
 }
 
 /**
@@ -568,5 +602,7 @@ export function gameReducer(
       return state.summary ? state : { ...state, furniture: state.furniture.map((o) => (o.uid === action.uid ? { ...o, at: null } : o)) };
     case 'useFurniture':
       return operateFurniture(state, action.target, action.near, career, lifestyle);
+    case 'exercise':
+      return exercise(state, action.minutes, action.atPark, career, lifestyle);
   }
 }

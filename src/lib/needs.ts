@@ -44,13 +44,13 @@ export const SLEEP_ENERGY = { home: 100, friend: 85, rough: 55 } as const;
 
 const clamp = (v: number) => Math.min(100, Math.max(0, v));
 
-/** One awake minute. */
-export function decayNeeds(n: Needs): Needs {
+/** One awake minute. Traits and perks can slow a need down (rate below 1). */
+export function decayNeeds(n: Needs, rate: Partial<Needs> = {}): Needs {
   return {
-    energy: clamp(n.energy - NEED_LOSS_PER_MINUTE.energy),
-    hygiene: clamp(n.hygiene - NEED_LOSS_PER_MINUTE.hygiene),
-    fun: clamp(n.fun - NEED_LOSS_PER_MINUTE.fun),
-    social: clamp(n.social - NEED_LOSS_PER_MINUTE.social),
+    energy: clamp(n.energy - NEED_LOSS_PER_MINUTE.energy * (rate.energy ?? 1)),
+    hygiene: clamp(n.hygiene - NEED_LOSS_PER_MINUTE.hygiene * (rate.hygiene ?? 1)),
+    fun: clamp(n.fun - NEED_LOSS_PER_MINUTE.fun * (rate.fun ?? 1)),
+    social: clamp(n.social - NEED_LOSS_PER_MINUTE.social * (rate.social ?? 1)),
   };
 }
 
@@ -71,10 +71,10 @@ export function addNeeds(n: Needs, gains: Partial<Needs>): Needs {
 /** Home comfort (sum of the furniture's comfort) lifts mood by at most this much. */
 export const MAX_COMFORT_BONUS = 10;
 
-/** 0 … 100. Hunger counts as much as the other needs; comfort adds on top. */
-export function moodScore(n: Needs, fullness: number, comfort = 0): number {
+/** 0 … 100. Hunger counts as much as the other needs; comfort and other lifts (perks, good news) add on top. */
+export function moodScore(n: Needs, fullness: number, comfort = 0, lift = 0): number {
   const base = 0.24 * n.energy + 0.2 * fullness + 0.16 * n.hygiene + 0.2 * n.fun + 0.2 * n.social;
-  return Math.round(clamp(base + Math.min(MAX_COMFORT_BONUS, Math.max(0, comfort))));
+  return Math.round(clamp(base + Math.min(MAX_COMFORT_BONUS, Math.max(0, comfort)) + lift));
 }
 
 export type Mood = 'Inspired' | 'Happy' | 'Fine' | 'Low' | 'Miserable';

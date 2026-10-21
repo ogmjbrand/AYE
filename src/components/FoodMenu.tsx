@@ -42,7 +42,7 @@ export function FoodMenu({ vendor, diet, balance, fullness, onEat, onClose }: Fo
             <p className="text-xs uppercase tracking-widest text-ui-muted">{vendor.kind}</p>
             <h2 id="food-menu-title" className="font-display text-2xl font-bold">{vendor.name}</h2>
             <p className="text-sm text-ui-muted mt-1">
-              Your diet: <span className="text-ui-ink">{dietLabel}</span> · {hungerLabel(fullness)} · {balance.toLocaleString()} ⓒ
+              Your diet: <span className="text-ui-ink">{dietLabel}</span> · {hungerLabel(fullness)} · {balance.toLocaleString()} GHAI
             </p>
           </div>
           <button onClick={onClose} className="text-ui-muted hover:text-ui-ink text-sm px-2 py-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent" aria-label="Close menu">
@@ -67,7 +67,7 @@ export function FoodMenu({ vendor, diet, balance, fullness, onEat, onClose }: Fo
                   <p className="font-semibold">{dish.name}</p>
                   <p className="text-xs text-ui-muted">{dish.origin}</p>
                 </div>
-                <p className="font-mono text-right tabular-nums">{dish.price} ⓒ</p>
+                <p className="font-mono text-right tabular-nums">{dish.price} GHAI</p>
                 <p className="text-sm text-ui-muted col-span-2">{dish.description}</p>
                 {dish.note && <p className="text-xs text-ui-faint col-span-2">{dish.note}</p>}
                 <div className="col-span-2 flex items-center justify-between gap-3 mt-1">

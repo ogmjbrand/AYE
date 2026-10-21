@@ -53,15 +53,15 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
           <p className="m-0 text-sm text-ui-muted">{home.description}</p>
           <dl className="m-0 grid grid-cols-2 gap-y-1.5 rounded-lg bg-black/20 p-3 text-sm">
             <dt className="text-ui-muted">Rent</dt>
-            <dd className="m-0 text-right tabular-nums">{home.rentPerNight.toLocaleString()} ⓒ a night</dd>
+            <dd className="m-0 text-right tabular-nums">{home.rentPerNight.toLocaleString()} GHAI a night</dd>
             {!mine && (
               <>
                 <dt className="text-ui-muted">Move-in fee</dt>
-                <dd className="m-0 text-right tabular-nums">{fee.toLocaleString()} ⓒ</dd>
+                <dd className="m-0 text-right tabular-nums">{fee.toLocaleString()} GHAI</dd>
               </>
             )}
             <dt className="text-ui-muted">Your balance</dt>
-            <dd className="m-0 text-right tabular-nums">{balance.toLocaleString()} ⓒ</dd>
+            <dd className="m-0 text-right tabular-nums">{balance.toLocaleString()} GHAI</dd>
           </dl>
 
           {mine ? (
@@ -82,9 +82,9 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
           ) : (
             <div className="space-y-3">
               <button type="button" autoFocus className={PRIMARY} disabled={!affordable} onClick={onMoveIn}>
-                {current ? `Move here for ${fee.toLocaleString()} ⓒ` : `Rent it for ${fee.toLocaleString()} ⓒ`}
+                {current ? `Move here for ${fee.toLocaleString()} GHAI` : `Rent it for ${fee.toLocaleString()} GHAI`}
               </button>
-              {!affordable && <p className="m-0 text-xs text-ui-warn">You need {(fee - balance).toLocaleString()} ⓒ more for the move-in fee.</p>}
+              {!affordable && <p className="m-0 text-xs text-ui-warn">You need {(fee - balance).toLocaleString()} GHAI more for the move-in fee.</p>}
               <p className="m-0 text-xs text-ui-muted">
                 The move-in fee is {MOVE_IN_NIGHTS} nights' rent (agency fee and deposit, not refunded).
                 {current && <> Moving here gives up {current.name}.</>}

@@ -285,7 +285,7 @@ export function sanitiseFurniture(data: unknown): OwnedFurniture[] {
 }
 
 /** Where to stand to use a piece: in front of whichever side faces the middle of the room. */
-export function useSpot(f: Furniture): [number, number] {
+export function spotToUse(f: Furniture): [number, number] {
   const [x, z] = f.at;
   const [w, , d] = f.size;
   const toCentreX = -x, toCentreZ = -z;
@@ -309,7 +309,7 @@ export function effectLine(item: CatalogueItem): string {
     for (const [k, v] of Object.entries(use.gains) as [NeedKey, number][]) if (v) parts.push(`${v > 0 ? '+' : ''}${v} ${NEED_LABEL[k].toLowerCase()}`);
     if (use.fullness) parts.push(`+${use.fullness} fullness`);
     if (use.xpMinutes) parts.push(`+${use.xpMinutes} min experience`);
-    if (use.cost) parts.push(`${use.cost} ⓒ ingredients`);
+    if (use.cost) parts.push(`${use.cost} GHAI ingredients`);
     parts.push(use.minutes >= 60 ? `${use.minutes / 60} h` : `${use.minutes} min`);
   } else {
     parts.push('Decoration');

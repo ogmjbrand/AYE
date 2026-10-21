@@ -41,7 +41,7 @@ export interface City {
   country: string;
   /** IANA time zone, for when cities run on their own clocks. */
   timeZone: string;
-  /** Local currency code; the game itself uses one virtual currency (ⓒ). */
+  /** Local currency code; the game itself uses one virtual currency (GHAI). */
   currency: string;
   /** State, region or province. */
   region: string;

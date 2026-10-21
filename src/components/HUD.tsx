@@ -37,6 +37,9 @@ interface HUDProps {
   mood?: number;
   /** Opens the furniture catalogue (at home). */
   onOpenCatalogue?: () => void;
+  /** Opens or closes the Life OS dashboard. */
+  onOpenLife?: () => void;
+  lifeOpen?: boolean;
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   /** The district the player is in: its counters, homes and workplaces. */
@@ -115,6 +118,8 @@ export function HUD({
   needs,
   mood,
   onOpenCatalogue,
+  onOpenLife,
+  lifeOpen = false,
   onOpenVendor,
   onOpenShop,
   district,
@@ -219,6 +224,12 @@ export function HUD({
                 Map
               </button>
             )}
+            {onOpenLife && (
+              <button type="button" onClick={onOpenLife} aria-pressed={lifeOpen} title="Your Life OS: needs, goals, skills, people, money (L)"
+                className={`pointer-events-auto rounded-lg border border-ui-accent px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-ui-accent-strong shadow-lg hover:bg-ui-accent/30 ${lifeOpen ? 'bg-ui-accent/30' : 'bg-ui-panel/90'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}>
+                Life
+              </button>
+            )}
             {onOpenCatalogue && (
               <button type="button" onClick={onOpenCatalogue} className={BUTTON} title="Buy and arrange furniture">
                 Furniture
@@ -298,7 +309,7 @@ export function HUD({
             >
               <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} aria-hidden />
               <span className="font-display text-lg font-semibold tabular-nums leading-none">
-                {balance.toLocaleString()} <span className="text-sm text-ui-muted">ⓒ</span>
+                {balance.toLocaleString()} <span className="text-sm text-ui-muted">GHAI</span>
               </span>
               <span className="ml-auto flex min-w-0 items-center gap-2 text-xs">
                 {mood !== undefined && <span className="text-ui-muted">{moodLabel(mood)}</span>}
@@ -330,7 +341,7 @@ export function HUD({
                   <div>
                     <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
                     <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
-                      {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
+                      {balance.toLocaleString()} <span className="text-base text-ui-muted">GHAI</span>
                     </p>
                   </div>
                   {character.career !== 'none' && !insideHome && (
@@ -405,7 +416,7 @@ export function HUD({
                       const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
                       return (
                         <>
-                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} ⓒ an hour</Row>
+                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} GHAI an hour</Row>
                           <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
                         </>
                       );

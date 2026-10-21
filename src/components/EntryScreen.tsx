@@ -179,7 +179,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
         </div>
 
         <footer className="mt-10 text-center text-xs text-cc-muted">
-          Early build · Your life is saved in this browser only; online accounts are coming · In-game money (ⓒ) is virtual and has no cash value
+          Early build · Your life is saved in this browser only; online accounts are coming · In-game money (GHAI) is virtual and has no cash value
         </footer>
       </div>
     </div>

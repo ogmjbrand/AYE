@@ -21,7 +21,7 @@ export interface Dish {
   name: string;
   origin: string;
   description: string;
-  /** Price in ⓒ. */
+  /** Price in GHAI. */
   price: number;
   /** How much the fullness meter rises (0–100 scale). */
   fullness: number;

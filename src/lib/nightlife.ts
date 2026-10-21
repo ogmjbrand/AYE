@@ -12,7 +12,7 @@ export interface Venue {
   kind: string;
   /** Where you stand to go in (the front door on the pavement). */
   position: readonly [number, number, number];
-  /** Cover charge per person, in ⓒ. */
+  /** Cover charge per person, in GHAI. */
   cover: number;
   /** One line about the place, shown in the panel. */
   description: string;
