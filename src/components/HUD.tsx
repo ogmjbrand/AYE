@@ -300,7 +300,7 @@ export function HUD({
     : restaurant && onEnterRestaurant
       ? { verb: restaurantOpen(gameTime.hour) ? 'Go into' : `Closed until ${RESTAURANT_OPENS}:00:`, place: restaurant.name, onOpen: onEnterRestaurant }
     : counter === 'fashion' && onOpenShop
-      ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop }
+      ? { verb: 'Go into', place: district.fashionHouse.name, onOpen: onOpenShop }
       : counter === 'gadgets' && onOpenGadgets
         ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets }
         : counter === 'travel' && onOpenTravel

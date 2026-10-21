@@ -1,6 +1,6 @@
 # AYE: feature status against the full player journey
 
-Updated 21 October 2026 (Life OS milestone), branch `claude/wonderful-franklin-gixkta`.
+Updated 21 October 2026 (venues milestone), branch `claude/wonderful-franklin-gixkta`.
 "Done" means it changes real game state, is covered by tests and was checked
 in a browser. Nothing here is a mock: where something isn't built, it says so.
 
@@ -18,15 +18,24 @@ now shown under its official name).
 | 4 | Appearance, hair, clothes, colours, personality, traits, goals, background | **Partial** | Identity, heritage, country/region, look, height, body shape; clothes, fabrics, prints and hair colour in the boutique. **Missing:** personality, traits, life goals, background story; new hairstyles and garment cuts. |
 | 5 | Starting life that affects gameplay | **Done (basic)** | Lifestyle sets starting balance and hourly living costs; career sets workplace, wage and promotion ladder. |
 | 6 | Home selection (types, costs, rent, lifestyle) | **Partial** | Four tiers per city (room → penthouse) with move-in fee, nightly rent, eviction; bigger homes are bigger rooms. Chosen at the front door in the city, **not yet during onboarding**. |
-| 7 | Playable home: furniture, catalogue, needs, time, mood, balance | **Done (this milestone)** | Needs (energy, hygiene, fun, social) plus hunger, a mood that changes pay and work bonuses, a 27-piece furniture catalogue in 9 categories with search, 3D preview, prices, delivery into your home, moving/turning/storing/selling, and furniture you use (shower, bath, sofa, TV, games, books, music, cooking, study). Open-plan "dolls' house" room with no ceiling, as before. **Missing:** drag-to-place on the floor (pieces are moved with arrow buttons), wall items. |
+| 7 | Playable home: furniture, catalogue, needs, time, mood, balance | **Done** | Needs (energy, hygiene, fun, social) plus hunger, a mood that changes pay and work bonuses, the Home Decor catalogue (40 pieces by room, with a Luxe collection, 3D pictures and a Preview you can turn), delivery into your home, moving/turning/storing/selling, wall art, and furniture you use (shower, bath, sofa, TV, games, books, music, cooking, study). The penthouse is a Victoria Island apartment furnished in Luxe. Open-plan "dolls' house" room with no ceiling, as before. **Missing:** drag-to-place on the floor (pieces are moved with arrow buttons). |
 | 8 | Home → outdoor city transition | **Done** | Front door in and out, camera snaps behind you. |
 | 9 | Interactive 3D city map, labels, filters, landmarks | **Partial** | 3D districts in 235 cities; phone map; City Locations directory by category with walk-there routing; world map at the travel desk. **Missing:** a labelled overhead map of a district with pins and filters like the reference. |
-| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, boutique and salon, gadget shop, lounge, park, travel desk. **Missing: car dealership, owning a car, driving.** |
+| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, The Palms (a walk-in fine-dining restaurant in Lagos), the Fashion House (a walk-in boutique and salon in every city), gadget shop, lounge, park, travel desk. **Missing: car dealership, owning a car, driving; dresses, jackets and accessories (need new 3D garments).** |
 | 11 | Business advertising platform | **Not started** | Needs accounts, a review/approval process, payments and legal review first. Billboards exist in the world but only show built-in art. |
 | 12a | Character Life OS, missions, wishes, dreams, perks, achievements | **Done (this milestone)** | See below. |
 | 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled and labelled so; there are no fake player counts. |
 
-## This milestone: home life (verified)
+## Venues milestone (verified)
+
+Built from the reference screens (The Palms, My Apartment, Fashion House):
+- **HUD:** portrait chip with name and day/time, venue title plate, GHAI pill, round inventory/profile/settings buttons, a round minimap with place icons, a location pill, and a bottom bar that changes with where you are (street, home, restaurant, boutique). Urgent needs show as small chips; sleeping and the main menu moved into the Life OS.
+- **The Palms Restaurant** (`src/lib/restaurant.ts`, `src/world/RestaurantInterior.tsx`): shop front on the Lagos cross street; inside, marble, a lit bar, chandeliers, a kitchen pass, and staff and diners who are computer-controlled. Check in with the host or take a free table, then order: 19 dishes over four courses at the reference prices, each a 3D model served to your table and shown on the menu. Open 11:00–23:00. A meal costs GHAI, passes time, fills you, lifts fun and counts as a meal out.
+- **Home Decor and My Apartment:** see step 7. Thumbnails of dishes and furniture are rendered from the game's own 3D models (`src/components/snapshot/`), kept for the session only.
+- **Fashion House** (`src/lib/boutique.ts`, `src/world/BoutiqueInterior.tsx`): walk in from the boutique's street door in any city. Mannequins, rails in the city's own fabrics, bags and shoes, a lounge, the fitting room, a salon chair and the "Style Your Life" neon; the store assistant and stylist are computer-controlled. Clothes, Shoes, Hair, Accessories, Decor and Fitting Room; favourites (the heart) and a cart with checkout. Matching sets sell top and bottom together.
+- **Honest limits:** clothes restyle the fabric of what your character wears. Dresses, jackets and accessories say they aren't in the game yet (they need new 3D garments) and sell nothing. The Decor tab's rooms are the home's rooms; there is no outdoor furniture.
+
+## Home life milestone (verified)
 
 - `src/lib/needs.ts`: four needs, mood score and labels, exhausted pay penalty, mood multiplier on work-task bonuses.
 - `src/lib/furniture.ts`: catalogue, what each kind of piece does, placement that never blocks the door, the bed or anything you use, moving house, storage, resale at half price.
@@ -73,6 +82,7 @@ Also checked: desktop and phone layouts.
 
 ## Next task (pick up here)
 
+0. **New garments**: dresses, jackets and accessories as real 3D clothes on the character (see `CHARACTER_PIPELINE.md`), so the boutique can sell them.
 1. **Car dealership, ownership and driving** (step 10): a dealer counter per city, cars as owned items, get in at your parking spot, drive with the existing controls on the roads (traffic and collisions already exist), fuel/parking costs.
 2. **Onboarding flow** (steps 3–6): split character creation into steps with a progress bar (Identity → Look → Body → Personality & goals → Starting life → First home), add traits, goals and background that affect needs decay, pay or friendships, and pick the first home there.
 3. **District map with pins and filters** (step 9).

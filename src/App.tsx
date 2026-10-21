@@ -44,6 +44,11 @@ import { SnapshotHost } from './components/snapshot/Snapshot';
 import { RestaurantInterior } from './world/RestaurantInterior';
 import { PalmsFront } from './world/PalmsFront';
 import { HostPanel, RestaurantMenu } from './components/RestaurantMenu';
+import { AssistantPanel, BoutiquePanel } from './components/BoutiquePanel';
+import { BoutiqueInterior } from './world/BoutiqueInterior';
+import {
+  DESK_SPOT, DOOR_SPOT as BOUTIQUE_DOOR, FITTING_SPOT, SALON_SPOT, STAFF as BOUTIQUE_STAFF, boutiqueLayout, type BoutiqueSection,
+} from './lib/boutique';
 import {
   DOOR_SPOT as PALMS_DOOR, FREE_SEATS, HOST_SPOT as PALMS_HOST_SPOT, OPEN_HOUR as PALMS_OPEN_HOUR, STAFF as PALMS_STAFF,
   hostSeat, isOpen as palmsOpen, restaurantLayout, suitsYou, type MenuItem,
@@ -121,6 +126,8 @@ const CAMERA_TARGET_HEIGHT = 1.25;
 
 /** The Palms' room as a collision layout (the same for every visit). */
 const PALMS_LAYOUT = restaurantLayout();
+const BOUTIQUE_LAYOUT = boutiqueLayout();
+const BOUTIQUE_ID = 'fashion-house';
 
 /** The title plate at home, by the kind of place it is. */
 const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment' };
@@ -294,6 +301,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [venue, setVenue] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [hostOpen, setHostOpen] = useState(false);
+  // In the Fashion House: which collection is open, and the assistant's welcome
+  const [section, setSection] = useState<BoutiqueSection | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   // What you've ordered at your table (cleared when you get up)
   const [served, setServed] = useState<{ seatId: string; dishes: string[] } | null>(null);
   const interior = home ? interiorFor(home) : null;
@@ -310,10 +320,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
 
   const indoors = inside && !!home && home.district === district.id && !!roomLayout;
   const inPalms = !indoors && venue !== null && district.restaurant?.id === venue;
+  const inBoutique = !indoors && venue === BOUTIQUE_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
-  const offStreet = indoors || inPalms;
+  const offStreet = indoors || inPalms || inBoutique;
   // Collision and ground height follow where you are (set before this frame's movement)
-  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : district.layout;
+  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : district.layout;
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
   useEffect(() => {
     insideRef.current = offStreet;
@@ -370,6 +381,17 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     snapCamera();
   };
   const goOutside = () => {
+    if (venue === BOUTIQUE_ID) {
+      const p = district.fashionHouse.position;
+      setVenue(null);
+      setSection(null);
+      setAssistantOpen(false);
+      setTryOn({});
+      // Out onto the pavement, facing the road
+      placePlayer(p, p[0] > 0 ? -Math.PI / 2 : Math.PI / 2);
+      snapCamera();
+      return;
+    }
     if (venue) {
       const r = district.restaurant;
       setVenue(null);
@@ -433,6 +455,39 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     placePlayer([PALMS_DOOR[0], 0, PALMS_DOOR[1]], 0);
     snapCamera();
   };
+  /** In through the Fashion House's front door. */
+  const enterBoutique = () => {
+    setHomePanel(null);
+    setVenue(BOUTIQUE_ID);
+    placePlayer([BOUTIQUE_DOOR[0], 0, BOUTIQUE_DOOR[1]], 0);
+    snapCamera();
+  };
+  const openSection = (s: BoutiqueSection) => { setAssistantOpen(false); setStore(null); setCatalogueOpen(false); setSection((cur) => (cur === s ? null : s)); };
+  /** What E does where you stand inside the Fashion House. */
+  const boutiquePrompt = () => {
+    const { x, z } = controller.position;
+    const near = (p: readonly [number, number], r = USE_RADIUS) => Math.hypot(x - p[0], z - p[1]) <= r;
+    if (near(BOUTIQUE_DOOR)) return { verb: 'Leave to', place: district.name, onOpen: goOutside };
+    if (near(DESK_SPOT)) return { verb: 'Talk to', place: `${BOUTIQUE_STAFF.assistant.name}, the store assistant`, onOpen: () => { setSection(null); setAssistantOpen(true); } };
+    if (near(FITTING_SPOT)) return { verb: 'Try things on in', place: 'the fitting room', onOpen: () => { setSection(null); setStore('wardrobe'); } };
+    if (near(SALON_SPOT)) return { verb: 'Change your hair colour at', place: 'the salon', onOpen: () => openSection('hair') };
+    return null;
+  };
+  /** Pays for everything in the boutique cart at once and puts it on. */
+  const buyMany = (items: FashionItem[]) => {
+    const fresh = items.filter((i) => !wardrobe.owned.includes(i.id));
+    const total = fresh.reduce((sum, i) => sum + i.price, 0);
+    if (!fresh.length || state.balance < total) return;
+    purchase(total);
+    const equipped = { ...wardrobe.equipped };
+    for (const i of fresh) equipped[i.slot] = i.id;
+    onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, owned: [...wardrobe.owned, ...fresh.map((i) => i.id)], equipped } });
+    setTryOn({});
+  };
+  const toggleFavourite = (id: string) => {
+    const favs = wardrobe.favourites ?? [];
+    onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, favourites: favs.includes(id) ? favs.filter((f) => f !== id) : [...favs, id] } });
+  };
   /** Walk to that chair and sit; the menu opens straight away (ordering waits until you're seated). */
   const sitAtTable = (seat: Seat) => {
     setHostOpen(false);
@@ -472,6 +527,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         palmsPrompt()?.onOpen();
         return;
       }
+      if (inBoutique) {
+        boutiquePrompt()?.onOpen();
+        return;
+      }
       if (indoors && interior) {
         if (nearSpot(bedSpot(interior))) rest(true);
         else if (usableHere()) operateHere();
@@ -484,7 +543,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const door = homeAtDoor(district.id, x, z);
       if (near) setVendor(near);
       else if (restaurantAt(district, x, z)) enterPalms();
-      else if (counter === 'fashion') setStore('shop');
+      else if (counter === 'fashion') enterBoutique();
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
       else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
@@ -498,9 +557,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -665,15 +724,16 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   const openOs = (tab: OsTab) => { setOsTab(tab); setOsOpen(true); };
   // The area you're in (indoors: where the building's door is)
-  const areaHere = inPalms && district.restaurant
-    ? district.neighborhoods.find((n) => district.restaurant!.door[0] >= n.bounds.minX && district.restaurant!.door[0] <= n.bounds.maxX && district.restaurant!.door[2] >= n.bounds.minZ && district.restaurant!.door[2] <= n.bounds.maxZ) ?? null
-    : indoors && home
-    ? district.neighborhoods.find((n) => home.door[0] >= n.bounds.minX && home.door[0] <= n.bounds.maxX && home.door[2] >= n.bounds.minZ && home.door[2] <= n.bounds.maxZ) ?? null
+  // Inside a building, the area is where its front door is
+  const doorNow = inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : indoors && home ? home.door : null;
+  const areaHere = doorNow
+    ? district.neighborhoods.find((n) => doorNow[0] >= n.bounds.minX && doorNow[0] <= n.bounds.maxX && doorNow[2] >= n.bounds.minZ && doorNow[2] <= n.bounds.maxZ) ?? null
     : neighborhood;
   const areaName = areaHere?.name ?? district.name;
   // Title plate: the building you're in, the place you're standing at, or the area
   const plate: PlacePlate = (() => {
     if (inPalms && district.restaurant) return { title: district.restaurant.name, subtitle: district.restaurant.kind, icon: 'restaurant' };
+    if (inBoutique) return { title: district.fashionHouse.name, subtitle: district.fashionHouse.kind, icon: 'hanger' };
     if (indoors && home) return { title: home.id === state.home && interior ? MY_HOME[interior.tier] : home.name, subtitle: areaName, icon: 'home' };
     const { x, z } = controller.position;
     const at = district.places.find((p) => Math.hypot(p.position[0] - x, p.position[2] - z) < PLATE_RADIUS);
@@ -682,7 +742,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return { title: areaName, subtitle: district.city.name, icon: 'palm' };
   })();
   const toggleOs = (tab: OsTab) => { if (osOpen && osTab === tab) setOsOpen(false); else openOs(tab); };
-  const nav: NavItem[] = [
+  const nav: NavItem[] = inBoutique ? [
+    { id: 'clothes', label: 'Clothes', icon: 'shirt', onClick: () => openSection('clothes'), active: section === 'clothes' },
+    { id: 'shoes', label: 'Shoes', icon: 'shoe', onClick: () => openSection('shoes'), active: section === 'shoes' },
+    { id: 'hair', label: 'Hair', icon: 'hair', onClick: () => openSection('hair'), active: section === 'hair' },
+    { id: 'accessories', label: 'Accessories', icon: 'bag', onClick: () => openSection('accessories'), active: section === 'accessories' },
+    { id: 'decor', label: 'Decor', icon: 'decor', onClick: () => { setSection(null); setStore(null); setCatalogueOpen((o) => !o); }, active: catalogueOpen, title: 'Home Decor: furniture delivered to your home' },
+    { id: 'fitting', label: 'Fitting Room', icon: 'hanger', onClick: () => { setSection(null); setCatalogueOpen(false); setStore((s) => (s === 'wardrobe' ? null : 'wardrobe')); }, active: store === 'wardrobe', title: 'Change into clothes you own' },
+  ] : [
     indoors
       ? { id: 'home', label: 'Decor', icon: 'decor', onClick: () => setCatalogueOpen(true), active: catalogueOpen, title: 'Buy, place and arrange furniture' }
       : { id: 'home', label: 'Home', icon: 'home', onClick: () => onGo(state.home ? { to: 'home' } : { to: 'homes' }), title: state.home ? 'Walk home' : 'Find a home to rent' },
@@ -703,8 +770,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
   ];
   const whereabouts = {
-    place: inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
-    activity: inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
+    place: inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
+    activity: inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
       : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
         : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
   };
@@ -913,6 +980,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
+            ) : inBoutique ? (
+              <BoutiqueInterior gameTime={state.time} districtId={district.id}>
+                <InteriorLighting gameTime={state.time} player={controller} />
+                <Player controller={controller} character={character} tryOn={tryOn} />
+              </BoutiqueInterior>
             ) : inPalms ? (
               <RestaurantInterior gameTime={state.time} served={served && tableSeat && served.seatId === tableSeat.id ? { seat: tableSeat, dishes: served.dishes } : null}>
                 <InteriorLighting gameTime={state.time} player={controller} />
@@ -979,6 +1051,29 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={() => setMenuOpen(false)}
         />
       )}
+      {inBoutique && section && (
+        <BoutiquePanel
+          section={section}
+          districtId={district.id}
+          wardrobe={wardrobe}
+          balance={state.balance}
+          onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}
+          onBuyMany={buyMany}
+          onWear={(item) => wear(item.slot, item.id)}
+          onToggleFavourite={toggleFavourite}
+          onClose={() => { setSection(null); setTryOn({}); }}
+        />
+      )}
+      {inBoutique && assistantOpen && (
+        <AssistantPanel
+          name={BOUTIQUE_STAFF.assistant.name}
+          shop={district.fashionHouse.name}
+          onSection={openSection}
+          onFitting={() => { setAssistantOpen(false); setStore('wardrobe'); }}
+          onDecor={() => { setAssistantOpen(false); setCatalogueOpen(true); }}
+          onClose={() => setAssistantOpen(false)}
+        />
+      )}
       {inPalms && hostOpen && (
         <HostPanel
           name={PALMS_STAFF.host.name}
@@ -1035,7 +1130,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         onEnterRestaurant={enterPalms}
-        insideHome={inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
+        insideHome={inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
             const use = usableHere();
@@ -1048,10 +1143,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         fullness={state.fullness}
         needs={state.needs}
         onOpenVendor={setVendor}
-        onOpenShop={() => setStore('shop')}
+        onOpenShop={enterBoutique}
         place={plate}
         nav={nav}
-        mapPosition={inPalms && district.restaurant ? { x: district.restaurant.door[0], z: district.restaurant.door[2] } : indoors && home ? { x: home.door[0], z: home.door[2] } : null}
+        mapPosition={doorNow ? { x: doorNow[0], z: doorNow[2] } : null}
         onOpenMoney={() => openOs('money')}
         onOpenInventory={() => setStore('wardrobe')}
         onOpenProfile={() => openOs('profile')}
