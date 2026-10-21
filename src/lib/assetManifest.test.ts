@@ -65,4 +65,12 @@ describe('asset manifest', () => {
     const bad = parseManifest({ avatar: { url: 'a.glb', height: 1.8, walkSpeed: -1 } });
     expect(bad.manifest.avatar?.walkSpeed).toBe(1.4);
   });
+
+  it('reads an optional ambient-occlusion map, and ignores a bad one', () => {
+    const { manifest } = parseManifest({ surfaces: { pavement: { color: 'textures/pavement/color.jpg', ao: 'textures/pavement/ao.jpg', tileMeters: 2 } } });
+    expect(manifest.surfaces.pavement?.ao).toBe('textures/pavement/ao.jpg');
+    const bad = parseManifest({ surfaces: { road: { color: 'textures/road/color.jpg', ao: '../secret.jpg', tileMeters: 4 } } });
+    expect(bad.manifest.surfaces.road?.ao).toBeUndefined();
+    expect(bad.problems.some((p) => p.includes('road.ao'))).toBe(true);
+  });
 });

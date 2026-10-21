@@ -15,6 +15,8 @@ export interface SurfaceFiles {
   normal?: string;
   /** Greyscale roughness map. Optional. */
   roughness?: string;
+  /** Greyscale ambient-occlusion map (ambientCG "AmbientOcclusion"). Optional. */
+  ao?: string;
   /** How many metres one copy of the image covers. */
   tileMeters: number;
 }
@@ -72,12 +74,14 @@ export function parseManifest(data: unknown): { manifest: AssetManifest; problem
     }
     if (e.normal !== undefined && !isPath(e.normal)) problems.push(`surfaces.${key}.normal is not a valid path; ignored`);
     if (e.roughness !== undefined && !isPath(e.roughness)) problems.push(`surfaces.${key}.roughness is not a valid path; ignored`);
+    if (e.ao !== undefined && !isPath(e.ao)) problems.push(`surfaces.${key}.ao is not a valid path; ignored`);
     const tile = typeof e.tileMeters === 'number' && e.tileMeters > 0 && e.tileMeters <= 50 ? e.tileMeters : 2;
     if (tile !== e.tileMeters) problems.push(`surfaces.${key}.tileMeters missing or out of range; using 2`);
     manifest.surfaces[key] = {
       color: e.color,
       normal: isPath(e.normal) ? e.normal : undefined,
       roughness: isPath(e.roughness) ? e.roughness : undefined,
+      ao: isPath(e.ao) ? e.ao : undefined,
       tileMeters: tile,
     };
   }
@@ -116,6 +120,40 @@ export const assetManifest = () => current;
 /** URL of a file inside public/assets/. */
 export const assetUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`;
 
+const exists = async (path: string) => {
+  try {
+    const res = await fetch(assetUrl(path), { method: 'HEAD', cache: 'no-cache' });
+    // A dev server answers unknown paths with index.html; a real image never comes back as HTML
+    return res.ok && !(res.headers.get('content-type') ?? '').includes('text/html');
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Listed surface images that aren't actually there would render black, so they
+ * are dropped before any material is made: a missing colour image means the
+ * built-in surface, a missing normal/roughness/AO map just goes without it.
+ */
+async function dropMissingFiles(m: AssetManifest): Promise<AssetManifest> {
+  const surfaces: AssetManifest['surfaces'] = {};
+  await Promise.all((Object.entries(m.surfaces) as [SurfaceKey, SurfaceFiles][]).map(async ([key, s]) => {
+    if (!(await exists(s.color))) {
+      console.warn(`[AYE assets] ${s.color} not found; ${key} uses the built-in texture`);
+      return;
+    }
+    const keep = async (path: string | undefined, label: string) => {
+      if (!path) return undefined;
+      if (await exists(path)) return path;
+      console.warn(`[AYE assets] ${path} not found; ${key} goes without its ${label} map`);
+      return undefined;
+    };
+    const [normal, roughness, ao] = await Promise.all([keep(s.normal, 'normal'), keep(s.roughness, 'roughness'), keep(s.ao, 'ambient-occlusion')]);
+    surfaces[key] = { ...s, normal, roughness, ao };
+  }));
+  return { ...m, surfaces };
+}
+
 /** Loads public/assets/manifest.json once at startup. Never throws. */
 export async function loadAssetManifest(): Promise<void> {
   try {
@@ -123,7 +161,7 @@ export async function loadAssetManifest(): Promise<void> {
     if (!res.ok) return;
     const { manifest, problems } = parseManifest(await res.json());
     for (const p of problems) console.warn(`[AYE assets] ${p}`);
-    current = manifest;
+    current = await dropMissingFiles(manifest);
   } catch (err) {
     console.warn('[AYE assets] manifest.json could not be read; using built-in assets', err);
   }

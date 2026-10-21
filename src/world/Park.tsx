@@ -3,6 +3,7 @@ import { Euler, MeshStandardMaterial, Vector3 } from 'three';
 import { useDistrict } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { seeded } from '../lib/world';
+import { parkPathSurface } from './materials';
 
 // Dry-season colours: a sun-faded lawn, laterite paths, olive shade trees (muted, never the brand colours)
 const LAWN = '#7f7c55';
@@ -22,6 +23,24 @@ export function Park() {
     trunk: new MeshStandardMaterial({ color: TRUNK, roughness: 0.95 }),
     wood: new MeshStandardMaterial({ color: WOOD, roughness: 0.8 }),
   }), []);
+  // Footpaths in real paving stones when the pavement texture is listed, tiled to each path's size
+  const pathMats = useMemo(() => {
+    const base = parkPathSurface();
+    if (!base || !park) return [];
+    const tile = base.userData.tileMeters as number;
+    return park.paths.map((p) => {
+      const m = base.clone();
+      for (const key of ['map', 'normalMap', 'roughnessMap', 'aoMap'] as const) {
+        const t = base[key];
+        if (!t) continue;
+        const c = t.clone();
+        c.repeat.set((p.x1 - p.x0) / tile, (p.z1 - p.z0) / tile);
+        c.needsUpdate = true;
+        m[key] = c;
+      }
+      return m;
+    });
+  }, [park]);
   const parts = useMemo(() => {
     if (!park) return null;
     const rand = seeded(57);
@@ -63,9 +82,9 @@ export function Park() {
         <meshStandardMaterial color={LAWN} roughness={1} />
       </mesh>
       {park.paths.map((p, i) => (
-        <mesh key={i} position={[(p.x0 + p.x1) / 2, 0.008, (p.z0 + p.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <mesh key={i} position={[(p.x0 + p.x1) / 2, 0.008, (p.z0 + p.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={pathMats[i] ?? undefined}>
           <planeGeometry args={[p.x1 - p.x0, p.z1 - p.z0]} />
-          <meshStandardMaterial color={PATH} roughness={0.95} />
+          {!pathMats[i] && <meshStandardMaterial color={PATH} roughness={0.95} />}
         </mesh>
       ))}
       <Instances items={parts.trunks} material={mats.trunk} geometry={<cylinderGeometry args={[0.14, 0.2, 1, 7]} />} />

@@ -23,7 +23,7 @@ function Strip({
   // Clone the material per strip so each gets its own texture repeat
   const mat = useMemo(() => {
     const m = material.clone();
-    for (const key of ['map', 'roughnessMap', 'metalnessMap', 'normalMap'] as const) {
+    for (const key of ['map', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap'] as const) {
       const t = material[key];
       if (t) {
         const c = t.clone();
