@@ -2,11 +2,15 @@
  * Inside your home: one furnished room (or open-plan flat) per tier of rent.
  * Rooms are centred on the origin; the front door is in the middle of the
  * near wall (−Z) and the bed against the far wall. Furniture is solid.
+ * Every home has somewhere to wash. Furniture you buy (lib/furniture.ts)
+ * stands alongside these pieces.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import type { Home } from './homes';
 
-export type FurnitureKind = 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp' | 'fridge';
+export type FurnitureKind =
+  | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp' | 'fridge'
+  | 'armchair' | 'shower' | 'bathtub' | 'bookshelf' | 'stove' | 'speaker' | 'console' | 'dresser';
 
 export interface Furniture {
   kind: FurnitureKind;
@@ -43,6 +47,7 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('wardrobe', 1.65, 1.6, 1.0, 2.0, 0.6, '#6b4a33'),
       f('table', 1.5, -0.6, 0.8, 0.75, 0.6, '#7a5a3e'),
       f('rug', -0.2, -0.2, 1.6, 0.01, 1.1, '#a3483a'),
+      f('shower', -1.75, -1.75, 0.9, 2.1, 0.9, '#b9c9cf'),
     ],
   },
   flat: {
@@ -56,6 +61,7 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('fridge', 1.25, -2.15, 0.7, 1.8, 0.65, '#d8d9d6'),
       f('rug', 1.1, 0.6, 1.6, 0.01, 2.0, '#2f6a73'),
       f('plant', -3.0, -2.3, 0.45, 1.1, 0.45, '#3f6b3a'),
+      f('shower', -2.8, -0.6, 0.9, 2.1, 0.9, '#b9c9cf'),
     ],
   },
   apartment: {
@@ -72,6 +78,7 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('rug', 2.9, 0.6, 3.0, 0.01, 2.2, '#c8a96a'),
       f('plant', 4.1, -3.0, 0.5, 1.3, 0.5, '#3f6b3a'),
       f('lamp', -0.3, 2.6, 0.4, 1.7, 0.4, '#e8d8b0'),
+      f('shower', -4.0, -0.6, 0.9, 2.1, 0.9, '#b9c9cf'),
     ],
   },
   penthouse: {
@@ -90,6 +97,7 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('plant', 6.0, 3.8, 0.6, 1.6, 0.6, '#3f6b3a'),
       f('plant', 0.6, 3.9, 0.6, 1.6, 0.6, '#3f6b3a'),
       f('lamp', -6.0, 1.0, 0.4, 1.8, 0.4, '#efe2c0'),
+      f('bathtub', -5.7, -2.2, 1.4, 0.6, 0.8, '#f2f1ee'),
     ],
   },
 };
@@ -111,8 +119,8 @@ export function bedSpot(i: Interior): readonly [number, number] {
 
 const WALL = 0.2;
 
-/** Walls and furniture as a collision layout (no streets: the floor is flat). */
-export function interiorLayout(i: Interior): DistrictLayout {
+/** Walls and furniture (plus any pieces you've placed) as a collision layout (no streets: the floor is flat). */
+export function interiorLayout(i: Interior, extra: readonly Furniture[] = []): DistrictLayout {
   const { width: w, depth: d } = i;
   const wall = (x: number, z: number, sx: number, sz: number): Building =>
     ({ position: [x, 0, z], size: [sx, WALL_HEIGHT, sz], color: i.wallColor, style: 'residential' });
@@ -125,7 +133,7 @@ export function interiorLayout(i: Interior): DistrictLayout {
     wall(w / 4 + 0.35, -d / 2 - WALL / 2, w / 2 - 0.7, WALL),
     // The doorway itself: you leave with E, not by walking out
     wall(0, -d / 2 - WALL - 0.1, 1.4, WALL),
-    ...i.furniture
+    ...[...i.furniture, ...extra]
       .filter((x) => x.kind !== 'rug')
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];

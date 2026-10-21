@@ -10,7 +10,7 @@ import type { GameTime } from '../lib/gameState';
  * (often behind the front wall) you look straight into the room, like a
  * dolls' house; there is no ceiling for the same reason.
  */
-export function HomeInterior({ interior, gameTime, children }: { interior: Interior; gameTime: GameTime; children: ReactNode }) {
+export function HomeInterior({ interior, gameTime, extra = [], children }: { interior: Interior; gameTime: GameTime; extra?: readonly Furniture[]; children: ReactNode }) {
   const { width: w, depth: d } = interior;
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const H = WALL_HEIGHT;
@@ -53,6 +53,8 @@ export function HomeInterior({ interior, gameTime, children }: { interior: Inter
       </mesh>
 
       {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
+      {/* Furniture you bought */}
+      {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
 
       {/* Ceiling light: warm, brighter after dark */}
       <pointLight position={[0, H - 0.2, 0]} intensity={4 + night * 14} distance={Math.max(w, d) * 1.6} decay={1.6} color="#ffd9a8" />
@@ -77,8 +79,8 @@ const box = (w: number, h: number, d: number, y: number, color: string, x = 0, z
   </mesh>
 );
 
-/** One piece of furniture, built from simple shapes. */
-function Piece({ f }: { f: Furniture }) {
+/** One piece of furniture, built from simple shapes (also used for the catalogue's 3D preview). */
+export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
   let parts: ReactNode;
@@ -148,6 +150,92 @@ function Piece({ f }: { f: Furniture }) {
             <cylinderGeometry args={[w * 0.35, w * 0.5, 0.3, 16, 1, true]} />
             <meshStandardMaterial color={f.color} emissive={f.color} emissiveIntensity={0.6} side={DoubleSide} />
           </mesh>
+        </>
+      );
+      break;
+    case 'armchair':
+      parts = (
+        <>
+          {box(w, 0.4, d, 0.2, f.color)}
+          {box(w, 0.5, 0.18, 0.6, f.color, 0, d / 2 - 0.09)}
+          {box(0.14, 0.25, d, 0.52, f.color, -w / 2 + 0.07)}
+          {box(0.14, 0.25, d, 0.52, f.color, w / 2 - 0.07)}
+        </>
+      );
+      break;
+    case 'shower':
+      parts = (
+        <>
+          {box(w, 0.08, d, 0.04, '#e8eaea')}
+          {/* Glass screen on the open sides, a tiled back */}
+          <mesh position={[0, h / 2, -d / 2 + 0.01]}>
+            <boxGeometry args={[w, h, 0.02]} />
+            <meshStandardMaterial color={f.color} transparent opacity={0.35} roughness={0.05} />
+          </mesh>
+          <mesh position={[w / 2 - 0.01, h / 2, 0]}>
+            <boxGeometry args={[0.02, h, d]} />
+            <meshStandardMaterial color={f.color} transparent opacity={0.35} roughness={0.05} />
+          </mesh>
+          {box(w, h, 0.04, h / 2, '#dfe3e2', 0, d / 2 - 0.02)}
+          {box(0.04, h, d, h / 2, '#dfe3e2', -w / 2 + 0.02)}
+          {box(0.18, 0.04, 0.18, h - 0.2, '#b8bcbf', 0, d / 2 - 0.25)}
+        </>
+      );
+      break;
+    case 'bathtub':
+      parts = (
+        <>
+          {box(w, h * 0.85, d, (h * 0.85) / 2, f.color)}
+          {box(w - 0.14, 0.02, d - 0.14, h * 0.85 + 0.005, '#9fc3d1')}
+          {box(0.05, 0.25, 0.05, h + 0.1, '#b8bcbf', -w / 2 + 0.12)}
+        </>
+      );
+      break;
+    case 'bookshelf':
+      parts = (
+        <>
+          {box(w, h, 0.04, h / 2, f.color, 0, d / 2 - 0.02)}
+          {box(0.04, h, d, h / 2, f.color, -w / 2 + 0.02)}
+          {box(0.04, h, d, h / 2, f.color, w / 2 - 0.02)}
+          {[0, 1, 2, 3, 4].map((k) => box(w, 0.03, d, 0.02 + k * (h / 4.4), f.color, 0, 0, `s${k}`))}
+          {[0, 1, 2, 3].map((k) => box(w * 0.8, h / 4.4 - 0.08, d * 0.7, 0.04 + k * (h / 4.4) + (h / 4.4 - 0.08) / 2, ['#7b2f2f', '#2f5a7b', '#c49a3a', '#3e6b4a'][k], 0, 0, `b${k}`))}
+        </>
+      );
+      break;
+    case 'stove':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, f.color)}
+          {box(w * 0.8, 0.4, 0.02, 0.4, '#1c1d20', 0, -d / 2 - 0.01)}
+          {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.14, 0.02, 0.14, h + 0.01, '#2a2a2a', sx * w * 0.22, sz * d * 0.22, `h${sx}${sz}`)))}
+        </>
+      );
+      break;
+    case 'speaker':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, f.color)}
+          <mesh position={[0, h * 0.62, -d / 2 - 0.005]}>
+            <circleGeometry args={[w * 0.32, 20]} />
+            <meshStandardMaterial color="#111" roughness={0.6} />
+          </mesh>
+        </>
+      );
+      break;
+    case 'console':
+      parts = (
+        <>
+          {box(w, 0.45, d, 0.225, '#3a3a3c')}
+          {box(w * 0.95, h - 0.5, 0.05, 0.45 + (h - 0.5) / 2, '#0d0e10')}
+          {box(0.3, 0.06, 0.2, 0.48, f.color, -w * 0.3, -d * 0.1)}
+        </>
+      );
+      break;
+    case 'dresser':
+      parts = (
+        <>
+          {box(w, h, d, h / 2, f.color)}
+          {[0, 1, 2, 3].map((k) => box(w * 0.9, 0.02, 0.02, 0.12 + k * (h / 4.2), '#3b2c22', 0, -d / 2 - 0.01, `d${k}`))}
         </>
       );
       break;

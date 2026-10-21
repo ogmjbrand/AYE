@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MOOD_TASK_MULTIPLIER } from './needs';
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import {
   FULLNESS_LOSS_PER_MINUTE,
@@ -347,10 +348,19 @@ describe('work tasks', () => {
   };
 
   it('a good call pays a bonus and counts towards promotion', () => {
+    // Well rested and fed in the morning: an inspired mood adds a quarter
     const s = answer(atWork(), 'best');
-    expect(s.balance).toBe(5000 + Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare));
+    const bonus = Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare * MOOD_TASK_MULTIPLIER.Inspired);
+    expect(s.balance).toBe(5000 + bonus);
     expect(s.workMinutes).toBe(TASK_REWARD.best.xpMinutes);
-    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare));
+    expect(s.today.income).toBe(bonus);
+  });
+
+  it('a low mood shrinks the bonus', () => {
+    // Tired, unwashed, bored and lonely (but fed): a low mood
+    const low = { ...atWork(), needs: { energy: 20, hygiene: 10, fun: 10, social: 10 } };
+    const s = answer(low, 'best');
+    expect(s.balance).toBe(5000 + Math.round(HOURLY_WAGE.doctor * TASK_REWARD.best.payShare * MOOD_TASK_MULTIPLIER.Low));
   });
 
   it('a poor call earns nothing extra', () => {

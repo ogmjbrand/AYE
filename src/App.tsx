@@ -53,7 +53,10 @@ import { VenueFront } from './world/VenueFront';
 import { Park } from './world/Park';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
-import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout } from './lib/interiors';
+import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout, type Furniture } from './lib/interiors';
+import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
+import { currentMood, type FurnitureTarget } from './lib/gameState';
+import { FurnitureCatalogue } from './components/FurnitureCatalogue';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, residentById, residentNear, type Resident } from './lib/people';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
@@ -233,7 +236,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
       isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
@@ -242,7 +245,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const home = homeById(state.home);
   const [inside, setInside] = useState(false);
   const interior = home ? interiorFor(home) : null;
-  const roomLayout = useMemo(() => (interior ? interiorLayout(interior) : null), [interior]);
+  // Furniture you bought and placed, alongside what the home came with
+  const ownedPieces = useMemo(
+    () => state.furniture.flatMap((o) => { const f = asFurniture(o); return f ? [{ uid: o.uid, f }] : []; }),
+    [state.furniture],
+  );
+  const roomLayout = useMemo(() => (interior ? interiorLayout(interior, ownedPieces.map((p) => p.f)) : null), [interior, ownedPieces]);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const indoors = inside && !!home && home.district === district.id && !!roomLayout;
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : district.layout;
@@ -319,6 +328,26 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
+  /** The piece of furniture you're standing at that does something (shower, sofa, cooker…), if any. */
+  const usableHere = (): { target: FurnitureTarget; verb: string; cost: number; minutes: number } | null => {
+    if (!indoors || !interior) return null;
+    const { x, z } = controller.position;
+    const pieces: { target: FurnitureTarget; f: Furniture; quality: number }[] = [
+      ...interior.furniture.map((f, i) => ({ target: { builtin: i }, f, quality: 1 })),
+      ...ownedPieces.map(({ uid, f }) => ({ target: { uid }, f, quality: catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.quality ?? 1 })),
+    ];
+    for (const p of pieces) {
+      const use = furnitureUse(p.f.kind, p.quality);
+      if (use && nearPiece(p.f, x, z)) return { target: p.target, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
+    }
+    return null;
+  };
+  const operateHere = () => {
+    const u = usableHere();
+    if (!u || state.balance < u.cost) return;
+    operateFurniture(u.target, true);
+    setArrival(`${u.verb}: ${u.minutes >= 60 ? `${u.minutes / 60} h` : `${u.minutes} min`} pass${u.cost ? `, ${u.cost} ⓒ for ingredients` : ''}.`);
+  };
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
 
@@ -336,6 +365,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       }
       if (indoors && interior) {
         if (nearSpot(bedSpot(interior))) rest(true);
+        else if (usableHere()) operateHere();
         else if (nearSpot(doorSpot(interior))) goOutside();
         return;
       }
@@ -358,9 +388,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -487,6 +517,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={closeStore}
         />
       )}
+      {catalogueOpen && (
+        <FurnitureCatalogue
+          balance={state.balance}
+          owned={state.furniture}
+          interior={interior}
+          onBuy={buyFurniture}
+          onSell={sellFurniture}
+          onPlace={placeFurniture}
+          onStore={storeFurniture}
+          onClose={() => setCatalogueOpen(false)}
+        />
+      )}
       {gadgets && (
         <GadgetStore
           shop={district.gadgetHub}
@@ -585,7 +627,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time}>
+              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.map((p) => p.f)}>
                 <InteriorLighting gameTime={state.time} player={controller} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
@@ -663,11 +705,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
           name: home!.name,
-          prompt: nearSpot(bedSpot(interior))
-            ? { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) }
-            : nearSpot(doorSpot(interior))
-              ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside }
-              : null,
+          prompt: () => {
+            const use = usableHere();
+            if (nearSpot(bedSpot(interior))) return { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) };
+            if (use) return { verb: use.verb, place: use.cost ? `${use.cost} ⓒ` : 'at home', onOpen: operateHere };
+            return nearSpot(doorSpot(interior)) ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside } : null;
+          },
         } : undefined}
         workMinutes={state.workMinutes}
         equipment={state.equipment}
@@ -675,6 +718,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenMap={phone ? () => setMapOpen(true) : undefined}
         onOpenLocations={indoors ? undefined : () => setLocationsOpen(true)}
         fullness={state.fullness}
+        needs={state.needs}
+        mood={currentMood(state)}
+        onOpenCatalogue={() => setCatalogueOpen(true)}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
         onOpenWardrobe={() => setStore('wardrobe')}

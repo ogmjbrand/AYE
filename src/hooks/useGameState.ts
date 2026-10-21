@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
-import { gameReducer, type GameAction, type GameState } from '../lib/gameState';
+import { gameReducer, type FurnitureTarget, type GameAction, type GameState } from '../lib/gameState';
 import { loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
@@ -53,5 +53,10 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),
+    buyFurniture: (itemId: string) => dispatch({ type: 'buyFurniture', itemId }),
+    sellFurniture: (uid: string) => dispatch({ type: 'sellFurniture', uid }),
+    placeFurniture: (uid: string, at: readonly [number, number], rot: 0 | 1) => dispatch({ type: 'placeFurniture', uid, at, rot }),
+    storeFurniture: (uid: string) => dispatch({ type: 'storeFurniture', uid }),
+    operateFurniture: (target: FurnitureTarget, near: boolean) => dispatch({ type: 'useFurniture', target, near }),
   };
 }

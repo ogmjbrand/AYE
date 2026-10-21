@@ -17,6 +17,10 @@
  *     uses half the usual hunger.
  *   - Every worked minute counts towards promotion (lib/progression.ts);
  *     each level raises the hourly wage.
+ *   - Energy, hygiene, fun and social (lib/needs.ts) run down while awake.
+ *     Sleep restores energy (fully only at home), friends meet social needs,
+ *     and furniture at home (lib/furniture.ts) meets the rest. Exhausted
+ *     work is paid at half rate, and mood scales a work task's bonus.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
@@ -30,6 +34,9 @@ import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } f
 import { travelOption, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
 import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
+import { FULL_NEEDS, MOOD_TASK_MULTIPLIER, SLEEP_ENERGY, TIRED_THRESHOLD, addNeeds, decayNeeds, decayNeedsAsleep, moodLabel, moodScore, type Needs } from './needs';
+import { catalogueItem, findSpot, fits, homeComfort, walkable, nextUid, replaceAll, resaleValue, furnitureUse, type OwnedFurniture } from './furniture';
+import { interiorFor, type Interior } from './interiors';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -88,7 +95,14 @@ export interface GameState {
   relationships: Record<string, Relationship>;
   /** Game hour (totalMinutes / 60) of the last work task, or -1: one task per hour. */
   lastTaskHour: number;
+  /** Energy, hygiene, fun and social (lib/needs.ts). */
+  needs: Needs;
+  /** Furniture you've bought, placed in your home or in storage (lib/furniture.ts). */
+  furniture: OwnedFurniture[];
 }
+
+/** A piece of furniture to use: one you bought, or one the home came with (by index). */
+export type FurnitureTarget = { uid: string } | { builtin: number };
 
 export type GameAction =
   | { type: 'tick'; atWorkplace: boolean }
@@ -103,6 +117,11 @@ export type GameAction =
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   | { type: 'eat'; price: number; fullness: number }
   | { type: 'purchase'; price: number }
+  | { type: 'buyFurniture'; itemId: string }
+  | { type: 'sellFurniture'; uid: string }
+  | { type: 'placeFurniture'; uid: string; at: readonly [number, number]; rot: 0 | 1 }
+  | { type: 'storeFurniture'; uid: string }
+  | { type: 'useFurniture'; target: FurnitureTarget; near: boolean }
   | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -197,7 +216,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1 };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [] };
 }
 
 export function emptyLedger(): DayLedger {
@@ -223,15 +242,16 @@ function advanceMinute(time: GameTime): GameTime {
  * and the player is at their workplace. When an hour ends, pay the wage for
  * the minutes worked in it and charge the hour's living cost.
  */
-function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean, hungerRate = 1): GameState {
+function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean, hungerRate = 1, asleep = false): GameState {
   const worked = atWorkplace && career !== 'none' && isWorkingHours(state.time) ? 1 : 0;
-  const pay = worked * (state.fullness < HUNGRY_THRESHOLD ? 0.5 : 1);
+  const pay = worked * (state.fullness < HUNGRY_THRESHOLD || state.needs.energy < TIRED_THRESHOLD ? 0.5 : 1);
   const minutesWorkedThisHour = state.minutesWorkedThisHour + pay;
   const fullness = Math.max(0, state.fullness - FULLNESS_LOSS_PER_MINUTE * hungerRate);
+  const needs = asleep ? decayNeedsAsleep(state.needs) : decayNeeds(state.needs);
   const time = advanceMinute(state.time);
   const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
   const workMinutes = state.workMinutes + worked;
-  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, workMinutes };
+  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, needs, workMinutes };
 
   // Paid at the rate of the level held when the hour ends
   const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
@@ -246,8 +266,14 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
     today: { ...today, income: today.income + income, expenses: today.expenses + expenses },
     minutesWorkedThisHour: 0,
     fullness,
+    needs,
     workMinutes,
   };
+}
+
+/** Mood right now (0 … 100): needs, hunger and the comfort of your home. */
+export function currentMood(state: Pick<GameState, 'needs' | 'fullness' | 'furniture' | 'home'>): number {
+  return moodScore(state.needs, state.fullness, state.home ? homeComfort(state.furniture) : 0);
 }
 
 /** Travels to another district: pays the fare, then the clock runs for the length of the trip. */
@@ -283,9 +309,20 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   for (let i = 0; i < a.minutes; i++) next = tick(next, career, lifestyle, false);
   return {
     ...next,
+    needs: addNeeds(next.needs, SOCIAL_GAINS[activity]),
     relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + a.points), lastDay: today } },
   };
 }
+
+/** What time with a friend does for you. */
+export const SOCIAL_GAINS: Record<Activity, Partial<Needs>> = {
+  chat: { social: 15 },
+  treat: { social: 25, fun: 5 },
+  hangout: { social: 40, fun: 15 },
+};
+export const NIGHT_OUT_GAINS: Partial<Needs> = { social: 45, fun: 40, energy: -10 };
+/** Fun per minute sitting in the park or on a terrace. */
+export const SIT_FUN_PER_MINUTE = 0.3;
 
 /**
  * A night out at the district's lounge with a friend: open in the evening
@@ -303,6 +340,7 @@ function nightOut(state: GameState, residentId: string, career: Career, lifestyl
   for (let i = 0; i < NIGHT_OUT_MINUTES; i++) next = tick(next, career, lifestyle, false);
   return {
     ...next,
+    needs: addNeeds(next.needs, NIGHT_OUT_GAINS),
     relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + NIGHT_OUT_POINTS), lastDay: today } },
   };
 }
@@ -320,7 +358,7 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   if (!option) return state;
   const reward = TASK_REWARD[option.quality];
   const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
-  const bonus = Math.round(hourly * reward.payShare);
+  const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))]);
   return {
     ...state,
     balance: state.balance + bonus,
@@ -336,7 +374,91 @@ function moveIn(state: GameState, homeId: string): GameState {
   if (!home || state.home === homeId || state.summary) return state;
   const fee = moveInFee(home);
   if (state.balance < fee) return state;
-  return { ...state, home: homeId, balance: state.balance - fee, today: { ...state.today, expenses: state.today.expenses + fee } };
+  // Your furniture moves with you: what fits the new place goes in, the rest into storage
+  return {
+    ...state,
+    home: homeId,
+    balance: state.balance - fee,
+    today: { ...state.today, expenses: state.today.expenses + fee },
+    furniture: replaceAll(interiorFor(home), state.furniture),
+  };
+}
+
+const storeAll = (owned: readonly OwnedFurniture[]) => owned.map((o) => ({ ...o, at: null }));
+
+function homeInterior(state: GameState): Interior | null {
+  const home = homeById(state.home);
+  return home ? interiorFor(home) : null;
+}
+
+/** Buys a piece from the catalogue: delivered into your home if there's room, otherwise into storage. */
+function buyFurniture(state: GameState, itemId: string): GameState {
+  const piece = catalogueItem(itemId);
+  if (!piece || state.summary || state.balance < piece.price) return state;
+  const interior = homeInterior(state);
+  const spot = interior ? findSpot(interior, state.furniture, piece) : null;
+  const owned: OwnedFurniture = { uid: nextUid(state.furniture), itemId, at: spot?.at ?? null, rot: spot?.rot ?? 0 };
+  return {
+    ...state,
+    balance: state.balance - piece.price,
+    today: { ...state.today, expenses: state.today.expenses + piece.price },
+    furniture: [...state.furniture, owned],
+  };
+}
+
+function sellFurniture(state: GameState, uid: string): GameState {
+  const owned = state.furniture.find((o) => o.uid === uid);
+  const piece = catalogueItem(owned?.itemId);
+  if (!owned || !piece || state.summary) return state;
+  const value = resaleValue(piece);
+  return {
+    ...state,
+    balance: state.balance + value,
+    today: { ...state.today, income: state.today.income + value },
+    furniture: state.furniture.filter((o) => o.uid !== uid),
+  };
+}
+
+function placeFurniture(state: GameState, uid: string, at: readonly [number, number], rot: 0 | 1): GameState {
+  const owned = state.furniture.find((o) => o.uid === uid);
+  const piece = catalogueItem(owned?.itemId);
+  const interior = homeInterior(state);
+  if (!owned || !piece || !interior || state.summary || !at.every(Number.isFinite)) return state;
+  if (!fits(interior, state.furniture, piece, at, rot, uid)) return state;
+  const furniture = state.furniture.map((o) => (o.uid === uid ? { ...o, at: [at[0], at[1]] as const, rot } : o));
+  // Never wall yourself off from the bed or anything you use
+  return walkable(interior, furniture) ? { ...state, furniture } : state;
+}
+
+/**
+ * Uses a piece in your home: time passes, needs are met, ingredients are
+ * paid for. Only at home, standing at the piece, and only if you can pay.
+ */
+function operateFurniture(state: GameState, target: FurnitureTarget, near: boolean, career: Career, lifestyle: Lifestyle): GameState {
+  const interior = homeInterior(state);
+  if (state.summary || !near || !interior) return state;
+  let kind, quality = 1;
+  if ('uid' in target) {
+    const owned = state.furniture.find((o) => o.uid === target.uid);
+    const piece = catalogueItem(owned?.itemId);
+    if (!owned?.at || !piece) return state;
+    kind = piece.kind;
+    quality = piece.quality;
+  } else {
+    kind = interior.furniture[target.builtin]?.kind;
+  }
+  const use = kind ? furnitureUse(kind, quality) : undefined;
+  if (!use) return state;
+  const cost = use.cost ?? 0;
+  if (state.balance < cost) return state;
+  let next: GameState = cost > 0 ? { ...state, balance: state.balance - cost, today: { ...state.today, expenses: state.today.expenses + cost } } : state;
+  for (let i = 0; i < use.minutes; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    needs: addNeeds(next.needs, use.gains),
+    fullness: Math.min(100, next.fullness + (use.fullness ?? 0)),
+    workMinutes: next.workMinutes + (career !== 'none' ? use.xpMinutes ?? 0 : 0),
+  };
 }
 
 /**
@@ -354,16 +476,19 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
       start = { ...state, balance: state.balance - rent, today: { ...state.today, expenses: state.today.expenses + rent } };
     } else {
       evicted = true;
-      start = { ...state, home: null };
+      start = { ...state, home: null, furniture: storeAll(state.furniture) };
     }
   }
   const sleptHome = !!start.home && atHome;
   const rough = !sleptHome && !atFriend;
   const hungerRate = rough ? 1 : HOME_SLEEP_HUNGER_RATE;
-  let next = tick(start, career, lifestyle, false, hungerRate);
+  let next = tick(start, career, lifestyle, false, hungerRate, true);
   while (!(next.time.hour === WAKE_HOUR && next.time.minute === 0)) {
-    next = tick(next, career, lifestyle, false, hungerRate);
+    next = tick(next, career, lifestyle, false, hungerRate, true);
   }
+  // Rough sleep never leaves you fully rested
+  const restored = sleptHome ? SLEEP_ENERGY.home : atFriend ? SLEEP_ENERGY.friend : SLEEP_ENERGY.rough;
+  next = { ...next, needs: { ...next.needs, energy: Math.max(next.needs.energy, restored) } };
   const startOfDay = next.workMinutes - next.today.minutesWorked;
   const promoted = levelIndex(career, next.workMinutes) > levelIndex(career, startOfDay);
   const { income, expenses, minutesWorked } = next.today;
@@ -421,17 +546,27 @@ export function gameReducer(
       if (state.summary || !Number.isInteger(action.minutes) || action.minutes < 1 || action.minutes > MAX_WAIT) return state;
       let next = state;
       for (let i = 0; i < action.minutes; i++) next = tick(next, career, lifestyle, false);
-      return next;
+      return { ...next, needs: addNeeds(next.needs, { fun: SIT_FUN_PER_MINUTE * action.minutes }) };
     }
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'moveOut':
-      return state.summary ? state : { ...state, home: null };
+      return state.summary ? state : { ...state, home: null, furniture: storeAll(state.furniture) };
     case 'dismissSummary':
       return { ...state, summary: null };
     case 'eat':
       return eat(state, action.price, action.fullness);
     case 'purchase':
       return purchase(state, action.price);
+    case 'buyFurniture':
+      return buyFurniture(state, action.itemId);
+    case 'sellFurniture':
+      return sellFurniture(state, action.uid);
+    case 'placeFurniture':
+      return placeFurniture(state, action.uid, action.at, action.rot);
+    case 'storeFurniture':
+      return state.summary ? state : { ...state, furniture: state.furniture.map((o) => (o.uid === action.uid ? { ...o, at: null } : o)) };
+    case 'useFurniture':
+      return operateFurniture(state, action.target, action.near, career, lifestyle);
   }
 }

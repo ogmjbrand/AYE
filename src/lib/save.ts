@@ -14,6 +14,8 @@ import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
+import { sanitiseNeeds } from './needs';
+import { sanitiseFurniture } from './furniture';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -133,10 +135,13 @@ export function loadProgress(character: Character, storage: Storage = localStora
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
     lastTaskHour: isInt(p.lastTaskHour, -1, Number.MAX_SAFE_INTEGER) ? p.lastTaskHour : -1,
+    // Saves from before needs start with every need met, and own no furniture
+    needs: sanitiseNeeds(p.needs),
+    furniture: sanitiseFurniture(p.furniture),
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, needs, furniture }));
 }

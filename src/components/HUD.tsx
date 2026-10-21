@@ -17,6 +17,7 @@ import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
 import { HOURLY_WAGE } from '../lib/gameState';
+import { NEED_KEYS, NEED_LABEL, TIRED_THRESHOLD, moodLabel, type Needs } from '../lib/needs';
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -30,6 +31,12 @@ interface HUDProps {
   qualityLabel?: string;
   onCycleQuality?: () => void;
   fullness: number;
+  /** Energy, hygiene, fun and social (lib/needs.ts). */
+  needs?: Needs;
+  /** Mood score 0 … 100. */
+  mood?: number;
+  /** Opens the furniture catalogue (at home). */
+  onOpenCatalogue?: () => void;
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   /** The district the player is in: its counters, homes and workplaces. */
@@ -44,8 +51,8 @@ interface HUDProps {
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
-  /** Set while inside your home: replaces the street prompts. */
-  insideHome?: { name: string; prompt: { verb: string; place: string; onOpen: () => void } | null };
+  /** Set while inside your home: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
+  insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
@@ -105,6 +112,9 @@ export function HUD({
   qualityLabel,
   onCycleQuality,
   fullness,
+  needs,
+  mood,
+  onOpenCatalogue,
   onOpenVendor,
   onOpenShop,
   district,
@@ -159,7 +169,7 @@ export function HUD({
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
-  const placePrompt = busy ? null : insideHome ? insideHome.prompt : streetPrompt;
+  const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
   const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
@@ -207,6 +217,11 @@ export function HUD({
             {onOpenMap && (
               <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the map on your phone (M)">
                 Map
+              </button>
+            )}
+            {onOpenCatalogue && (
+              <button type="button" onClick={onOpenCatalogue} className={BUTTON} title="Buy and arrange furniture">
+                Furniture
               </button>
             )}
             {onOpenWardrobe && (
@@ -286,6 +301,7 @@ export function HUD({
                 {balance.toLocaleString()} <span className="text-sm text-ui-muted">ⓒ</span>
               </span>
               <span className="ml-auto flex min-w-0 items-center gap-2 text-xs">
+                {mood !== undefined && <span className="text-ui-muted">{moodLabel(mood)}</span>}
                 <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-muted'}>{hungerLabel(fullness)}</span>
                 <span className="block h-1.5 w-12 overflow-hidden rounded-full bg-ui-line" aria-hidden>
                   <span className={`block h-full rounded-full ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
@@ -344,6 +360,30 @@ export function HUD({
                   </div>
                   {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
                 </div>
+
+                {needs && mood !== undefined && (
+                  <div className="mt-3">
+                    <div className="flex items-baseline justify-between text-xs">
+                      <span className="text-ui-muted">Mood</span>
+                      <span className={mood < 25 ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{moodLabel(mood)}</span>
+                    </div>
+                    <dl className="m-0 mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                      {NEED_KEYS.map((k) => {
+                        const v = Math.round(needs[k]);
+                        const bar = v < 20 ? 'bg-ui-danger' : v < 45 ? 'bg-ui-warn' : 'bg-ui-accent';
+                        return (
+                          <div key={k}>
+                            <dt className="flex justify-between text-[11px] text-ui-muted"><span>{NEED_LABEL[k]}</span><span className="tabular-nums">{v}</span></dt>
+                            <dd className="m-0 mt-0.5 h-1 overflow-hidden rounded-full bg-ui-line" role="meter" aria-label={NEED_LABEL[k]} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v}>
+                              <div className={`h-full rounded-full transition-[width] duration-500 ${bar}`} style={{ width: `${v}%` }} />
+                            </dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                    {needs.energy < TIRED_THRESHOLD && <p className="m-0 mt-1.5 text-xs text-ui-danger">Exhausted: pay is halved until you sleep.</p>}
+                  </div>
+                )}
               </>
             )}
 
