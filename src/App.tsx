@@ -15,7 +15,8 @@ import { QualityContext, settingsFor, useQuality, type Quality } from './world/q
 import { lightingAt } from './world/timeOfDay';
 import { FpsMeter } from './world/FpsMeter';
 import { Player } from './components/Player';
-import { HUD } from './components/HUD';
+import { HUD, type NavItem, type PlacePlate } from './components/HUD';
+import type { IconName } from './components/os/icons';
 import { CharacterCreation, type Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
@@ -38,7 +39,8 @@ import type { WaitMinutes } from './lib/parks';
 import { cityDirectory, type Destination } from './lib/cityDirectory';
 import { makeTarget } from './lib/clickToMove';
 import { hasMap } from './lib/equipment';
-import { counterAt, districtById, type District } from './lib/geography';
+import { counterAt, districtById, type District, type PlaceKind } from './lib/geography';
+import { SnapshotHost } from './components/snapshot/Snapshot';
 import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
 import { TalkPanel } from './components/TalkPanel';
@@ -108,6 +110,11 @@ const followShift = new Vector3();
  * behind and 1.5 m above, so the player fills a good part of the frame.
  */
 const CAMERA_TARGET_HEIGHT = 1.25;
+
+/** Standing this close to a place puts its name on the title plate. */
+const PLATE_RADIUS = 9;
+const PLATE_SUBTITLE: Record<PlaceKind, string> = { food: 'Food & drinks', shop: 'Shopping', workplace: 'Workplace', home: 'Homes', public: 'Travel', nightlife: 'Lounge & nightlife', park: 'Park' };
+const PLATE_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm' };
 
 function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
   useFrame(({ camera }) => {
@@ -581,6 +588,39 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     exercise(minutes, !!here);
     setArrival(`You ran for ${minutes} minutes in ${district.park.name}. Sweaty, tired and happier.`);
   };
+  const openOs = (tab: OsTab) => { setOsTab(tab); setOsOpen(true); };
+  // The area you're in (indoors: where the building's door is)
+  const areaHere = indoors && home
+    ? district.neighborhoods.find((n) => home.door[0] >= n.bounds.minX && home.door[0] <= n.bounds.maxX && home.door[2] >= n.bounds.minZ && home.door[2] <= n.bounds.maxZ) ?? neighborhood
+    : neighborhood;
+  const areaName = areaHere?.name ?? district.name;
+  // Title plate: the building you're in, the place you're standing at, or the area
+  const plate: PlacePlate = (() => {
+    if (indoors && home) return { title: home.id === state.home ? `My ${home.kind}` : home.name, subtitle: areaName, icon: 'home' };
+    const { x, z } = controller.position;
+    const at = district.places.find((p) => Math.hypot(p.position[0] - x, p.position[2] - z) < PLATE_RADIUS);
+    if (at) return { title: at.name, subtitle: PLATE_SUBTITLE[at.kind], icon: PLATE_ICON[at.kind] };
+    return { title: areaName, subtitle: district.city.name, icon: 'palm' };
+  })();
+  const toggleOs = (tab: OsTab) => { if (osOpen && osTab === tab) setOsOpen(false); else openOs(tab); };
+  const nav: NavItem[] = [
+    indoors
+      ? { id: 'home', label: 'Decor', icon: 'decor', onClick: () => setCatalogueOpen(true), active: catalogueOpen, title: 'Buy, place and arrange furniture' }
+      : { id: 'home', label: 'Home', icon: 'home', onClick: () => onGo(state.home ? { to: 'home' } : { to: 'homes' }), title: state.home ? 'Walk home' : 'Find a home to rent' },
+    { id: 'phone', label: 'Phone', icon: 'phone', onClick: () => toggleOs('today'), active: osOpen && osTab === 'today', title: 'Your Life OS: needs, goals and today (L)' },
+    {
+      id: 'map', label: 'Map', icon: 'map', active: mapOpen || locationsOpen,
+      title: phone ? 'The map on your phone (M)' : 'Every place in the city',
+      onClick: () => {
+        if (phone) setMapOpen(true);
+        else if (indoors) { goOutside(); setTimeout(() => setLocationsOpen(true), 150); }
+        else setLocationsOpen(true);
+      },
+    },
+    { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setStore('wardrobe'), active: store === 'wardrobe', title: 'Change into clothes you own' },
+    { id: 'career', label: 'Career', icon: 'career', onClick: () => toggleOs('career'), active: osOpen && osTab === 'career', title: 'Your job, pay and promotions' },
+    { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
+  ];
   const whereabouts = {
     place: indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
     activity: sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
@@ -842,6 +882,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       <Celebrations items={state.life.celebrations} />
+      <SnapshotHost />
       {osOpen && (
         <LifeOS
           state={state}
@@ -857,7 +898,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onOpenWardrobe={() => { setOsOpen(false); setStore('wardrobe'); }}
           // Step outside first, so you come back to the street (the room isn't restored after the creator)
           onEditLook={() => { if (indoors) goOutside(); onEditLook(); }}
-          settings={{ quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange }}
+          settings={{
+            quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange,
+            onRest: () => { setOsOpen(false); rest(atHome()); },
+            restWhere: () => atHome() ? `In your bed at ${home!.name}.` : state.home ? 'Away from home: you\u2019ll sleep rough and wake less rested. Your bed is better.' : 'You have no home, so you\u2019ll sleep rough and wake less rested.',
+            onExitToMenu,
+          }}
           onClose={() => setOsOpen(false)}
         />
       )}
@@ -878,9 +924,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         character={character}
         balance={state.balance}
         gameTime={state.time}
-        neighborhood={neighborhood}
-        onExitToMenu={onExitToMenu}
-        onRest={() => rest(atHome())}
+        neighborhood={areaHere}
         homeId={state.home}
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
@@ -892,22 +936,19 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             return nearSpot(doorSpot(interior)) ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside } : null;
           },
         } : undefined}
-        workMinutes={state.workMinutes}
-        equipment={state.equipment}
         onOpenGadgets={() => setGadgets(true)}
-        onOpenMap={phone ? () => setMapOpen(true) : undefined}
-        onOpenLocations={indoors ? undefined : () => setLocationsOpen(true)}
         fullness={state.fullness}
         needs={state.needs}
-        mood={currentMood(state)}
-        onOpenCatalogue={indoors ? () => setCatalogueOpen(true) : undefined}
-        onOpenLife={() => setOsOpen((o) => !o)}
-        lifeOpen={osOpen}
         onOpenVendor={setVendor}
         onOpenShop={() => setStore('shop')}
-        onOpenWardrobe={() => setStore('wardrobe')}
-        qualityLabel={qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode}
-        onCycleQuality={() => onQualityChange(nextQualityMode(qualityMode))}
+        place={plate}
+        nav={nav}
+        mapPosition={indoors && home ? { x: home.door[0], z: home.door[2] } : null}
+        onOpenMoney={() => openOs('money')}
+        onOpenInventory={() => setStore('wardrobe')}
+        onOpenProfile={() => openOs('profile')}
+        onOpenSettings={() => openOs('settings')}
+        onOpenNeeds={() => openOs('today')}
       />
     </main>
   );

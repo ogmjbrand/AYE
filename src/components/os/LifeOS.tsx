@@ -50,7 +50,13 @@ export interface LifeOSProps {
   onOpenWardrobe: () => void;
   /** Opens the character creator to change appearance. */
   onEditLook: () => void;
-  settings: { quality: string; onCycleQuality: () => void; showRoute: boolean; onShowRouteChange: (v: boolean) => void };
+  settings: {
+    quality: string; onCycleQuality: () => void; showRoute: boolean; onShowRouteChange: (v: boolean) => void;
+    /** Sleep until 07:00 where you are (your bed, a friend's, or rough). */
+    onRest: () => void; restWhere: () => string;
+    /** Back to the main menu (the game saves as you play). */
+    onExitToMenu: () => void;
+  };
   onClose: () => void;
 }
 
@@ -213,7 +219,7 @@ export function LifeOS(props: LifeOSProps) {
 
 // ---------------------------------------------------------------- Today
 
-function Today({ state, character, onGo, onDismissWish }: LifeOSProps) {
+function Today({ state, character, onGo, onDismissWish, settings }: LifeOSProps) {
   const tips: Suggestion[] = suggestions(state, character.career);
   const needs: { key: NeedKey | 'hunger'; value: number; label: string }[] = [
     { key: 'hunger', value: state.fullness, label: `Hunger · ${hungerLabel(state.fullness)}` },
@@ -267,6 +273,17 @@ function Today({ state, character, onGo, onDismissWish }: LifeOSProps) {
           );
         })}
       </div>
+      <Card className="mt-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="m-0 text-sm font-semibold">Sleep until 07:00</p>
+            <p className="m-0 text-[11px] text-ui-muted">{settings.restWhere()}</p>
+          </div>
+          <button type="button" onClick={settings.onRest} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-accent/60 bg-ui-accent/15 px-3 py-1.5 text-xs font-semibold text-ui-accent-strong hover:bg-ui-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">
+            <Icon name="energy" className="h-3 w-3" /> Sleep
+          </button>
+        </div>
+      </Card>
 
       <SectionTitle aside="New missions each game day">Daily missions</SectionTitle>
       <div className="space-y-2">
@@ -673,6 +690,16 @@ function Profile({ state, character, onSetProfile, onOpenWardrobe, onEditLook, o
 function Settings({ settings }: LifeOSProps) {
   return (
     <>
+      <SectionTitle>Game</SectionTitle>
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="m-0 text-sm font-semibold">Main menu</p>
+            <p className="m-0 text-[11px] text-ui-muted">Your life saves as you play, so nothing is lost.</p>
+          </div>
+          <button type="button" onClick={settings.onExitToMenu} className="rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Main menu</button>
+        </div>
+      </Card>
       <SectionTitle>Graphics</SectionTitle>
       <Card>
         <div className="flex items-center justify-between gap-3">

@@ -1,23 +1,37 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
-import { useEffect, useState, type ReactNode } from 'react';
-import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
-import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
+import { useEffect, useRef, useState } from 'react';
+import { assetUrl } from '../lib/assetManifest';
+import { HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
+import { nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
-import { perfStats } from '../world/quality';
 import { TouchStick } from './TouchStick';
-import { genderLabel, heritageLabel } from '../lib/identity';
-import { formatHome } from '../lib/places';
-import { homeAtDoor, homeById, type Home } from '../lib/homes';
-import { equipmentPay } from '../lib/equipment';
-import { counterAt, type District } from '../lib/geography';
+import { homeAtDoor, type Home } from '../lib/homes';
+import { counterAt, type District, type PlaceKind } from '../lib/geography';
 import { venueAt } from '../lib/nightlife';
 import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
-import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
-import { HOURLY_WAGE } from '../lib/gameState';
-import { NEED_KEYS, NEED_LABEL, TIRED_THRESHOLD, moodLabel, type Needs } from '../lib/needs';
+import { TIRED_THRESHOLD, type Needs } from '../lib/needs';
+import { Icon, type IconName } from './os/icons';
+import { ICON_PATHS } from './os/iconPaths';
+
+/** One button on the bottom bar. The bar changes with where you are (street, home, restaurant, boutique). */
+export interface NavItem {
+  id: string;
+  label: string;
+  icon: IconName;
+  onClick: () => void;
+  active?: boolean;
+  title?: string;
+}
+
+/** The title plate at the top of the screen: the venue or area you're in. */
+export interface PlacePlate {
+  title: string;
+  subtitle: string;
+  icon: IconName;
+}
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -25,21 +39,9 @@ interface HUDProps {
   balance: number;
   gameTime: GameTime;
   neighborhood?: Neighborhood | null;
-  /** Back to the entry screen (nothing is lost; the game saves as you play). */
-  onExitToMenu?: () => void;
-  onRest?: () => void;
-  qualityLabel?: string;
-  onCycleQuality?: () => void;
   fullness: number;
   /** Energy, hygiene, fun and social (lib/needs.ts). */
   needs?: Needs;
-  /** Mood score 0 … 100. */
-  mood?: number;
-  /** Opens the furniture catalogue (at home). */
-  onOpenCatalogue?: () => void;
-  /** Opens or closes the Life OS dashboard. */
-  onOpenLife?: () => void;
-  lifeOpen?: boolean;
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   /** The district the player is in: its counters, homes and workplaces. */
@@ -54,52 +56,188 @@ interface HUDProps {
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
-  /** Set while inside your home: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
+  /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
-  onOpenWardrobe?: () => void;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
-  /** Opens the smartphone map (only passed once you own a phone). */
-  onOpenMap?: () => void;
-  /** The ⋯ city locations directory. */
-  onOpenLocations?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
-  /** Experience in the current career, in worked minutes (lib/progression.ts). */
-  workMinutes?: number;
-  /** Owned equipment (work kits raise pay). */
-  equipment?: readonly string[];
+  /** The title plate (venue or area). */
+  place?: PlacePlate | null;
+  /** The bottom bar's buttons. */
+  nav: readonly NavItem[];
+  /** Where to put you on the minimap while you're indoors (the building's door). */
+  mapPosition?: { x: number; z: number } | null;
+  onOpenMoney?: () => void;
+  onOpenInventory?: () => void;
+  onOpenProfile?: () => void;
+  onOpenSettings?: () => void;
+  /** Opens the Life OS on today's needs (the warning chips). */
+  onOpenNeeds?: () => void;
 }
 
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-/** Opaque enough to stay readable over a bright midday sky, without a costly backdrop blur. */
-const PANEL = 'rounded-xl border border-ui-line/70 bg-ui-panel/85 shadow-[0_8px_24px_rgba(0,0,0,0.35)]';
-const BUTTON =
-  'pointer-events-auto rounded-lg border border-ui-line bg-ui-panel/85 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] sm:px-3 sm:tracking-[0.14em] text-ui-ink transition hover:border-ui-accent hover:text-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent';
+/** Dark glass with a thin gold edge, opaque enough to read over a bright sky without a costly backdrop blur. */
+const GLASS = 'border border-ui-gold/35 bg-[#0d1412]/85 shadow-[0_8px_24px_rgba(0,0,0,0.4)]';
+const ROUND =
+  `pointer-events-auto grid h-10 w-10 place-items-center rounded-full ${GLASS} text-ui-gold-strong transition hover:border-ui-gold hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold sm:h-11 sm:w-11`;
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-ui-muted">{label}</dt>
-      <dd className="m-0 text-right text-ui-ink">{children}</dd>
-    </div>
-  );
-}
+const twoDigits = (n: number) => String(n).padStart(2, '0');
 
-/** "E — do something here" prompt for food vendors and shops. */
+/** "E: do something here", for counters, doors, people and furniture. */
 function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
+      className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-sm hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:whitespace-nowrap`}
     >
-      <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
-      <span>
-        {verb} <span className="font-semibold">{place}</span>
+      <kbd className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ui-gold/60 bg-ui-gold/15 font-mono text-xs font-bold text-ui-gold-strong">E</kbd>
+      <span className="leading-tight">
+        {verb} <span className="font-semibold text-ui-gold-strong">{place}</span>
       </span>
+    </button>
+  );
+}
+
+/** Head-and-shoulders picture of your character (the same portrait as the Life OS). */
+function Portrait({ character }: { character?: Character }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const src = character ? assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`) : null;
+  return (
+    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a3a33] to-[#121a17] sm:h-12 sm:w-12">
+      {src && broken !== src
+        ? <img src={src} alt="" onError={() => setBroken(src)} className="h-full w-full object-cover" draggable={false} />
+        : <span className="font-display text-lg font-bold text-ui-gold-strong">{character?.name.slice(0, 1).toUpperCase() ?? '?'}</span>}
+    </span>
+  );
+}
+
+const POI_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm' };
+const POI_COLOR: Record<PlaceKind, string> = { food: '#e0913f', shop: '#b07fd6', workplace: '#5b9bd5', home: '#3fbf8e', public: '#8a8f96', nightlife: '#d46a92', park: '#7aa54a' };
+const ICON_2D = new Map<IconName, Path2D>();
+const path2d = (name: IconName) => {
+  let p = ICON_2D.get(name);
+  if (!p) { p = new Path2D(ICON_PATHS[name]); ICON_2D.set(name, p); }
+  return p;
+};
+
+/** Metres from the centre to the edge of the minimap. */
+const MAP_RANGE = 42;
+
+/** Round minimap, north up: streets, buildings, places (pinned to the rim when out of range) and you. */
+function Minimap({ district, at, direction, homePlaceId, workPlaceId, size }: { district: District; at: { x: number; z: number }; direction: number; homePlaceId: string | null; workPlaceId: string | null; size: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = canvas.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (c.width !== size * dpr) { c.width = size * dpr; c.height = size * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r = size / 2;
+    const k = r / MAP_RANGE;
+    // The world's east is -x: mirror x so east is on the right, as on the phone map
+    const mx = (wx: number) => r - (wx - at.x) * k;
+    const my = (wz: number) => r - (wz - at.z) * k;
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(r, r, r - 1, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = '#1a2420';
+    ctx.fillRect(0, 0, size, size);
+    const { roadHalfWidth, crossStreet, buildings } = district.layout;
+    ctx.fillStyle = '#3b4441';
+    ctx.fillRect(mx(roadHalfWidth), 0, roadHalfWidth * 2 * k, size);
+    ctx.fillRect(0, my(crossStreet.maxZ), size, (crossStreet.maxZ - crossStreet.minZ) * k);
+    ctx.fillStyle = '#56615c';
+    for (const b of buildings) {
+      const w = b.size[0] * k;
+      const d = b.size[2] * k;
+      const x = mx(b.position[0]) - w / 2;
+      const y = my(b.position[2]) - d / 2;
+      if (x > size || y > size || x + w < 0 || y + d < 0) continue;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, d, 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // Places: icon discs, pinned to the rim when out of range
+    for (const p of district.places) {
+      let x = mx(p.position[0]) - r;
+      let y = my(p.position[2]) - r;
+      const dist = Math.hypot(x, y);
+      const rim = r - 9;
+      const out = dist > rim;
+      // Out of range, only your home and your workplace stay on the rim
+      if (out) {
+        if (p.id !== homePlaceId && p.id !== workPlaceId) continue;
+        x = (x / dist) * rim;
+        y = (y / dist) * rim;
+      }
+      const mine = p.id === homePlaceId;
+      const rad = mine ? 8 : 6.5;
+      ctx.save();
+      ctx.translate(r + x, r + y);
+      ctx.globalAlpha = out ? 0.75 : 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.fillStyle = POI_COLOR[p.kind];
+      ctx.fill();
+      ctx.lineWidth = mine ? 1.6 : 1;
+      ctx.strokeStyle = mine ? '#ecc98a' : 'rgba(0,0,0,0.5)';
+      ctx.stroke();
+      const s = (rad * 1.25) / 24;
+      ctx.translate(-12 * s, -12 * s);
+      ctx.scale(s, s);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke(path2d(POI_ICON[p.kind]));
+      ctx.restore();
+    }
+    // You: a gold arrow in the middle
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.rotate(-direction);
+    ctx.beginPath();
+    ctx.moveTo(0, -8);
+    ctx.lineTo(6, 6);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(-6, 6);
+    ctx.closePath();
+    ctx.fillStyle = '#ecc98a';
+    ctx.strokeStyle = '#1a1206';
+    ctx.lineWidth = 1.4;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    // North marker on the rim
+    ctx.fillStyle = '#ecc98a';
+    ctx.font = '600 10px "DM Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', r, 11);
+  });
+  return (
+    <canvas
+      ref={canvas}
+      style={{ width: size, height: size }}
+      className="block rounded-full border-2 border-ui-gold/50 shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+      role="img"
+      aria-label={`Map of ${district.name}. You are the gold arrow; north is up.`}
+    />
+  );
+}
+
+/** A warning chip for a need that is costing you (pay, mood). */
+function NeedChip({ icon, text, onClick }: { icon: IconName; text: string; onClick?: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title={text} aria-label={text} className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-ui-danger/60 bg-[#2a1210]/90 px-2.5 py-1 text-[11px] font-semibold text-ui-danger shadow-lg hover:border-ui-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-danger">
+      <Icon name={icon} className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{text}</span>
     </button>
   );
 }
@@ -110,16 +248,8 @@ export function HUD({
   balance,
   gameTime,
   neighborhood,
-  onExitToMenu,
-  onRest,
-  qualityLabel,
-  onCycleQuality,
   fullness,
   needs,
-  mood,
-  onOpenCatalogue,
-  onOpenLife,
-  lifeOpen = false,
   onOpenVendor,
   onOpenShop,
   district,
@@ -130,14 +260,17 @@ export function HUD({
   onTalk,
   workTask,
   insideHome,
-  onOpenWardrobe,
   onOpenGadgets,
-  onOpenMap,
-  onOpenLocations,
   homeId = null,
   onOpenHome,
-  workMinutes = 0,
-  equipment = [],
+  place,
+  nav,
+  mapPosition,
+  onOpenMoney,
+  onOpenInventory,
+  onOpenProfile,
+  onOpenSettings,
+  onOpenNeeds,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -145,9 +278,12 @@ export function HUD({
     const id = setInterval(() => setFrame((n) => n + 1), 100);
     return () => clearInterval(id);
   }, []);
-  const [showDetails, setShowDetails] = useState(false);
-  // Phones start with a slim one-row panel so the street stays visible
-  const [expanded, setExpanded] = useState(false);
+  const [small, setSmall] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const onResize = () => setSmall(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
   const { x: px, z: pz } = controller.position;
@@ -175,290 +311,133 @@ export function HUD({
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
   const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
-  const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
-  const status = !shiftHours
-    ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
+
+  const shiftHours = isWorkingHours(gameTime) && !!character && character.career !== 'none';
+  const status = !shiftHours ? null
     : workplaceStatus.isAtWorkplace
       ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
-      : { label: 'Not at work', dot: 'bg-ui-warn', text: 'text-ui-warn' };
+      : { label: insideHome ? 'Not at work' : `Not at work · ${workplaceStatus.distanceToWorkplace} m`, dot: 'bg-ui-warn', text: 'text-ui-warn' };
 
-  const hungry = fullness < HUNGRY_THRESHOLD;
-  const hungerBar = hungry ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-ui-accent';
+  const warnings: { icon: IconName; text: string }[] = [];
+  if (fullness < HUNGRY_THRESHOLD) warnings.push({ icon: 'hunger', text: 'Hungry: pay halved' });
+  if (needs && needs.energy < TIRED_THRESHOLD) warnings.push({ icon: 'energy', text: 'Exhausted: pay halved' });
+  if (needs && needs.hygiene < 20) warnings.push({ icon: 'hygiene', text: 'Needs a shower' });
+  if (needs && needs.fun < 20) warnings.push({ icon: 'fun', text: 'Bored' });
+  if (needs && needs.social < 20) warnings.push({ icon: 'social', text: 'Lonely' });
 
-  const x = controller.position.x.toFixed(1);
-  const z = controller.position.z.toFixed(1);
-  const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
-  const speed = Math.sqrt(controller.velocity.x ** 2 + controller.velocity.z ** 2).toFixed(1);
+  const mapAt = mapPosition ?? { x: px, z: pz };
+  const homePlaceId = homeId ? `${district.id}.home.${homeId}` : null;
+  const location = neighborhood?.name ?? district.name;
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
-      {/* Top bar: identity and clock on the left, system actions on the right */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-5">
-        <div className={`${PANEL} flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3`}>
-          <h1 className="m-0 shrink-0">
-            <img
-              src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`}
-              alt="AYE"
-              className="h-8 w-auto sm:h-11"
-            />
-          </h1>
+      {/* Top-left: who and when */}
+      <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5 sm:left-5 sm:top-5">
+        <div className={`${GLASS} flex items-center gap-2.5 rounded-full py-1 pl-1 pr-4`}>
+          <Portrait character={character} />
           <div className="min-w-0">
-            <p className="m-0 font-display text-xl font-semibold leading-none tabular-nums sm:text-2xl">
-              {formatGameTime(gameTime)}
+            <p className="m-0 max-w-[9rem] truncate text-sm font-semibold leading-tight sm:max-w-[12rem]">{character?.name ?? 'You'}</p>
+            <p className="m-0 font-display text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
+              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}
             </p>
-            <p className="m-0 mt-1 whitespace-nowrap text-[11px] uppercase tracking-[0.06em] text-ui-muted sm:tracking-[0.14em]">
-              {DAY_SHORT[gameTime.dayOfWeek]} · <span className="capitalize">{gameTime.period}</span>
-            </p>
+            {status && (
+              <p className={`m-0 flex items-center gap-1 text-[10px] font-medium leading-tight ${status.text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} aria-hidden /> {status.label}
+              </p>
+            )}
           </div>
         </div>
-
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
-            {onOpenLocations && (
-              <button type="button" onClick={onOpenLocations} className={BUTTON} title="City locations: restaurants, shops, homes, workplaces" aria-label="City locations">
-                <span aria-hidden="true" className="text-base leading-none">⋯</span>
-              </button>
-            )}
-            {onOpenMap && (
-              <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the map on your phone (M)">
-                Map
-              </button>
-            )}
-            {onOpenLife && (
-              <button type="button" onClick={onOpenLife} aria-pressed={lifeOpen} title="Your Life OS: needs, goals, skills, people, money (L)"
-                className={`pointer-events-auto rounded-lg border border-ui-accent px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-ui-accent-strong shadow-lg hover:bg-ui-accent/30 ${lifeOpen ? 'bg-ui-accent/30' : 'bg-ui-panel/90'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}>
-                Life
-              </button>
-            )}
-            {onOpenCatalogue && (
-              <button type="button" onClick={onOpenCatalogue} className={BUTTON} title="Buy and arrange furniture">
-                Furniture
-              </button>
-            )}
-            {onOpenWardrobe && (
-              <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own">
-                Wardrobe
-              </button>
-            )}
-            {onRest && (
-              <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00">
-                Rest
-              </button>
-            )}
-            {onCycleQuality && (
-              <button
-                type="button"
-                onClick={onCycleQuality}
-                title="Graphics quality: Auto lowers detail if the frame rate drops"
-                className={BUTTON}
-              >
-                <span className="hidden sm:inline">Quality: </span>
-                <span className="capitalize">{qualityLabel}</span>
-              </button>
-            )}
-            {onExitToMenu && (
-              <button type="button" onClick={onExitToMenu} className={BUTTON} title="Back to the main menu (your life is saved)">
-                Menu
-              </button>
-            )}
+        {warnings.length > 0 && (
+          <div className="flex max-w-[16rem] flex-wrap gap-1">
+            {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}
           </div>
-          <p className="m-0 rounded-md bg-ui-panel/70 px-2 py-0.5 font-mono text-[11px] text-ui-muted" aria-label="Frames per second">
-            {perfStats.fps} FPS
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* Where you are: under the top bar, centred */}
-      {(insideHome || neighborhood) && (
-        <div className="absolute left-1/2 top-[5.25rem] -translate-x-1/2 text-center sm:top-6">
-          <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-ink [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]">
-            {insideHome ? `At home · ${district.city.name}` : `${neighborhood!.name} · ${district.city.name}`}
-          </p>
-          <p className="m-0 mt-0.5 hidden text-xs text-ui-ink/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.8)] sm:block">
-            {insideHome ? insideHome.name : neighborhood!.description}
-          </p>
-        </div>
-      )}
-
-      {/* Prompt when standing at a vendor or shop (desktop: bottom centre) */}
-      {placePrompt && (
-        <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
-          <PlacePrompt {...placePrompt} />
-        </div>
-      )}
-
-      {/* Player panel: the numbers that drive decisions first, profile second, telemetry on request */}
-      <div className="absolute bottom-0 left-0 flex w-full flex-col gap-2 p-3 sm:w-auto sm:p-5">
-        {/* Touch screens get a thumb-stick; on phones the food prompt shares its row so nothing overlaps */}
-        <div className="flex items-end justify-between gap-2">
-          <TouchStick />
-          {placePrompt && (
-            <div className="ml-auto sm:hidden">
-              <PlacePrompt {...placePrompt} />
+      {/* Top-centre: the venue or area */}
+      {place && (
+        <div className="absolute left-1/2 top-[4.6rem] -translate-x-1/2 sm:top-5">
+          <div className={`${GLASS} flex items-center gap-3 rounded-2xl px-4 py-2 sm:px-5`}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-ui-gold/60 bg-ui-gold/10 text-ui-gold-strong sm:h-9 sm:w-9">
+              <Icon name={place.icon} className="h-4 w-4 sm:h-5 sm:w-5" />
+            </span>
+            <div className="text-center">
+              <p className="m-0 whitespace-nowrap font-display text-sm font-bold uppercase tracking-[0.14em] sm:text-base">{place.title}</p>
+              <p className="m-0 flex items-center justify-center gap-2 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.22em] text-ui-gold-strong">
+                <span className="h-px w-4 bg-ui-gold/60" aria-hidden /> {place.subtitle} <span className="h-px w-4 bg-ui-gold/60" aria-hidden />
+              </p>
             </div>
-          )}
-        </div>
-        <section className={`${PANEL} w-full sm:w-72`} aria-label="Player status">
-          {character && !expanded && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              aria-expanded={false}
-              aria-label="Show player details"
-              className="pointer-events-auto flex w-full items-center gap-3 px-3.5 py-2.5 text-left sm:hidden"
-            >
-              <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} aria-hidden />
-              <span className="font-display text-lg font-semibold tabular-nums leading-none">
-                {balance.toLocaleString()} <span className="text-sm text-ui-muted">GHAI</span>
-              </span>
-              <span className="ml-auto flex min-w-0 items-center gap-2 text-xs">
-                {mood !== undefined && <span className="text-ui-muted">{moodLabel(mood)}</span>}
-                <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-muted'}>{hungerLabel(fullness)}</span>
-                <span className="block h-1.5 w-12 overflow-hidden rounded-full bg-ui-line" aria-hidden>
-                  <span className={`block h-full rounded-full ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                </span>
-              </span>
-              <span aria-hidden className="text-xs text-ui-faint">▴</span>
-            </button>
-          )}
-          <div className={`${expanded ? 'block' : 'hidden'} px-4 py-3.5 sm:block`}>
-            {character && (
-              <>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="m-0 truncate text-sm font-semibold">{character.name}</p>
-                    <p className="m-0 mt-0.5 truncate text-xs text-ui-muted">
-                      {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
-                    </p>
-                  </div>
-                  <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
-                    <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
-                    {status.label}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="m-0 text-[10px] uppercase tracking-[0.16em] text-ui-faint">Balance</p>
-                    <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
-                      {balance.toLocaleString()} <span className="text-base text-ui-muted">GHAI</span>
-                    </p>
-                  </div>
-                  {character.career !== 'none' && !insideHome && (
-                    <p className="m-0 text-right text-xs text-ui-muted">
-                      Workplace
-                      <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
-                        {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
-                      </span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-ui-muted">Hunger</span>
-                    <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
-                  </div>
-                  <div
-                    className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line"
-                    role="meter"
-                    aria-label="Fullness"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={Math.round(fullness)}
-                  >
-                    <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                  </div>
-                  {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
-                </div>
-
-                {needs && mood !== undefined && (
-                  <div className="mt-3">
-                    <div className="flex items-baseline justify-between text-xs">
-                      <span className="text-ui-muted">Mood</span>
-                      <span className={mood < 25 ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{moodLabel(mood)}</span>
-                    </div>
-                    <dl className="m-0 mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
-                      {NEED_KEYS.map((k) => {
-                        const v = Math.round(needs[k]);
-                        const bar = v < 20 ? 'bg-ui-danger' : v < 45 ? 'bg-ui-warn' : 'bg-ui-accent';
-                        return (
-                          <div key={k}>
-                            <dt className="flex justify-between text-[11px] text-ui-muted"><span>{NEED_LABEL[k]}</span><span className="tabular-nums">{v}</span></dt>
-                            <dd className="m-0 mt-0.5 h-1 overflow-hidden rounded-full bg-ui-line" role="meter" aria-label={NEED_LABEL[k]} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v}>
-                              <div className={`h-full rounded-full transition-[width] duration-500 ${bar}`} style={{ width: `${v}%` }} />
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </dl>
-                    {needs.energy < TIRED_THRESHOLD && <p className="m-0 mt-1.5 text-xs text-ui-danger">Exhausted: pay is halved until you sleep.</p>}
-                  </div>
-                )}
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowDetails((v) => !v)}
-              aria-expanded={showDetails}
-              className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-            >
-              Details
-              <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-            {showDetails && (
-              <dl className="m-0 mt-2 space-y-1 text-xs">
-                {character && (
-                  <>
-                    {character.career !== 'none' && (() => {
-                      const left = hoursToNextLevel(character.career, workMinutes);
-                      const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
-                      return (
-                        <>
-                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} GHAI an hour</Row>
-                          <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
-                        </>
-                      );
-                    })()}
-                    <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
-                    <Row label="From">{formatHome(character.country, character.region)}</Row>
-                    <Row label="Gender">{genderLabel(character.gender)}</Row>
-                    <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
-                    <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>
-                  </>
-                )}
-                <Row label="Period">
-                  <span className="capitalize">{gameTime.period}</span>
-                </Row>
-                <Row label="Position">
-                  <span className="font-mono text-ui-muted">
-                    {x}, {z}
-                  </span>
-                </Row>
-                <Row label="Direction">
-                  <span className="font-mono text-ui-muted">{direction}°</span>
-                </Row>
-                <Row label="Speed">
-                  <span className="font-mono text-ui-muted">{speed} m/s</span>
-                </Row>
-              </dl>
-            )}
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="pointer-events-auto mt-3 w-full rounded-lg border border-ui-line/70 py-1.5 text-[11px] uppercase tracking-[0.14em] text-ui-muted sm:hidden"
-            >
-              Show less
-            </button>
           </div>
-        </section>
+        </div>
+      )}
+
+      {/* Top-right: money and the system buttons */}
+      <div className="absolute right-3 top-3 flex items-center gap-1.5 sm:right-5 sm:top-5 sm:gap-2">
+        <button
+          type="button"
+          onClick={onOpenMoney}
+          title="Your money: income, spending and savings"
+          className={`${GLASS} pointer-events-auto flex h-10 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:h-11 sm:gap-2 sm:pr-3`}
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#3a2606] sm:h-8 sm:w-8">
+            <Icon name="coin" className="h-4 w-4 sm:h-5 sm:w-5" />
+          </span>
+          <span className="font-display text-sm font-bold tabular-nums sm:text-base">{Math.round(balance).toLocaleString()}</span>
+          <span className="hidden text-[10px] font-semibold text-ui-gold-strong sm:inline">GHAI</span>
+          <Icon name="arrowRight" className="h-3.5 w-3.5 text-ui-gold-strong" />
+        </button>
+        {onOpenInventory && (
+          <button type="button" onClick={onOpenInventory} className={ROUND} title="Inventory: the clothes you own" aria-label="Inventory">
+            <Icon name="bag" className="h-5 w-5" />
+          </button>
+        )}
+        {onOpenProfile && (
+          <button type="button" onClick={onOpenProfile} className={`${ROUND} hidden sm:grid`} title="Your profile" aria-label="Profile">
+            <Icon name="profile" className="h-5 w-5" />
+          </button>
+        )}
+        {onOpenSettings && (
+          <button type="button" onClick={onOpenSettings} className={ROUND} title="Settings and main menu" aria-label="Settings">
+            <Icon name="settings" className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
-      {/* Keyboard hint: desktop only, hidden on touch screens */}
-      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block pointer-coarse:hidden">
+      {/* Bottom-left: minimap and where you are */}
+      <div className="absolute bottom-[5.25rem] left-3 flex flex-col items-center gap-1.5 sm:bottom-5 sm:left-5 pointer-coarse:bottom-auto pointer-coarse:left-auto pointer-coarse:right-3 pointer-coarse:top-[4.6rem] sm:pointer-coarse:top-[4.75rem]">
+        <Minimap district={district} at={mapAt} direction={mapPosition ? Math.PI : controller.direction} homePlaceId={homePlaceId} workPlaceId={character && character.career !== 'none' ? `${district.id}.work.${character.career}` : null} size={small ? 92 : 148} />
+        <p className={`${GLASS} m-0 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold`}>
+          <Icon name="pin" className="h-3.5 w-3.5 text-ui-gold-strong" /> {location}
+        </p>
+      </div>
+
+      {/* Bottom: the prompt, then the bar */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-3 pb-3 sm:pb-5">
+        <div className="flex w-full items-end justify-between gap-2 sm:justify-center">
+          <TouchStick />
+          {placePrompt && <PlacePrompt {...placePrompt} />}
+        </div>
+        <nav aria-label="Main" className={`${GLASS} pointer-events-auto flex max-w-full items-stretch gap-0.5 overflow-x-auto rounded-2xl p-1 sm:gap-1 sm:p-1.5`}>
+          {nav.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={n.onClick}
+              title={n.title ?? n.label}
+              aria-pressed={n.active || undefined}
+              className={`flex min-w-[3.4rem] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:min-w-[4.5rem] sm:px-2.5 sm:text-[11px] ${n.active ? 'bg-ui-gold/20 text-ui-gold-strong' : 'text-ui-ink/85 hover:bg-white/5 hover:text-ui-gold-strong'}`}
+            >
+              <Icon name={n.icon} className="h-5 w-5" />
+              <span className="whitespace-nowrap">{n.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Keyboard hint: desktop only */}
+      <div className="absolute bottom-5 right-5 hidden text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] lg:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
-        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
+        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom · <span className="font-semibold">L</span> phone</p>
       </div>
     </div>
   );
