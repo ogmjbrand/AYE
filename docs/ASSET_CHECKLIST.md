@@ -1,23 +1,29 @@
 # AYE asset acquisition checklist
 
-**Status (October 2026): section 1 (player character with Idle/Walk/Run) is installed from Microsoft Rocketbox. Nothing from sections 3–4 has been downloaded yet.**
-The game currently runs on procedural textures, procedural buildings and
-vehicles. The player character is a Microsoft Rocketbox avatar (MIT, realistic
+**Status (October 2026):** the Rocketbox player with Idle/Walk/Run is installed. Four CC0 MakeHuman hair meshes (afro, braids, ponytail and long waves) are selectable, previewable and saved separately from hair colour. Character creation also offers independently saved skin-tone tints applied to exposed skin while preserving the source texture. NPCs now receive stable, role-aware material styles, skin tones, body shapes and compatible head-attached hair. Their clothes are the existing Rocketbox baked garments restyled by masks; there are no modular garment, shoe, dress or accessory meshes.
+The city uses ambientCG PBR maps for asphalt, paving and exposed ground,
+venue/tier-specific tile materials for interiors, and ambientCG EXR lighting
+for day, golden hour and indoor venues. Snow is retained but not applied to the
+Nigerian city. Buildings and vehicles remain procedural. The player character
+is a Microsoft Rocketbox avatar (MIT, realistic
 proportions and photo-sourced textures, but a ~6.7k-triangle mesh from the 2010s;
-see `public/assets/CREDITS.md`). Every slot in
-`public/assets/manifest.json` is `null`.
+see `public/assets/CREDITS.md`). `public/assets/manifest.json` enables road,
+pavement and ground; roof, concrete, avatar and vehicle entries use built-ins.
 
 Live metadata for some sources is reachable, but obtaining model files can
-require authorized account access. No compatible, redistribution-ready shoe
-model has been downloaded or verified in this project. Names below are search
-terms and selection criteria, not file names. Record each selected asset's
-real ID and exact licence in `public/assets/CREDITS.md`.
+require authorized account access. MakeHuman system clothing and shoe assets
+are available locally, but their HM08 proxy fit and skeleton weights must be
+converted to a compatible wearable rig before registration. Names below are
+search terms and selection criteria, not file names. Record each selected
+asset's real ID and exact licence in `public/assets/CREDITS.md`.
 
 The current filesystem and supplied archive scan is recorded in
 [`ASSET_INVENTORY.md`](./ASSET_INVENTORY.md). It found licensed Rocketbox
-characters and MakeHuman morph-target source data, but no compatible wearable
-clothing, shoes, hair, or furniture models. Reference images are not product
-meshes and are not treated as redistributable assets.
+characters, MakeHuman morph-target source data, and four converted CC0 hair
+meshes. The downloaded clothing and shoe meshes remain fitted to the MakeHuman
+body and have not been verified on Rocketbox; no furniture meshes were found.
+Reference images are not product meshes and are not treated as redistributable
+assets.
 
 Tick each box only when the file is in place **and** `npm.cmd run assets:check`
 passes **and** you have looked at it in the game at http://localhost:5173.
@@ -106,10 +112,10 @@ frame rate on integrated graphics. You need three images per surface:
 
 | Slot | Search for | Folder | Used on |
 |---|---|---|---|
-| [ ] `road` | "Asphalt": worn, fine aggregate, no painted lines | `textures/road/` | Boulevard and cross street |
-| [ ] `pavement` | "PavingStones": interlocking concrete pavers, as on Lagos pavements | `textures/pavement/` | Raised pavements |
+| [x] `road` | "Asphalt015": worn, fine aggregate, no painted lines | `environment/road/` | Boulevard and cross street |
+| [x] `pavement` | "PavingStones036": interlocking concrete pavers, as on Lagos pavements | `environment/pavement/` | Raised pavements |
 | [ ] `concrete` | "Concrete": plain, lightly stained | `textures/concrete/` | Balcony slabs and ledges (small areas) |
-| [ ] `ground` (optional) | "Ground" / "Dirt": red laterite soil looks right for Lagos | `textures/ground/` | Unpaved ground |
+| [x] `ground` (optional) | "Ground003": suitable exposed soil | `environment/ground/` | Unpaved ground |
 | [ ] `roof` (optional) | "Concrete" or "Roofing" | `textures/roof/` | Flat roofs |
 
 Manifest entry (repeat per slot). `tileMeters` is the real-world width one
@@ -125,6 +131,14 @@ image covers; the asset page lists it:
 ```
 
 `assets:check` warns above 3 MB per colour or normal image and above 2 MB per roughness image.
+
+### Integrated interior and environment maps
+
+Tiles074 is used in boutiques, Tiles075 in offices, Tiles076 in penthouses, and
+Tiles078 in homes and restaurants. DaySkyHDRI026A and DaySkyHDRI030A provide
+time-aware outdoor image-based lighting; IndoorEnvironmentHDRI020 is selected
+only inside venues. Snow007A remains unused outside a suitable snowy setting.
+The assets and ambientCG CC0 licence are recorded in `public/assets/CREDITS.md`.
 
 ## 4. Vehicles and buildings
 

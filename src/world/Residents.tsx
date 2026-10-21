@@ -16,6 +16,11 @@ import { withRelaxedHands } from '../components/handPose';
 import { Gestures, type GestureActions } from '../components/Gestures';
 import { conversationGesture, shouldWave, type Gesture } from '../lib/bodyLanguage';
 import type { HugSession } from '../lib/hug';
+import { generateNpcAppearance } from '../lib/npcFashion';
+import { applyBodyShape } from '../components/bodyShapeSkin';
+import { OutfitStyler } from '../components/Avatar';
+import { GarmentLayer } from '../components/GarmentLoader';
+import { getGarmentModel } from '../lib/fashion';
 
 /** Name tag above a resident: their name and that they are a computer-controlled resident. */
 function nameTag(name: string) {
@@ -46,6 +51,10 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
   hugSession: HugSession | null;
 }) {
   const look = lookById(resident.lookId);
+  const appearance = useMemo(
+    () => generateNpcAppearance(resident.id, resident.role, look.body === 'feminine'),
+    [resident.id, resident.role, look.body],
+  );
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
   // Own copy of the person: the player may be wearing the same look, with its own clothes and shape
@@ -78,6 +87,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
     const h = box.max.y - box.min.y;
     return h > 0 ? look.height / h : 1;
   }, [figure, look.height]);
+  useEffect(() => applyBodyShape(figure, appearance.shape), [figure, appearance.shape]);
   const clipsWithHands = useMemo(() => withRelaxedHands(animations), [animations]);
   const { actions, names, mixer } = useAnimations(clipsWithHands, group);
   const clips = useMemo(() => ({
@@ -176,6 +186,15 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
     <group ref={root} position={[x, groundHeightAt(x, z), z]}>
       <group ref={group} rotation={[0, resident.facing, 0]}>
         <primitive object={figure} scale={scale} />
+        <OutfitStyler scene={figure} lookId={look.id} styles={appearance.styles} skinTone={appearance.skinTone} />
+        {appearance.hairstyleItemId && getGarmentModel(appearance.hairstyleItemId) && (
+          <GarmentLayer
+            groupRef={group}
+            model={getGarmentModel(appearance.hairstyleItemId)!}
+            isEquipped
+            avatarScale={scale}
+          />
+        )}
       </group>
       <Gestures body={look.body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />
       <sprite position={[0, look.height + 0.35, 0]} scale={[0.9, 0.28, 1]}>

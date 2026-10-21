@@ -1,5 +1,6 @@
 import { Matrix4, type Bone, type Object3D, type Skeleton, type SkinnedMesh } from 'three';
 import { girthFactors, type BodyShape } from '../lib/bodyShape';
+import { rocketboxBodyShapeBoneKey } from '../lib/characterRig';
 
 /**
  * Applies a body shape to a skinned character. Each listed bone's skinning
@@ -12,9 +13,6 @@ import { girthFactors, type BodyShape } from '../lib/bodyShape';
 interface Entry { bone: Bone; scale: Matrix4; saved: Matrix4 }
 
 const shaped = new WeakMap<Skeleton, Entry[]>();
-
-/** Biped name without the "Bip01" prefix, whatever separator the loader used ("Bip01_L_Thigh" → "L Thigh"). */
-const bipedName = (name: string) => name.replace(/[_\s]+/g, ' ').replace(/^Bip01 /, '');
 
 function wrap(skeleton: Skeleton) {
   if (shaped.has(skeleton)) return;
@@ -40,7 +38,7 @@ export function applyBodyShape(scene: Object3D, shape: BodyShape) {
     wrap(mesh.skeleton);
     const entries: Entry[] = [];
     for (const bone of mesh.skeleton.bones) {
-      const f = factors.get(bipedName(bone.name));
+      const f = factors.get(rocketboxBodyShapeBoneKey(bone.name));
       if (f) entries.push({ bone, scale: new Matrix4().makeScale(1, f[0], f[1]), saved: new Matrix4() });
     }
     shaped.set(mesh.skeleton, entries);

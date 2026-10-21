@@ -41,6 +41,31 @@ for (const [key, s] of Object.entries(manifest.surfaces ?? {})) {
   if (!(s.tileMeters > 0)) warn(`${key}: set tileMeters (how many metres one image covers)`);
 }
 
+console.log('Environment materials and lighting');
+for (const [rel, label, maxMb] of [
+  ['environment/tiles074/Tiles074_1K-JPG_Color.jpg', 'boutique floor colour', 3],
+  ['environment/tiles074/Tiles074_1K-JPG_NormalGL.jpg', 'boutique floor normal', 3],
+  ['environment/tiles074/Tiles074_1K-JPG_Roughness.jpg', 'boutique floor roughness', 2],
+  ['environment/tiles075/Tiles075_1K-JPG_Color.jpg', 'office floor colour', 3],
+  ['environment/tiles075/Tiles075_1K-JPG_NormalGL.jpg', 'office floor normal', 3],
+  ['environment/tiles075/Tiles075_1K-JPG_Roughness.jpg', 'office floor roughness', 2],
+  ['environment/tiles076/Tiles076_1K-JPG_Color.jpg', 'penthouse floor colour', 3],
+  ['environment/tiles076/Tiles076_1K-JPG_NormalGL.jpg', 'penthouse floor normal', 3],
+  ['environment/tiles076/Tiles076_1K-JPG_Roughness.jpg', 'penthouse floor roughness', 2],
+  ['environment/tiles078/Tiles078_1K-JPG_Color.jpg', 'home floor colour', 3],
+  ['environment/tiles078/Tiles078_1K-JPG_NormalGL.jpg', 'home floor normal', 3],
+  ['environment/tiles078/Tiles078_1K-JPG_Roughness.jpg', 'home floor roughness', 2],
+  ['environment/sky-day/DaySkyHDRI026A_1K_HDR.exr', 'day environment HDRI', 20],
+  ['environment/sky-day/DaySkyHDRI026A_1K_TONEMAPPED.jpg', 'day HDRI preview', 3],
+  ['environment/sky-golden/DaySkyHDRI030A_1K_HDR.exr', 'golden-hour environment HDRI', 20],
+  ['environment/sky-golden/DaySkyHDRI030A_1K_TONEMAPPED.jpg', 'golden-hour HDRI preview', 3],
+  ['environment/sky-indoor/IndoorEnvironmentHDRI020_1K_HDR.exr', 'indoor environment HDRI', 20],
+  ['environment/sky-indoor/IndoorEnvironmentHDRI020_1K_TONEMAPPED.jpg', 'indoor HDRI preview', 3],
+  ['environment/snow/Snow007A_1K-JPG_Color.jpg', 'unused snow colour', 3],
+  ['environment/snow/Snow007A_1K-JPG_NormalGL.jpg', 'unused snow normal', 3],
+  ['environment/snow/Snow007A_1K-JPG_Roughness.jpg', 'unused snow roughness', 2],
+]) checkFile(rel, label, maxMb);
+
 /** Shared GLB checks: triangle budget, texture sizes, compression the game can't decode. */
 async function inspectGlb(rel, label, maxTris) {
   try {

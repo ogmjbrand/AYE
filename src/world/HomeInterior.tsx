@@ -6,6 +6,7 @@ import type { Furniture, Interior } from '../lib/interiors';
 import { WALL_HEIGHT } from '../lib/interiors';
 import { lightingAt } from './timeOfDay';
 import type { GameTime } from '../lib/gameState';
+import { interiorFloorMaterial } from './interiorMaterials';
 
 /**
  * Shared enclosed interior shell for homes and public venues. Roof and wall
@@ -50,11 +51,7 @@ export function HomeInterior({ interior, gameTime, doorOpen = false, children }:
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial
-          color={interior.floorColor}
-          roughness={interior.architecture === 'office' ? 0.38 : interior.architecture === 'boutique' ? 0.32 : 0.75}
-          metalness={interior.architecture === 'office' || interior.architecture === 'boutique' ? 0.08 : 0}
-        />
+        <primitive object={interiorFloorMaterial(interior)} attach="material" />
       </mesh>
 
       <Wall color={interior.wallColor} position={[-(w + windowWidth) / 4, H / 2, d / 2]} rotationY={Math.PI} size={[windowSide, H]} />

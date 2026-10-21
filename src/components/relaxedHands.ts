@@ -1,4 +1,5 @@
 import { AnimationClip, Bone, Object3D, Quaternion, Vector3, type AnimationAction } from 'three';
+import { isRocketboxFingerBone, rocketboxFingerSegment } from '../lib/characterRig';
 
 /**
  * Relaxed hands for the Rocketbox rig. Its Idle and Walk clips leave the
@@ -10,7 +11,6 @@ import { AnimationClip, Bone, Object3D, Quaternion, Vector3, type AnimationActio
  */
 
 const RELAXED_CURL_DEG = [16, 22, 12]; // proximal, middle, distal segment
-const FINGER = /^Bip01[ _][LR][ _]Finger[1-4](\d?)$/;
 const FLEX = new Vector3(0, 0, 1);
 
 const restCache = new WeakMap<Object3D, Map<string, Quaternion>>();
@@ -21,7 +21,7 @@ function restPoses(scene: Object3D) {
     // Captured on first use, before any mixer has posed this shared scene
     rest = new Map();
     scene.traverse((o) => {
-      if ((o as Bone).isBone && FINGER.test(o.name)) rest!.set(o.name, o.quaternion.clone());
+      if ((o as Bone).isBone && isRocketboxFingerBone(o.name)) rest!.set(o.name, o.quaternion.clone());
     });
     restCache.set(scene, rest);
   }
@@ -51,7 +51,7 @@ function curlTopUp(clip: AnimationClip, rest: Map<string, Quaternion>) {
   }
   const topUp = new Map<string, number>();
   for (const name of rest.keys()) {
-    const segment = Number(FINGER.exec(name)![1] || 0);
+    const segment = rocketboxFingerSegment(name)!;
     const need = Math.max(0, RELAXED_CURL_DEG[segment] - (peak.get(name) ?? 0));
     topUp.set(name, (need * Math.PI) / 180);
   }

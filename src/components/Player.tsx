@@ -62,6 +62,7 @@ export function Player({
   const equipped = character?.wardrobe.equipped;
   const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
   const visibleShoeId = resolveFashionItemId(equipped ?? {}, tryOn, 'shoes');
+  const visibleHairstyleId = resolveFashionItemId(equipped ?? {}, tryOn, 'hairstyle');
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
@@ -134,10 +135,12 @@ export function Player({
             heightCm={character?.heightCm}
             styles={styles}
             shape={character?.shape}
+            skinTone={character?.skinTone}
             conversing={conversing}
             hugSession={hugSession}
             eating={eating}
             shoeItemId={visibleShoeId}
+            hairstyleItemId={visibleHairstyleId}
           />
         </Suspense>
       </ErrorBoundary>

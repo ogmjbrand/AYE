@@ -1,17 +1,24 @@
 /**
  * Fashion: fabrics, prints and colours the player buys and wears, plus hair
- * dye. With the current Rocketbox models every item restyles the garment the
- * person already wears (top, bottom, shoes) or their hair; cut and hairstyle
- * shape need separate clothing/hair meshes (see docs/CHARACTER_PIPELINE.md).
+ * dye. With the current Rocketbox models, most items restyle the garment the
+ * person already wears (top, bottom, shoes) or their hair. Model-backed CC0
+ * hairstyles use separate meshes; clothing still needs rig-compatible assets
+ * (see docs/CHARACTER_PIPELINE.md).
  * 
  * Extended to support real 3D garments via modelPath/modelConfig while
  * maintaining backward compatibility with material-based styling.
  */
 import { districtById } from './geography';
 
-export type Slot = 'top' | 'bottom' | 'shoes' | 'hair';
-export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair'];
-export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour' };
+export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'hairstyle';
+export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'hairstyle'];
+export const SLOT_LABEL: Record<Slot, string> = {
+  top: 'Tops',
+  bottom: 'Bottoms',
+  shoes: 'Shoes',
+  hair: 'Hair colour',
+  hairstyle: 'Hairstyles',
+};
 
 /** Shader pattern ids (must match the GLSL in components/outfitShader.ts). */
 export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6, bogolan: 7, houndstooth: 8, batik: 9 } as const;
@@ -41,7 +48,7 @@ export const FABRICS: Record<Fabric['name'], Fabric> = {
 
 /** The fabric an item is made of, from what it is. Hair dye keeps the hair's own finish. */
 export function fabricFor(id: string, pattern: Pattern): Fabric | undefined {
-  if (id.startsWith('hair-')) return undefined;
+  if (id.startsWith('hair-') || id.startsWith('hairstyle-')) return undefined;
   if (id.includes('silk')) return FABRICS.silk;
   if (id.includes('denim')) return FABRICS.denim;
   if (id.includes('linen')) return FABRICS.linen;
@@ -69,6 +76,10 @@ export interface GarmentModel {
   path: string;
   /** Expected scale factor to match character proportions (1.0 = no scaling). */
   scale?: number;
+  /** Apply the player's avatar height normalization to a source model in avatar space. */
+  fitToAvatar?: boolean;
+  /** Preserve avatar-root coordinates while parenting the model to its animated attachment bone. */
+  preserveWorldTransform?: boolean;
   /** Which bones/sockets to attach this garment to (e.g., ['Shoe_L', 'Shoe_R'] for shoes). */
   attachBones?: readonly string[];
   /** Thumbnail image path for UI display, relative to public/assets/. */
@@ -100,6 +111,42 @@ const item = (
 // Aso-oke and adire eleko in Nigeria, kente and batakari in Ghana
 const LAGOS = ['NG'] as const;
 const ACCRA = ['GH'] as const;
+
+const HAIRSTYLE_MODELS: Record<string, GarmentModel> = {
+  'hairstyle-afro': {
+    path: 'hair/afro01.glb',
+    fitToAvatar: true,
+    preserveWorldTransform: true,
+    attachBones: ['Bip01 Head'],
+    thumbnail: 'clothing/hair/afro01.png',
+  },
+  'hairstyle-braids': {
+    path: 'hair/braid01.glb',
+    fitToAvatar: true,
+    preserveWorldTransform: true,
+    attachBones: ['Bip01 Head'],
+    thumbnail: 'clothing/hair/braid01.png',
+  },
+  'hairstyle-ponytail': {
+    path: 'hair/ponytail01.glb',
+    fitToAvatar: true,
+    preserveWorldTransform: true,
+    attachBones: ['Bip01 Head'],
+    thumbnail: 'clothing/hair/ponytail01.png',
+  },
+  'hairstyle-long': {
+    path: 'hair/long01.glb',
+    fitToAvatar: true,
+    preserveWorldTransform: true,
+    attachBones: ['Bip01 Head'],
+    thumbnail: 'clothing/hair/long01.png',
+  },
+};
+
+const hairstyle = (id: string, name: string, price: number): FashionItem => ({
+  ...item(id, 'hairstyle', name, price, 'Salon', 'solid', ['#ffffff']),
+  model: HAIRSTYLE_MODELS[id],
+});
 
 export const FASHION_ITEMS: readonly FashionItem[] = [
   // Tops
@@ -147,6 +194,10 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('hair-burgundy', 'hair', 'Burgundy', 300, 'Salon', 'solid', ['#5b1b26']),
   item('hair-honey-blonde', 'hair', 'Honey blonde', 300, 'Salon', 'solid', ['#b48748']),
   item('hair-platinum', 'hair', 'Platinum', 450, 'Salon', 'solid', ['#d8d2c4']),
+  hairstyle('hairstyle-afro', 'Natural afro', 650),
+  hairstyle('hairstyle-braids', 'Long braids', 850),
+  hairstyle('hairstyle-ponytail', 'Ponytail', 600),
+  hairstyle('hairstyle-long', 'Long waves', 700),
 ];
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
@@ -203,6 +254,7 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
 export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>) {
   const out: Partial<Record<Slot, Style>> = {};
   for (const slot of SLOTS) {
+    if (slot === 'hairstyle') continue;
     const id = resolveFashionItemId(equipped, tryOn, slot);
     const it = itemById(id);
     if (it) out[slot] = it.style;
@@ -241,7 +293,7 @@ export function swatchCss(style: Style): string {
  * These override material-based styling when specified.
  * Models should be in GLB/GLTF format at public/assets/clothing/<path>.
  */
-export const GARMENT_MODELS: Partial<Record<string, GarmentModel>> = {};
+export const GARMENT_MODELS: Partial<Record<string, GarmentModel>> = { ...HAIRSTYLE_MODELS };
 
 /** Get the 3D model configuration for a fashion item, if it exists. */
 export function getGarmentModel(itemId: string): GarmentModel | undefined {

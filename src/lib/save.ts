@@ -16,6 +16,7 @@ import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
 import { sanitiseOfficeCareer } from './officeCareer';
 import { sanitiseHomeDecor } from './homeDecor';
+import { DEFAULT_SKIN_TONE, isSkinToneId } from './skinTone';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -75,6 +76,7 @@ export function parseCharacter(data: unknown): Character | null {
     homeDecor: sanitiseHomeDecor(c.homeDecor),
     // Saves from before body shape start average
     shape: sanitiseShape(c.shape),
+    skinTone: isSkinToneId(c.skinTone) ? c.skinTone : DEFAULT_SKIN_TONE,
   };
 }
 

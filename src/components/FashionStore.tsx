@@ -28,6 +28,7 @@ import { HOME_DECOR_ITEMS, decorItemById, type HomeDecorPlacement } from '../lib
 import { fashionShowcaseResult } from '../lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from '../lib/fashionMission';
 import { GarmentPreviewPanel } from './GarmentPreviewPanel';
+import { assetUrl } from '../lib/assetManifest';
 
 interface FashionStoreProps {
   mode: 'shop' | 'wardrobe' | 'decor';
@@ -78,7 +79,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 const CATEGORY_SLOT: Partial<Record<Category, Slot>> = {
   clothes: 'top',
   shoes: 'shoes',
-  hair: 'hair',
+  hair: 'hairstyle',
   'fitting-room': 'top',
 };
 
@@ -116,6 +117,7 @@ export function FashionStore({
   const [outfitName, setOutfitName] = useState('');
   const [decorRoom, setDecorRoom] = useState<'All' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom'>('All');
   const [shoePreviewId, setShoePreviewId] = useState<string | null>(null);
+  const [hairstylePreviewId, setHairstylePreviewId] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -131,14 +133,21 @@ export function FashionStore({
   const items = catalogue.filter((item) => {
     if (category === 'clothes') return item.slot === slot;
     if (category === 'shoes') return item.slot === 'shoes';
-    if (category === 'hair') return item.slot === 'hair';
+    if (category === 'hair') return item.slot === slot && (slot === 'hair' || slot === 'hairstyle');
     if (category === 'fitting-room') return item.slot === slot;
     return false;
   });
   const wornOrPreviewedShoeId = tryOn.shoes !== undefined ? tryOn.shoes : wardrobe.equipped.shoes;
+  const wornOrPreviewedHairstyleId = tryOn.hairstyle !== undefined ? tryOn.hairstyle : wardrobe.equipped.hairstyle;
   const shoePreview = category === 'shoes'
     ? items.find((item) => item.id === shoePreviewId)
       ?? items.find((item) => item.id === wornOrPreviewedShoeId)
+      ?? items[0]
+    : undefined;
+  const hairstylePreview = category === 'hair' && slot === 'hairstyle'
+    ? items.find((item) => item.id === hairstylePreviewId)
+      ?? items.find((item) => item.id === wornOrPreviewedHairstyleId)
+      ?? items.find((item) => item.id === wardrobe.equipped.hairstyle)
       ?? items[0]
     : undefined;
   const equippedId = wardrobe.equipped[slot] ?? null;
@@ -155,6 +164,13 @@ export function FashionStore({
     setCategory(next);
     setSlot(CATEGORY_SLOT[next] ?? slot);
     setMessage('');
+  };
+
+  const previewItem = (item: FashionItem) => {
+    if (item.slot === 'shoes') setShoePreviewId(item.id);
+    if (item.slot === 'hairstyle') setHairstylePreviewId(item.id);
+    onTryOn(item.slot, item.id);
+    setMessage(`${item.name} previewed on your character.`);
   };
 
   return (
@@ -215,6 +231,21 @@ export function FashionStore({
                 className={`whitespace-nowrap border px-3 py-1.5 text-xs transition ${slot === itemSlot ? 'border-[#e3bd70] bg-[#d2b36f]/15 text-white' : 'border-white/10 text-white/65 hover:border-white/30 hover:text-white'}`}
               >
                 {SLOT_LABEL[itemSlot]}
+              </button>
+            ))}
+          </nav>
+        )}
+        {category === 'hair' && (
+          <nav className="flex gap-1.5 border-b border-white/10 px-4 py-2" aria-label="Hair options">
+            {(['hairstyle', 'hair'] as const).map((hairSlot) => (
+              <button
+                key={hairSlot}
+                type="button"
+                aria-pressed={slot === hairSlot}
+                onClick={() => { setSlot(hairSlot); setMessage(''); }}
+                className={`whitespace-nowrap border px-3 py-1.5 text-xs transition ${slot === hairSlot ? 'border-[#e3bd70] bg-[#d2b36f]/15 text-white' : 'border-white/10 text-white/65 hover:border-white/30 hover:text-white'}`}
+              >
+                {SLOT_LABEL[hairSlot]}
               </button>
             ))}
           </nav>
@@ -359,6 +390,21 @@ export function FashionStore({
                 </div>
               </section>
             )}
+            {hairstylePreview?.model?.thumbnail && (
+              <section className="mb-3 overflow-hidden border border-[#c9a35e]/35 bg-[#181b20]">
+                <img
+                  src={assetUrl(hairstylePreview.model.thumbnail)}
+                  alt={`${hairstylePreview.name} hairstyle`}
+                  className="h-28 w-full bg-[#1a1e24] object-contain"
+                />
+                <div className="border-t border-white/10 px-3 py-2">
+                  <h3 className="m-0 text-xs font-semibold">{hairstylePreview.name}</h3>
+                  <p className="m-0 mt-1 text-[10px] text-amber-100/70">
+                    CC0 3D hairstyle preview · follows the head during movement.
+                  </p>
+                </div>
+              </section>
+            )}
             {(equippedId || slot in tryOn) && (
               <div className="mb-3 flex items-center justify-between gap-2 border border-white/10 bg-[#232730] px-3 py-2">
                 <span className="text-xs text-white/70">{equippedId ? `Wearing ${itemById(equippedId)?.name ?? 'a saved item'}` : 'Previewing an item'}</span>
@@ -396,6 +442,21 @@ export function FashionStore({
                         <Footprints size={24} aria-hidden="true" />
                         Inspect placeholder
                       </button>
+                    ) : item.model?.thumbnail ? (
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => previewItem(item)}
+                        className="relative mb-2 flex h-20 w-full items-center justify-center overflow-hidden border border-white/10 bg-[#1a1e24]"
+                      >
+                        <img
+                          src={assetUrl(item.model.thumbnail)}
+                          alt={`${item.name} hairstyle`}
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                        />
+                        {selected && <Check className="absolute right-1 top-1 drop-shadow-md" size={18} aria-hidden="true" />}
+                      </button>
                     ) : (
                       <div
                         className="mb-2 flex h-20 items-center justify-center border border-white/10"
@@ -414,7 +475,7 @@ export function FashionStore({
                       {!wearing && (
                         <button
                           type="button"
-                          onClick={() => { onTryOn(item.slot, item.id); setMessage(`${item.name} previewed on your character.`); }}
+                          onClick={() => previewItem(item)}
                           className={`${BUTTON} border-white/20 text-white/80 hover:border-white/50`}
                         >
                           <ScanEye size={13} /> Preview
@@ -513,7 +574,7 @@ export function FashionStore({
           {message || (category === 'decor'
             ? 'Preview in your 3D home before purchasing; placed furniture remains saved to that home.'
             : category === 'hair'
-            ? 'Hair colour changes are available; hairstyle meshes are not yet available.'
+            ? 'Choose a real CC0 hairstyle model, or switch to Hair colour to recolour the built-in hair.'
             : 'Previews apply fabric and print to the clothing currently modeled; distinct garment meshes are not yet available.')}
         </footer>
       </aside>

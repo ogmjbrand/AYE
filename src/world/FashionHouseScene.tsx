@@ -1,17 +1,17 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC } from './WorldNPC';
-import { NPC_UNIFORMS } from './npcUniforms';
 
 export function FashionHouseScene({ player }: { player: PlayerHandle }) {
   return (
     <>
       <WorldNPC
+        npcId="fashion-house-stylist"
+        role="fashion designer and stylist"
         lookId="female-adult-10"
         position={[0, 0, 5.45]}
         facing={Math.PI}
         player={player}
         greetPlayer
-        styles={NPC_UNIFORMS.fashion}
       />
       <mesh position={[0, 2.76, 0.7]}>
         <boxGeometry args={[5.8, 0.035, 0.035]} />

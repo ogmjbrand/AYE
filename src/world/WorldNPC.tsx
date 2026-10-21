@@ -13,10 +13,17 @@ import { Gestures, type GestureActions } from '../components/Gestures';
 import { OutfitStyler } from '../components/Avatar';
 import { withRelaxedHands } from '../components/handPose';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { generateNpcAppearance } from '../lib/npcFashion';
+import { applyBodyShape } from '../components/bodyShapeSkin';
+import { GarmentLayer } from '../components/GarmentLoader';
+import { getGarmentModel } from '../lib/fashion';
 
 export type NPCPath = readonly (readonly [number, number, number])[];
 
 export interface WorldNPCProps {
+  /** Stable NPC key; derived from role, look and location if omitted. */
+  npcId?: string;
+  role?: string;
   lookId: string;
   position: readonly [number, number, number];
   facing?: number;
@@ -72,6 +79,8 @@ interface NPCRoute {
 }
 
 function NPCModel({
+  npcId,
+  role = 'city resident',
   look,
   position,
   facing = 0,
@@ -86,6 +95,14 @@ function NPCModel({
   styles,
 }: WorldNPCProps & { look: Look }) {
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
+  const appearance = useMemo(
+    () => generateNpcAppearance(
+      npcId ?? `world:${role}:${look.id}:${position.join(',')}`,
+      role,
+      look.body === 'feminine',
+    ),
+    [npcId, role, look.id, look.body, position],
+  );
   const root = useRef<Group>(null);
   const rig = useRef<Group>(null);
   const route = useRef<NPCRoute | null>(null);
@@ -129,6 +146,7 @@ function NPCModel({
     const height = box.max.y - box.min.y;
     return height > 0 ? look.height / height : 1;
   }, [figure, look.height]);
+  useEffect(() => applyBodyShape(figure, appearance.shape), [figure, appearance.shape]);
   const clips = useMemo(() => withRelaxedHands(animations), [animations]);
   const { actions, mixer } = useAnimations(clips, rig);
   const idleClip = useMemo(() => clips.find((clip) => /idle|stand/i.test(clip.name)), [clips]);
@@ -234,7 +252,15 @@ function NPCModel({
     <group ref={root} position={position} dispose={null}>
       <group ref={rig} rotation={[0, facing, 0]}>
         <primitive object={figure} scale={scale} />
-        {styles && <OutfitStyler scene={figure} lookId={look.id} styles={styles} />}
+        <OutfitStyler scene={figure} lookId={look.id} styles={styles ?? appearance.styles} skinTone={appearance.skinTone} />
+        {!styles && appearance.hairstyleItemId && getGarmentModel(appearance.hairstyleItemId) && (
+          <GarmentLayer
+            groupRef={rig}
+            model={getGarmentModel(appearance.hairstyleItemId)!}
+            isEquipped
+            avatarScale={scale}
+          />
+        )}
       </group>
       <Gestures body={look.body} mixer={mixer} root={rig} idle={idleClip} onLoad={setGestureActions} />
     </group>

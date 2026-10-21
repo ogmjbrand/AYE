@@ -11,10 +11,11 @@ import { SkyDome } from './SkyDome';
 import { lightingAt, type HdriKey } from './timeOfDay';
 
 const HDRI: Record<HdriKey, string> = {
-  day: `${import.meta.env.BASE_URL}assets/hdri/potsdamer_platz_1k.hdr`,
-  golden: `${import.meta.env.BASE_URL}assets/hdri/venice_sunset_1k.hdr`,
+  day: `${import.meta.env.BASE_URL}assets/environment/sky-day/DaySkyHDRI026A_1K_HDR.exr`,
+  golden: `${import.meta.env.BASE_URL}assets/environment/sky-golden/DaySkyHDRI030A_1K_HDR.exr`,
   night: `${import.meta.env.BASE_URL}assets/hdri/dikhololo_night_1k.hdr`,
 };
+const INDOOR_HDRI = `${import.meta.env.BASE_URL}assets/environment/sky-indoor/IndoorEnvironmentHDRI020_1K_HDR.exr`;
 
 const SHADOW_EXTENT = 32;
 const sunOffset = new Vector3();
@@ -34,7 +35,7 @@ const characterLightFor = (sunIntensity: number) => CHARACTER_LIGHT_MAX * Math.m
  * The sun's shadow camera follows the player so a small, sharp shadow map
  * covers the area the camera can actually see.
  */
-export function SceneLighting({ gameTime, player }: { gameTime: GameTime; player: PlayerHandle }) {
+export function SceneLighting({ gameTime, player, indoor = false }: { gameTime: GameTime; player: PlayerHandle; indoor?: boolean }) {
   const quality = useQuality();
   const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
   const sun = useRef<DirectionalLight>(null);
@@ -89,7 +90,7 @@ export function SceneLighting({ gameTime, player }: { gameTime: GameTime; player
       {/* Image-based lighting and reflections; the scene still works if it fails to load */}
       <ErrorBoundary fallback={null}>
         <Suspense fallback={null}>
-          <Environment files={HDRI[l.hdri]} environmentIntensity={l.envIntensity} />
+          <Environment files={indoor ? INDOOR_HDRI : HDRI[l.hdri]} environmentIntensity={indoor ? 0.45 : l.envIntensity} />
         </Suspense>
       </ErrorBoundary>
     </>

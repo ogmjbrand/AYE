@@ -8,6 +8,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { type Group, type Object3D } from 'three';
 import type { GarmentModel } from '../lib/fashion';
 import { assetUrl } from '../lib/assetManifest';
+import { findRigBone } from '../lib/characterRig';
 
 const loader = new GLTFLoader();
 const garmentLoadingPromises = new Map<string, Promise<Object3D>>();
@@ -33,14 +34,22 @@ function attachGarment(
   garmentScene: Object3D,
   garmentModel: GarmentModel,
   characterScene: Object3D,
+  avatarScale: number,
 ): void {
-  if (garmentModel.scale !== undefined) garmentScene.scale.setScalar(garmentModel.scale);
+  const scale = (garmentModel.fitToAvatar ? avatarScale : 1) * (garmentModel.scale ?? 1);
+  garmentScene.scale.setScalar(scale);
 
   if (garmentModel.attachBones && garmentModel.attachBones.length > 0) {
     for (const boneName of garmentModel.attachBones) {
-      const bone = characterScene.getObjectByName(boneName);
+      const bone = findRigBone(characterScene, boneName);
       if (bone) {
-        bone.add(garmentScene);
+        if (garmentModel.preserveWorldTransform) {
+          characterScene.add(garmentScene);
+          characterScene.updateWorldMatrix(true, true);
+          bone.attach(garmentScene);
+        } else {
+          bone.add(garmentScene);
+        }
         return;
       }
     }
@@ -54,12 +63,13 @@ export interface GarmentLayerProps {
   groupRef: RefObject<Group | null>;
   model: GarmentModel;
   isEquipped: boolean;
+  avatarScale?: number;
 }
 
 /**
  * Load and attach a garment after the parent character ref has been committed.
  */
-export function GarmentLayer({ groupRef, model, isEquipped }: GarmentLayerProps) {
+export function GarmentLayer({ groupRef, model, isEquipped, avatarScale = 1 }: GarmentLayerProps) {
   const garmentRef = useRef<Object3D | null>(null);
 
   useEffect(() => {
@@ -79,7 +89,7 @@ export function GarmentLayer({ groupRef, model, isEquipped }: GarmentLayerProps)
         const garmentScene = await loadGarmentModel(model);
         if (cancelled) return;
 
-        attachGarment(garmentScene, model, group);
+        attachGarment(garmentScene, model, group, avatarScale);
         garmentRef.current = garmentScene;
       } catch (error) {
         console.error('[GarmentLayer] Failed to load garment:', error);
@@ -93,7 +103,7 @@ export function GarmentLayer({ groupRef, model, isEquipped }: GarmentLayerProps)
       }
       garmentRef.current = null;
     };
-  }, [groupRef, isEquipped, model]);
+  }, [groupRef, isEquipped, model, avatarScale]);
 
   return null;
 }

@@ -2,7 +2,6 @@ import type { Dish } from '../lib/food';
 import { RESTAURANT_TABLES, restaurantTableById } from '../lib/interiors';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC, type NPCPath } from './WorldNPC';
-import { NPC_UNIFORMS } from './npcUniforms';
 
 function MealPlate({ tableId, dish }: { tableId: string; dish: Dish }) {
   const table = restaurantTableById(tableId);
@@ -106,6 +105,8 @@ export function RestaurantScene({
         return (
           <WorldNPC
             key={seat.id}
+            npcId={`restaurant-guest-${seat.id}`}
+            role="restaurant guest"
             lookId={lookId}
             position={[seat.x, seat.height, seat.z]}
             facing={seat.facing}
@@ -114,28 +115,31 @@ export function RestaurantScene({
         );
       })}
       <WorldNPC
+        npcId="restaurant-host"
+        role="restaurant host"
         lookId="female-adult-06"
         position={[-0.55, 0, -4.05]}
         facing={0}
         player={player}
         greetPlayer
-        styles={NPC_UNIFORMS.host}
       />
       <WorldNPC
+        npcId="restaurant-server"
+        role="restaurant waiter"
         lookId="male-adult-04"
         position={[0, 0, -1.3]}
         path={deliveryPath ?? servicePath}
         pathKey={deliveryTable ? `delivery-${deliveryTable.id}` : 'service-patrol'}
         loopPath={!deliveryTable}
         walkSpeed={1.15}
-        styles={NPC_UNIFORMS.waiter}
         onArrive={deliveryTable ? onMealDelivered : undefined}
       />
       <WorldNPC
+        npcId="restaurant-chef"
+        role="restaurant chef"
         lookId="male-adult-18"
         position={[-7, 0, 5.1]}
         facing={Math.PI}
-        styles={NPC_UNIFORMS.chef}
       />
       {deliveryTable && dish && mealDelivered && (
         <MealPlate tableId={deliveryTable.id} dish={dish} />

@@ -8,7 +8,7 @@ import { seatDrop } from '../lib/seating';
 import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
-import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
+import { applySkinTone, applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
 import { applyBodyShape } from './bodyShapeSkin';
 import { createRelaxedHands } from './relaxedHands';
 import { withRelaxedHands } from './handPose';
@@ -18,6 +18,8 @@ import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { GarmentLayer } from './GarmentLoader';
 import { getGarmentModel } from '../lib/fashion';
+import { DEFAULT_SKIN_TONE, skinToneById, type SkinToneId } from '../lib/skinTone';
+import { findRigBone } from '../lib/characterRig';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 const EAT_UPPER_ARM = new Quaternion().setFromEuler(new Euler(-0.16, 0.05, -0.82));
@@ -25,7 +27,12 @@ const EAT_FOREARM = new Quaternion().setFromEuler(new Euler(-0.08, 0, -1.05));
 const EAT_HAND = new Quaternion().setFromEuler(new Euler(0, 0, -0.22));
 
 /** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
-export function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
+export function OutfitStyler({ scene, lookId, styles, skinTone = DEFAULT_SKIN_TONE }: {
+  scene: Object3D;
+  lookId: string;
+  styles: Partial<Record<Slot, Style>>;
+  skinTone?: SkinToneId;
+}) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
   const uniforms = useMemo(() => {
     const list: StyleUniforms[] = [];
@@ -46,8 +53,12 @@ export function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookI
     return list;
   }, [scene, bodyMask, headMask]);
   useEffect(() => {
-    for (const u of uniforms) applyStyles(u, styles);
-  }, [uniforms, styles]);
+    const tone = skinToneById(skinTone);
+    for (const u of uniforms) {
+      applyStyles(u, styles);
+      applySkinTone(u, tone.color, skinTone !== 'original');
+    }
+  }, [uniforms, styles, skinTone]);
   return null;
 }
 
@@ -97,7 +108,7 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false, shoeItemId = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = DEFAULT_SKIN_TONE, conversing = false, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
@@ -105,6 +116,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   eating?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
   shape?: BodyShape;
+  /** Skin-only tint layered over the model's existing texture; original keeps its authored skin. */
+  skinTone?: SkinToneId;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
   styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
@@ -113,6 +126,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   heightCm?: number;
   /** Visible shoe item (equipped or tried on); rendered when its model is available. */
   shoeItemId?: string | null;
+  /** Visible 3D hairstyle item (equipped or tried on). */
+  hairstyleItemId?: string | null;
 }) {
   const group = useRef<Group>(null);
   // A character listed in public/assets/manifest.json replaces the built-in looks
@@ -162,9 +177,9 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
 
   const relaxed = useMemo(() => createRelaxedHands(scene, clipsWithHands), [scene, clipsWithHands]);
   const eatingBones = useMemo(() => ({
-    upperArm: scene.getObjectByName('Bip01 R UpperArm'),
-    forearm: scene.getObjectByName('Bip01 R Forearm'),
-    hand: scene.getObjectByName('Bip01 R Hand'),
+    upperArm: findRigBone(scene, 'rightUpperArm'),
+    forearm: findRigBone(scene, 'rightForearm'),
+    hand: findRigBone(scene, 'rightHand'),
   }), [scene]);
   const eatingStart = useRef<number | null>(null);
   const eatingWasActive = useRef(false);
@@ -225,13 +240,15 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   });
 
   const garmentModel = shoeItemId ? getGarmentModel(shoeItemId) : null;
+  const hairstyleModel = hairstyleItemId ? getGarmentModel(hairstyleItemId) : null;
 
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
-      {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
+      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? {}} skinTone={skinTone} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
       {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped />}
+      {hairstyleModel && <GarmentLayer groupRef={group} model={hairstyleModel} isEquipped avatarScale={scale} />}
     </group>
   );
 }

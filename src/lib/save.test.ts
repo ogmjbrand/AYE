@@ -20,6 +20,7 @@ const character: Character = {
   body: 'feminine', lookId: 'female-adult-10', heightCm: 168, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15 },
   wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
   homeDecor: [],
+  skinTone: 'rich',
 };
 
 describe('character save', () => {
@@ -69,6 +70,14 @@ describe('character save', () => {
     const { shape, ...old } = character;
     void shape;
     expect(parseCharacter(old)!.shape).toEqual({ weight: 0, muscle: 0, curves: 0, belly: 0 });
+  });
+
+  it('preserves selected skin tone and safely defaults older or invalid values', () => {
+    expect(parseCharacter({ ...character, skinTone: 'deep' })?.skinTone).toBe('deep');
+    expect(parseCharacter({ ...character, skinTone: 'unknown-tone' })?.skinTone).toBe('original');
+    const { skinTone: _skinTone, ...old } = character;
+    void _skinTone;
+    expect(parseCharacter(old)?.skinTone).toBe('original');
   });
 
   it('drops unknown or unowned wardrobe items', () => {

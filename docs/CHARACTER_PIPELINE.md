@@ -1,24 +1,56 @@
 # AYE character pipeline proposal
 
-Status: **proposal, not implemented.** Written October 2026. Licence facts
-were checked against the sources linked at the end; where a source was
-second-hand or disputed, it says so.
+Status: **incremental migration in progress.** Rocketbox remains the active,
+save-compatible character pipeline. A skin-only tint selector and four CC0
+head-attached hairstyles are integrated; a MakeHuman base character, facial
+morphs, and rigged MakeHuman clothing are not integrated.
 
 ## 1. Audit: what the game has today
 
 | Part | Current state | Meets the target? |
 |---|---|---|
-| Model | One fixed avatar: Microsoft Rocketbox `Male_Adult_12` (MIT). Real human proportions, photo-sourced face, hand and clothing textures (2K), ~6,700 triangles. | Human, not cartoon. Low-poly by 2026 standards; hair is painted on the head. |
-| Variation | **None** except an outfit tint that recolours the denim. Every player is the same man. | **No.** |
-| Presentation | Male only. The library has no dark-skinned adult woman (checked all 17 adult women). | **No.** |
-| Body / face | No morphs. Height is a fixed scale. | **No.** |
-| Hair / clothes | Baked into one texture; not interchangeable. | **No.** |
+| Model | Twelve selectable Microsoft Rocketbox adult looks (MIT), retained as the active player and NPC-compatible fallback. | Realistic game-resolution people; the original rig and locomotion clips remain. |
+| Variation | Look, height, four existing bone-based body-shape controls, and a separately saved skin tint. | Partial; skin-tone colors modulate exposed skin pixels, not source skin-texture replacement. |
+| Presentation | Six feminine and six masculine Rocketbox looks. | Fixed source models; not an exhaustive or fully representative character library. |
+| Body / face | Existing body shape scales selected bones. No facial morph targets are present on these Rocketbox meshes. | Body-shape foundation only; no face-shape editing. |
+| Hair / clothes | Four CC0 MakeHuman hairstyles are static GLBs attached to the Rocketbox head bone. Existing clothing restyling remains texture-mask based. | Hair follows head turns but lacks secondary motion; downloaded MakeHuman garments are not asserted to fit Rocketbox. |
 | Animation | Rocketbox motion capture: idle, walk, run on the avatar's own skeleton, cadence matched to ground speed. The walk clip holds the fingers still, so its finger rotations were dropped at conversion and the hands showed the open bind pose; `components/handPose.ts` gives such clips the idle clip's relaxed hand at load time. Rocketbox has 417 more clips on the same skeleton (sit, talk, phone, work…). | Yes for locomotion; extensible. |
-| Creation UI | Name, lifestyle, career, diet, outfit colour, with a live 3D preview. | Systems are fine; appearance options are missing. |
+| Creation UI | Name, lifestyle, career, diet, outfit colour, with a live 3D preview. | Skin tint and model-backed hairstyle options are available; facial and parametric controls remain unavailable on Rocketbox. |
 
-Conclusion: the game has a **character file**, not a **character system**.
-Fixing that needs a different kind of source asset: a parametric human with
-morph targets and modular hair and clothing on a shared skeleton.
+### Pre-dress appearance target
+
+The supplied reference is the target for a neutral, adult feminine base body
+before outfit selection: realistic proportions, dark simple undergarments, and
+front/side/back views. The target should be visible in the creator and where
+the corresponding outfit slots are empty, with bought/equipped clothing layered
+over it. Implement the feminine version first and keep current Rocketbox looks
+as the fallback for all players until the replacement passes rig, movement,
+save, and clothing-fit checks. The reference image is guidance only, not a
+redistributable character asset.
+
+This is **not yet implemented**: current Rocketbox outfits are part of the
+model's baked mesh/texture and cannot be safely removed or reshaped into
+undergarments with the clothing-colour shader. The MakeHuman base OBJ, game
+rig, and fitted underwear garment are not present in the repository. Do not
+paint underwear onto a texture or recolour the existing shirt and trousers as
+a substitute for the required base model.
+
+### Verified rig boundary
+
+`src/lib/characterRig.ts` records the gameplay-critical `rocketbox-biped-v1`
+bone roles and normalizes the space/underscore bone-name variants found in
+the GLBs. Eating poses, body-shape bone matching, relaxed finger animation,
+and accessory attachment all use this shared boundary. The verified runtime
+conventions are the existing `Bip01` hierarchy and its matching Idle/Walk/Run
+and gesture clips; this adapter does not retarget clips or certify another
+skeleton as compatible. A future MakeHuman kit must supply its own verified
+profile, rigged model, clothing weights, and animation mapping before it can
+be selected in gameplay.
+
+Conclusion: AYE now has a safer customization foundation on the existing
+character system, but not yet the parametric human pipeline described below.
+Facial morphs and modular fitted garments require a compatible base mesh and
+verified rig/weights before they can be activated.
 
 ## 2. Options compared
 
@@ -118,24 +150,21 @@ work activities without buying motion capture.
 5. **Performance pass on your laptop** (your FPS readings) before adding more
    assets.
 
-## 5. What is needed from you
+## 5. Asset availability
 
-**For Phase 1 (free):** the MPFB2 core data (base mesh, targets, rigs) is on
-GitHub and reachable from the development environment. **Skins, eyes, hair
-and clothes come in asset packs hosted on makehumancommunity.org, which the
-development environment cannot reach.** On your laptop:
+The MakeHuman system-assets archive and several CC0 target packs are now
+available in the local Downloads folder. There is no need to upload them
+again. Four system hairstyles (afro, braids, ponytail and long waves) have
+been converted, optimized and integrated with the existing player. The
+remaining system clothing and shoe assets are fitted to MakeHuman's HM08
+topology, not the Rocketbox avatar, and are not yet safe to wear in-game.
 
-1. Open the official asset packs page:
-   https://static.makehumancommunity.org/assets/assetpacks.html
-2. Download **"MakeHuman system assets"** (required), plus any packs offering
-   skins with darker tones and afro, braid or loc hair. **Check each pack's
-   stated licence**: CC0 is fine to commit; CC-BY needs a credit line.
-3. Get the zip files to me by uploading them in this chat. Don't commit them
-   to GitHub: large binaries bloat the repository. I'll extract only what the
-   kit uses.
+The selected public assets are CC0 and attributed in
+`public/assets/CREDITS.md`. Original archives remain in Downloads; only the
+converted, verified runtime assets are copied into the repository.
 
-Not needed for Phase 1: installing Blender yourself. The build runs here. If
-you'd like to try MPFB interactively, it needs Blender 4.2 or newer.
+Not needed for this step: installing Blender yourself. Blender 5.2 is
+available in the development environment.
 
 **For Phase 2 (premium):** a budget decision on Reallusion Character Creator
 plus the content licences, and a written mass-distribution permission request
@@ -171,10 +200,14 @@ Rocketbox people allow.
 
 What is still missing before MakeHuman people can replace Rocketbox in the game:
 
-1. **MakeHuman system assets** (CC0): skins, eyes, eyebrows, eyelashes, hair and
-   clothes. Without them a MakeHuman person has no skin texture, hair or
-   clothing, which would look worse than today's characters.
-2. **Animations for the MakeHuman game-engine skeleton** (idle, walk, run), or a
-   retarget of the Rocketbox clips onto it.
-3. A build step (MPFB in headless Blender, or a Node script) that bakes body
-   shape, skin and clothes into optimised GLBs.
+1. A complete MakeHuman base body, skin, eye and skeleton export. The local
+   CC0 system pack contains multiple skin textures, hair, clothing and shoes;
+   four hairstyles are already converted for the Rocketbox head attachment.
+2. Idle, walk and run animations for the MakeHuman game-engine skeleton, or a
+   verified retarget of Rocketbox clips onto it.
+3. A repeatable rigged export that applies the HM08 clothing proxy mappings
+   and weights, and a save-compatible character selection path.
+
+The four current hairstyles are static meshes attached to the Rocketbox head
+bone: they follow head turns and locomotion, but do not have ponytail or braid
+secondary-motion simulation.

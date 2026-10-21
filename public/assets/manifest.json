@@ -1,8 +1,23 @@
 {
   "surfaces": {
-    "road": null,
-    "pavement": null,
-    "ground": null,
+    "road": {
+      "color": "environment/road/Asphalt015_1K-JPG_Color.jpg",
+      "normal": "environment/road/Asphalt015_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/road/Asphalt015_1K-JPG_Roughness.jpg",
+      "tileMeters": 2
+    },
+    "pavement": {
+      "color": "environment/pavement/PavingStones036_1K-JPG_Color.jpg",
+      "normal": "environment/pavement/PavingStones036_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/pavement/PavingStones036_1K-JPG_Roughness.jpg",
+      "tileMeters": 2.5
+    },
+    "ground": {
+      "color": "environment/ground/Ground003_1K-JPG_Color.jpg",
+      "normal": "environment/ground/Ground003_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/ground/Ground003_1K-JPG_Roughness.jpg",
+      "tileMeters": 6
+    },
     "roof": null,
     "concrete": null
   },

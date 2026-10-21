@@ -1352,7 +1352,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                   mealDelivered={restaurantDeliveryReady}
                 />}
                 {insideOffice && <OfficeScene player={controller} />}
-                <InteriorLighting gameTime={state.time} player={controller} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor />
                 <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
                 {inside && home && decorPlacement && decorPlacementItem && (
                   <DecorPlacementPreview controller={controller} item={decorPlacementItem} rotation={decorPlacement.rotation} />

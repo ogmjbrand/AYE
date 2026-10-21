@@ -1,13 +1,13 @@
 import { Color, DataTexture, NoColorSpace, type Material, type MeshStandardMaterial, type Texture } from 'three';
-import { PATTERNS, type Slot, type Style } from '../lib/fashion';
+import { PATTERNS, SLOTS, type Slot, type Style } from '../lib/fashion';
 
 /**
  * Restyles a Rocketbox avatar's clothes and hair in the fragment shader.
  * A garment map (see scripts/rocketbox/garment-masks.mjs) says which texels
  * belong to the top, bottom, shoes (body texture: R, G, B) or hair (head
- * texture: R; cut-out cards such as hijab drapes count as headwear). Those
- * texels take the chosen fabric's colours and pattern,
- * keeping the original fabric's folds and shading; skin is never touched.
+ * texture: R; cut-out cards such as hijab drapes count as headwear). Garments
+ * keep their original folds and shading; optional skin tinting uses only the
+ * unmasked body/head texels.
  */
 
 interface SlotUniforms {
@@ -23,7 +23,10 @@ interface SlotUniforms {
   c: { value: Color };
 }
 
-export type StyleUniforms = Partial<Record<Slot, SlotUniforms>>;
+export interface StyleUniforms extends Partial<Record<Slot, SlotUniforms>> {
+  skinTone: { value: Color };
+  skinToneEnabled: { value: number };
+}
 
 const BODY_SLOTS: readonly (readonly [Slot, string])[] = [['top', 'r'], ['bottom', 'g'], ['shoes', 'b']];
 
@@ -147,7 +150,10 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   if (!slots || !m.map) return null;
   if (cutout) mask = FULL_MASK;
 
-  const uniforms: StyleUniforms = {};
+  const uniforms: StyleUniforms = {
+    skinTone: { value: new Color('#ffffff') },
+    skinToneEnabled: { value: 0 },
+  };
   for (const [slot] of slots) {
     uniforms[slot] = {
       on: { value: 0 }, pattern: { value: 0 }, scale: { value: 16 }, rough: { value: -1 }, weave: { value: 0 }, metal: { value: 0 },
@@ -166,6 +172,9 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       decl += `uniform float uAye_${slot}_rough; uniform float uAye_${slot}_weave; uniform float uAye_${slot}_metal;\n`;
       decl += `uniform vec3 uAye_${slot}_a; uniform vec3 uAye_${slot}_b; uniform vec3 uAye_${slot}_c;\n`;
     }
+    shader.uniforms.uAyeSkinTone = uniforms.skinTone;
+    shader.uniforms.uAyeSkinToneEnabled = uniforms.skinToneEnabled;
+    decl += 'uniform vec3 uAyeSkinTone; uniform float uAyeSkinToneEnabled;\n';
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${decl}${PATTERN_GLSL}`)
       .replace(
@@ -177,6 +186,13 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
         float ayeFinish = 0.0;
         {
           vec4 ayeMask = texture2D(uAyeMask, vMapUv);
+          ${cutout ? '' : `
+          float ayeSkinCoverage = ${isHead ? 'ayeMask.r' : 'max(ayeMask.r, max(ayeMask.g, ayeMask.b))'};
+          float ayeSkinWeight = (1.0 - clamp(ayeSkinCoverage, 0.0, 1.0)) * uAyeSkinToneEnabled;
+          float ayeSkinLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          vec3 ayeSkinShade = uAyeSkinTone * (0.45 + 1.1 * sqrt(clamp(ayeSkinLum, 0.0, 1.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, ayeSkinShade, ayeSkinWeight);
+          `}
           // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
           float ayeLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
@@ -186,14 +202,16 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v2-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v3-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }
 
 /** Points the uniforms at the styles to show; slots without a style show the original clothes. */
 export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot, Style>>) {
-  for (const [slot, u] of Object.entries(uniforms) as [Slot, SlotUniforms][]) {
+  for (const slot of SLOTS) {
+    const u = uniforms[slot];
+    if (!u) continue;
     const s = styles[slot];
     u.on.value = s ? 1 : 0;
     if (!s) continue;
@@ -206,4 +224,9 @@ export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot
     u.b.value.set(s.colors[1]);
     u.c.value.set(s.colors[2]);
   }
+}
+
+export function applySkinTone(uniforms: StyleUniforms, color: string, enabled: boolean) {
+  uniforms.skinTone.value.set(color);
+  uniforms.skinToneEnabled.value = enabled ? 1 : 0;
 }
