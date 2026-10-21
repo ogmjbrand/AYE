@@ -136,7 +136,7 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('top-festival-adire', 'top', 'Festival adire · Gold resist', 0, 'Rewards', 'adire', ['#2b1d4f', '#e3c27a', '#3a2a6e'], 22, []),
   item('top-friendship-ankara', 'top', 'Friendship ankara', 0, 'Rewards', 'ankara', ['#b8463a', '#1f6b4f', '#f0d6a0'], 16, []),
   item('shoes-trail-emerald', 'shoes', 'Trail runners · Emerald', 0, 'Rewards', 'solid', ['#2f8f6b'], 18, []),
-  item('hair-rose-gold', 'hair', 'Rose gold', 0, 'Salon', 'solid', ['#b9776a'], 18, []),
+  item('hair-rose-gold', 'hair', 'Rose gold', 0, 'Rewards', 'solid', ['#b9776a'], 18, []),
 ];
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
