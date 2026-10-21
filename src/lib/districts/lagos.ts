@@ -23,6 +23,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-11, 24, 6, 12, 17, 'residential', '#d8a47f', 'Palm View'),
       b(-23, 24, 10, 12, 22, 'office', '#c9ccc8', 'Tech Campus'),
       b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Gadget Hub'),
+      // The Palms restaurant, fronting the cross street behind Mama Put
+      b(-21, -10.25, 12, 5.5, 7, 'shop', '#1f2c27'),
       // West side, south of the cross street
       b(-13, -36, 10, 12, 18, 'office', '#d6cdbd', 'University'),
       b(-26, -36, 10, 10, 13, 'residential', '#e3cf9a'),
@@ -76,12 +78,14 @@ export const LAGOS_MARINA: DistrictSpec = {
       towerChance: 0.55,
     },
   },
+  // Real Lagos areas, laid over the district: the boulevard runs along the Marina, Victoria Island lies south over the bridge
   neighborhoods: [
-    { id: 'downtown', name: 'Downtown', bounds: { minX: -15, maxX: 15, minZ: -20, maxZ: 0 }, description: 'The heart of the city', atmosphere: 'urban' },
-    { id: 'harbor', name: 'Harbor District', bounds: { minX: -20, maxX: 0, minZ: 0, maxZ: 25 }, description: 'Waterfront commerce and trade', atmosphere: 'commercial' },
-    { id: 'uptown', name: 'Uptown', bounds: { minX: 10, maxX: 30, minZ: -15, maxZ: 15 }, description: 'Luxury residences and boutiques', atmosphere: 'residential' },
-    { id: 'industrial', name: 'Industrial District', bounds: { minX: -35, maxX: -15, minZ: 10, maxZ: 35 }, description: 'Manufacturing and logistics', atmosphere: 'industrial' },
-    { id: 'parks', name: 'Central Park', bounds: { minX: 0, maxX: 20, minZ: 20, maxZ: 35 }, description: 'Green spaces and recreation', atmosphere: 'residential' },
+    { id: 'downtown', name: 'Lagos Island', bounds: { minX: -15, maxX: 15, minZ: -20, maxZ: 0 }, description: 'Markets, offices and the old city', atmosphere: 'urban' },
+    { id: 'harbor', name: 'Marina', bounds: { minX: -20, maxX: 0, minZ: 0, maxZ: 25 }, description: 'The waterfront and the boulevard', atmosphere: 'commercial' },
+    { id: 'uptown', name: 'Ikoyi', bounds: { minX: 10, maxX: 30, minZ: -15, maxZ: 15 }, description: 'Leafy streets, smart homes and boutiques', atmosphere: 'residential' },
+    { id: 'industrial', name: 'Apapa', bounds: { minX: -35, maxX: -15, minZ: 10, maxZ: 35 }, description: 'The port, warehouses and logistics', atmosphere: 'industrial' },
+    { id: 'parks', name: 'Onikan', bounds: { minX: 0, maxX: 20, minZ: 20, maxZ: 35 }, description: 'Green spaces, culture and recreation', atmosphere: 'residential' },
+    { id: 'vi', name: 'Victoria Island', bounds: { minX: -35, maxX: 35, minZ: -45, maxZ: -24 }, description: 'Towers, fine dining and the lagoon', atmosphere: 'residential' },
   ],
   vendors: [
     {
@@ -108,6 +112,7 @@ export const LAGOS_MARINA: DistrictSpec = {
     id: 'lagoon-live', name: 'Lagoon Live', kind: 'Live music lounge', position: [5.5, 0, 20], cover: 250,
     description: 'Afrobeats and highlife from a house band, small chops at the bar, open late.',
   },
+  restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   homes: [
     {
       id: 'marina-court-room', district: 'lagos.marina', name: 'Marina Court, room 4B', kind: 'Room in a shared flat', building: 'Marina Court',

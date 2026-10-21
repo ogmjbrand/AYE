@@ -78,6 +78,18 @@ export interface DistrictSpec {
   nightlife: Venue;
   /** The district's public park: benches where you can sit and let time pass (lib/parks.ts). */
   park: Park;
+  /** A sit-down restaurant you walk into (lib/restaurant.ts), where the district has one. */
+  restaurant?: RestaurantFront;
+}
+
+export interface RestaurantFront {
+  id: string;
+  name: string;
+  kind: string;
+  /** Where you stand outside the door (E goes in). */
+  door: Spot;
+  /** Which way the shop front faces (0 = +z, π = −z). */
+  facing: number;
 }
 
 export interface District extends Omit<DistrictSpec, 'layout'> {
@@ -85,6 +97,14 @@ export interface District extends Omit<DistrictSpec, 'layout'> {
   /** Every interactive place, indexed for maps, saves and a future server. */
   places: readonly Place[];
 }
+
+/** The restaurant whose door you're standing at, if any. */
+export function restaurantAt(d: Pick<District, 'restaurant'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.restaurant;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+/** Within this distance of a restaurant's door you can go in (E). */
+export const DOOR_RADIUS = 2;
 
 /** Within this distance of a counter you can use it (E). */
 export const COUNTER_RADIUS = 3;
@@ -98,6 +118,7 @@ function buildDistrict(spec: DistrictSpec): District {
     { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
     { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
+    ...(spec.restaurant ? [{ id: id(`restaurant.${spec.restaurant.id}`), kind: 'food' as const, name: spec.restaurant.name, position: spec.restaurant.door }] : []),
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,

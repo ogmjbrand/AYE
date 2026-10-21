@@ -51,3 +51,7 @@ export function finishJob(job: SnapshotJob, url: string | null) {
   queue.shift();
   notify();
 }
+
+/** The finished picture for a key, if there is one (null while queued, or if it failed). */
+export const snapshotOf = (key: string): string | null => done.get(key) ?? null;
+export const snapshotFailed = (key: string): boolean => failed.has(key);

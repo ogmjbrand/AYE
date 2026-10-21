@@ -6,6 +6,7 @@ import type { DreamId, TraitId } from '../lib/lifeState';
 import { loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
+import type { Needs } from '../lib/needs';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -53,7 +54,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     wait: (minutes: number) => dispatch({ type: 'wait', minutes }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
-    eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
+    eat: (price: number, fullness: number, lift?: Partial<Needs>) => dispatch({ type: 'eat', price, fullness, lift }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),
     buyFurniture: (itemId: string) => dispatch({ type: 'buyFurniture', itemId }),
     sellFurniture: (uid: string) => dispatch({ type: 'sellFurniture', uid }),

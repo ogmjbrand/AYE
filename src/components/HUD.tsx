@@ -8,7 +8,8 @@ import { nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { TouchStick } from './TouchStick';
 import { homeAtDoor, type Home } from '../lib/homes';
-import { counterAt, type District, type PlaceKind } from '../lib/geography';
+import { counterAt, restaurantAt, type District, type PlaceKind } from '../lib/geography';
+import { OPEN_HOUR as RESTAURANT_OPENS, isOpen as restaurantOpen } from '../lib/restaurant';
 import { venueAt } from '../lib/nightlife';
 import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
@@ -60,6 +61,8 @@ interface HUDProps {
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
+  /** Goes into the district's restaurant when standing at its door. */
+  onEnterRestaurant?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
@@ -261,6 +264,7 @@ export function HUD({
   workTask,
   insideHome,
   onOpenGadgets,
+  onEnterRestaurant,
   homeId = null,
   onOpenHome,
   place,
@@ -290,8 +294,11 @@ export function HUD({
   const vendor = nearestVendor(district.vendors, px, pz);
   const counter = counterAt(district, px, pz);
   // One prompt at a time: a food vendor, then a shop or desk, then a front door
+  const restaurant = restaurantAt(district, px, pz);
   const prompt = vendor && onOpenVendor
     ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
+    : restaurant && onEnterRestaurant
+      ? { verb: restaurantOpen(gameTime.hour) ? 'Go into' : `Closed until ${RESTAURANT_OPENS}:00:`, place: restaurant.name, onOpen: onEnterRestaurant }
     : counter === 'fashion' && onOpenShop
       ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop }
       : counter === 'gadgets' && onOpenGadgets

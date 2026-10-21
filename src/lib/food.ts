@@ -432,7 +432,7 @@ const FORBIDDEN: Record<Diet, readonly AnimalProduct[]> = {
   vegan: ['meat', 'fish', 'dairy', 'egg'],
 };
 
-export function suitsDiet(dish: Dish, diet: Diet): boolean {
+export function suitsDiet(dish: Pick<Dish, 'contains'>, diet: Diet): boolean {
   return !dish.contains.some((p) => FORBIDDEN[diet].includes(p));
 }
 

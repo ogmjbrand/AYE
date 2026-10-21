@@ -155,6 +155,8 @@ export interface Wardrobe {
   equipped: Partial<Record<Slot, string>>;
   /** Saved looks (absent until the player saves one). */
   outfits?: Outfit[];
+  /** Pieces and sets hearted in the boutique, by id (absent until the player hearts one). */
+  favourites?: string[];
 }
 
 /** Items a district's boutique sells: the basics, plus what's made in its country. */
@@ -183,7 +185,11 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
     .filter((o): o is { name: string; equipped: unknown } => typeof o === 'object' && o !== null && typeof (o as { name?: unknown }).name === 'string' && (o as { name: string }).name.trim() !== '')
     .slice(0, MAX_OUTFITS)
     .map((o) => ({ name: o.name.trim().slice(0, 24), equipped: cleanEquipped(o.equipped) }));
-  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}) };
+  // Hearted items and sets (a set's id is "set-" and its top's id without "top-")
+  const favourites = (Array.isArray((w as { favourites?: unknown }).favourites) ? (w as { favourites: unknown[] }).favourites : [])
+    .filter((id): id is string => typeof id === 'string' && (!!itemById(id) || (id.startsWith('set-') && !!itemById(`top-${id.slice(4)}`))))
+    .slice(0, 200);
+  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}), ...(favourites.length ? { favourites: [...new Set(favourites)] } : {}) };
 }
 
 /** The styles to draw for each slot (equipped items, overridden by anything being tried on). */

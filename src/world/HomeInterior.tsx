@@ -1,8 +1,10 @@
 import { DoubleSide } from 'three';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { Furniture, Interior } from '../lib/interiors';
 import { WALL_HEIGHT } from '../lib/interiors';
 import { lightingAt } from './timeOfDay';
+import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
+import { LuxePiece } from './LuxeFurniture';
 import type { GameTime } from '../lib/gameState';
 
 /**
@@ -18,8 +20,12 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
   const side = (w - doorW) / 2;
   const windowSize = interior.window === 'full' ? [w * 0.8, H - 0.3] : interior.window === 'wide' ? [Math.min(3.2, w * 0.5), 1.4] : [1.1, 1.0];
   const windowY = interior.window === 'full' ? H / 2 : 1.6;
-  // Daylight or a night city outside the window
-  const sky = night > 0.5 ? '#1b2536' : night > 0.1 ? '#e0a46c' : '#bcd6e8';
+  // The city outside the window, by time of day
+  const sky = skylineTexture(skyMoodAt(night, gameTime.hour), 23);
+  const luxe = interior.tier === 'penthouse' || interior.tier === 'apartment';
+  const floor = useMemo(() => (interior.tier === 'penthouse' ? marbleTexture('cream', [w / 2.4, d / 2.4]) : null), [interior.tier, w, d]);
+  // Pendant lights over the kitchen island and the dining table
+  const pendants = luxe ? [...interior.furniture, ...extra].filter((f) => (f.kind === 'counter' || (f.kind === 'table' && f.size[0] * f.size[2] > 2)) && f.style === 'luxe') : [];
 
   return (
     <group>
@@ -30,7 +36,7 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color={interior.floorColor} roughness={0.75} />
+        {floor ? <meshStandardMaterial map={floor} roughness={0.14} /> : <meshStandardMaterial color={interior.floorColor} roughness={0.75} />}
       </mesh>
 
       {/* Walls, facing inwards */}
@@ -49,8 +55,41 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
       {/* Window on the far wall */}
       <mesh position={[0, windowY, d / 2 - 0.02]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={windowSize as [number, number]} />
-        <meshStandardMaterial color={sky} emissive={sky} emissiveIntensity={night > 0.5 ? 0.5 : 0.9} roughness={0.2} />
+        <meshStandardMaterial map={sky} emissiveMap={sky} emissive="#ffffff" emissiveIntensity={night > 0.5 ? 0.7 : 0.85} roughness={0.2} toneMapped={false} />
       </mesh>
+      {interior.window === 'full' && Array.from({ length: 5 }, (_, i) => (
+        <mesh key={i} position={[-windowSize[0] / 2 + (i * windowSize[0]) / 4, windowY, d / 2 - 0.04]}>
+          <boxGeometry args={[0.05, windowSize[1], 0.04]} />
+          <meshStandardMaterial color="#2b2622" roughness={0.4} metalness={0.5} />
+        </mesh>
+      ))}
+      {/* Warm cove light along the top of the walls */}
+      {luxe && [[0, d / 2 - 0.03, w, 0], [-w / 2 + 0.03, 0, d, Math.PI / 2], [w / 2 - 0.03, 0, d, -Math.PI / 2]].map(([x, z, len, ry], i) => (
+        <mesh key={i} position={[x, H - 0.12, z]} rotation={[0, ry, 0]}>
+          <boxGeometry args={[len, 0.035, 0.03]} />
+          <meshStandardMaterial color="#fff2d6" emissive="#ffcf8a" emissiveIntensity={1.4 + night * 1.5} toneMapped={false} />
+        </mesh>
+      ))}
+      {pendants.map((p, i) => (
+        <group key={i} position={[p.at[0], 0, p.at[1]]}>
+          {[-1, 0, 1].map((k) => {
+            const along = p.size[0] >= p.size[2];
+            const off = k * Math.max(p.size[0], p.size[2]) * 0.28;
+            return (
+              <group key={k} position={[along ? off : 0, 2.05, along ? 0 : off]}>
+                <mesh position={[0, (H - 2.05) / 2 + 0.2, 0]}>
+                  <cylinderGeometry args={[0.006, 0.006, H - 2.05 + 0.4, 6]} />
+                  <meshStandardMaterial color="#c9a052" metalness={0.85} roughness={0.3} />
+                </mesh>
+                <mesh>
+                  <sphereGeometry args={[0.13, 20, 16]} />
+                  <meshStandardMaterial color="#fff2d6" emissive="#ffcf8a" emissiveIntensity={1 + night} toneMapped={false} transparent opacity={0.95} />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      ))}
 
       {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
       {/* Furniture you bought */}
@@ -83,6 +122,7 @@ const box = (w: number, h: number, d: number, y: number, color: string, x = 0, z
 export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
+  if (f.style === 'luxe' || f.kind === 'art') return <group position={[x, 0, z]}><LuxePiece f={f} /></group>;
   let parts: ReactNode;
   switch (f.kind) {
     case 'bed':

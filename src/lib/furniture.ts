@@ -29,10 +29,30 @@ export const FURNITURE_CATEGORIES: readonly { id: FurnitureCategory; label: stri
   { id: 'storage', label: 'Storage' },
 ];
 
+/** The rooms the Home Decor catalogue is sorted by. */
+export type DecorRoom = 'living' | 'bedroom' | 'kitchen' | 'bathroom';
+
+export const DECOR_ROOMS: readonly { id: DecorRoom | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'living', label: 'Living Room' },
+  { id: 'bedroom', label: 'Bedroom' },
+  { id: 'kitchen', label: 'Kitchen' },
+  { id: 'bathroom', label: 'Bathroom' },
+];
+
+const ROOM_OF: Record<FurnitureCategory, DecorRoom> = {
+  seating: 'living', beds: 'bedroom', tables: 'living', kitchen: 'kitchen', bathroom: 'bathroom',
+  electronics: 'living', lighting: 'living', decor: 'living', storage: 'bedroom',
+};
+
 export interface CatalogueItem {
   id: string;
   name: string;
   category: FurnitureCategory;
+  /** Which room it's listed under. */
+  room: DecorRoom;
+  /** The Luxe collection: designer pieces with their own look. */
+  style?: 'luxe';
   price: number;
   /** Decides its 3D shape and what using it does. */
   kind: FurnitureKind;
@@ -49,7 +69,10 @@ export interface CatalogueItem {
 const item = (
   id: string, name: string, category: FurnitureCategory, price: number, kind: FurnitureKind,
   size: readonly [number, number, number], color: string, comfort: number, quality: number, description: string,
-): CatalogueItem => ({ id, name, category, price, kind, size, color, comfort, quality, description });
+  extra: { room?: DecorRoom; style?: 'luxe' } = {},
+): CatalogueItem => ({ id, name, category, room: extra.room ?? ROOM_OF[category], style: extra.style, price, kind, size, color, comfort, quality, description });
+
+const luxe = { style: 'luxe' as const };
 
 export const CATALOGUE: readonly CatalogueItem[] = [
   item('armchair-rattan', 'Rattan armchair', 'seating', 450, 'armchair', [0.8, 0.85, 0.8], '#b08a5a', 1, 1, 'Hand-woven cane on a hardwood frame. Sit back with a cold drink.'),
@@ -79,6 +102,20 @@ export const CATALOGUE: readonly CatalogueItem[] = [
   item('bookshelf', 'Bookshelf with books', 'storage', 980, 'bookshelf', [1.0, 1.9, 0.35], '#6b4f36', 1, 1, 'Fill it with stories. Reading is good fun.'),
   item('wardrobe-double', 'Double wardrobe', 'storage', 1500, 'wardrobe', [1.2, 2.0, 0.6], '#5d4330', 1, 1, 'Room for every outfit you own.'),
   item('dresser', 'Chest of drawers', 'storage', 700, 'dresser', [1.0, 0.85, 0.5], '#7a5a3e', 1, 1, 'Four deep drawers.'),
+  // The Luxe collection: designer pieces for a serious home. Prices reflect it.
+  item('luxe-sofa', 'Modern Sofa', 'seating', 15000, 'sofa', [2.6, 0.8, 1.05], '#e9e3d8', 6, 1.6, 'A deep, curved sofa in ivory bouclé with brass feet.', luxe),
+  item('luxe-coffee-table', 'Coffee Table', 'tables', 6800, 'table', [1.1, 0.4, 1.1], '#f1ede6', 3, 1, 'Round Carrara marble on a brushed-gold base.', luxe),
+  item('luxe-accent-chair', 'Accent Chair', 'seating', 7200, 'armchair', [0.85, 0.8, 0.85], '#1f5a47', 4, 1.5, 'An emerald velvet tub chair that holds you like a hug.', luxe),
+  item('luxe-tv-console', 'TV Console', 'electronics', 9500, 'tv', [2.0, 1.45, 0.45], '#2b2622', 3, 1.5, 'A walnut and brass media console with a 75-inch screen.', luxe),
+  item('luxe-bookshelf', 'Book Shelf', 'storage', 8000, 'bookshelf', [1.2, 2.0, 0.38], '#c9a052', 3, 1.4, 'Open brass shelving, filled with books and a few treasures.', { ...luxe, room: 'living' }),
+  item('luxe-floor-lamp', 'Floor Lamp', 'lighting', 3500, 'lamp', [0.45, 1.75, 0.45], '#e6c78a', 2, 1, 'A slim brass lamp with a linen drum shade.', luxe),
+  item('luxe-rug', 'Rug', 'decor', 4200, 'rug', [2.8, 0.01, 2.0], '#d8cdb8', 3, 1, 'A hand-tufted wool rug in sand and charcoal.', luxe),
+  item('luxe-plant', 'Indoor Plant', 'decor', 2800, 'plant', [0.7, 1.8, 0.7], '#3b7a3c', 3, 1, 'A tall palm in a brass planter.', luxe),
+  item('luxe-wall-art', 'Wall Art', 'decor', 3200, 'art', [1.2, 0.9, 0.06], '#c9a052', 2, 1, 'An original abstract canvas in a gold frame, hung on the wall.', luxe),
+  item('luxe-dining-table', 'Dining Table', 'tables', 12000, 'table', [2.0, 0.76, 1.7], '#f1ede6', 3, 1, 'Marble-topped, with four velvet chairs.', { ...luxe, room: 'kitchen' }),
+  item('luxe-kitchen-island', 'Kitchen Island', 'kitchen', 11500, 'counter', [2.0, 0.95, 0.9], '#f1ede6', 3, 1.4, 'A marble island with a hob and bar stools. Cook like a chef.', luxe),
+  item('luxe-bed', 'Upholstered King Bed', 'beds', 14000, 'bed', [2.0, 0.6, 2.2], '#e9e3d8', 6, 1.4, 'A king bed with a tall channel-tufted headboard.', luxe),
+  item('luxe-bathtub', 'Stone Bathtub', 'bathroom', 9800, 'bathtub', [1.7, 0.6, 0.85], '#f4f2ee', 5, 1.4, 'A freestanding stone tub with brass taps.', luxe),
 ];
 
 export const catalogueItem = (id: string | undefined) => CATALOGUE.find((c) => c.id === id);
@@ -147,8 +184,11 @@ export function asFurniture(o: OwnedFurniture): Furniture | null {
   const i = catalogueItem(o.itemId);
   if (!i || !o.at) return null;
   const [w, d] = footprint(i, o.rot);
-  return { kind: i.kind, at: o.at, size: [w, i.size[1], d], color: i.color };
+  return { kind: i.kind, at: o.at, size: [w, i.size[1], d], color: i.color, style: i.style };
 }
+
+/** Rugs lie on the floor and art hangs on the wall: neither is in your way. */
+export const layerOf = (kind: FurnitureKind): 'floor' | 'wall' | 'solid' => (kind === 'rug' ? 'floor' : kind === 'art' ? 'wall' : 'solid');
 
 /** Gap kept between pieces, so you can walk round them. */
 const GAP = 0.15;
@@ -169,8 +209,12 @@ export function fits(interior: Interior, others: readonly OwnedFurniture[], piec
   const r = rectOf(at, w, d);
   const hw = interior.width / 2, hd = interior.depth / 2;
   if (r.x0 < -hw + 0.02 || r.x1 > hw - 0.02 || r.z0 < -hd + 0.02 || r.z1 > hd - 0.02) return false;
-  const rug = piece.kind === 'rug';
-  const solid = (f: Furniture) => (f.kind === 'rug') === rug;
+  const layer = layerOf(piece.kind);
+  // Rugs only clash with rugs, wall art with wall art, everything else with everything else
+  const solid = (f: Furniture) => layerOf(f.kind) === layer;
+  const rug = layer !== 'solid';
+  // Art hangs on a wall: it has to touch one
+  if (layer === 'wall' && !(r.z1 >= hd - 0.15 || r.z0 <= -hd + 0.15 || r.x0 <= -hw + 0.15 || r.x1 >= hw - 0.15)) return false;
   if (!rug) {
     const door: Rect = { x0: -DOOR_CLEAR.halfWidth, x1: DOOR_CLEAR.halfWidth, z0: -hd, z1: -hd + DOOR_CLEAR.depth };
     if (overlaps(r, door, 0)) return false;
@@ -197,7 +241,7 @@ export function fits(interior: Interior, others: readonly OwnedFurniture[], piec
  */
 export function walkable(interior: Interior, owned: readonly OwnedFurniture[]): boolean {
   const pieces = [...interior.furniture, ...owned.map(asFurniture).filter((f): f is Furniture => !!f)];
-  const solid = pieces.filter((f) => f.kind !== 'rug').map((f) => rectOf(f.at, f.size[0], f.size[2]));
+  const solid = pieces.filter((f) => layerOf(f.kind) === 'solid').map((f) => rectOf(f.at, f.size[0], f.size[2]));
   const hw = interior.width / 2, hd = interior.depth / 2, r = PLAYER_RADIUS;
   const step = 0.25;
   const open = (x: number, z: number) =>

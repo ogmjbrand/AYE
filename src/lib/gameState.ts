@@ -120,7 +120,8 @@ export type GameAction =
   | { type: 'nightOut'; residentId: string }
   | { type: 'wait'; minutes: number }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
-  | { type: 'eat'; price: number; fullness: number }
+  /** A meal bought out; `lift` is what a good meal does besides filling you (a restaurant's fun, an espresso's energy). */
+  | { type: 'eat'; price: number; fullness: number; lift?: Partial<Needs> }
   | { type: 'purchase'; price: number }
   | { type: 'buyFurniture'; itemId: string }
   | { type: 'sellFurniture'; uid: string }
@@ -177,13 +178,13 @@ export function hungerLabel(fullness: number): 'Full' | 'Fed' | 'Peckish' | 'Hun
 }
 
 /** Pay for a meal and raise fullness. Refused if the player can't afford it. */
-function eat(state: GameState, price: number, gain: number): GameState {
+function eat(state: GameState, price: number, gain: number, lift: Partial<Needs> = {}): GameState {
   if (!(price > 0) || !(gain > 0) || state.balance < price || state.summary) return state;
   return {
     ...state,
     balance: state.balance - price,
     fullness: Math.min(100, state.fullness + gain),
-    needs: addNeeds(state.needs, { fun: modifiers(state.life).mealFun }),
+    needs: addNeeds(state.needs, { ...lift, fun: (lift.fun ?? 0) + modifiers(state.life).mealFun }),
     today: { ...state.today, expenses: state.today.expenses + price },
   };
 }
@@ -589,7 +590,7 @@ export function gameReducer(
     case 'dismissSummary':
       return { ...state, summary: null };
     case 'eat':
-      return eat(state, action.price, action.fullness);
+      return eat(state, action.price, action.fullness, action.lift);
     case 'purchase':
       return purchase(state, action.price);
     case 'buyFurniture':

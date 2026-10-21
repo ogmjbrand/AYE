@@ -4,6 +4,9 @@ import { ACESFilmicToneMapping, Box3, Vector3, type Camera, type Group, type Per
 import { ErrorBoundary } from '../ErrorBoundary';
 import { finishJob, queue, storeVersion, subscribe, useSnapshot, type SnapshotJob } from './store';
 
+/** How long one picture may take before it's skipped (software rendering is slow). */
+const GIVE_UP_MS = 45_000;
+
 /** Points the camera at the whole of `object`, from the `view` direction. */
 function frameObject(camera: Camera, object: Group, view: readonly [number, number, number] = [0.9, 0.75, 1.1]) {
   const box = new Box3().setFromObject(object);
@@ -12,7 +15,7 @@ function frameObject(camera: Camera, object: Group, view: readonly [number, numb
   const centre = box.getCenter(new Vector3());
   const radius = box.getSize(new Vector3()).length() / 2;
   const dir = new Vector3(...view).normalize();
-  const dist = (radius / Math.sin(((cam.fov / 2) * Math.PI) / 180)) * 1.02;
+  const dist = (radius / Math.sin(((cam.fov / 2) * Math.PI) / 180)) * 0.8;
   cam.position.copy(centre).addScaledVector(dir, dist);
   cam.near = dist / 50;
   cam.far = dist * 4;
@@ -57,12 +60,17 @@ function Fail({ job }: { job: SnapshotJob }) {
   return null;
 }
 
+/** Builds the scene inside the error boundary, so a broken model only loses its own picture. */
+function Scene({ job }: { job: SnapshotJob }) {
+  return <>{job.scene()}</>;
+}
+
 function Job({ job }: { job: SnapshotJob }) {
   const group = useRef<Group>(null);
   return (
     <ErrorBoundary fallback={<Fail job={job} />}>
       <Suspense fallback={null}>
-        <group ref={group}>{job.scene()}</group>
+        <group ref={group}><Scene job={job} /></group>
         <Capture job={job} target={group} />
       </Suspense>
     </ErrorBoundary>
@@ -76,6 +84,12 @@ function Job({ job }: { job: SnapshotJob }) {
 export function SnapshotHost() {
   useSyncExternalStore(subscribe, storeVersion);
   const job = queue[0];
+  // No WebGL, or a scene that never settles: give up on this picture and move on
+  useEffect(() => {
+    if (!job) return;
+    const id = setTimeout(() => finishJob(job, null), GIVE_UP_MS);
+    return () => clearTimeout(id);
+  }, [job]);
   if (!job) return null;
   const size = job.size ?? 256;
   return (
@@ -84,7 +98,6 @@ export function SnapshotHost() {
         dpr={1}
         camera={{ position: [0, 1, 3], fov: 30 }}
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-        fallback={<Fail job={job} />}
       >
         <hemisphereLight args={['#fff4e2', '#2a2420', 0.9]} />
         <directionalLight position={[2.5, 4, 3]} intensity={2.4} color="#fff1dc" />

@@ -10,7 +10,7 @@ import type { Home } from './homes';
 
 export type FurnitureKind =
   | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp' | 'fridge'
-  | 'armchair' | 'shower' | 'bathtub' | 'bookshelf' | 'stove' | 'speaker' | 'console' | 'dresser';
+  | 'armchair' | 'shower' | 'bathtub' | 'bookshelf' | 'stove' | 'speaker' | 'console' | 'dresser' | 'art';
 
 export interface Furniture {
   kind: FurnitureKind;
@@ -19,6 +19,8 @@ export interface Furniture {
   /** Width (X), height, depth (Z). */
   size: readonly [number, number, number];
   color: string;
+  /** The Luxe collection's designer look (lib/furniture.ts). */
+  style?: 'luxe';
 }
 
 export interface Interior {
@@ -36,8 +38,8 @@ export const WALL_HEIGHT = 2.9;
 /** Use radius for the bed and the door. */
 export const USE_RADIUS = 1.4;
 
-const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string): Furniture =>
-  ({ kind, at: [x, z], size: [w, h, d], color });
+const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string, style?: 'luxe'): Furniture =>
+  ({ kind, at: [x, z], size: [w, h, d], color, ...(style ? { style } : {}) });
 
 export const INTERIORS: Record<Interior['tier'], Interior> = {
   room: {
@@ -70,34 +72,36 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('bed', -3.2, 2.2, 1.8, 0.55, 2.2, '#2d4a5e'),
       f('wardrobe', -1.3, 3.15, 1.8, 2.1, 0.6, '#4f3a2a'),
       f('desk', 3.4, 2.9, 1.5, 0.75, 0.7, '#6e5038'),
-      f('sofa', 2.9, -0.2, 2.4, 0.85, 1.0, '#7a3e3a'),
+      f('sofa', 2.9, -0.2, 2.4, 0.85, 1.0, '#e9e3d8', 'luxe'),
       f('table', 2.9, 1.25, 1.2, 0.45, 0.7, '#5a4330'),
       f('tv', 2.9, -2.1, 1.6, 1.0, 0.4, '#18191c'),
       f('counter', -3.4, -2.6, 1.8, 0.92, 0.7, '#d5ccbb'),
       f('fridge', -1.95, -3.0, 0.75, 1.85, 0.7, '#dcdcda'),
-      f('rug', 2.9, 0.6, 3.0, 0.01, 2.2, '#c8a96a'),
-      f('plant', 4.1, -3.0, 0.5, 1.3, 0.5, '#3f6b3a'),
+      f('rug', 2.9, 0.6, 3.0, 0.01, 2.2, '#c8a96a', 'luxe'),
+      f('plant', 4.1, -3.0, 0.5, 1.3, 0.5, '#3f6b3a', 'luxe'),
       f('lamp', -0.3, 2.6, 0.4, 1.7, 0.4, '#e8d8b0'),
       f('shower', -4.0, -0.6, 0.9, 2.1, 0.9, '#b9c9cf'),
     ],
   },
   penthouse: {
-    tier: 'penthouse', width: 13, depth: 9, wallColor: '#f1ede6', floorColor: '#d9d4cc', window: 'full',
+    tier: 'penthouse', width: 13, depth: 9, wallColor: '#ece6dc', floorColor: '#e8e2d8', window: 'full',
     furniture: [
-      f('bed', -4.8, 3.0, 2.2, 0.6, 2.3, '#e7e2d8'),
+      f('bed', -4.8, 3.0, 2.2, 0.6, 2.3, '#e9e3d8', 'luxe'),
       f('wardrobe', -2.3, 4.15, 2.2, 2.2, 0.6, '#3a3a3c'),
       f('desk', -5.6, -0.4, 0.8, 0.75, 1.8, '#2b2b2d'),
-      f('sofa', 3.5, 1.4, 3.2, 0.85, 1.1, '#3b4250'),
-      f('sofa', 5.6, -0.6, 1.0, 0.85, 2.4, '#3b4250'),
-      f('table', 3.5, -0.4, 1.6, 0.42, 0.9, '#c9c3b8'),
-      f('tv', 3.5, -3.2, 2.2, 1.2, 0.4, '#151517'),
-      f('counter', -3.6, -3.5, 3.0, 0.95, 0.8, '#efece6'),
+      f('sofa', 3.5, 1.4, 3.2, 0.85, 1.1, '#e9e3d8', 'luxe'),
+      f('sofa', 5.6, -0.6, 1.0, 0.85, 2.4, '#e9e3d8', 'luxe'),
+      f('table', 3.5, -0.4, 1.6, 0.42, 0.9, '#c9c3b8', 'luxe'),
+      f('tv', 3.5, -3.2, 2.2, 1.2, 0.4, '#2b2622', 'luxe'),
+      f('counter', -3.6, -3.5, 3.0, 0.95, 0.8, '#efece6', 'luxe'),
       f('fridge', -1.6, -3.95, 0.8, 1.9, 0.75, '#c4c6c8'),
-      f('rug', 3.5, 0.5, 4.0, 0.01, 3.2, '#8a7b66'),
-      f('plant', 6.0, 3.8, 0.6, 1.6, 0.6, '#3f6b3a'),
-      f('plant', 0.6, 3.9, 0.6, 1.6, 0.6, '#3f6b3a'),
-      f('lamp', -6.0, 1.0, 0.4, 1.8, 0.4, '#efe2c0'),
-      f('bathtub', -5.7, -2.2, 1.4, 0.6, 0.8, '#f2f1ee'),
+      f('rug', 3.5, 0.5, 4.0, 0.01, 3.2, '#8a7b66', 'luxe'),
+      f('plant', 6.0, 3.8, 0.6, 1.6, 0.6, '#3f6b3a', 'luxe'),
+      f('plant', 0.6, 3.9, 0.6, 1.6, 0.6, '#3f6b3a', 'luxe'),
+      f('lamp', -6.0, 1.0, 0.4, 1.8, 0.4, '#efe2c0', 'luxe'),
+      // Dining for four between the kitchen and the living room
+      f('table', -1.4, -0.5, 2.0, 0.76, 1.7, '#f1ede6', 'luxe'),
+      f('bathtub', -5.7, -2.2, 1.4, 0.6, 0.8, '#f2f1ee', 'luxe'),
     ],
   },
 };
@@ -134,7 +138,7 @@ export function interiorLayout(i: Interior, extra: readonly Furniture[] = []): D
     // The doorway itself: you leave with E, not by walking out
     wall(0, -d / 2 - WALL - 0.1, 1.4, WALL),
     ...[...i.furniture, ...extra]
-      .filter((x) => x.kind !== 'rug')
+      .filter((x) => x.kind !== 'rug' && x.kind !== 'art')
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
   ];
   return buildLayout({

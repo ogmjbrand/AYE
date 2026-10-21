@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, categoryCounts, cityDirectory, filterDirectory } from './cityDirectory';
-import { DISTRICTS, counterAt } from './geography';
+import { DISTRICTS, counterAt, restaurantAt } from './geography';
 import { nearestVendor } from './food';
 import { homeAtDoor } from './homes';
 import { venueAt } from './nightlife';
@@ -18,7 +18,8 @@ describe('city directory', () => {
     expect(mamaPut.status).toBe('open');
     expect(mamaPut.position).toEqual({ x: -5.2, z: -4.5 });
     expect(list.filter((d) => d.categories.includes('residential')).length).toBe(lagos.homes.length);
-    expect(list.filter((d) => d.categories.includes('restaurants')).length).toBe(lagos.vendors.length);
+    expect(list.filter((d) => d.categories.includes('restaurants')).length).toBe(lagos.vendors.length + (lagos.restaurant ? 1 : 0));
+    expect(list.find((d) => d.name === 'The Palms Restaurant')).toMatchObject({ status: 'open', position: { x: -21, z: -14.3 } });
   });
 
   it('only your own workplace is open; the rest are honest "visit" entries', () => {
@@ -67,7 +68,8 @@ describe('city directory', () => {
           // Within 0.35 m of the route's end is where the walk stops
           const at = { x: end.x, z: end.z };
           const key = dest.id.slice(d.id.length + 1);
-          if (dest.categories.includes('restaurants')) expect(nearestVendor(d.vendors, at.x, at.z)?.id, dest.id).toBe(key);
+          if (key.startsWith('restaurant.')) expect(restaurantAt(d, at.x, at.z)?.id, dest.id).toBe(key.slice('restaurant.'.length));
+          else if (dest.categories.includes('restaurants')) expect(nearestVendor(d.vendors, at.x, at.z)?.id, dest.id).toBe(key);
           else if (key === 'fashion' || key === 'gadgets' || key === 'travel') expect(counterAt(d, at.x, at.z), dest.id).toBe(key);
           else if (key.startsWith('park.')) expect(parkAt(d.park, at.x, at.z)?.id, dest.id).toBe(d.park.id);
           else if (key.startsWith('night.')) expect(venueAt(d.nightlife, at.x, at.z)?.id, dest.id).toBe(d.nightlife.id);

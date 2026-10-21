@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGUE, FURNITURE_CATEGORIES, USES, asFurniture, catalogueItem, findSpot, fits, homeComfort, replaceAll, resaleValue, sanitiseFurniture, furnitureUse, walkable, type OwnedFurniture } from './furniture';
+import { CATALOGUE, DECOR_ROOMS, FURNITURE_CATEGORIES, USES, asFurniture, catalogueItem, findSpot, fits, footprint, homeComfort, layerOf, replaceAll, resaleValue, sanitiseFurniture, furnitureUse, walkable, type OwnedFurniture } from './furniture';
 import { INTERIORS, bedSpot, doorSpot, interiorFor, interiorLayout } from './interiors';
 import { createGameState, gameReducer, type GameState } from './gameState';
 import { allHomes, homeById, moveInFee } from './homes';
@@ -171,5 +171,43 @@ describe('furniture in the game', () => {
   it('a stored piece can\'t be used', () => {
     const s = act(act(housed(), { type: 'buyFurniture', itemId: 'tv-43' }), { type: 'storeFurniture', uid: 'f#1' });
     expect(act(s, { type: 'useFurniture', target: { uid: 'f#1' }, near: true })).toBe(s);
+  });
+});
+
+describe('Home Decor: the Luxe collection and rooms', () => {
+  it('sells the reference pieces at their prices', () => {
+    const price = (name: string) => CATALOGUE.find((c) => c.name === name)?.price;
+    expect(price('Modern Sofa')).toBe(15000);
+    expect(price('Coffee Table')).toBe(6800);
+    expect(price('Accent Chair')).toBe(7200);
+    expect(price('TV Console')).toBe(9500);
+    expect(price('Book Shelf')).toBe(8000);
+    expect(price('Floor Lamp')).toBe(3500);
+    expect(price('Rug')).toBe(4200);
+    expect(price('Indoor Plant')).toBe(2800);
+    expect(price('Wall Art')).toBe(3200);
+  });
+
+  it('lists something under every room', () => {
+    for (const r of DECOR_ROOMS) if (r.id !== 'all') expect(CATALOGUE.some((c) => c.room === r.id), r.id).toBe(true);
+  });
+
+  it('hangs wall art on a wall, where it never gets in the way', () => {
+    const art = CATALOGUE.find((c) => c.kind === 'art')!;
+    const room = INTERIORS.flat;
+    const spot = findSpot(room, [], art)!;
+    expect(spot).not.toBeNull();
+    const [w, d] = footprint(art, spot.rot);
+    const hw = room.width / 2, hd = room.depth / 2;
+    const touches = spot.at[1] + d / 2 >= hd - 0.15 || spot.at[1] - d / 2 <= -hd + 0.15 || spot.at[0] - w / 2 <= -hw + 0.15 || spot.at[0] + w / 2 >= hw - 0.15;
+    expect(touches).toBe(true);
+    // Not in the middle of the floor
+    expect(fits(room, [], art, [0, 0], 0)).toBe(false);
+    expect(layerOf('art')).toBe('wall');
+  });
+
+  it('the penthouse, furnished in Luxe with a dining table, can still be walked round', () => {
+    expect(walkable(INTERIORS.penthouse, [])).toBe(true);
+    expect(INTERIORS.penthouse.furniture.some((f) => f.kind === 'table' && f.style === 'luxe' && f.size[0] * f.size[2] > 2)).toBe(true);
   });
 });
