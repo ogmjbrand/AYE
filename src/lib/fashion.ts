@@ -3,6 +3,9 @@
  * dye. With the current Rocketbox models every item restyles the garment the
  * person already wears (top, bottom, shoes) or their hair; cut and hairstyle
  * shape need separate clothing/hair meshes (see docs/CHARACTER_PIPELINE.md).
+ * 
+ * Extended to support real 3D garments via modelPath/modelConfig while
+ * maintaining backward compatibility with material-based styling.
  */
 import { districtById } from './geography';
 
@@ -60,6 +63,18 @@ export interface Style {
   fabric?: Fabric;
 }
 
+/** Configuration for loading a 3D garment model. */
+export interface GarmentModel {
+  /** Path to GLB/GLTF model relative to public/assets/, e.g., 'clothing/shoes/heels-01.glb'. */
+  path: string;
+  /** Expected scale factor to match character proportions (1.0 = no scaling). */
+  scale?: number;
+  /** Which bones/sockets to attach this garment to (e.g., ['Shoe_L', 'Shoe_R'] for shoes). */
+  attachBones?: readonly string[];
+  /** Thumbnail image path for UI display, relative to public/assets/. */
+  thumbnail?: string;
+}
+
 export interface FashionItem {
   id: string;
   name: string;
@@ -69,6 +84,8 @@ export interface FashionItem {
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
+  /** Real 3D garment model; if present, this overrides material-based styling for this item. */
+  model?: GarmentModel;
 }
 
 const item = (
@@ -133,6 +150,9 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
 ];
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
+
+/** Returns true if this item is rendered as a 3D garment model. */
+export const usesGarmentModel = (item: FashionItem | undefined) => !!item?.model?.path;
 
 /** A saved look: a name and what to wear in each slot. */
 export interface Outfit {
@@ -205,4 +225,22 @@ export function swatchCss(style: Style): string {
     case 'batik': return `radial-gradient(circle, ${b} 0 22%, transparent 26%) 0 0 / 18px 18px, repeating-linear-gradient(70deg, transparent 0 9px, ${c}88 9px 10px), ${a}`;
     default: return a;
   }
+}
+
+/**
+ * Mapping of fashion item IDs to 3D garment models.
+ * These override material-based styling when specified.
+ * Models should be in GLB/GLTF format at public/assets/clothing/<path>.
+ */
+export const GARMENT_MODELS: Record<string, GarmentModel> = {
+  'shoes-clean-white': { path: 'shoes/sneaker-white.glb', thumbnail: 'shoes/sneaker-white-thumb.jpg' },
+  'shoes-leather-black': { path: 'shoes/flat-black.glb', thumbnail: 'shoes/flat-black-thumb.jpg' },
+  'shoes-leather-tan': { path: 'shoes/flat-tan.glb', thumbnail: 'shoes/flat-tan-thumb.jpg' },
+  'shoes-suede-burgundy': { path: 'shoes/flat-burgundy.glb', thumbnail: 'shoes/flat-burgundy-thumb.jpg' },
+  'shoes-metallic-gold': { path: 'shoes/heel-gold.glb', thumbnail: 'shoes/heel-gold-thumb.jpg' },
+};
+
+/** Get the 3D model configuration for a fashion item, if it exists. */
+export function getGarmentModel(itemId: string): GarmentModel | undefined {
+  return GARMENT_MODELS[itemId];
 }
