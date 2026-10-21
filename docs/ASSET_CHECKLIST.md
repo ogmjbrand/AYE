@@ -7,11 +7,11 @@ proportions and photo-sourced textures, but a ~6.7k-triangle mesh from the 2010s
 see `public/assets/CREDITS.md`). Every slot in
 `public/assets/manifest.json` is `null`.
 
-The development container that wrote this cannot reach ambientCG, Poly Haven,
-Mixamo, Sketchfab or Fab, so **no asset IDs below have been checked against
-the live sites**. Names are search terms and selection criteria, not file
-names. When you pick a file, record its real ID and licence in
-`public/assets/CREDITS.md`.
+Live metadata for some sources is reachable, but obtaining model files can
+require authorized account access. No compatible, redistribution-ready shoe
+model has been downloaded or verified in this project. Names below are search
+terms and selection criteria, not file names. Record each selected asset's
+real ID and exact licence in `public/assets/CREDITS.md`.
 
 Tick each box only when the file is in place **and** `npm.cmd run assets:check`
 passes **and** you have looked at it in the game at http://localhost:5173.
@@ -154,6 +154,27 @@ requirements will be:
 Near‑photoreal African street architecture is unlikely to exist as free
 downloads. Expect to commission it or use photogrammetry, which is a budget
 decision for you.
+
+### Shoes and garment models (not yet installed)
+
+The fashion catalogue currently has **no real garment GLB files**. Its shoe
+preview is procedural placeholder geometry, and the garment model registry
+must stay empty until compatible, licensed files are actually present. Do not
+add placeholder paths or generated meshes to the registry as if they were
+finished products.
+
+For each shoe model:
+
+- Save the optimised file under `public/assets/clothing/shoes/` and register
+  its path in `src/lib/fashion.ts`.
+- Use CC0 or CC-BY assets that may be redistributed in this public repository;
+  add the source URL, asset ID and exact licence to `public/assets/CREDITS.md`.
+- Keep the GLB below 30,000 triangles with textures no larger than 2048 px.
+- Match the shoe pair's scale, orientation and placement to the Rocketbox feet.
+  Bone attachment alone does not make a shoe fitted or rigged; inspect walking
+  and sitting in-game before calling it complete.
+- Rigged garments must use a compatible skeleton. Runtime retargeting is not
+  implemented; incompatible skinned models must not be attached as props.
 
 ## 5. Optimise, check, test
 

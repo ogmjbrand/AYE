@@ -12,12 +12,12 @@ interface GarmentPreviewPanelProps {
  * Map shoe IDs to their color/style for procedural geometry.
  * This is temporary until real 3D models are imported.
  */
-const SHOE_STYLES: Record<string, { baseColor: string; soleColor?: string; type: 'sneaker' | 'flat' | 'heel' | 'boot' | 'sandal' }> = {
-  'clean-white': { baseColor: '#efefea', soleColor: '#cccccc', type: 'sneaker' },
-  'leather-black': { baseColor: '#1b1b1d', soleColor: '#3a3a3c', type: 'flat' },
-  'leather-tan': { baseColor: '#94623a', soleColor: '#5c4a35', type: 'flat' },
-  'suede-burgundy': { baseColor: '#5c1f2b', soleColor: '#3a1520', type: 'flat' },
-  'metallic-gold': { baseColor: '#c7a24f', soleColor: '#8a7a4a', type: 'heel' },
+const SHOE_TYPES: Record<string, 'sneaker' | 'flat' | 'heel' | 'boot' | 'sandal'> = {
+  'shoes-clean-white': 'sneaker',
+  'shoes-leather-black': 'flat',
+  'shoes-leather-tan': 'flat',
+  'shoes-suede-burgundy': 'flat',
+  'shoes-metallic-gold': 'heel',
 };
 
 /**
@@ -26,97 +26,90 @@ const SHOE_STYLES: Record<string, { baseColor: string; soleColor?: string; type:
  */
 export function GarmentPreviewPanel({ item, className = '' }: GarmentPreviewPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const shoeRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
+  const baseColor = item.style.colors[0];
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     // Set up scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1e24);
-    sceneRef.current = scene;
 
     // Camera
     const camera = new THREE.PerspectiveCamera(
       45,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
+      container.clientWidth / container.clientHeight,
       0.1,
       1000
     );
-    camera.position.set(0, 0.15, 0.3);
+    camera.position.set(0.28, 0.16, 0.34);
     camera.lookAt(0, 0, 0);
-    cameraRef.current = camera;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    container.appendChild(renderer.domElement);
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.3);
     directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
     scene.add(directionalLight);
 
-    // Add ground plane for shadow
-    const groundGeometry = new THREE.PlaneGeometry(1, 1);
-    const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.3 });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.1;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
     // Create shoe geometry
-    const shoeStyle = SHOE_STYLES[item.id] || { baseColor: '#cccccc', type: 'sneaker' as const };
+    const shoeStyle = {
+      baseColor,
+      soleColor: item.id === 'shoes-clean-white' ? '#cccccc' : '#3a3030',
+      type: SHOE_TYPES[item.id] ?? 'flat',
+    };
     const shoe = generateShoeGeometry(shoeStyle);
-    shoe.castShadow = true;
-    shoe.receiveShadow = true;
     scene.add(shoe);
     shoeRef.current = shoe;
 
     // Animation loop
+    let previousTime = 0;
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
+      const now = performance.now();
       if (shoeRef.current) {
-        shoeRef.current.rotation.y += 0.01;
+        shoeRef.current.rotation.y += Math.min((now - previousTime) / 1000, 0.05) * 0.4;
       }
+      previousTime = now;
       renderer.render(scene, camera);
     };
     animate();
 
-    // Handle window resize
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
+    const resizeObserver = new ResizeObserver(() => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
-    };
-    window.addEventListener('resize', handleResize);
+    });
+    resizeObserver.observe(container);
 
     return () => {
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
-      window.removeEventListener('resize', handleResize);
-      containerRef.current?.removeChild(renderer.domElement);
+      resizeObserver.disconnect();
+      shoe.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.geometry.dispose();
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach((material) => material.dispose());
+      });
+      container.removeChild(renderer.domElement);
       renderer.dispose();
     };
-  }, [item.id]);
+  }, [item.id, baseColor]);
 
-  return <div ref={containerRef} className={`h-24 w-full ${className}`} />;
+  return <div ref={containerRef} className={className || 'h-24 w-full'} />;
 }

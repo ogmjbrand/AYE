@@ -115,6 +115,7 @@ export function FashionStore({
   const [message, setMessage] = useState('');
   const [outfitName, setOutfitName] = useState('');
   const [decorRoom, setDecorRoom] = useState<'All' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom'>('All');
+  const [shoePreviewId, setShoePreviewId] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -134,6 +135,12 @@ export function FashionStore({
     if (category === 'fitting-room') return item.slot === slot;
     return false;
   });
+  const wornOrPreviewedShoeId = tryOn.shoes !== undefined ? tryOn.shoes : wardrobe.equipped.shoes;
+  const shoePreview = category === 'shoes'
+    ? items.find((item) => item.id === shoePreviewId)
+      ?? items.find((item) => item.id === wornOrPreviewedShoeId)
+      ?? items[0]
+    : undefined;
   const equippedId = wardrobe.equipped[slot] ?? null;
   const showcase = fashionShowcaseResult(wardrobe);
   const attendedShowcase = lastShowcaseDay === today;
@@ -339,6 +346,19 @@ export function FashionStore({
             </p>
           ) : (
             <>
+            {shoePreview && (
+              <section className="mb-3 overflow-hidden border border-[#c9a35e]/35 bg-[#181b20]">
+                <div className="h-28">
+                  <GarmentPreviewPanel item={shoePreview} className="h-full w-full" />
+                </div>
+                <div className="border-t border-white/10 px-3 py-2">
+                  <h3 className="m-0 text-xs font-semibold">{shoePreview.name}</h3>
+                  <p className="m-0 mt-1 text-[10px] text-amber-100/70">
+                    Procedural placeholder preview — no fitted shoe model is installed yet.
+                  </p>
+                </div>
+              </section>
+            )}
             {(equippedId || slot in tryOn) && (
               <div className="mb-3 flex items-center justify-between gap-2 border border-white/10 bg-[#232730] px-3 py-2">
                 <span className="text-xs text-white/70">{equippedId ? `Wearing ${itemById(equippedId)?.name ?? 'a saved item'}` : 'Previewing an item'}</span>
@@ -367,7 +387,15 @@ export function FashionStore({
                 return (
                   <article key={item.id} className={`min-w-0 border p-2 ${selected ? 'border-[#d2b36f]' : 'border-white/10'} bg-[#232730]`}>
                     {item.slot === 'shoes' ? (
-                      <GarmentPreviewPanel item={item} className="mb-2 h-20" />
+                      <button
+                        type="button"
+                        aria-pressed={shoePreview?.id === item.id}
+                        onClick={() => setShoePreviewId(item.id)}
+                        className={`mb-2 flex h-20 w-full flex-col items-center justify-center gap-1 border text-[10px] transition ${shoePreview?.id === item.id ? 'border-[#c9a35e]/60 text-[#f0d797]' : 'border-white/10 text-white/55 hover:border-white/30'}`}
+                      >
+                        <Footprints size={24} aria-hidden="true" />
+                        Inspect placeholder
+                      </button>
                     ) : (
                       <div
                         className="mb-2 flex h-20 items-center justify-center border border-white/10"

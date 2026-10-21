@@ -231,7 +231,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
       <primitive object={scene} scale={scale} />
       {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
-      {garmentModel && <GarmentLayer group={group.current} model={garmentModel} isEquipped={!!equippedShoeId} />}
+      {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped={!!equippedShoeId} />}
     </group>
   );
 }

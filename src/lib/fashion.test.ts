@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { FABRICS, FASHION_ITEMS, GARMENT_MODELS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -71,5 +71,12 @@ describe('fashion catalogue', () => {
     expect(itemById('bottom-denim-classic')!.style.fabric!.weave).toBe(2);
     expect(itemById('top-kente-adweneasa')!.style.fabric!.name).toBe('handwoven');
     expect(itemById('shoes-metallic-gold')!.style.fabric!.metalness).toBeGreaterThan(0.5);
+  });
+
+  it('only registers garment models for catalogue items', () => {
+    for (const [id, model] of Object.entries(GARMENT_MODELS)) {
+      expect(itemById(id), id).toBeDefined();
+      expect(model?.path, id).toMatch(/^[^/\\]+(?:[/\\][^/\\]+)*\.gl(?:b|tf)$/i);
+    }
   });
 });

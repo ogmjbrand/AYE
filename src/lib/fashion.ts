@@ -232,13 +232,7 @@ export function swatchCss(style: Style): string {
  * These override material-based styling when specified.
  * Models should be in GLB/GLTF format at public/assets/clothing/<path>.
  */
-export const GARMENT_MODELS: Record<string, GarmentModel> = {
-  'shoes-clean-white': { path: 'shoes/sneaker-white.glb', thumbnail: 'shoes/sneaker-white-thumb.jpg' },
-  'shoes-leather-black': { path: 'shoes/flat-black.glb', thumbnail: 'shoes/flat-black-thumb.jpg' },
-  'shoes-leather-tan': { path: 'shoes/flat-tan.glb', thumbnail: 'shoes/flat-tan-thumb.jpg' },
-  'shoes-suede-burgundy': { path: 'shoes/flat-burgundy.glb', thumbnail: 'shoes/flat-burgundy-thumb.jpg' },
-  'shoes-metallic-gold': { path: 'shoes/heel-gold.glb', thumbnail: 'shoes/heel-gold-thumb.jpg' },
-};
+export const GARMENT_MODELS: Partial<Record<string, GarmentModel>> = {};
 
 /** Get the 3D model configuration for a fashion item, if it exists. */
 export function getGarmentModel(itemId: string): GarmentModel | undefined {
