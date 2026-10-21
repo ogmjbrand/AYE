@@ -13,6 +13,12 @@ model has been downloaded or verified in this project. Names below are search
 terms and selection criteria, not file names. Record each selected asset's
 real ID and exact licence in `public/assets/CREDITS.md`.
 
+The current filesystem and supplied archive scan is recorded in
+[`ASSET_INVENTORY.md`](./ASSET_INVENTORY.md). It found licensed Rocketbox
+characters and MakeHuman morph-target source data, but no compatible wearable
+clothing, shoes, hair, or furniture models. Reference images are not product
+meshes and are not treated as redistributable assets.
+
 Tick each box only when the file is in place **and** `npm.cmd run assets:check`
 passes **and** you have looked at it in the game at http://localhost:5173.
 
