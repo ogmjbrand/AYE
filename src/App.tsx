@@ -63,7 +63,9 @@ import { Celebrations } from './components/os/Celebrations';
 import type { LifeLink } from './lib/life';
 import { spotToUse } from './lib/furniture';
 import { residentPosition, residentsIn } from './lib/people';
-import { getTrip } from './hooks/usePlayerController';
+import { getTrip, setPace } from './hooks/usePlayerController';
+import { ACHIEVEMENTS } from './lib/life';
+import { MOOD_PACE, moodLabel } from './lib/needs';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, residentById, residentNear, type Resident } from './lib/people';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
@@ -453,6 +455,17 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const first = residentById(residentId)?.name.split(' ')[0];
     sitOnTerrace(`${district.nightlife.name}${first ? ` after a night out with ${first}` : ''}`, 6);
   };
+
+  // Mood shows in how you move
+  const moodNow = moodLabel(currentMood(state));
+  useEffect(() => { setPace(MOOD_PACE[moodNow]); }, [moodNow]);
+
+  // Collectibles: achievements that unlock clothes add them to your wardrobe (once; kept if you already own them)
+  useEffect(() => {
+    const owned = character.wardrobe.owned;
+    const unlocked = ACHIEVEMENTS.filter((a) => a.unlock && !owned.includes(a.unlock) && state.life.achievements.some((x) => x.id === a.id)).map((a) => a.unlock!);
+    if (unlocked.length) onCharacterUpdate({ ...character, wardrobe: { ...character.wardrobe, owned: [...owned, ...unlocked] } });
+  }, [state.life.achievements, character, onCharacterUpdate]);
 
   // L opens and closes the Life OS
   useEffect(() => {

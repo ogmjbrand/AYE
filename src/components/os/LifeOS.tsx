@@ -3,7 +3,7 @@ import type { Character } from '../CharacterCreation';
 import type { GameState } from '../../lib/gameState';
 import { HOURLY_LIVING_COST, HOURLY_WAGE, WORK_END_HOUR, WORK_START_HOUR, currentMood, formatGameTime, hungerLabel, isWorkingHours } from '../../lib/gameState';
 import {
-  ACHIEVEMENTS, CAREER_SKILL, DREAMS, DREAM_CHANGE_DAYS, canChangeDream, dreamById, missionTemplate, peopleHere, suggestions, wishTemplate,
+  ACHIEVEMENTS, CAREER_SKILL, DREAMS, DREAM_CHANGE_DAYS, canChangeDream, dreamById, eventOn, eventToday, missionTemplate, peopleHere, suggestions, wishTemplate,
   type LifeLink, type Suggestion,
 } from '../../lib/life';
 import { MAX_TRAITS, PERKS, PERK_LEVEL, SKILLS, TRAITS, perksOf, skillLevel, skillProgress, type DreamId, type Mission, type TraitId } from '../../lib/lifeState';
@@ -17,6 +17,7 @@ import { districtById } from '../../lib/geography';
 import { formatHome } from '../../lib/places';
 import { genderLabel, heritageLabel } from '../../lib/identity';
 import { assetUrl } from '../../lib/assetManifest';
+import { itemById } from '../../lib/fashion';
 import { Icon, type IconName } from './icons';
 import { linkLabel } from './links';
 
@@ -240,6 +241,8 @@ function Today({ state, character, onGo, onDismissWish }: LifeOSProps) {
         </>
       )}
 
+      <TodayEvent state={state} onGo={onGo} />
+
       <SectionTitle aside="Tap a need to look after it">Needs</SectionTitle>
       <div className="grid grid-cols-2 gap-2">
         {needs.map((n) => {
@@ -281,11 +284,11 @@ function Today({ state, character, onGo, onDismissWish }: LifeOSProps) {
           return (
             <Card key={w.id}>
               <div className="flex items-start justify-between gap-3">
-                <p className="m-0 text-sm font-semibold"><Icon name="spark" className="mr-1 inline h-3 w-3 text-ui-gold" />{t.title(ctx)}</p>
+                <p className="m-0 text-sm font-semibold"><Icon name="spark" className="mr-1 inline h-3 w-3 text-ui-gold" />{t.title(ctx, w)}</p>
                 <Reward amount={w.reward} />
               </div>
               <div className="mt-2.5 flex items-center gap-2">
-                <div className="flex-1"><Bar value={(live / w.target) * 100} tone="gold" label={t.title(ctx)} /></div>
+                <div className="flex-1"><Bar value={(live / w.target) * 100} tone="gold" label={t.title(ctx, w)} /></div>
                 <button type="button" onClick={() => onDismissWish(w.id)} className="rounded-full px-2 py-1 text-[11px] text-ui-faint hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Not now</button>
                 <GoButton link={t.link} onGo={onGo} small />
               </div>
@@ -293,6 +296,30 @@ function Today({ state, character, onGo, onDismissWish }: LifeOSProps) {
           );
         })}
       </div>
+    </>
+  );
+}
+
+/** Today's optional city event, if there is one: what it is, when, the bonus for joining in, and a way there. */
+function TodayEvent({ state, onGo }: { state: GameState; onGo: (l: LifeLink) => void }) {
+  const day = gameDay(state.time.totalMinutes);
+  const e = eventToday(state.districtId, day);
+  if (!e) return null;
+  const on = eventOn(e, state.time.hour);
+  const over = state.time.hour >= e.to;
+  const hh = (h: number) => `${String(h % 24).padStart(2, '0')}:00`;
+  return (
+    <>
+      <SectionTitle aside={on ? 'On now' : over ? 'Finished for today' : `From ${hh(e.from)}`}>Happening today</SectionTitle>
+      <Card className={on ? 'border-ui-accent/60 bg-ui-accent/10' : ''}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="m-0 text-sm font-semibold">{e.title(districtById(state.districtId))}</p>
+            <p className="m-0 text-[11px] text-ui-muted">{hh(e.from)}–{hh(e.to)} · {e.perk}</p>
+          </div>
+          {!over && <GoButton link={e.link} onGo={onGo} small />}
+        </div>
+      </Card>
     </>
   );
 }
@@ -375,6 +402,7 @@ function Goals({ state, character, onGo, onSetDream }: LifeOSProps) {
               </p>
               <p className="m-0 mt-0.5 text-[10px] text-ui-muted">{a.description}</p>
               <p className="m-0 mt-1 text-[10px] text-ui-faint">{t !== undefined ? `Earned day ${gameDay(t) + 1}` : `+${a.reward.toLocaleString()} GHAI`}</p>
+              {a.unlock && <p className="m-0 mt-0.5 text-[10px] text-ui-gold-strong">{t !== undefined ? 'Unlocked' : 'Unlocks'}: {itemById(a.unlock)?.name}</p>}
             </li>
           );
         })}
@@ -453,12 +481,18 @@ function People({ state, onGo }: LifeOSProps) {
                 </div>
                 <span className="shrink-0 rounded-full border border-ui-line px-2 py-0.5 text-[10px] text-ui-faint">Computer-controlled</span>
               </div>
+              {(() => {
+                const past = state.life.history.filter((h) => h.who === resident.id).slice(-3).reverse();
+                return past.length > 0 && (
+                  <p className="m-0 mt-2 text-[10px] text-ui-faint">Recently: {past.map((h) => `${h.what} (day ${gameDay(h.t) + 1})`).join(' · ')}</p>
+                );
+              })()}
               <div className="mt-2.5 flex items-center gap-2">
                 <div className="flex-1"><Bar value={rel.points} label={`Friendship with ${resident.name}`} /></div>
                 <span className="text-[10px] text-ui-faint">{next ? `${next.points - rel.points} to ${next.name.toLowerCase()}` : 'Best friends'}</span>
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="m-0 text-[11px] text-ui-muted">{seenToday ? 'You\'ve spent time together today.' : level >= HANGOUT_LEVEL ? 'Free to hang out today.' : 'Say hello and chat.'}</p>
+                <p className="m-0 text-[11px] text-ui-muted">{seenToday ? 'You\'ve spent time together today.' : level >= HANGOUT_LEVEL ? 'Free to hang out today.' : rel.points ? 'Say hello and chat.' : 'You haven\'t met yet.'}</p>
                 <GoButton link={{ to: 'friend', residentId: resident.id }} onGo={onGo} small />
               </div>
             </Card>

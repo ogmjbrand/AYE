@@ -20,6 +20,10 @@ const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
  * strides play at about 1.4x their recorded rate rather than sliding. */
 export const RUN_SPEED = 4.2;
 export const WALK_SPEED = 1.4;
+
+/** Mood shows in how you move: a little brisker when happy, slower when low (see App). */
+let pace = 1;
+export function setPace(factor: number) { pace = Math.max(0.8, Math.min(1.1, factor)); }
 const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 // Where a click or tap sent the player, until they arrive, steer themselves or get stuck
@@ -77,7 +81,7 @@ const playerHandle: PlayerHandle = {
         if (route.length === 0) endTrip('arrived');
       } else intent = s;
     }
-    const moveSpeed = intent.walk ? WALK_SPEED : RUN_SPEED;
+    const moveSpeed = (intent.walk ? WALK_SPEED : RUN_SPEED) * pace;
     const rotationSpeed = 3; // radians per second
     const acceleration = 6;
     const damping = 0.92;

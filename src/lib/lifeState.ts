@@ -87,7 +87,20 @@ export interface Wish {
   progress: number;
   target: number;
   reward: number;
+  /** Who or what it's about, e.g. a resident id for "Become friends with…". */
+  subject?: string;
 }
+
+/** One thing you did with someone. */
+export interface Interaction {
+  /** Resident id. */
+  who: string;
+  /** "Chat", "Treat", "Hang out", "Night out". */
+  what: string;
+  t: number;
+}
+
+export const HISTORY_SIZE = 60;
 
 export type DreamId = 'mogul' | 'luxury' | 'career' | 'fashion' | 'social' | 'globetrotter' | 'chef';
 
@@ -110,7 +123,7 @@ export interface Celebration {
 
 export type StatKey =
   | 'goodTasks' | 'mealsOut' | 'mealsCooked' | 'washes' | 'runs' | 'chats' | 'nightsOut'
-  | 'furnitureBought' | 'clothesBought' | 'trips' | 'earned' | 'missionsDone' | 'wishesDone' | 'relaxed' | 'studied';
+  | 'furnitureBought' | 'clothesBought' | 'trips' | 'earned' | 'missionsDone' | 'wishesDone' | 'relaxed' | 'studied' | 'events' | 'met';
 
 export interface LifeState {
   profile: { bio: string; traits: TraitId[] };
@@ -139,10 +152,12 @@ export interface LifeState {
   boost: { amount: number; until: number } | null;
   ledger: LedgerEntry[];
   celebrations: Celebration[];
+  /** Recent time with people, newest last. */
+  history: Interaction[];
 }
 
 const SKILL_IDS = SKILLS.map((s) => s.id);
-const STAT_KEYS: readonly StatKey[] = ['goodTasks', 'mealsOut', 'mealsCooked', 'washes', 'runs', 'chats', 'nightsOut', 'furnitureBought', 'clothesBought', 'trips', 'earned', 'missionsDone', 'wishesDone', 'relaxed', 'studied'];
+const STAT_KEYS: readonly StatKey[] = ['goodTasks', 'mealsOut', 'mealsCooked', 'washes', 'runs', 'chats', 'nightsOut', 'furnitureBought', 'clothesBought', 'trips', 'earned', 'missionsDone', 'wishesDone', 'relaxed', 'studied', 'events', 'met'];
 const DREAM_IDS: readonly DreamId[] = ['mogul', 'luxury', 'career', 'fashion', 'social', 'globetrotter', 'chef'];
 
 export function emptyLife(): LifeState {
@@ -166,6 +181,7 @@ export function emptyLife(): LifeState {
     boost: null,
     ledger: [],
     celebrations: [],
+    history: [],
   };
 }
 
@@ -262,7 +278,11 @@ export function sanitiseLife(data: unknown): LifeState {
     week: Number.isInteger(d.week) ? (d.week as number) : -1,
     daily: missions(d.daily),
     weekly: missions(d.weekly),
-    wishes: missions(d.wishes).map((w) => ({ id: w.id, template: w.template, progress: w.progress, target: w.target, reward: w.reward })),
+    wishes: missions(d.wishes).map((w, i) => {
+      const raw = (Array.isArray(d.wishes) ? d.wishes[i] : null) as { subject?: unknown } | null;
+      const subject = typeof raw?.subject === 'string' ? raw.subject.slice(0, 80) : undefined;
+      return { id: w.id, template: w.template, progress: w.progress, target: w.target, reward: w.reward, ...(subject ? { subject } : {}) };
+    }),
     wishSeq: num(d.wishSeq),
     wishAt: typeof d.wishAt === 'number' && Number.isFinite(d.wishAt) ? d.wishAt : -Infinity,
     dream: dream && DREAM_IDS.includes(dream.id as DreamId) ? { id: dream.id as DreamId, since: num(dream.since) } : null,
@@ -279,6 +299,12 @@ export function sanitiseLife(data: unknown): LifeState {
       }).slice(-LEDGER_SIZE)
       : [],
     celebrations: [],
+    history: Array.isArray(d.history)
+      ? d.history.flatMap((e) => {
+        const o = e as Record<string, unknown>;
+        return o && typeof o.who === 'string' && typeof o.what === 'string' ? [{ who: o.who.slice(0, 80), what: o.what.slice(0, 40), t: num(o.t) }] : [];
+      }).slice(-HISTORY_SIZE)
+      : [],
   };
 }
 

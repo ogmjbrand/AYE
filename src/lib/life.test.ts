@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Career } from '../components/CharacterCreation';
 import { createGameState, createTime, HOURLY_LIVING_COST, type GameState } from './gameState';
-import { ACHIEVEMENTS, DAILY_MISSIONS, DREAMS, lifeReducer, recogniseExisting, suggestions, type AnyAction } from './life';
+import { ACHIEVEMENTS, DAILY_MISSIONS, DREAMS, eventToday, lifeReducer, recogniseExisting, suggestions, type AnyAction } from './life';
+import { residentsIn } from './people';
+import { itemById } from './fashion';
 import { emptyLife, modifiers, sanitiseLife, skillLevel, xpForLevel } from './lifeState';
 import { cityDirectory } from './cityDirectory';
 import { districtById } from './geography';
@@ -175,5 +177,42 @@ describe('saving', () => {
     expect(back.life.daily).toEqual(s.life.daily);
     expect(sanitiseLife(undefined)).toEqual(emptyLife());
     expect(sanitiseLife({ skills: { cooking: 'lots' }, dream: { id: 'emperor' } }).dream).toBeNull();
+  });
+});
+
+describe('people, events and collectibles', () => {
+  it('meeting someone new counts once, and every visit goes into the history', () => {
+    let s = tick(createGameState(5000, createTime(10, 0)));
+    s = { ...s, life: { ...s.life, daily: [{ id: 'd-meet@x', template: 'd-meet', progress: 0, target: 1, reward: 50, done: false }] } };
+    const who = residentsIn(s.districtId)[0];
+    s = act(s, { type: 'socialise', residentId: who.id, activity: 'chat' });
+    expect(s.life.stats.met).toBe(1);
+    expect(s.life.daily[0].done).toBe(true);
+    expect(s.life.history.at(-1)).toMatchObject({ who: who.id, what: 'Chat' });
+    // The next day, the same person isn't new any more
+    const later = tick({ ...s, time: createTime(10, 0, 3) });
+    const again = act({ ...later, time: { ...later.time, totalMinutes: later.time.totalMinutes + 1440 } }, { type: 'socialise', residentId: who.id, activity: 'chat' });
+    expect(again.life.stats.met).toBe(1);
+  });
+
+  it('city events are stable for a day and give their bonus only while on', () => {
+    const day = 4;
+    const ev = (() => { for (let d = 0; d < 50; d++) { const e = eventToday('lagos.marina', d); if (e?.id === 'run-club') return d; } return -1; })();
+    expect(eventToday('lagos.marina', day)).toEqual(eventToday('lagos.marina', day));
+    expect(ev).toBeGreaterThanOrEqual(0);
+    const at = (hour: number) => tick({ ...createGameState(5000), time: { ...createTime(hour, 0), totalMinutes: ev * 1440 + hour * 60 } });
+    const during = act(at(7), { type: 'exercise', minutes: 30, atPark: true });
+    const after = act(at(11), { type: 'exercise', minutes: 30, atPark: true });
+    expect(during.life.skills.fitness).toBe(40);
+    expect(after.life.skills.fitness).toBe(20);
+    expect(during.life.stats.events).toBe(1);
+  });
+
+  it('some achievements unlock collectible clothes that no shop sells', () => {
+    for (const a of ACHIEVEMENTS.filter((x) => x.unlock)) {
+      const item = itemById(a.unlock)!;
+      expect(item, a.id).toBeDefined();
+      expect(item.stockedIn).toEqual([]);
+    }
   });
 });

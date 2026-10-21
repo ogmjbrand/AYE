@@ -90,6 +90,9 @@ export function moodLabel(score: number): Mood {
 /** A work task's bonus is scaled by how you feel. */
 export const MOOD_TASK_MULTIPLIER: Record<Mood, number> = { Inspired: 1.25, Happy: 1.1, Fine: 1, Low: 0.85, Miserable: 0.7 };
 
+/** How briskly you walk and run in that mood. */
+export const MOOD_PACE: Record<Mood, number> = { Inspired: 1.06, Happy: 1.03, Fine: 1, Low: 0.94, Miserable: 0.88 };
+
 /** The lowest need, for a hint like "You need a shower". */
 export function lowestNeed(n: Needs): NeedKey {
   return NEED_KEYS.reduce((a, b) => (n[b] < n[a] ? b : a));

@@ -17,17 +17,19 @@
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { gameReducer, currentMood, type GameAction, type GameState } from './gameState';
 import {
-  LEDGER_SIZE, MAX_TRAITS, PERKS, SKILLS, TRAITS, modifiers, perksOf, skillLevel,
+  HISTORY_SIZE, LEDGER_SIZE, MAX_TRAITS, PERKS, SKILLS, TRAITS, modifiers, perksOf, skillLevel,
   type Celebration, type DreamId, type LifeState, type Mission, type SkillId, type StatKey, type TraitId, type Wish,
 } from './lifeState';
 import { taskForHour } from './workTasks';
+import { addNeeds, type Needs } from './needs';
 import { cityDirectory } from './cityDirectory';
 import { districtById } from './geography';
 import { catalogueItem, homeComfort } from './furniture';
 import { homeById } from './homes';
 import { interiorFor, type FurnitureKind } from './interiors';
 import { careerLadder, levelIndex } from './progression';
-import { friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
+import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
+import type { District } from './geography';
 import { equipmentById } from './equipment';
 
 // ---------------------------------------------------------------- actions and links
@@ -57,8 +59,8 @@ export type LifeEvent =
   | { kind: 'wash' }
   | { kind: 'relax'; piece: FurnitureKind }
   | { kind: 'study' }
-  | { kind: 'socialise'; activity: Activity }
-  | { kind: 'nightOut' }
+  | { kind: 'socialise'; activity: Activity; residentId: string; isNew: boolean }
+  | { kind: 'nightOut'; residentId: string }
   | { kind: 'buyFurniture' }
   | { kind: 'shop' }
   | { kind: 'gadget' }
@@ -109,8 +111,8 @@ export function eventsFor(prev: GameState, action: GameAction, next: GameState, 
       else if (kind && kind !== 'fridge') out.push({ kind: 'relax', piece: kind });
       break;
     }
-    case 'socialise': out.push({ kind: 'socialise', activity: action.activity }); break;
-    case 'nightOut': out.push({ kind: 'nightOut' }); break;
+    case 'socialise': out.push({ kind: 'socialise', activity: action.activity, residentId: action.residentId, isNew: !(prev.relationships[action.residentId]?.points) }); break;
+    case 'nightOut': out.push({ kind: 'nightOut', residentId: action.residentId }); break;
     case 'buyFurniture': out.push({ kind: 'buyFurniture' }); break;
     case 'purchase': out.push({ kind: 'shop' }); break;
     case 'buyEquipment': out.push({ kind: 'gadget' }); break;
@@ -156,7 +158,7 @@ interface Ctx {
   state: GameState;
 }
 
-type Metric = 'lounge' | 'work' | 'goodTask' | 'eatOut' | 'cook' | 'wash' | 'relax' | 'social' | 'newPlace' | 'run' | 'earn' | 'xp' | 'study' | 'buyFurniture' | 'nightOut' | 'shop' | 'park' | 'meal';
+type Metric = 'meetNew' | 'lounge' | 'work' | 'goodTask' | 'eatOut' | 'cook' | 'wash' | 'relax' | 'social' | 'newPlace' | 'run' | 'earn' | 'xp' | 'study' | 'buyFurniture' | 'nightOut' | 'shop' | 'park' | 'meal';
 
 /** How far an event moves a metric. Skill experience ('xp') is counted separately. */
 function metricGain(m: Metric, e: LifeEvent): number {
@@ -177,6 +179,7 @@ function metricGain(m: Metric, e: LifeEvent): number {
     case 'nightOut': return e.kind === 'nightOut' ? 1 : 0;
     case 'shop': return e.kind === 'shop' ? 1 : 0;
     case 'park': return e.kind === 'park' ? e.minutes : 0;
+    case 'meetNew': return e.kind === 'socialise' && e.isNew ? 1 : 0;
     case 'lounge': return e.kind === 'visit' && e.isNew && e.placeId.includes('.night.') ? 1 : 0;
     case 'xp': return 0;
   }
@@ -195,6 +198,8 @@ export interface MissionTemplate {
 
 const working = (c: Ctx) => c.career !== 'none';
 const housed = (c: Ctx) => !!c.state.home;
+/** Someone in this district you haven't met yet. */
+const strangerHere = (c: Ctx) => residentsIn(c.state.districtId).some((r) => !c.state.relationships[r.id]?.points);
 const unvisited = (c: Ctx) => cityDirectory(districtById(c.state.districtId), c.career, c.state.home).some((d) => d.position && d.status !== 'planned' && !c.state.life.visited.includes(d.id));
 
 export const DAILY_MISSIONS: readonly MissionTemplate[] = [
@@ -205,6 +210,7 @@ export const DAILY_MISSIONS: readonly MissionTemplate[] = [
   { id: 'd-cook', title: 'Cook a meal at home', metric: 'cook', target: 1, reward: 50, link: { to: 'homeUse', use: 'cook' }, when: housed },
   { id: 'd-wash', title: 'Start fresh: shower or bath', metric: 'wash', target: 1, reward: 30, link: { to: 'homeUse', use: 'shower' }, when: housed },
   { id: 'd-friend', title: 'Spend time with someone', metric: 'social', target: 1, reward: 50, link: { to: 'friend' } },
+  { id: 'd-meet', title: 'Meet someone new', metric: 'meetNew', target: 1, reward: 50, link: { to: 'friend' }, when: strangerHere },
   { id: 'd-explore', title: 'Discover a new place', metric: 'newPlace', target: 1, reward: 60, link: { to: 'explore' }, when: unvisited },
   { id: 'd-run', title: 'Go for a run in the park', metric: 'run', target: 1, reward: 60, link: { to: 'park' } },
   { id: 'd-unwind', title: 'Unwind at home', metric: 'relax', target: 1, reward: 30, link: { to: 'homeUse', use: 'relax' }, when: housed },
@@ -214,6 +220,7 @@ export const DAILY_MISSIONS: readonly MissionTemplate[] = [
 export const WEEKLY_MISSIONS: readonly MissionTemplate[] = [
   { id: 'w-work', title: 'Work 15 hours this week', metric: 'work', target: 900, reward: 500, link: { to: 'work' }, when: working },
   { id: 'w-friends', title: 'See people 4 times this week', metric: 'social', target: 4, reward: 350, link: { to: 'friend' } },
+  { id: 'w-meet', title: 'Meet 2 new people', metric: 'meetNew', target: 2, reward: 250, link: { to: 'friend' }, when: strangerHere },
   { id: 'w-explore', title: 'Discover 4 new places', metric: 'newPlace', target: 4, reward: 400, link: { to: 'explore' }, when: unvisited },
   { id: 'w-chef', title: 'Cook 4 meals at home', metric: 'cook', target: 4, reward: 300, link: { to: 'homeUse', use: 'cook' }, when: housed },
   { id: 'w-fit', title: 'Go for 3 runs', metric: 'run', target: 3, reward: 300, link: { to: 'park' } },
@@ -241,8 +248,10 @@ export const missionTemplate = (id: string) => [...DAILY_MISSIONS, ...WEEKLY_MIS
 
 export interface WishTemplate {
   id: string;
-  title: (c: Ctx) => string;
-  metric: Metric | 'balance' | 'home';
+  title: (c: Ctx, w?: { subject?: string }) => string;
+  metric: Metric | 'balance' | 'home' | 'friendship';
+  /** Who it's about (e.g. the resident to befriend), chosen when the wish is made. */
+  subjectFor?: (c: Ctx) => string | undefined;
   target: (c: Ctx) => number;
   reward: number;
   link: LifeLink;
@@ -266,6 +275,14 @@ export const WISHES: readonly WishTemplate[] = [
   { id: 'wish-task', title: () => 'Nail a task at work', metric: 'goodTask', target: () => 1, reward: 40, link: { to: 'work' }, when: working },
   { id: 'wish-cook', title: () => 'Learn to cook a couple of dishes', metric: 'cook', target: () => 2, reward: 50, link: { to: 'homeUse', use: 'cook' }, when: (c) => !!c.state.home && skillLevel(c.state.life.skills.cooking) < 2 },
   { id: 'wish-run', title: () => 'Clear your head with a run', metric: 'run', target: () => 1, reward: 40, link: { to: 'park' }, when: (c) => c.state.needs.energy > 40 },
+  {
+    id: 'wish-befriend', title: (_c, w) => `Become friends with ${residentById(w?.subject ?? '')?.name ?? 'someone you know'}`,
+    metric: 'friendship', target: () => 1, reward: 60, link: { to: 'friend' },
+    subjectFor: (c) => residentsIn(c.state.districtId)
+      .filter((r) => { const p = c.state.relationships[r.id]?.points ?? 0; return p > 0 && friendshipLevel(p) < HANGOUT_LEVEL; })
+      .sort((x, y) => (c.state.relationships[y.id]?.points ?? 0) - (c.state.relationships[x.id]?.points ?? 0))[0]?.id,
+    when: (c) => residentsIn(c.state.districtId).some((r) => { const p = c.state.relationships[r.id]?.points ?? 0; return p > 0 && friendshipLevel(p) < HANGOUT_LEVEL; }),
+  },
   { id: 'wish-style', title: () => 'Try a new look', metric: 'shop', target: () => 1, reward: 40, link: { to: 'fashion' }, when: (c) => c.state.life.stats.clothesBought < 3 },
 ];
 
@@ -273,8 +290,9 @@ export const MAX_WISHES = 3;
 const WISH_GAP_MINUTES = 60;
 export const wishTemplate = (id: string) => WISHES.find((w) => w.id === id);
 
-function stateProgress(w: { template: string }, s: GameState): number | null {
+function stateProgress(w: { template: string; subject?: string }, s: GameState): number | null {
   const t = wishTemplate(w.template);
+  if (t?.metric === 'friendship') return friendshipLevel(s.relationships[w.subject ?? '']?.points ?? 0) >= HANGOUT_LEVEL ? 1 : 0;
   if (t?.metric === 'balance') return s.balance;
   if (t?.metric === 'home') return s.home ? 1 : 0;
   return null;
@@ -386,10 +404,12 @@ export interface Achievement {
   category: 'career' | 'people' | 'explore' | 'home' | 'money' | 'skills' | 'goals';
   reward: number;
   check: (c: Ctx) => boolean;
+  /** A collectible item (lib/fashion.ts, 'Rewards') added to your wardrobe when earned. */
+  unlock?: string;
 }
 
-const a = (id: string, title: string, description: string, category: Achievement['category'], reward: number, check: Achievement['check']): Achievement =>
-  ({ id, title, description, category, reward, check });
+const a = (id: string, title: string, description: string, category: Achievement['category'], reward: number, check: Achievement['check'], unlock?: string): Achievement =>
+  ({ id, title, description, category, reward, check, ...(unlock ? { unlock } : {}) });
 const careerTop = (c: Ctx) => c.career !== 'none' && levelIndex(c.career, c.state.workMinutes) === careerLadder(c.career).length - 1;
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
@@ -398,9 +418,11 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('promoted', 'Promoted', 'Climb to the second rung of your career.', 'career', 300, (c) => c.career !== 'none' && levelIndex(c.career, c.state.workMinutes) >= 1),
   a('career-top', 'Top of the ladder', 'Reach the highest level of your career.', 'career', 2000, careerTop),
   a('first-friend', 'Made a friend', 'Become friends with someone.', 'people', 150, (c) => friendsAt(c, 2) >= 1),
-  a('best-friend', 'Best friends', 'Have a best friend.', 'people', 500, (c) => friendsAt(c, 4) >= 1),
+  a('best-friend', 'Best friends', 'Have a best friend.', 'people', 500, (c) => friendsAt(c, 4) >= 1, 'top-friendship-ankara'),
+  a('met-5', 'Friendly face', 'Meet 5 people.', 'people', 200, (c) => c.state.life.stats.met >= 5),
+  a('events-3', 'Out and about', 'Join 3 city events.', 'explore', 300, (c) => c.state.life.stats.events >= 3, 'top-festival-adire'),
   a('night-out', 'Night on the town', 'Go on a night out with a friend.', 'people', 150, (c) => c.state.life.stats.nightsOut >= 1),
-  a('explorer-5', 'Explorer', 'Discover 5 places.', 'explore', 150, (c) => c.state.life.visited.length >= 5),
+  a('explorer-5', 'Explorer', 'Discover 5 places.', 'explore', 150, (c) => c.state.life.visited.length >= 5, 'top-explorer-kente'),
   a('explorer-25', 'Know your way around', 'Discover 25 places.', 'explore', 500, (c) => c.state.life.visited.length >= 25),
   a('cities-3', 'Frequent flyer', 'Visit 3 cities.', 'explore', 400, (c) => c.state.life.cities.length >= 3),
   a('home', 'A place of your own', 'Rent a home.', 'home', 150, (c) => !!c.state.home),
@@ -410,13 +432,55 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('saver-10k', 'Rainy-day fund', 'Hold 10,000 GHAI.', 'money', 200, (c) => c.state.balance >= 10_000),
   a('saver-100k', 'Six figures', 'Hold 100,000 GHAI.', 'money', 1500, (c) => c.state.balance >= 100_000),
   a('chef-10', 'Home cook', 'Cook 10 meals at home.', 'skills', 250, (c) => c.state.life.stats.mealsCooked >= 10),
-  a('runner-10', 'Ten runs', 'Go for 10 runs.', 'skills', 250, (c) => c.state.life.stats.runs >= 10),
+  a('runner-10', 'Ten runs', 'Go for 10 runs.', 'skills', 250, (c) => c.state.life.stats.runs >= 10, 'shoes-trail-emerald'),
   a('skill-5', 'Skilled', 'Reach level 5 in any skill.', 'skills', 400, (c) => SKILLS.some((s) => sk(c, s.id) >= 5)),
   a('all-rounder', 'All-rounder', 'Reach level 3 in four skills.', 'skills', 500, (c) => SKILLS.filter((s) => sk(c, s.id) >= 3).length >= 4),
-  a('missions-10', 'Go-getter', 'Complete 10 missions.', 'goals', 300, (c) => c.state.life.stats.missionsDone >= 10),
+  a('missions-10', 'Go-getter', 'Complete 10 missions.', 'goals', 300, (c) => c.state.life.stats.missionsDone >= 10, 'top-gogetter-silk'),
   a('missions-50', 'Unstoppable', 'Complete 50 missions.', 'goals', 1000, (c) => c.state.life.stats.missionsDone >= 50),
-  a('wishes-10', 'Wishes come true', 'Fulfil 10 wishes.', 'goals', 300, (c) => c.state.life.stats.wishesDone >= 10),
+  a('wishes-10', 'Wishes come true', 'Fulfil 10 wishes.', 'goals', 300, (c) => c.state.life.stats.wishesDone >= 10, 'hair-rose-gold'),
 ];
+
+// ---------------------------------------------------------------- city events
+
+/**
+ * Optional events: on most days something is on in the district for a few
+ * hours, with a real bonus for joining in. Nothing is lost by missing one.
+ */
+export interface CityEvent {
+  id: 'run-club' | 'food-fest' | 'music-night' | 'pop-up';
+  title: (d: District) => string;
+  perk: string;
+  /** Hours it runs, [from, to). */
+  from: number;
+  to: number;
+  link: LifeLink;
+}
+
+export const CITY_EVENTS: readonly CityEvent[] = [
+  { id: 'run-club', title: (d) => `Morning run club in ${d.park.name}`, perk: 'Runs build twice the fitness and count as time with people (+10 social).', from: 6, to: 10, link: { to: 'park' } },
+  { id: 'food-fest', title: () => 'Street food festival', perk: 'Meals out are extra fun (+15 fun) and teach you a little cooking.', from: 12, to: 16, link: { to: 'food' } },
+  { id: 'music-night', title: (d) => `Live music special at ${d.nightlife.name}`, perk: 'Nights out give +20 fun and build twice the social skill.', from: 20, to: 24, link: { to: 'nightlife' } },
+  { id: 'pop-up', title: (d) => `Designer pop-up at ${d.fashionHouse.name}`, perk: 'New clothes build twice the fashion skill.', from: 10, to: 18, link: { to: 'fashion' } },
+];
+
+/** Today's event in a district, if any (about four days in five). */
+export function eventToday(districtId: string, day: number): CityEvent | null {
+  const h = hash(`${districtId}:${day}`);
+  return h % 5 === 0 ? null : CITY_EVENTS[h % CITY_EVENTS.length];
+}
+export const eventOn = (e: CityEvent | null, hour: number): boolean => !!e && hour >= e.from && hour < e.to;
+
+/** Extra skill and need gains for joining in an event that's on. */
+function eventBonus(e: CityEvent | null, ev: LifeEvent): { skills: Partial<Record<SkillId, number>>; needs: Partial<Needs> } | null {
+  if (!e) return null;
+  if (e.id === 'run-club' && ev.kind === 'run') return { skills: { fitness: (ev.minutes / 30) * 20 }, needs: { social: 10 } };
+  if (e.id === 'food-fest' && ev.kind === 'eatOut') return { skills: { cooking: 5 }, needs: { fun: 15 } };
+  if (e.id === 'music-night' && ev.kind === 'nightOut') return { skills: { social: 25 }, needs: { fun: 20 } };
+  if (e.id === 'pop-up' && ev.kind === 'shop') return { skills: { fashion: 15 }, needs: {} };
+  return null;
+}
+
+const ACTIVITY_WORD: Record<Activity, string> = { chat: 'Chat', treat: 'Treat', hangout: 'Hang out' };
 
 // ---------------------------------------------------------------- the reducer
 
@@ -494,18 +558,30 @@ function rollOver(s: GameState, career: Career): GameState {
   return { ...s, life };
 }
 
-function applyEvents(s: GameState, events: readonly LifeEvent[], career: Career): GameState {
+function applyEvents(s: GameState, events: readonly LifeEvent[], career: Career, startMinute = s.time.totalMinutes): GameState {
   if (!events.length) return s;
   const mods = modifiers(s.life);
   const skills = { ...s.life.skills };
   const stats = { ...s.life.stats };
   let xpGained = 0;
   const levelUps: SkillId[] = [];
+  // An event counts if it was on when the activity started
+  const happening = eventToday(s.districtId, gameDay(startMinute));
+  const event = eventOn(happening, Math.floor(startMinute / 60) % 24) ? happening : null;
+  let needs = s.needs;
+  const history = [...s.life.history];
   for (const e of events) {
     const stat = STAT_OF[e.kind];
     if (stat) stats[stat] += 1;
     if (e.kind === 'earn') stats.earned += e.amount;
-    for (const [k, v] of Object.entries(skillGains(e, career)) as [SkillId, number][]) {
+    if (e.kind === 'socialise' && e.isNew) stats.met += 1;
+    if (e.kind === 'socialise') history.push({ who: e.residentId, what: ACTIVITY_WORD[e.activity], t: s.time.totalMinutes });
+    if (e.kind === 'nightOut') history.push({ who: e.residentId, what: 'Night out', t: s.time.totalMinutes });
+    const bonus = eventBonus(event, e);
+    if (bonus) { stats.events += 1; needs = addNeeds(needs, bonus.needs); }
+    const gains = { ...skillGains(e, career) };
+    for (const [k, v] of Object.entries(bonus?.skills ?? {}) as [SkillId, number][]) gains[k] = (gains[k] ?? 0) + v;
+    for (const [k, v] of Object.entries(gains) as [SkillId, number][]) {
       if (!v) continue;
       const gain = v * mods.skillXp[k];
       const before = skillLevel(skills[k]);
@@ -518,17 +594,19 @@ function applyEvents(s: GameState, events: readonly LifeEvent[], career: Career)
   const step = (m: Mission | Wish) => {
     const t = missionTemplate(m.template) ?? wishTemplate(m.template);
     if (!t) return m;
-    const metric = t.metric as Metric | 'balance' | 'home';
-    if (metric === 'balance' || metric === 'home') return m;
+    const metric = t.metric as Metric | 'balance' | 'home' | 'friendship';
+    if (metric === 'balance' || metric === 'home' || metric === 'friendship') return m;
     const gain = metric === 'xp' ? xpGained : events.reduce((sum, e) => sum + metricGain(metric, e), 0);
     return gain ? { ...m, progress: Math.min(m.target, m.progress + gain) } : m;
   };
   let next: GameState = {
     ...s,
+    needs,
     life: {
       ...s.life,
       skills,
       stats,
+      history: history.slice(-HISTORY_SIZE),
       cities: [...s.life.cities, ...cities],
       daily: s.life.daily.map((m) => (m.done ? m : step(m) as Mission)),
       weekly: s.life.weekly.map((m) => (m.done ? m : step(m) as Mission)),
@@ -566,7 +644,7 @@ function settle(s: GameState, career: Career): GameState {
     const t = wishTemplate(w.template);
     const ctx = { career, state: next };
     next = { ...next, life: { ...next.life, wishes: next.life.wishes.filter((x) => x.id !== w.id), stats: { ...next.life.stats, wishesDone: next.life.stats.wishesDone + 1 } } };
-    next = pay(next, w.reward, `Wish: ${t ? t.title(ctx) : w.template}`, 'Wish fulfilled', t ? t.title(ctx) : w.template, 8);
+    next = pay(next, w.reward, `Wish: ${t ? t.title(ctx, w) : w.template}`, 'Wish fulfilled', t ? t.title(ctx, w) : w.template, 8);
     next = { ...next, needs: { ...next.needs, fun: Math.min(100, next.needs.fun + 5) } };
   }
   // Dream milestones, in order
@@ -608,7 +686,8 @@ function topUpWishes(s: GameState, career: Career): GameState {
   const options = WISHES.filter((w) => !active.includes(w.id) && w.when(ctx));
   if (!options.length) return s;
   const pick = options[s.life.wishSeq % options.length];
-  const wish: Wish = { id: `${pick.id}#${s.life.wishSeq + 1}`, template: pick.id, progress: 0, target: pick.target(ctx), reward: pick.reward };
+  const subject = pick.subjectFor?.(ctx);
+  const wish: Wish = { id: `${pick.id}#${s.life.wishSeq + 1}`, template: pick.id, progress: 0, target: pick.target(ctx), reward: pick.reward, ...(subject ? { subject } : {}) };
   return { ...s, life: { ...s.life, wishes: [...s.life.wishes, wish], wishSeq: s.life.wishSeq + 1, wishAt: t } };
 }
 
@@ -662,7 +741,7 @@ export function lifeReducer(state: GameState, action: AnyAction, career: Career,
   }
   if (!next.life.cities.includes(next.districtId)) next = { ...next, life: { ...next.life, cities: [...next.life.cities, next.districtId] } };
   next = rollOver(next, career);
-  next = applyEvents(next, events, career);
+  next = applyEvents(next, events, career, state.time.totalMinutes);
   next = settle(next, career);
   next = topUpWishes(next, career);
   return next;
