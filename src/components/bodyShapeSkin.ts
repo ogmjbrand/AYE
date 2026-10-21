@@ -41,7 +41,7 @@ export function applyBodyShape(scene: Object3D, shape: BodyShape) {
     const entries: Entry[] = [];
     for (const bone of mesh.skeleton.bones) {
       const f = factors.get(bipedName(bone.name));
-      if (f) entries.push({ bone, scale: new Matrix4().makeScale(1, f[0], f[1]), saved: new Matrix4() });
+      if (f) entries.push({ bone, scale: new Matrix4().makeScale(1, f[0], f[1]).setPosition(0, f[2] ?? 0, 0), saved: new Matrix4() });
     }
     shaped.set(mesh.skeleton, entries);
   });

@@ -7,7 +7,7 @@ import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, defaultHeightCm, looksFor, type BodyType } from '../lib/looks';
 import type { Slot, Style, Wardrobe } from '../lib/fashion';
-import { AVERAGE_SHAPE, SHAPE_PRESETS, SHAPE_SLIDERS, presetFor, type BodyShape } from '../lib/bodyShape';
+import { AVERAGE_SHAPE, presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
 
@@ -80,6 +80,8 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
     setBody(next);
     setLookId(looksFor(next)[0].id);
     setHeightCm(defaultHeightCm(next));
+    // Bust and waist are only offered for feminine bodies
+    if (next === 'masculine') setShape((s) => ({ ...s, bust: 0, waist: 0 }));
   };
   const chooseGender = (next: Gender) => {
     setGender(next);
@@ -221,8 +223,8 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
           <div>
             <p className="mb-2 text-sm font-medium text-cc-ink">Body shape</p>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Body shape">
-              {SHAPE_PRESETS.map((p) => {
-                const on = presetFor(shape)?.id === p.id;
+              {shapePresets(body).map((p) => {
+                const on = presetFor(shape, body)?.id === p.id;
                 return (
                   <button key={p.id} type="button" role="radio" aria-checked={on} onClick={() => setShape(p.shape)}
                     className={`rounded-full border px-3 py-1 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${on ? 'border-cc-gold bg-cc-gold/10 text-cc-ink' : 'border-cc-line text-cc-muted hover:border-cc-gold/60'}`}>
@@ -232,7 +234,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
               })}
             </div>
             <div className="mt-3 space-y-2">
-              {SHAPE_SLIDERS.map((s) => (
+              {shapeSliders(body).map((s) => (
                 <div key={s.key} className="grid grid-cols-[6.5rem_1fr] items-center gap-3">
                   <label htmlFor={`shape-${s.key}`} className="text-sm text-cc-muted">{s.label}</label>
                   <div>
