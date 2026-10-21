@@ -178,3 +178,37 @@ What is still missing before MakeHuman people can replace Rocketbox in the game:
    retarget of the Rocketbox clips onto it.
 3. A build step (MPFB in headless Blender, or a Node script) that bakes body
    shape, skin and clothes into optimised GLBs.
+
+## Status update: MakeHuman body in the game (October 2026)
+
+`scripts/makehuman/build-body.mjs` now builds a real MakeHuman body from the
+CC0 MPFB data (fetched from raw.githubusercontent.com and cached in
+`assets-src/makehuman/cache/`, which is not committed):
+
+- An adult African female base (`macrodetails/african-female-young`).
+- The arms posed down by the shoulders, using the game-engine rig's own
+  skin weights.
+- 14 morph targets: weight, muscle, cup size, bust, waist in and out, hips,
+  hip width, belly, buttocks, and arm room for fuller figures. Each target is
+  posed the same way and has its own normals.
+- Eyes, plus a scalp cap cut from the body for hair.
+- The output is `public/assets/characters/mh/female-body.glb` (438 KB after
+  meshopt).
+
+In the game it powers the women's **body-type chart** in "Create your life":
+- seven 3D figures in a black two-piece, placed on the body by shader;
+- deep skin tones;
+- natural hair: afro, afro puff, short natural and bun.
+
+Choosing one sets the character's body shape.
+
+Not done yet, so the playable character is still the Rocketbox person:
+- a men's MakeHuman body;
+- face shaping;
+- textured skin;
+- real hair models (braids, locs, long hair);
+- fitted clothing;
+- animations on the MakeHuman skeleton.
+
+The playable character takes the chosen shape through the bone-girth system,
+fully clothed.

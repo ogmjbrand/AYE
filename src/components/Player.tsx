@@ -79,7 +79,7 @@ export function Player({ controller, character, tryOn, conversing = false }: Pla
     <group ref={groupRef}>
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} conversing={conversing} />
+          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} />
         </Suspense>
       </ErrorBoundary>
     </group>

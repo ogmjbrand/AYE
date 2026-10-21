@@ -12,3 +12,7 @@
 All other textures (asphalt, pavers, soil, kerbs, facades, roofs, palm fronds, signage) are generated procedurally in `src/world/textures.ts` and are original to this project.
 
 The HDRIs are used for lighting and reflections only; the visible sky is rendered by the `Sky` shader so the backdrop is not a European city.
+
+## MakeHuman body (characters/mh/)
+
+`female-body.glb` is built by `scripts/makehuman/build-body.mjs` from the MakeHuman base mesh, targets and game-engine rig weights in the MPFB repository (github.com/makehumancommunity/mpfb2). MakeHuman assets and their output are **CC0** (public domain); credit given with thanks to the MakeHuman community.

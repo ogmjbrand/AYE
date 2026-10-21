@@ -47,6 +47,8 @@ export interface LifeOSProps {
   onDismissWish: (id: string) => void;
   onSetSavingsGoal: (amount: number | null) => void;
   onOpenWardrobe: () => void;
+  /** Opens the character creator to change appearance. */
+  onEditLook: () => void;
   settings: { quality: string; onCycleQuality: () => void; showRoute: boolean; onShowRouteChange: (v: boolean) => void };
   onClose: () => void;
 }
@@ -566,7 +568,7 @@ function Money({ state, character, onSetSavingsGoal }: LifeOSProps) {
 
 // ---------------------------------------------------------------- Profile
 
-function Profile({ state, character, onSetProfile, onOpenWardrobe, onGo }: LifeOSProps) {
+function Profile({ state, character, onSetProfile, onOpenWardrobe, onEditLook, onGo }: LifeOSProps) {
   const [bio, setBio] = useState(state.life.profile.bio);
   const [traits, setTraits] = useState<TraitId[]>(state.life.profile.traits);
   const dirty = bio !== state.life.profile.bio || traits.join() !== state.life.profile.traits.join();
@@ -609,8 +611,9 @@ function Profile({ state, character, onSetProfile, onOpenWardrobe, onGo }: LifeO
           <dt className="text-ui-muted">Days lived</dt><dd className="m-0">{gameDay(state.time.totalMinutes) + 1}</dd>
         </dl>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="m-0 text-[11px] text-ui-muted">Change clothes here; buy new looks and hair colours at the boutique.</p>
-          <div className="flex gap-2">
+          <p className="m-0 text-[11px] text-ui-muted">Change your body, skin, hair colour and clothes; buy new pieces at the boutique.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onEditLook} className="rounded-full border border-ui-gold/60 px-3 py-1.5 text-xs text-ui-gold-strong hover:bg-ui-gold/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Change appearance</button>
             <button type="button" onClick={onOpenWardrobe} className="rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Wardrobe</button>
             <GoButton link={{ to: 'fashion' }} onGo={onGo} small />
           </div>

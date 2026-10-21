@@ -41,8 +41,8 @@ describe('body shape', () => {
   it('sanitises saved data and recognises presets', () => {
     expect(sanitiseShape(undefined)).toEqual(AVERAGE_SHAPE);
     // Saves from before bust and waist existed come back with both at zero
-    expect(sanitiseShape({ weight: 5, muscle: -1, curves: 'x', belly: 0.333 })).toEqual({ weight: 1, muscle: 0, curves: 0, belly: 0.33, bust: 0, waist: 0 });
-    expect(presetFor(SHAPE_PRESETS[3].shape)?.id).toBe('curvy');
+    expect(sanitiseShape({ weight: 5, muscle: -1, curves: 'x', belly: 0.333 })).toEqual({ weight: 1, muscle: 0, curves: 0, belly: 0.33, bust: 0, waist: 0, shoulders: 0, legs: 0 });
+    expect(presetFor(SHAPE_PRESETS[3].shape)?.id).toBe('muscular');
     expect(presetFor(FEMININE_SHAPE_PRESETS.find((p) => p.id === 'hourglass')!.shape, 'feminine')?.id).toBe('hourglass');
   });
 

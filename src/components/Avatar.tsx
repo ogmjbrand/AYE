@@ -1,27 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, NoColorSpace, type AnimationAction, type Group, type Mesh, type Object3D } from 'three';
+import { Box3, NoColorSpace, type AnimationAction, type Group, type Material, type Mesh, type Object3D } from 'three';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
 
 import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
-import { applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
+import { applySkinTone, applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
 import { applyBodyShape } from './bodyShapeSkin';
 import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 
+const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 
 /** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
-function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>> }) {
+function OutfitStyler({ scene, lookId, styles, skinTone }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
-  const uniforms = useMemo(() => {
+  const [uniforms, materials] = useMemo(() => {
     const list: StyleUniforms[] = [];
+    const mats: Material[] = [];
     for (const tex of [bodyMask, headMask]) {
       // Garment maps are data in glTF UV space, like the model's own textures
       tex.flipY = false;
@@ -33,14 +35,17 @@ function OutfitStyler({ scene, lookId, styles }: { scene: Object3D; lookId: stri
       if (!mesh.isMesh) return;
       for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         const u = installStyleShader(mat, /_head$/i.test(mat.name) ? headMask : bodyMask);
-        if (u) list.push(u);
+        if (u) { list.push(u); mats.push(mat); }
       }
     });
-    return list;
+    return [list, mats] as const;
   }, [scene, bodyMask, headMask]);
   useEffect(() => {
     for (const u of uniforms) applyStyles(u, styles);
   }, [uniforms, styles]);
+  useEffect(() => {
+    for (const m of materials) applySkinTone(m, skinTone);
+  }, [materials, skinTone]);
   return null;
 }
 
@@ -90,12 +95,14 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
   shape?: BodyShape;
+  /** Deeper (to 1) or lighter (to -1) than the person's own skin; 0 keeps it. */
+  skinTone?: number;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
   styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
@@ -180,7 +187,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
-      {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
+      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );

@@ -76,6 +76,8 @@ export function parseCharacter(data: unknown): Character | null {
     wardrobe: sanitiseWardrobe(c.wardrobe),
     // Saves from before body shape start average
     shape: sanitiseShape(c.shape),
+    // Saves from before skin tone keep the person's own skin
+    skinTone: isNum(c.skinTone, -1, 1) ? Math.round(c.skinTone * 100) / 100 : 0,
   };
 }
 

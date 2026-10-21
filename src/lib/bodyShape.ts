@@ -23,30 +23,36 @@ export interface BodyShape {
   bust: number;
   /** 0 … 1: a narrower, more defined waist. */
   waist: number;
+  /** -1 narrow … 1 broad shoulders. */
+  shoulders: number;
+  /** -1 slender … 1 strong, full legs. */
+  legs: number;
 }
 
-export const AVERAGE_SHAPE: BodyShape = { weight: 0, muscle: 0, curves: 0, belly: 0, bust: 0, waist: 0 };
+export const AVERAGE_SHAPE: BodyShape = { weight: 0, muscle: 0, curves: 0, belly: 0, bust: 0, waist: 0, shoulders: 0, legs: 0 };
 
 type Preset = { id: string; label: string; shape: BodyShape };
 const figure = (s: Partial<BodyShape>): BodyShape => ({ ...AVERAGE_SHAPE, ...s });
 
+/** Men's builds: slim, average, athletic, muscular, larger and heavy-set. */
 export const SHAPE_PRESETS: readonly Preset[] = [
-  { id: 'slim', label: 'Slim', shape: figure({ weight: -0.7, muscle: 0.1, curves: 0.1 }) },
+  { id: 'slim', label: 'Slim', shape: figure({ weight: -0.7, muscle: 0.1, curves: 0.1, shoulders: -0.3, legs: -0.3 }) },
   { id: 'average', label: 'Average', shape: AVERAGE_SHAPE },
-  { id: 'athletic', label: 'Athletic', shape: figure({ weight: -0.1, muscle: 0.85, curves: 0.2 }) },
-  { id: 'curvy', label: 'Curvy', shape: figure({ weight: 0.3, curves: 0.9, belly: 0.15 }) },
-  { id: 'full', label: 'Full-figured', shape: figure({ weight: 0.85, muscle: 0.1, curves: 0.5, belly: 0.6 }) },
+  { id: 'athletic', label: 'Athletic', shape: figure({ weight: -0.1, muscle: 0.7, curves: 0.1, shoulders: 0.3, legs: 0.2 }) },
+  { id: 'muscular', label: 'Muscular', shape: figure({ weight: 0.15, muscle: 1, shoulders: 0.8, legs: 0.5 }) },
+  { id: 'larger', label: 'Larger', shape: figure({ weight: 0.7, muscle: 0.1, curves: 0.2, belly: 0.5, shoulders: 0.2, legs: 0.3 }) },
+  { id: 'heavy', label: 'Heavy-set', shape: figure({ weight: 0.95, muscle: 0.2, curves: 0.3, belly: 0.85, shoulders: 0.3, legs: 0.4 }) },
 ];
 
 /** Women's figures: slim and toned, lean athletic, curvy, hourglass, full with a round belly, plus-size curvy. */
 export const FEMININE_SHAPE_PRESETS: readonly Preset[] = [
-  { id: 'slim', label: 'Slim', shape: figure({ weight: -0.6, muscle: 0.25, curves: 0.15, bust: 0.1, waist: 0.3 }) },
+  { id: 'slim', label: 'Slim', shape: figure({ weight: -0.6, muscle: 0.25, curves: 0.15, bust: 0.1, waist: 0.3, shoulders: -0.2, legs: -0.2 }) },
   { id: 'average', label: 'Average', shape: AVERAGE_SHAPE },
-  { id: 'athletic', label: 'Athletic', shape: figure({ weight: -0.3, muscle: 0.7, curves: 0.25, bust: 0.05, waist: 0.4 }) },
+  { id: 'athletic', label: 'Athletic', shape: figure({ weight: -0.3, muscle: 0.7, curves: 0.25, bust: 0.05, waist: 0.4, shoulders: 0.2, legs: 0.3 }) },
   { id: 'curvy', label: 'Curvy', shape: figure({ weight: 0.25, curves: 0.85, belly: 0.1, bust: 0.6, waist: 0.2 }) },
   { id: 'hourglass', label: 'Hourglass', shape: figure({ weight: 0.1, muscle: 0.05, curves: 0.8, bust: 0.8, waist: 0.85 }) },
   { id: 'full', label: 'Full-figured', shape: figure({ weight: 0.85, curves: 0.5, belly: 0.85, bust: 0.6 }) },
-  { id: 'plus-curvy', label: 'Plus-size curvy', shape: figure({ weight: 0.7, curves: 0.95, belly: 0.45, bust: 0.75, waist: 0.25 }) },
+  { id: 'plus-curvy', label: 'Plus-size curvy', shape: figure({ weight: 0.7, curves: 0.95, belly: 0.45, bust: 0.75, waist: 0.25, legs: 0.4 }) },
 ];
 
 type Slider = { key: keyof BodyShape; label: string; min: number; ends: [string, string] };
@@ -56,6 +62,8 @@ export const SHAPE_SLIDERS: readonly Slider[] = [
   { key: 'muscle', label: 'Muscle', min: 0, ends: ['Soft', 'Muscular'] },
   { key: 'curves', label: 'Hips & thighs', min: 0, ends: ['Straight', 'Curvy'] },
   { key: 'belly', label: 'Belly', min: 0, ends: ['Flat', 'Round'] },
+  { key: 'shoulders', label: 'Shoulders', min: -1, ends: ['Narrow', 'Broad'] },
+  { key: 'legs', label: 'Legs', min: -1, ends: ['Slender', 'Strong'] },
 ];
 
 export const FEMININE_SHAPE_SLIDERS: readonly Slider[] = [
@@ -82,6 +90,8 @@ export function sanitiseShape(data: unknown): BodyShape {
     belly: num(s.belly, 0, 1, 0),
     bust: num(s.bust, 0, 1, 0),
     waist: num(s.waist, 0, 1, 0),
+    shoulders: num(s.shoulders, -1, 1, 0),
+    legs: num(s.legs, -1, 1, 0),
   };
 }
 
@@ -106,7 +116,7 @@ const CHEST_BACK = -0.1;
  * prefix ("Spine1", "L Thigh"). Average shape returns an empty map.
  */
 export function girthFactors(shape: BodyShape): Map<string, Girth> {
-  const { weight: w, muscle: m, curves: c, belly: b, bust: u, waist: n } = sanitiseShape(shape);
+  const { weight: w, muscle: m, curves: c, belly: b, bust: u, waist: n, shoulders: sh, legs: lg } = sanitiseShape(shape);
   const out = new Map<string, Girth>();
   const set = (bone: string, y: number, z: number, forward = 0) => {
     if (Math.abs(y - 1) > 1e-3 || Math.abs(z - 1) > 1e-3) out.set(bone, forward ? [y, z, forward] : [y, z]);
@@ -120,14 +130,15 @@ export function girthFactors(shape: BodyShape): Map<string, Girth> {
   // A defined waist pulls in the middle of the torso, mostly at the sides
   set('Spine', (1 + 0.26 * w + 0.4 * b + 0.06 * c) * (1 - 0.04 * n), (1 + 0.24 * w + 0.14 * b + 0.16 * c) * (1 - 0.14 * n));
   set('Spine1', (1 + 0.26 * w + 0.5 * b) * (1 - 0.08 * n) + underBust, (1 + 0.22 * w + 0.18 * b + 0.06 * m) * (1 - 0.24 * n), -CHEST_BACK * underBust);
-  set('Spine2', 1 + 0.18 * w + 0.14 * m + 0.08 * b + bust, 1 + 0.14 * w + 0.14 * m + 0.1 * u, -CHEST_BACK * bust);
+  set('Spine2', 1 + 0.18 * w + 0.14 * m + 0.08 * b + bust, (1 + 0.14 * w + 0.14 * m + 0.1 * u) * (1 + 0.08 * sh), -CHEST_BACK * bust);
   set('Neck', 1 + 0.14 * w + 0.18 * m, 1 + 0.14 * w + 0.18 * m);
   for (const side of ['L', 'R']) {
-    set(`${side} Clavicle`, 1 + 0.1 * w + 0.22 * m, 1 + 0.1 * w + 0.22 * m);
-    set(`${side} UpperArm`, 1 + 0.28 * w + 0.4 * m, 1 + 0.28 * w + 0.4 * m);
+    // Broader shoulders fill out the collarbone area and the top of the arm
+    set(`${side} Clavicle`, (1 + 0.1 * w + 0.22 * m) * (1 + 0.12 * sh), (1 + 0.1 * w + 0.22 * m) * (1 + 0.2 * sh));
+    set(`${side} UpperArm`, (1 + 0.28 * w + 0.4 * m) * (1 + 0.06 * sh), (1 + 0.28 * w + 0.4 * m) * (1 + 0.06 * sh));
     set(`${side} Forearm`, 1 + 0.18 * w + 0.22 * m, 1 + 0.18 * w + 0.22 * m);
-    set(`${side} Thigh`, 1 + 0.28 * w + 0.16 * m + 0.24 * c, 1 + 0.28 * w + 0.16 * m + 0.28 * c);
-    set(`${side} Calf`, 1 + 0.18 * w + 0.16 * m + 0.08 * c, 1 + 0.18 * w + 0.16 * m + 0.08 * c);
+    set(`${side} Thigh`, (1 + 0.28 * w + 0.16 * m + 0.24 * c) * (1 + 0.14 * lg), (1 + 0.28 * w + 0.16 * m + 0.28 * c) * (1 + 0.14 * lg));
+    set(`${side} Calf`, (1 + 0.18 * w + 0.16 * m + 0.08 * c) * (1 + 0.12 * lg), (1 + 0.18 * w + 0.16 * m + 0.08 * c) * (1 + 0.12 * lg));
   }
   return out;
 }

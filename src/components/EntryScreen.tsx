@@ -15,6 +15,8 @@ interface EntryScreenProps {
   onQualityChange: (quality: QualityMode) => void;
   onContinue: () => void;
   onNewLife: () => void;
+  /** Change the saved character's appearance (keeps their life and progress). */
+  onEditLook?: () => void;
 }
 
 type Panel = 'menu' | 'confirm-new' | 'help' | 'settings';
@@ -38,7 +40,7 @@ const LINK =
  * The first thing a player sees: the AYE mark, Continue or start a new life,
  * how to play and settings. Saving is per device for now, and the screen says so.
  */
-export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife }: EntryScreenProps) {
+export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife, onEditLook }: EntryScreenProps) {
   const [panel, setPanel] = useState<Panel>('menu');
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -82,6 +84,11 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                   {saved && (
                     <button type="button" onClick={onContinue} className={PRIMARY}>
                       Continue as {saved.name}
+                    </button>
+                  )}
+                  {saved && onEditLook && (
+                    <button type="button" onClick={onEditLook} className={SECONDARY}>
+                      Change {saved.name}&rsquo;s appearance
                     </button>
                   )}
                   <button type="button" onClick={startNew} className={saved ? SECONDARY : PRIMARY}>
@@ -166,6 +173,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                 heightCm={saved.heightCm}
                 styles={resolveStyles(saved.wardrobe.equipped)}
                 shape={saved.shape}
+                skinTone={saved.skinTone}
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cc-bg/95 to-transparent p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-cc-gold">Welcome back</p>

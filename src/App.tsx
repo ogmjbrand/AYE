@@ -171,7 +171,9 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
 
 export default function App() {
   // The entry screen comes first; 'create' is character creation; a character means playing
-  const [screen, setScreen] = useState<'entry' | 'create' | 'play'>('entry');
+  const [screen, setScreen] = useState<'entry' | 'create' | 'edit' | 'play'>('entry');
+  // Where to go back to after changing appearance
+  const [editFrom, setEditFrom] = useState<'entry' | 'play'>('entry');
   const [character, setCharacter] = useState<Character | null>(() => loadCharacter());
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const quality = settings.quality;
@@ -195,6 +197,15 @@ export default function App() {
       />
     );
   }
+  if (screen === 'edit' && character) {
+    return (
+      <CharacterCreation
+        editing={character}
+        onCharacterCreate={(c) => { setCharacter(c); setScreen(editFrom); }}
+        onBack={() => setScreen(editFrom)}
+      />
+    );
+  }
   if (screen === 'entry' || !character) {
     return (
       <EntryScreen
@@ -203,6 +214,7 @@ export default function App() {
         onQualityChange={changeQuality}
         onContinue={() => setScreen('play')}
         onNewLife={() => setScreen('create')}
+        onEditLook={() => { setEditFrom('entry'); setScreen('edit'); }}
       />
     );
   }
@@ -218,6 +230,7 @@ export default function App() {
       onShowRouteChange={(showRoute) => changeSettings({ showRoute })}
       onExitToMenu={() => setScreen('entry')}
       onCharacterUpdate={handleCharacterUpdate}
+      onEditLook={() => { setEditFrom('play'); setScreen('edit'); }}
     />
   );
 }
@@ -229,6 +242,8 @@ interface GameProps {
   /** Dotted route line on the ground for click-to-move trips. */
   showRoute: boolean;
   onShowRouteChange: (show: boolean) => void;
+  /** Opens the character creator to change appearance (life and progress are kept). */
+  onEditLook: () => void;
   /** Back to the entry screen; the game is already saved. */
   onExitToMenu: () => void;
   onCharacterUpdate: (character: Character) => void;
@@ -237,7 +252,7 @@ interface GameProps {
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
 let placedIn: string | null = null;
 
-function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, onExitToMenu, onCharacterUpdate }: GameProps) {
+function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, onExitToMenu, onCharacterUpdate, onEditLook }: GameProps) {
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
@@ -827,6 +842,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onDismissWish={dismissWish}
           onSetSavingsGoal={setSavingsGoal}
           onOpenWardrobe={() => { setOsOpen(false); setStore('wardrobe'); }}
+          // Step outside first, so you come back to the street (the room isn't restored after the creator)
+          onEditLook={() => { if (indoors) goOutside(); onEditLook(); }}
           settings={{ quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange }}
           onClose={() => setOsOpen(false)}
         />
