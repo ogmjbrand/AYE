@@ -276,8 +276,8 @@ export function InteriorFurniturePiece({ f }: { f: Furniture }) {
           {box(w - 0.18, 0.28, d - 0.2, 0.46, f.color)}
           {long ? box(w, 0.48, 0.22, 0.65, f.color, 0, d / 2 - 0.1) : box(0.22, 0.48, d, 0.65, f.color, w / 2 - 0.1, 0)}
           {long
-            ? [-1, 1].map((side) => box(w / 2 - 0.08, 0.22, d - 0.28, 0.62, '#777a76', side * w / 4, -d / 2 + 0.1))
-            : [-1, 1].map((side) => box(w - 0.28, 0.22, d / 2 - 0.08, 0.62, '#777a76', -w / 2 + 0.1, side * d / 4))}
+            ? [-1, 1].map((side) => box(w / 2 - 0.08, 0.22, d - 0.28, 0.62, '#777a76', side * w / 4, -d / 2 + 0.1, `arm-${side}`))
+            : [-1, 1].map((side) => box(w - 0.28, 0.22, d / 2 - 0.08, 0.62, '#777a76', -w / 2 + 0.1, side * d / 4, `arm-${side}`))}
         </>
       );
       break;
@@ -460,8 +460,8 @@ export function InteriorFurniturePiece({ f }: { f: Furniture }) {
       parts = (
         <>
           {box(w, h, d, h / 2, f.color)}
-          {[-1, 1].map((side) => box(w * 0.44, h * 0.86, 0.035, h / 2, '#b6a58f', side * w * 0.25, d / 2 + 0.02))}
-          {[-1, 1].map((side) => box(0.035, 0.16, 0.035, h / 2, '#d2b36f', side * 0.12, d / 2 + 0.05))}
+          {[-1, 1].map((side) => box(w * 0.44, h * 0.86, 0.035, h / 2, '#b6a58f', side * w * 0.25, d / 2 + 0.02, `door-${side}`))}
+          {[-1, 1].map((side) => box(0.035, 0.16, 0.035, h / 2, '#d2b36f', side * 0.12, d / 2 + 0.05, `handle-${side}`))}
         </>
       );
       break;
