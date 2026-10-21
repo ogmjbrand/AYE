@@ -266,7 +266,7 @@ function Signs() {
         const SIGN_BG = ['#24323f', '#4a3226', '#2f3b34', '#3a3340', '#463d2c'];
         const tex = signTexture(b.name!, SIGN_BG[b.name!.length % SIGN_BG.length], '#f1ede6');
         return {
-          key: b.name!,
+          key: `${b.name}:${b.position[0]}:${b.position[2]}`,
           tex,
           width,
           position: [(side > 0 ? max.x : min.x) + side * 0.06, isShop ? 4.1 : 4.6, b.position[2]] as const,
