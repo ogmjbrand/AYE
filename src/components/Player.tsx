@@ -7,7 +7,7 @@ import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
-import { resolveStyles, type Slot } from '../lib/fashion';
+import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
 import { residentById, residentPosition } from '../lib/people';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
@@ -61,6 +61,7 @@ export function Player({
 
   const equipped = character?.wardrobe.equipped;
   const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
+  const visibleShoeId = resolveFashionItemId(equipped ?? {}, tryOn, 'shoes');
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
@@ -136,7 +137,7 @@ export function Player({
             conversing={conversing}
             hugSession={hugSession}
             eating={eating}
-            equippedShoeId={character?.wardrobe.equipped.shoes ?? null}
+            shoeItemId={visibleShoeId}
           />
         </Suspense>
       </ErrorBoundary>

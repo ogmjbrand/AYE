@@ -97,7 +97,7 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false, equippedShoeId = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false, shoeItemId = null }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
@@ -111,8 +111,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   lookId?: string;
   /** Standing height; the look's own height if omitted. */
   heightCm?: number;
-  /** ID of equipped shoe (fashion.ts); shown on character. */
-  equippedShoeId?: string | null;
+  /** Visible shoe item (equipped or tried on); rendered when its model is available. */
+  shoeItemId?: string | null;
 }) {
   const group = useRef<Group>(null);
   // A character listed in public/assets/manifest.json replaces the built-in looks
@@ -224,14 +224,14 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
     }
   });
 
-  const garmentModel = equippedShoeId ? getGarmentModel(equippedShoeId) : null;
+  const garmentModel = shoeItemId ? getGarmentModel(shoeItemId) : null;
 
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
       {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
-      {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped={!!equippedShoeId} />}
+      {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped />}
     </group>
   );
 }

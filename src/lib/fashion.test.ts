@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FABRICS, FASHION_ITEMS, GARMENT_MODELS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { FABRICS, FASHION_ITEMS, GARMENT_MODELS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveFashionItemId, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -20,6 +20,9 @@ describe('fashion catalogue', () => {
     expect(styles.top).toBe(itemById('top-ankara-royal')!.style);
     expect(styles.shoes).toBeUndefined();
     expect(styles.bottom).toBeUndefined();
+    expect(resolveFashionItemId(equipped, { shoes: 'shoes-metallic-gold' }, 'shoes')).toBe('shoes-metallic-gold');
+    expect(resolveFashionItemId(equipped, { shoes: null }, 'shoes')).toBeNull();
+    expect(resolveFashionItemId(equipped, undefined, 'shoes')).toBe('shoes-clean-white');
   });
 
   it('sanitises saved wardrobes', () => {

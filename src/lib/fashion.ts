@@ -203,11 +203,20 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
 export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>) {
   const out: Partial<Record<Slot, Style>> = {};
   for (const slot of SLOTS) {
-    const id = tryOn && slot in tryOn ? tryOn[slot] : equipped[slot];
+    const id = resolveFashionItemId(equipped, tryOn, slot);
     const it = itemById(id);
     if (it) out[slot] = it.style;
   }
   return out;
+}
+
+/** Resolve the visible item for a slot, including an explicit null try-on that removes it. */
+export function resolveFashionItemId(
+  equipped: Partial<Record<Slot, string>>,
+  tryOn: Partial<Record<Slot, string | null>> | undefined,
+  slot: Slot,
+): string | null {
+  return tryOn && slot in tryOn ? tryOn[slot] ?? null : equipped[slot] ?? null;
 }
 
 /** A CSS background that previews an item's pattern in the shop. */
