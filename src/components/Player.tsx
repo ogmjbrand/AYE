@@ -136,6 +136,7 @@ export function Player({
             conversing={conversing}
             hugSession={hugSession}
             eating={eating}
+            equippedShoeId={character?.wardrobe.equipped.shoes ?? null}
           />
         </Suspense>
       </ErrorBoundary>

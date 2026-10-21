@@ -27,6 +27,7 @@ import {
 import { HOME_DECOR_ITEMS, decorItemById, type HomeDecorPlacement } from '../lib/homeDecor';
 import { fashionShowcaseResult } from '../lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from '../lib/fashionMission';
+import { GarmentPreviewPanel } from './GarmentPreviewPanel';
 
 interface FashionStoreProps {
   mode: 'shop' | 'wardrobe' | 'decor';
@@ -365,14 +366,18 @@ export function FashionStore({
                 const affordable = balance >= item.price;
                 return (
                   <article key={item.id} className={`min-w-0 border p-2 ${selected ? 'border-[#d2b36f]' : 'border-white/10'} bg-[#232730]`}>
-                    <div
-                      className="mb-2 flex h-20 items-center justify-center border border-white/10"
-                      style={{ background: swatchCss(item.style) }}
-                      role="img"
-                      aria-label={`${item.name} fabric preview`}
-                    >
-                      {selected && <Check className="drop-shadow-md" size={22} aria-hidden="true" />}
-                    </div>
+                    {item.slot === 'shoes' ? (
+                      <GarmentPreviewPanel item={item} className="mb-2 h-20" />
+                    ) : (
+                      <div
+                        className="mb-2 flex h-20 items-center justify-center border border-white/10"
+                        style={{ background: swatchCss(item.style) }}
+                        role="img"
+                        aria-label={`${item.name} fabric preview`}
+                      >
+                        {selected && <Check className="drop-shadow-md" size={22} aria-hidden="true" />}
+                      </div>
+                    )}
                     <h3 className="m-0 truncate text-xs font-semibold">{item.name}</h3>
                     <p className="m-0 mt-1 truncate text-[10px] text-white/55">
                       {item.style.fabric?.name ?? item.collection}{owned ? ' · Owned' : ` · ${item.price.toLocaleString()} ⓒ`}

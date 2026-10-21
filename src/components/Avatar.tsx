@@ -16,6 +16,8 @@ import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
+import { GarmentLayer } from './GarmentLoader';
+import { getGarmentModel } from '../lib/fashion';
 
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 const EAT_UPPER_ARM = new Quaternion().setFromEuler(new Euler(-0.16, 0.05, -0.82));
@@ -95,7 +97,7 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, conversing = false, hugSession = null, eating = false, equippedShoeId = null }: {
   controller: PlayerHandle;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
@@ -109,6 +111,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
   lookId?: string;
   /** Standing height; the look's own height if omitted. */
   heightCm?: number;
+  /** ID of equipped shoe (fashion.ts); shown on character. */
+  equippedShoeId?: string | null;
 }) {
   const group = useRef<Group>(null);
   // A character listed in public/assets/manifest.json replaces the built-in looks
@@ -220,11 +224,14 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, conversing
     }
   });
 
+  const garmentModel = equippedShoeId ? getGarmentModel(equippedShoeId) : null;
+
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
       {styledLook && styles && <OutfitStyler scene={scene} lookId={styledLook} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
+      {garmentModel && <GarmentLayer group={group.current} model={garmentModel} isEquipped={!!equippedShoeId} />}
     </group>
   );
 }
