@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, type RefObject } from 'react';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { type Group, type Object3D } from 'three';
 import type { GarmentModel } from '../lib/fashion';
@@ -11,6 +12,7 @@ import { assetUrl } from '../lib/assetManifest';
 import { findRigBone } from '../lib/characterRig';
 
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
 const garmentLoadingPromises = new Map<string, Promise<Object3D>>();
 
 function loadGarmentScene(model: GarmentModel): Promise<Object3D> {

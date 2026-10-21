@@ -70,7 +70,7 @@ is listed as `"private/characters/player.glb"`.
 - ✓ Rigged: one skinned mesh with a skeleton. A static statue won't animate.
 - ✓ Under **80,000 triangles**; aim for 30,000–60,000 on Intel integrated graphics.
 - ✓ Textures **2048 px or smaller** (1024 is fine for clothing). Use PBR metal/roughness, not specular/gloss.
-- ✓ **No Draco compression** (the game's loader uses meshopt). `npm run assets:optimize` produces the right format.
+- ✓ **No Draco compression** (the game's avatar, vehicle and clothing loaders configure MeshoptDecoder). `npm run assets:optimize` produces the right format.
 - Y-up, metres, facing **+Z**, feet at the origin, rest pose T or A.
 - At most 4 bone influences per vertex (Blender's glTF exporter does this by default).
 - Under ~15 MB after optimisation; aim for under 8 MB.
