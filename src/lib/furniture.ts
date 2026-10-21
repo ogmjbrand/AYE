@@ -110,7 +110,7 @@ export const CATALOGUE: readonly CatalogueItem[] = [
   item('luxe-bookshelf', 'Book Shelf', 'storage', 8000, 'bookshelf', [1.2, 2.0, 0.38], '#c9a052', 3, 1.4, 'Open brass shelving, filled with books and a few treasures.', { ...luxe, room: 'living' }),
   item('luxe-floor-lamp', 'Floor Lamp', 'lighting', 3500, 'lamp', [0.45, 1.75, 0.45], '#e6c78a', 2, 1, 'A slim brass lamp with a linen drum shade.', luxe),
   item('luxe-rug', 'Rug', 'decor', 4200, 'rug', [2.8, 0.01, 2.0], '#d8cdb8', 3, 1, 'A hand-tufted wool rug in sand and charcoal.', luxe),
-  item('luxe-plant', 'Indoor Plant', 'decor', 2800, 'plant', [0.7, 1.8, 0.7], '#3b7a3c', 3, 1, 'A tall palm in a brass planter.', luxe),
+  item('luxe-plant', 'Indoor Plant', 'decor', 2800, 'plant', [0.7, 1.0, 0.7], '#3b7a3c', 3, 1, 'A lush leafy plant in a ceramic pot.', luxe),
   item('luxe-wall-art', 'Wall Art', 'decor', 3200, 'art', [1.2, 0.9, 0.06], '#c9a052', 2, 1, 'An original abstract canvas in a gold frame, hung on the wall.', luxe),
   item('luxe-dining-table', 'Dining Table', 'tables', 12000, 'table', [2.0, 0.76, 1.7], '#f1ede6', 3, 1, 'Marble-topped, with four velvet chairs.', { ...luxe, room: 'kitchen' }),
   item('luxe-kitchen-island', 'Kitchen Island', 'kitchen', 11500, 'counter', [2.0, 0.95, 0.9], '#f1ede6', 3, 1.4, 'A marble island with a hob and bar stools. Cook like a chef.', luxe),

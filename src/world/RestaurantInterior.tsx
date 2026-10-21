@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { DoubleSide } from 'three';
+import { DoubleSide, type Texture } from 'three';
 import type { GameTime } from '../lib/gameState';
 import { lightingAt } from './timeOfDay';
 import {
@@ -11,10 +11,13 @@ import { palmsSign } from './signs';
 import { PottedPalm } from './PottedPalm';
 import { DishModel } from './Dishes';
 import { VenueNpc } from './VenueNpc';
+import { UNIFORMS } from '../lib/uniforms';
+import { Ceiling, Downlight, LedRing, PolishedFloor, TrackLight } from './VenueShell';
+import { RealModel } from './RealModel';
 
 const GOLD = '#c9a052';
-const EMERALD = '#123a30';
-const EMERALD_DEEP = '#0c2721';
+const EMERALD = '#2b1d14';
+const EMERALD_DEEP = '#1c130d';
 const VELVET = '#1d5a47';
 const TABLE_TOP = 0.76;
 const DRINKS = new Set(PALMS_MENU.filter((i) => i.course === 'drink').map((i) => i.id));
@@ -59,9 +62,10 @@ function Panelling({ length, count }: { length: number; count: number }) {
   );
 }
 
-function Chair({ seat }: { seat: Seat }) {
+/** The old box chair: shown while the velvet chair model loads, or if it can't. */
+function BoxChair() {
   return (
-    <group position={[seat.x, 0, seat.z]} rotation={[0, seat.facing, 0]}>
+    <>
       <mesh position={[0, 0.45, 0]} castShadow>
         <boxGeometry args={[0.48, 0.09, 0.46]} />
         <meshStandardMaterial color={VELVET} roughness={0.85} />
@@ -72,51 +76,66 @@ function Chair({ seat }: { seat: Seat }) {
       </mesh>
       <Gold p={[0, 1.12, -0.21]} s={[0.48, 0.03, 0.08]} />
       {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Gold key={`${sx}${sz}`} p={[sx * 0.2, 0.2, sz * 0.19]} s={[0.03, 0.4, 0.03]} />))}
+    </>
+  );
+}
+
+/** A plush tan velvet chair, facing the table. */
+function Chair({ seat }: { seat: Seat }) {
+  return (
+    <group position={[seat.x, 0, seat.z]} rotation={[0, seat.facing, 0]}>
+      <RealModel name="chair-velvet-mango" fit={[0.78, 0.82, 0.66]} recolor={{ match: /fabric/i, color: '#b08860' }} fallback={<BoxChair />} />
     </group>
   );
 }
 
-/** A round table in a white cloth, with a candle and a bud vase, and dishes on it. */
-function Table({ t, dishes }: { t: DiningTable; dishes: { at: 0 | 1; id: string; drink?: string }[] }) {
+/** A round black-marble table on a brass pedestal, laid with plates and glasses, a lamp and flowers. */
+function Table({ t, dishes, marble }: { t: DiningTable; dishes: { at: 0 | 1; id: string; drink?: string }[]; marble: Texture }) {
   return (
     <group>
       <group position={[t.x, 0, t.z]}>
-        <mesh position={[0, TABLE_TOP - 0.01, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[TABLE_RADIUS, TABLE_RADIUS, 0.02, 40]} />
-          <meshStandardMaterial color="#f7f4ee" roughness={0.85} />
+        <mesh position={[0, TABLE_TOP - 0.02, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[TABLE_RADIUS, TABLE_RADIUS, 0.04, 48]} />
+          <meshPhysicalMaterial map={marble} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
         </mesh>
-        {/* Cloth hanging down */}
-        <mesh position={[0, TABLE_TOP - 0.2, 0]}>
-          <cylinderGeometry args={[TABLE_RADIUS + 0.01, TABLE_RADIUS + 0.05, 0.38, 40, 1, true]} />
-          <meshStandardMaterial color="#efebe3" roughness={0.9} side={DoubleSide} />
+        <mesh position={[0, TABLE_TOP - 0.02, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[TABLE_RADIUS, 0.012, 8, 48]} />
+          <meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.25} />
         </mesh>
-        <mesh position={[0, 0.2, 0]} castShadow>
-          <cylinderGeometry args={[0.05, 0.07, 0.4, 12]} />
+        <mesh position={[0, 0.37, 0]} castShadow>
+          <cylinderGeometry args={[0.05, 0.07, 0.7, 12]} />
           <meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.3} />
         </mesh>
         <mesh position={[0, 0.02, 0]}>
           <cylinderGeometry args={[0.28, 0.3, 0.04, 24]} />
           <meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.3} />
         </mesh>
-        {/* Candle in a glass, and a bud vase */}
-        <mesh position={[0.05, TABLE_TOP + 0.04, 0.18]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.08, 16]} />
-          <meshStandardMaterial color="#e9e1d0" transparent opacity={0.45} roughness={0.05} />
-        </mesh>
-        <mesh position={[0.05, TABLE_TOP + 0.075, 0.18]}>
-          <sphereGeometry args={[0.009, 8, 6]} />
-          <meshStandardMaterial color="#ffd27a" emissive="#ffb347" emissiveIntensity={3} toneMapped={false} />
-        </mesh>
-        <mesh position={[-0.06, TABLE_TOP + 0.06, 0.2]}>
-          <cylinderGeometry args={[0.012, 0.022, 0.12, 12]} />
-          <meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.3} />
-        </mesh>
-        <mesh position={[-0.06, TABLE_TOP + 0.15, 0.2]}>
-          <sphereGeometry args={[0.025, 10, 8]} />
-          <meshStandardMaterial color="#d84a5a" roughness={0.7} />
-        </mesh>
+        {/* A little brass table lamp with a glowing shade */}
+        <group position={[0.1, TABLE_TOP, 0.22]}>
+          <mesh position={[0, 0.01, 0]}><cylinderGeometry args={[0.05, 0.06, 0.02, 20]} /><meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.25} /></mesh>
+          <mesh position={[0, 0.12, 0]}><cylinderGeometry args={[0.008, 0.008, 0.22, 8]} /><meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.25} /></mesh>
+          <mesh position={[0, 0.25, 0]}>
+            <cylinderGeometry args={[0.05, 0.08, 0.09, 24, 1, true]} />
+            <meshStandardMaterial color="#fff1d6" emissive="#ffc670" emissiveIntensity={2.4} toneMapped={false} side={DoubleSide} />
+          </mesh>
+        </group>
+        <group position={[-0.08, TABLE_TOP, 0.2]}><RealModel name="vase-flowers" fit={[0.22, 0.3, 0.22]} /></group>
       </group>
       {t.seats.map((s) => <Chair key={s.id} seat={s} />)}
+      {/* Laid places: a charger plate and a wine glass at each chair */}
+      {t.seats.map((s) => {
+        const x = t.x + (s.x - t.x) * 0.45;
+        const z = t.z + (s.z - t.z) * 0.45;
+        return (
+          <group key={`lay-${s.id}`}>
+            <mesh position={[x, TABLE_TOP + 0.004, z]} receiveShadow>
+              <cylinderGeometry args={[0.14, 0.14, 0.008, 32]} />
+              <meshStandardMaterial color={GOLD} metalness={0.8} roughness={0.3} />
+            </mesh>
+            <group position={[x - Math.cos(s.facing) * 0.18 + (t.x - s.x) * 0.12, TABLE_TOP, z + Math.sin(s.facing) * 0.18 + (t.z - s.z) * 0.12]}><WineGlass /></group>
+          </group>
+        );
+      })}
       {dishes.map((d) => {
         const s = t.seats[d.at];
         // On the table in front of that chair
@@ -136,6 +155,17 @@ function Table({ t, dishes }: { t: DiningTable; dishes: { at: 0 | 1; id: string;
           </group>
         );
       })}
+    </group>
+  );
+}
+
+/** A clear wine glass on a stem. */
+function WineGlass() {
+  return (
+    <group>
+      <mesh position={[0, 0.003, 0]}><cylinderGeometry args={[0.035, 0.035, 0.004, 20]} /><meshStandardMaterial color="#eef6f6" transparent opacity={0.35} roughness={0.05} /></mesh>
+      <mesh position={[0, 0.06, 0]}><cylinderGeometry args={[0.004, 0.004, 0.11, 8]} /><meshStandardMaterial color="#eef6f6" transparent opacity={0.4} roughness={0.05} /></mesh>
+      <mesh position={[0, 0.15, 0]}><sphereGeometry args={[0.04, 20, 14, 0, Math.PI * 2, 0.4, Math.PI - 0.4]} /><meshStandardMaterial color="#eef6f6" transparent opacity={0.25} roughness={0.03} side={DoubleSide} depthWrite={false} /></mesh>
     </group>
   );
 }
@@ -363,7 +393,8 @@ export function RestaurantInterior({ gameTime, served, children }: {
   const H = ROOM_HEIGHT;
   const l = lightingAt(gameTime.hour, gameTime.minute);
   const lit = 0.6 + 0.4 * l.night;
-  const floor = useMemo(() => marbleTexture('white', [w / 2.2, d / 2.2]), [w, d]);
+  const floor = useMemo(() => marbleTexture('cream', [w / 2.2, d / 2.2]), [w, d]);
+  const tableMarble = useMemo(() => marbleTexture('black', [1, 1]), []);
   const sky = skylineTexture(skyMoodAt(l.night, gameTime.hour), 41);
   const sign = useMemo(() => palmsSign('THE PALMS', 'Restaurant · Fine dining & lounge'), []);
   const doorW = 1.6;
@@ -376,10 +407,14 @@ export function RestaurantInterior({ gameTime, served, children }: {
         <planeGeometry args={[120, 120]} />
         <meshStandardMaterial color="#1c1f1e" roughness={1} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floor} roughness={0.12} metalness={0.05} />
-      </mesh>
+      <PolishedFloor width={w} depth={d} map={floor} />
+      {/* Dark ceiling: downlights, gold rings over the tables, a track over the bar */}
+      <Ceiling width={w} depth={d} height={H} color="#18110c">
+        {[-6, -2, 2, 6].flatMap((x) => [-4.5, 4.8].map((z) => <Downlight key={`${x},${z}`} x={x} z={z} />))}
+        <TrackLight x={BAR.x + 0.6} z={BAR.z} length={BAR.d} along="z" heads={5} />
+        <LedRing x={0.8} y={-0.35} z={-1.2} radius={1.6} />
+        <LedRing x={0.8} y={-0.35} z={2.6} radius={1.6} />
+      </Ceiling>
       {/* A dark inlaid border around the dining floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0.8, 0.003, 0.7]}>
         <ringGeometry args={[4.6, 4.75, 4, 1, Math.PI / 4]} />
@@ -393,7 +428,15 @@ export function RestaurantInterior({ gameTime, served, children }: {
       <Wall position={[-(doorW / 2 + side / 2), H / 2, -d / 2]} rotationY={0} size={[side, H]} />
       <Wall position={[doorW / 2 + side / 2, H / 2, -d / 2]} rotationY={0} size={[side, H]} />
       <Wall position={[0, (H + 2.4) / 2, -d / 2]} rotationY={0} size={[doorW, H - 2.4]} />
-      <group position={[w / 2 - 0.01, 0, 0]} rotation={[0, -Math.PI / 2, 0]}><Panelling length={d} count={4} /></group>
+      <group position={[w / 2 - 0.01, 0, 2]} rotation={[0, -Math.PI / 2, 0]}><Panelling length={d - 4} count={3} /></group>
+      {/* By the host desk: a wall of brass slats with the name in gold */}
+      <group position={[w / 2 - 0.02, 0, -d / 2 + 2]} rotation={[0, -Math.PI / 2, 0]}>
+        {Array.from({ length: 22 }, (_, i) => <Gold key={i} p={[-1.9 + i * 0.18, H / 2, 0.03]} s={[0.05, H, 0.05]} emissive={0.15} />)}
+        <mesh position={[0, 2.5, 0.07]}>
+          <planeGeometry args={[3.2, 0.8]} />
+          <meshStandardMaterial map={sign} emissiveMap={sign} emissive="#ffffff" emissiveIntensity={0.9} toneMapped={false} />
+        </mesh>
+      </group>
       {/* The front wall stays bare: the camera usually looks in through it. Glass doors, seen from inside only */}
       <mesh position={[0, 1.2, -d / 2 + 0.02]}>
         <planeGeometry args={[doorW - 0.1, 2.4]} />
@@ -431,7 +474,7 @@ export function RestaurantInterior({ gameTime, served, children }: {
           const drink = served.dishes.find((id) => DRINKS.has(id));
           if (food.length || drink) dishes.push({ at, id: food[food.length - 1] ?? '', drink });
         }
-        return <Table key={t.id} t={t} dishes={dishes} />;
+        return <Table key={t.id} t={t} dishes={dishes} marble={tableMarble} />;
       })}
 
       {/* Chandeliers over the dining room, globe pendants over the bar */}
@@ -453,17 +496,17 @@ export function RestaurantInterior({ gameTime, served, children }: {
       <PottedPalm position={[w / 2 - 0.8, 0, d / 2 - 0.8]} height={2.6} rotation={2.1} />
 
       {/* Warm light: one over each row of tables, one at the bar, one at the door */}
-      <hemisphereLight args={['#ffe6c4', '#2a1f18', 0.55]} />
+      <hemisphereLight args={['#ffe6c4', '#2a1f18', 0.25]} />
       <pointLight position={[0.8, 3.2, -1.2]} intensity={10 * lit} distance={14} decay={1.6} color="#ffd29a" />
       <pointLight position={[0.8, 3.2, 2.6]} intensity={10 * lit} distance={14} decay={1.6} color="#ffd29a" />
       <pointLight position={[-6.6, 2.6, 0.5]} intensity={6 * lit} distance={8} decay={1.6} color="#ffbf73" />
       <pointLight position={[1.5, 2.8, -4.8]} intensity={4 * lit} distance={8} decay={1.6} color="#ffd9a8" />
 
       {/* Staff and diners: computer-controlled */}
-      <VenueNpc {...STAFF.host} chatty />
-      <VenueNpc {...STAFF.bartender} />
-      <VenueNpc {...STAFF.chef} />
-      <VenueNpc lookId={STAFF.waiter.lookId} name={STAFF.waiter.name} role={STAFF.waiter.role} x={WAITER_ROUTE[0][0]} z={WAITER_ROUTE[0][1]} facing={0} route={WAITER_ROUTE} />
+      <VenueNpc {...STAFF.host} chatty uniform={UNIFORMS.black} />
+      <VenueNpc {...STAFF.bartender} uniform={UNIFORMS.black} />
+      <VenueNpc {...STAFF.chef} uniform={UNIFORMS.chef} />
+      <VenueNpc lookId={STAFF.waiter.lookId} name={STAFF.waiter.name} role={STAFF.waiter.role} x={WAITER_ROUTE[0][0]} z={WAITER_ROUTE[0][1]} facing={0} route={WAITER_ROUTE} uniform={UNIFORMS.black} />
       {DINERS.map((dn) => {
         const t = TABLES.find((x) => x.id === dn.tableId)!;
         return <VenueNpc key={dn.name} lookId={dn.lookId} name={dn.name} role="Diner" x={0} z={0} facing={0} seat={t.seats[dn.seat]} chatty />;

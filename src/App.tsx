@@ -977,17 +977,17 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.map((p) => p.f)}>
-                <InteriorLighting gameTime={state.time} player={controller} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
             ) : inBoutique ? (
               <BoutiqueInterior gameTime={state.time} districtId={district.id}>
-                <InteriorLighting gameTime={state.time} player={controller} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor="boutique" />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </BoutiqueInterior>
             ) : inPalms ? (
               <RestaurantInterior gameTime={state.time} served={served && tableSeat && served.seatId === tableSeat.id ? { seat: tableSeat, dishes: served.dishes } : null}>
-                <InteriorLighting gameTime={state.time} player={controller} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
@@ -1055,6 +1055,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         <BoutiquePanel
           section={section}
           districtId={district.id}
+          wearer={{ lookId: character.lookId, heightCm: character.heightCm, shape: character.shape, skinTone: character.skinTone }}
           wardrobe={wardrobe}
           balance={state.balance}
           onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}

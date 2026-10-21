@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, Box3, Vector3, type Camera, type Group, type PerspectiveCamera } from 'three';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { IndoorEnvironment } from '../../world/IndoorEnvironment';
 import { finishJob, queue, storeVersion, subscribe, useSnapshot, type SnapshotJob } from './store';
 
 /** How long one picture may take before it's skipped (software rendering is slow). */
@@ -102,6 +103,7 @@ export function SnapshotHost() {
         <hemisphereLight args={['#fff4e2', '#2a2420', 0.9]} />
         <directionalLight position={[2.5, 4, 3]} intensity={2.4} color="#fff1dc" />
         <directionalLight position={[-3, 2, -2]} intensity={0.9} color="#e8c27a" />
+        <IndoorEnvironment mood="boutique" />
         <Job key={job.key} job={job} />
       </Canvas>
     </div>

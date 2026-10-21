@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, NoColorSpace, type AnimationAction, type Group, type Material, type Mesh, type Object3D } from 'three';
+import { Box3, Material as MaterialBase, NoColorSpace, type AnimationAction, type Group, type Material, type Mesh, type Object3D } from 'three';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
 
@@ -19,7 +20,7 @@ const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 
 /** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
-function OutfitStyler({ scene, lookId, styles, skinTone }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
+export function OutfitStyler({ scene, lookId, styles, skinTone }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
   const [uniforms, materials] = useMemo(() => {
     const list: StyleUniforms[] = [];
@@ -95,8 +96,31 @@ function updateLocomotion(
  * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false }: {
+/** A copy of the cached model with its own materials and none of the shared styling installed. */
+function privateCopy(shared: Object3D): Object3D {
+  const copy = cloneSkinned(shared);
+  copy.position.set(0, 0, 0);
+  copy.rotation.set(0, 0, 0);
+  copy.scale.set(1, 1, 1);
+  copy.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    const fresh = (m: Material) => {
+      const c = m.clone();
+      c.onBeforeCompile = MaterialBase.prototype.onBeforeCompile;
+      c.customProgramCacheKey = MaterialBase.prototype.customProgramCacheKey;
+      delete (c.userData as { ayeStyle?: unknown }).ayeStyle;
+      return c;
+    };
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(fresh) : fresh(mesh.material);
+  });
+  return copy;
+}
+
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false, own = false }: {
   controller: PlayerHandle;
+  /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
+  own?: boolean;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
@@ -114,7 +138,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   // A character listed in public/assets/manifest.json replaces the built-in looks
   const avatarFile: AvatarFile = assetManifest().avatar ?? lookById(lookId);
   const targetHeight = heightCm ? heightCm / 100 : avatarFile.height;
-  const { scene, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
+  const { scene: shared, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
+  const scene = useMemo(() => (own ? privateCopy(shared) : shared), [shared, own]);
   const clipsWithHands = useMemo(() => withRelaxedHands(animations), [animations]);
   const { actions, mixer } = useAnimations(clipsWithHands, group);
   // Match clips by name (case-insensitive) so downloaded characters work without renaming

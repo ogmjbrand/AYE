@@ -9,6 +9,9 @@ import { neonSign } from './signs';
 import { PottedPalm } from './PottedPalm';
 import { LuxePiece } from './LuxeFurniture';
 import { VenueNpc } from './VenueNpc';
+import { UNIFORMS } from '../lib/uniforms';
+import { Ceiling, Downlight, LedRing, PolishedFloor, TrackLight } from './VenueShell';
+import { RealModel } from './RealModel';
 
 const GOLD = '#c9a052';
 const BLUSH = '#efe2da';
@@ -162,8 +165,7 @@ function Desk() {
       <mesh position={[-0.5, DESK.h + 0.06, 0]} rotation={[-0.4, 0.3, 0]}><boxGeometry args={[0.26, 0.18, 0.015]} /><meshStandardMaterial color="#111" emissive="#2a3a5a" emissiveIntensity={0.4} /></mesh>
       <mesh position={[0.65, DESK.h + 0.2, 0.05]} castShadow><boxGeometry args={[0.28, 0.32, 0.12]} /><meshStandardMaterial color="#1f5a47" /></mesh>
       <mesh position={[0.35, DESK.h + 0.16, 0.12]} castShadow><boxGeometry args={[0.22, 0.26, 0.1]} /><meshStandardMaterial color="#f4ece4" /></mesh>
-      <mesh position={[0.0, DESK.h + 0.11, 0.15]} castShadow><cylinderGeometry args={[0.05, 0.07, 0.16, 16]} /><meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.3} /></mesh>
-      {[0, 1, 2, 3].map((i) => <mesh key={i} position={[(i - 1.5) * 0.04, DESK.h + 0.24, 0.15]}><sphereGeometry args={[0.035, 10, 8]} /><meshStandardMaterial color={['#f2b8c6', '#ffffff', '#e8728a', '#f2b8c6'][i]} roughness={0.7} /></mesh>)}
+      <group position={[0.0, DESK.h + 0.03, 0.15]}><RealModel name="vase-flowers" fit={[0.3, 0.4, 0.3]} /></group>
     </group>
   );
 }
@@ -247,10 +249,24 @@ export function BoutiqueInterior({ gameTime, districtId, children }: { gameTime:
         <planeGeometry args={[120, 120]} />
         <meshStandardMaterial color="#1c1f1e" roughness={1} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floor} roughness={0.12} />
-      </mesh>
+      <PolishedFloor width={w} depth={d} map={floor} />
+      {/* White ceiling: tracks of spotlights over the rails and glowing gold rings over the lounge */}
+      <Ceiling width={w} depth={d} height={H} color="#f2ebe4">
+        <TrackLight x={-4.5} z={0} length={8} along="z" heads={6} />
+        <TrackLight x={4.8} z={0} length={8} along="z" heads={6} />
+        <TrackLight x={0} z={d / 2 - 1.6} length={9} heads={7} />
+        <LedRing x={LOUNGE.x} y={-0.6} z={LOUNGE.z} radius={1.1} />
+        <LedRing x={LOUNGE.x} y={-0.85} z={LOUNGE.z} radius={0.75} />
+        {[-2, 1].flatMap((x) => [-3, 0].map((z) => <Downlight key={`${x},${z}`} x={x} z={z} />))}
+      </Ceiling>
+      {/* Behind the neon: a dark panel framed by lit brass slats */}
+      <group position={[0.6, 0, d / 2 - 0.02]} rotation={[0, Math.PI, 0]}>
+        <mesh position={[0, 2.4, 0]}>
+          <planeGeometry args={[3.6, 2.6]} />
+          <meshStandardMaterial color="#1a1512" roughness={0.6} />
+        </mesh>
+        {[-2.2, -2.06, -1.92, 1.92, 2.06, 2.2].map((x) => <Gold key={x} p={[x, 1.9, 0.03]} s={[0.05, 3.8, 0.05]} />)}
+      </group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[LOUNGE.x, 0.004, LOUNGE.z]}>
         <circleGeometry args={[1.6, 48]} />
         <meshStandardMaterial color="#e6d3c8" roughness={1} />
@@ -312,13 +328,13 @@ export function BoutiqueInterior({ gameTime, districtId, children }: { gameTime:
         </group>
       ))}
 
-      <hemisphereLight args={['#fff1ea', '#3a2a28', 0.75]} />
+      <hemisphereLight args={['#fff1ea', '#3a2a28', 0.4]} />
       <pointLight position={[0, 3.2, -2]} intensity={9 * lit} distance={13} decay={1.6} color="#ffe2c8" />
       <pointLight position={[0, 3.2, 3]} intensity={9 * lit} distance={13} decay={1.6} color="#ffe2c8" />
       <pointLight position={[0.6, 2.4, d / 2 - 0.8]} intensity={3} distance={5} decay={1.8} color="#ff9ec2" />
 
-      <VenueNpc {...STAFF.assistant} chatty />
-      <VenueNpc {...STAFF.stylist} />
+      <VenueNpc {...STAFF.assistant} chatty uniform={UNIFORMS.black} />
+      <VenueNpc {...STAFF.stylist} uniform={UNIFORMS.stylist} />
       {children}
     </group>
   );

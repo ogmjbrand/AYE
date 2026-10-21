@@ -80,11 +80,11 @@ export const LAGOS_MARINA: DistrictSpec = {
   },
   // Real Lagos areas, laid over the district: the boulevard runs along the Marina, Victoria Island lies south over the bridge
   neighborhoods: [
-    { id: 'downtown', name: 'Lagos Island', bounds: { minX: -15, maxX: 15, minZ: -20, maxZ: 0 }, description: 'Markets, offices and the old city', atmosphere: 'urban' },
+    { id: 'downtown', name: 'Lagos Island', bounds: { minX: -30, maxX: 15, minZ: -20, maxZ: 0 }, description: 'Markets, offices and the old city', atmosphere: 'urban' },
     { id: 'harbor', name: 'Marina', bounds: { minX: -20, maxX: 0, minZ: 0, maxZ: 25 }, description: 'The waterfront and the boulevard', atmosphere: 'commercial' },
     { id: 'uptown', name: 'Ikoyi', bounds: { minX: 10, maxX: 30, minZ: -15, maxZ: 15 }, description: 'Leafy streets, smart homes and boutiques', atmosphere: 'residential' },
     { id: 'industrial', name: 'Apapa', bounds: { minX: -35, maxX: -15, minZ: 10, maxZ: 35 }, description: 'The port, warehouses and logistics', atmosphere: 'industrial' },
-    { id: 'parks', name: 'Onikan', bounds: { minX: 0, maxX: 20, minZ: 20, maxZ: 35 }, description: 'Green spaces, culture and recreation', atmosphere: 'residential' },
+    { id: 'parks', name: 'Onikan', bounds: { minX: 0, maxX: 20, minZ: 20, maxZ: 45 }, description: 'Green spaces, culture and recreation', atmosphere: 'residential' },
     { id: 'vi', name: 'Victoria Island', bounds: { minX: -35, maxX: 35, minZ: -45, maxZ: -24 }, description: 'Towers, fine dining and the lagoon', atmosphere: 'residential' },
   ],
   vendors: [

@@ -4,6 +4,7 @@ import { DoubleSide } from 'three';
 import type { Furniture } from '../lib/interiors';
 import { artTexture, marbleTexture, rugTexture } from './venueTextures';
 import { PottedPalm } from './PottedPalm';
+import { RealModel } from './RealModel';
 
 /**
  * The Luxe collection's designer pieces (lib/furniture.ts), drawn at the
@@ -69,7 +70,7 @@ function CoffeeTable({ w, d, h }: { w: number; d: number; h: number }) {
       {/* A stack of books and a small vase */}
       <mesh position={[-r * 0.3, h + 0.03, r * 0.1]} rotation={[0, 0.3, 0]} castShadow><boxGeometry args={[0.26, 0.03, 0.2]} /><meshStandardMaterial color="#1f5a47" /></mesh>
       <mesh position={[-r * 0.3, h + 0.06, r * 0.1]} rotation={[0, 0.1, 0]} castShadow><boxGeometry args={[0.24, 0.03, 0.18]} /><meshStandardMaterial color="#e6d3b0" /></mesh>
-      <mesh position={[r * 0.35, h + 0.09, -r * 0.15]} castShadow><cylinderGeometry args={[0.04, 0.06, 0.18, 16]} /><meshStandardMaterial color="#2b2622" roughness={0.3} /></mesh>
+      <group position={[r * 0.3, h, -r * 0.1]}><RealModel name="vase-flowers" fit={[0.3, 0.38, 0.3]} /></group>
     </>
   );
 }
@@ -239,8 +240,7 @@ function DiningTable({ w, d, h }: { w: number; d: number; h: number }) {
           {[-1, 1].flatMap((lx) => [-1, 1].map((lz) => <Brass key={`${lx}${lz}`} p={[lx * 0.19, 0.21, lz * 0.18]} s={[0.012, 0.42, 0]} round />))}
         </group>
       )))}
-      <mesh position={[0, h + 0.1, 0]} castShadow><cylinderGeometry args={[0.05, 0.07, 0.2, 16]} /><meshStandardMaterial color="#f1ede6" roughness={0.3} /></mesh>
-      <mesh position={[0, h + 0.27, 0]}><sphereGeometry args={[0.1, 12, 10]} /><meshStandardMaterial color="#3b7a3c" roughness={0.8} /></mesh>
+      <group position={[0, h, 0]}><RealModel name="vase-flowers" fit={[0.34, 0.42, 0.34]} /></group>
     </>
   );
 }
@@ -318,15 +318,17 @@ export function LuxePiece({ f }: { f: Furniture }) {
   const L = turned ? d : w;
   const D = turned ? w : d;
   switch (f.kind) {
-    case 'sofa': return <Turned turned={turned}><Sofa w={L} d={D} color={f.color} /></Turned>;
+    // Real velvet sofa (faces +z as modelled: turned round so its back is to +z like ours)
+    case 'sofa': return <Turned turned={turned}><RealModel name={f.color.toLowerCase() === '#f2d6dc' ? 'sofa-velvet-blush' : 'sofa-velvet-champagne'} fit={[L, h, D]} rotationY={Math.PI} recolor={{ match: /fabric/i, color: f.color }} fallback={<Sofa w={L} d={D} color={f.color} />} /></Turned>;
     case 'table': return w * d > 2 ? <Turned turned={turned}><DiningTable w={L} d={D} h={h} /></Turned> : <CoffeeTable w={w} d={d} h={h} />;
-    case 'armchair': return <AccentChair w={w} d={d} color={f.color} />;
+    case 'armchair': return <RealModel name="chair-velvet-peacock" fit={[w, h, d]} rotationY={Math.PI} fallback={<AccentChair w={w} d={d} color={f.color} />} />;
     // A screen faces into the room, whichever wall it stands against
     case 'tv': return <group rotation={[0, turned ? (f.at[0] >= 0 ? Math.PI / 2 : -Math.PI / 2) : f.at[1] >= 0 ? 0 : Math.PI, 0]}><TvConsole w={L} d={D} h={h} color={f.color} /></group>;
     case 'bookshelf': return <Turned turned={turned}><Bookshelf w={L} d={D} h={h} /></Turned>;
     case 'lamp': return <FloorLamp w={w} h={h} />;
     case 'rug': return <Rug w={w} d={d} />;
-    case 'plant': return <PottedPalm position={[0, 0, 0]} height={h} />;
+    // Tall corner plants are palms; smaller ones a real potted plant
+    case 'plant': return h > 1.2 ? <PottedPalm position={[0, 0, 0]} height={h} /> : <RealModel name="plant-potted" fit={[w, h, d]} fallback={<PottedPalm position={[0, 0, 0]} height={h} />} />;
     case 'art': return <WallArt f={f} />;
     case 'counter': return <Turned turned={turned}><KitchenIsland w={L} d={D} h={h} /></Turned>;
     case 'bed': return <Turned turned={turned}><Bed w={L} d={D} h={h} color={f.color} /></Turned>;

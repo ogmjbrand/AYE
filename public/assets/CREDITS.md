@@ -16,3 +16,17 @@ The HDRIs are used for lighting and reflections only; the visible sky is rendere
 ## MakeHuman body (characters/mh/)
 
 `female-body.glb` is built by `scripts/makehuman/build-body.mjs` from the MakeHuman base mesh, targets and game-engine rig weights in the MPFB repository (github.com/makehumancommunity/mpfb2). MakeHuman assets and their output are **CC0** (public domain); credit given with thanks to the MakeHuman community.
+
+## Furniture and flowers (models/furniture/)
+
+From the Khronos glTF Sample Assets (github.com/KhronosGroup/glTF-Sample-Assets), rebuilt by
+`scripts/khronos/build-furniture.mjs` (one colour baked in, WebP textures, meshopt compression).
+
+| File | Source model | Author / owner | Licence |
+|---|---|---|---|
+| `sofa-velvet-champagne.glb`, `sofa-velvet-blush.glb` | GlamVelvetSofa | Eric Chadwick, © Wayfair, LLC | CC BY 4.0 |
+| `chair-velvet-peacock.glb`, `chair-velvet-mango.glb` | SheenChair | Eric Chadwick, Wayfair, LLC | CC0 1.0 |
+| `vase-flowers.glb` | GlassVaseFlowers | Eric Chadwick (vase), Rico Cilliers (flowers) | CC0 1.0 |
+| `plant-potted.glb` | DiffuseTransmissionPlant | Rico Cilliers (original, CC0), Eric Chadwick / Darmstadt Graphics Group (materials) | CC BY 4.0 |
+
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ — changes made: colour variant baked in, textures resized and converted to WebP, meshes compressed, the vase model reduced to one vase.

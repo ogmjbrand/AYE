@@ -9,6 +9,8 @@ import { seatDrop, type Seat } from '../lib/seating';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { withRelaxedHands } from '../components/handPose';
 import { Gestures, type GestureActions } from '../components/Gestures';
+import { OutfitStyler } from '../components/Avatar';
+import type { Slot, Style } from '../lib/fashion';
 
 /** Name tag: their name, their job, and that they're computer-controlled. */
 function staffTag(name: string, role: string) {
@@ -49,12 +51,14 @@ export interface NpcProps {
   route?: readonly (readonly [number, number])[];
   /** Talks with their hands now and then (diners chatting, a host greeting). */
   chatty?: boolean;
+  /** A uniform: fabrics for their top, bottom and shoes (lib/fashion.ts styles). */
+  uniform?: Partial<Record<Slot, Style>>;
 }
 
 const WALK_SPEED = 1.0;
 const PAUSE_SECONDS = 2.2;
 
-function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false }: NpcProps) {
+function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform }: NpcProps) {
   const look = lookById(lookId);
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
@@ -150,6 +154,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false }: 
       <group ref={group} rotation={[0, heading, 0]}>
         <primitive object={figure} scale={scale} />
       </group>
+      {uniform && <OutfitStyler scene={figure} lookId={look.id} styles={uniform} skinTone={0} />}
       <Gestures body={look.body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />
       <sprite position={[0, (seat ? look.height * 0.78 : look.height) + 0.3, 0]} scale={[0.8, 0.25, 1]}>
         <spriteMaterial map={tag} depthWrite={false} transparent />

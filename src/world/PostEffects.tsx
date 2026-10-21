@@ -1,4 +1,4 @@
-import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 
 /**
@@ -13,6 +13,8 @@ export default function PostEffects() {
   return (
     <EffectComposer multisampling={0}>
       <N8AO halfRes quality="performance" aoRadius={2.5} distanceFalloff={1} intensity={4} color="#000000" />
+      {/* Only what's brighter than white glows: lamps, chandeliers, neon, lit windows */}
+      <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.2} intensity={0.55} radius={0.7} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       <SMAA />
     </EffectComposer>

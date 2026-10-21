@@ -64,13 +64,13 @@ function useLathe(points: [number, number][], seg = 40) {
 const PLATE_PTS: [number, number][] = [[0, 0.004], [0.09, 0.004], [0.1, 0.008], [0.118, 0.016], [0.135, 0.022], [0.136, 0.019], [0.12, 0.012], [0.1, 0.0], [0, 0]];
 const BOWL_PTS: [number, number][] = [[0, 0], [0.045, 0], [0.05, 0.006], [0.085, 0.03], [0.1, 0.06], [0.096, 0.061], [0.08, 0.034], [0.045, 0.012], [0, 0.012]];
 
-/** White porcelain dinner plate with a gold rim line. */
-function Plate({ scale = 1 }: { scale?: number }) {
+/** Dinner plate with a gold rim line: dark glazed stoneware for most dishes (as in a fine-dining room), white porcelain for some. */
+function Plate({ scale = 1, white = false }: { scale?: number; white?: boolean }) {
   const geo = useLathe(PLATE_PTS);
   return (
     <group scale={[scale, 1, scale]}>
       <mesh geometry={geo} castShadow receiveShadow>
-        <meshStandardMaterial color="#f6f3ee" roughness={0.22} side={DoubleSide} />
+        <meshPhysicalMaterial color={white ? '#f6f3ee' : '#26272a'} roughness={white ? 0.22 : 0.3} clearcoat={0.7} clearcoatRoughness={0.15} side={DoubleSide} />
       </mesh>
       <mesh position={[0, 0.0215, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.1355, 0.0012, 4, 48]} />
@@ -255,7 +255,7 @@ export function DishModel({ id }: { id: string }) {
       const rand = rng(11);
       return (
         <group>
-          <Plate scale={1.05} />
+          <Plate scale={1.05} white />
           <group position={[0, 0.024, 0]}>
             {Array.from({ length: 16 }, (_, i) => (
               <mesh key={i} position={[(rand() - 0.5) * 0.06, 0.006 + i * 0.0018, (rand() - 0.5) * 0.06]} rotation={[Math.PI / 2 + (rand() - 0.5) * 0.6, (rand() - 0.5) * 0.6, rand() * 3]} castShadow>
@@ -365,7 +365,7 @@ export function DishModel({ id }: { id: string }) {
       const rand = rng(13);
       return (
         <group>
-          <Plate />
+          <Plate white />
           <Greens center={[0, 0.026, 0]} n={18} spread={0.13} seed={12} />
           {[0, 1, 2, 3].map((i) => <Blob key={i} p={[-0.04 + i * 0.012, 0.036, -0.03 + i * 0.008]} s={[0.03, 0.009, 0.014]} rot={[0, 0.7, 0]} color="#a7cc5c" glossy />)}
           {Array.from({ length: 8 }, (_, i) => (
@@ -448,7 +448,7 @@ export function DishModel({ id }: { id: string }) {
     case 'lava-cake':
       return (
         <group>
-          <Plate />
+          <Plate white />
           <Cyl p={[-0.015, 0.045, 0]} r={0.04} r2={0.036} h={0.05} color="#3a1d12" rough={0.7} seg={28} />
           <Blob p={[-0.015, 0.07, 0]} s={[0.036, 0.006, 0.036]} color="#2a120a" glossy />
           <Blob p={[0.025, 0.024, 0.01]} s={[0.04, 0.004, 0.03]} color="#2a120a" glossy />
@@ -462,7 +462,7 @@ export function DishModel({ id }: { id: string }) {
       const rand = rng(31);
       return (
         <group>
-          <Plate />
+          <Plate white />
           {Array.from({ length: 6 }, (_, i) => {
             const a = (i / 6) * Math.PI * 2;
             return <Blob key={i} p={[Math.cos(a) * 0.045 - 0.015, 0.04 + (i % 2) * 0.006, Math.sin(a) * 0.045]} s={[0.022, 0.02, 0.022]} rot={[rand(), rand(), 0]} color={i % 2 ? '#c9822e' : '#d6923a'} rough={0.75} />;
@@ -477,7 +477,7 @@ export function DishModel({ id }: { id: string }) {
     case 'fruit-platter':
       return (
         <group>
-          <group scale={[1.2, 1, 0.85]}><Plate /></group>
+          <group scale={[1.2, 1, 0.85]}><Plate white /></group>
           {/* Watermelon half-moons standing up, green rind round the curve */}
           {[-0.085, -0.055, -0.025].map((x, i) => (
             <group key={i} position={[x, 0.022, -0.035]} rotation={[0, Math.PI / 2 + 0.3, 0]}>
@@ -503,7 +503,7 @@ export function DishModel({ id }: { id: string }) {
     case 'cheesecake':
       return (
         <group>
-          <Plate />
+          <Plate white />
           <group position={[0.0, 0.022, 0.0]} rotation={[0, 0.6, 0]}>
             <Cyl p={[-0.04, 0.008, 0]} r={0.085} h={0.016} color="#9a6a3a" theta={[1.25, 0.65]} rough={0.9} seg={32} />
             <Cyl p={[-0.04, 0.034, 0]} r={0.085} h={0.036} color="#f4e6bf" theta={[1.25, 0.65]} rough={0.65} seg={32} />

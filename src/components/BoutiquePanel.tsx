@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
+import { Vector3 } from 'three';
+import { swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
+import type { BodyShape } from '../lib/bodyShape';
+import { Avatar } from './Avatar';
+import { useSnapshot, type SnapshotJob } from './snapshot/store';
 import { CLOTHES_TABS, NOT_YET, cartTotal, rangeFor, setsIn, type BoutiqueSection, type ClothesTab, type FashionSet } from '../lib/boutique';
 import { Icon } from './os/icons';
 
@@ -20,6 +24,45 @@ function Garment({ item, className = '', style }: { item: FashionItem; className
       <span className="absolute inset-0" style={{ ...mask, background: 'linear-gradient(160deg, rgba(255,255,255,0.22), rgba(0,0,0,0) 45%, rgba(0,0,0,0.28))' }} />
     </span>
   );
+}
+
+const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
+
+/** Who you are, for pictures of clothes on your own character. */
+export interface WearerLook {
+  lookId: string;
+  heightCm?: number;
+  shape?: BodyShape;
+  skinTone?: number;
+}
+
+/** A picture of the piece on your character, framed on where it's worn (sets: the whole outfit). */
+function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
+  const h = (w.heightCm ?? 170) / 100;
+  const styles = Object.fromEntries(items.map((i) => [i.slot, i.style])) as Partial<Record<Slot, Style>>;
+  const where = items.length > 1 ? 'set' : items[0].slot;
+  const camera = {
+    top: { position: [0.2, 0.74 * h, 1.05], target: [0, 0.72 * h, 0], fov: 32 },
+    bottom: { position: [0.25, 0.34 * h, 1.5], target: [0, 0.3 * h, 0], fov: 32 },
+    shoes: { position: [0.45, 0.22, 0.75], target: [0, 0.06, 0.05], fov: 30 },
+    hair: { position: [0.3, 0.94 * h, 0.75], target: [0, 0.92 * h, 0], fov: 30 },
+    set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
+  }[where] as SnapshotJob['camera'];
+  return {
+    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => i.id).join('+')}`,
+    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
+    camera,
+    size: 320,
+  };
+}
+
+/** The piece on you once it's rendered; its fabric outline until then. */
+function Worn({ items, wearer }: { items: FashionItem[]; wearer: WearerLook }) {
+  const url = useSnapshot(wearJob(items, wearer));
+  if (url) return <img src={url} alt="" className="h-full w-full object-cover" draggable={false} />;
+  return items.length === 2
+    ? <><Garment item={items[0]} className="h-[46%] w-[46%]" /><Garment item={items[1]} className="h-[46%] w-[46%]" /></>
+    : <Garment item={items[0]} className="h-[82%] w-[82%]" />;
 }
 
 function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
@@ -45,8 +88,10 @@ interface Card {
  * heart, add to the cart and check out. Tapping a piece tries it on your
  * character. Clothes restyle the fabric of what your character wears.
  */
-export function BoutiquePanel({ section, districtId, wardrobe, balance, onTryOn, onBuyMany, onWear, onToggleFavourite, onClose }: {
+export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, onTryOn, onBuyMany, onWear, onToggleFavourite, onClose }: {
   section: BoutiqueSection;
+  /** Your character, so the pictures show each piece on you. */
+  wearer: WearerLook;
   districtId: string;
   wardrobe: Wardrobe;
   balance: number;
@@ -132,10 +177,8 @@ export function BoutiquePanel({ section, districtId, wardrobe, balance, onTryOn,
                 <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-ui-gold/20 bg-gradient-to-b from-[#1a2622] to-[#111916]">
                   <div className="relative">
                     <button type="button" onClick={() => c.items.forEach((i) => onTryOn(i.slot, i.id))} aria-label={`Try on ${c.name}`}
-                      className="flex aspect-square w-full flex-col items-center justify-center gap-1 bg-[radial-gradient(circle_at_50%_40%,#f4ece4,#d9cfc4)] p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-                      {c.items.length === 2
-                        ? <><Garment item={c.items[0]} className="h-[46%] w-[46%]" /><Garment item={c.items[1]} className="h-[46%] w-[46%]" /></>
-                        : <Garment item={c.items[0]} className="h-[82%] w-[82%]" />}
+                      className="flex aspect-square w-full flex-col items-center justify-center gap-1 overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#3a3430,#16120f)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+                      <Worn items={c.items} wearer={wearer} />
                     </button>
                     <button type="button" onClick={() => onToggleFavourite(c.id)} aria-pressed={fav} aria-label={fav ? `Remove ${c.name} from favourites` : `Add ${c.name} to favourites`}
                       className={`absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/85 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${fav ? 'text-[#d6455d]' : 'text-[#5a4a42]'}`}>
