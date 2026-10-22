@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { getTrip, placePlayer, setMovementBlocked, setMoveTarget, subscribeTrip, usePlayerController } from './hooks/usePlayerController';
+import { enterVehicle, exitVehicle, getTrip, placePlayer, setMovementBlocked, setMoveTarget, subscribeTrip, usePlayerController } from './hooks/usePlayerController';
 import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
@@ -70,6 +70,7 @@ import { DecorPlacementPreview } from './world/DecorPlacementPreview';
 import {
   FASHION_HOUSE_INTERIOR,
   RESTAURANT_INTERIOR,
+  CAR_DEALERSHIP_INTERIOR,
   RESTAURANT_TABLES,
   doorSpot,
   fashionHouseInteractionAt,
@@ -78,13 +79,23 @@ import {
   interiorLayout,
   restaurantInteractionAt,
   restaurantTableById,
+  dealershipInteractionAt,
   type HomeAction,
 } from './lib/interiors';
 import { canPlaceDecor, decorItemById, furnitureForHome, type HomeDecorPlacement } from './lib/homeDecor';
 import { officeInteractionAt, OFFICE_INTERIOR, OFFICE_TASK_SEATS, OFFICE_WORKPLACE, officeTaskId, type OfficeInteraction } from './lib/officeCareer';
 import { OfficePanel } from './components/OfficePanel';
+import { CampusPanel, type CampusPanelMode } from './components/CampusPanel';
+import { UniversityExterior, UniversityScene } from './world/UniversityScene';
+import { HospitalExterior, HospitalScene } from './world/HospitalScene';
+import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
+import { HOSPITAL, HOSPITAL_INTERIOR, hospitalInteractionAt, isInWard, isInSupervisorOffice, type HospitalInteraction } from './lib/hospitalSite';
+import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
+import { UNIVERSITY, UNIVERSITY_INTERIOR, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
+import { campusForDay, attendClass, submitAssignment, assignmentForDay, academicStanding, CLASS_SLOTS, type ClassSlot } from './lib/campus';
+import { DealershipPanel } from './components/DealershipPanel';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
-import { gameDay, isAdultResident, residentById, residentFacing, residentNear, residentPosition, type Resident } from './lib/people';
+import { gameDay, isAdultResident, residentById, residentFacing, residentNear, residentPosition, residentsIn, type Resident } from './lib/people';
 import { canResidentAcceptHug, findHugPlan, type HugSession } from './lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from './lib/traffic';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
@@ -95,8 +106,12 @@ import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
 import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
-import { BedDouble, BriefcaseBusiness, CookingPot, DoorOpen, FileText, Monitor, ScanEye, ShowerHead, Shirt, Sofa, Tv, Users } from 'lucide-react';
+import { BedDouble, BookOpen, BriefcaseBusiness, CarFront, CookingPot, DoorOpen, FileText, GraduationCap, Monitor, ScanEye, ShowerHead, Shirt, Sofa, Tv, Users, Utensils } from 'lucide-react';
 import './App.css';
+import { VEHICLE_CATALOG, vehicleColourById } from './lib/vehicleCatalog';
+import { isVehicleSpawnClear } from './lib/vehicleDriving';
+import type { OwnedVehicle } from './lib/vehicleCatalog';
+import { CarDealershipExterior, CarDealershipScene, DrivenVehicle } from './world/CarDealershipScene';
 
 // High tier only; the post-processing libraries are fetched on first use
 const PostEffects = lazy(() => import('./world/PostEffects'));
@@ -108,6 +123,7 @@ interface CityProps {
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
   district: District;
+  ownedVehicles: readonly OwnedVehicle[];
   /** The resident the player is talking with, if any. */
   talkingTo: string | null;
   hugSession: HugSession | null;
@@ -221,9 +237,12 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo, hugSession, onHugComplete }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
+  const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
+  const model = owned && VEHICLE_CATALOG.find((vehicle) => vehicle.id === owned.modelId);
+  const colour = owned && vehicleColourById(owned.colour);
   return (
     <>
       <SceneLighting gameTime={gameTime} player={controller} />
@@ -231,6 +250,9 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <Buildings />
       <Skyline />
       <Props night={night} />
+      {district.carDealership && <CarDealershipExterior />}
+      {district.id === UNIVERSITY.districtId && <UniversityExterior />}
+      {district.id === HOSPITAL.districtId && <HospitalExterior />}
       <VenueFront hour={gameTime.hour} night={night} />
       <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
@@ -238,16 +260,18 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <HomeMarkers homeId={homeId} />
       <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} />
       <Traffic player={controller} />
-      {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player
-        controller={controller}
-        character={character}
-        tryOn={tryOn}
-        conversing={talkingTo !== null}
-        conversationTarget={talkingTo}
-        hugSession={hugSession}
-        onHugComplete={onHugComplete}
-      />
+      {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
+      {controller.drivingVehicleId && model && colour
+        ? <DrivenVehicle controller={controller} colour={colour.hex} bodyStyle={model.bodyStyle} />
+        : <Player
+            controller={controller}
+            character={character}
+            tryOn={tryOn}
+            conversing={talkingTo !== null}
+            conversationTarget={talkingTo}
+            hugSession={hugSession}
+            onHugComplete={onHugComplete}
+          />}
     </>
   );
 }
@@ -324,6 +348,7 @@ interface DecorPlacementSession {
   rotation: number;
 }
 
+const CAFETERIA_MEAL_PRICE = 60;
 const EMPTY_HOME_DECOR: HomeDecorPlacement[] = [];
 
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
@@ -335,10 +360,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, moveIn, moveOut, buyEquipment, travel, socialise, hug, fashionShowcase, buyFashionItem, purchase, nightOut, wait, workTask, officeApply, officeClockIn, officeTask, officeClockOut } = useGameState(
+  const insideUniversityRef = useRef(false);
+  const insideHospitalRef = useRef(false);
+  const { state, rest, dismissSummary, eat, moveIn, moveOut, buyEquipment, travel, socialise, hug, fashionShowcase, buyFashionItem, purchase, buyVehicle, paintVehicle, nightOut, wait, workTask, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut } = useGameState(
     character,
-    () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
-      isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
+    () => character.career !== 'none' && !!districtRef.current && (
+      (character.career === 'student' && insideUniversityRef.current) || (character.career === 'doctor' && insideHospitalRef.current) || (!insideRef.current &&
+      isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z))),
   );
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -348,6 +376,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [insideOffice, setInsideOffice] = useState(false);
   const [insideRestaurant, setInsideRestaurant] = useState(false);
   const [insideFashionHouse, setInsideFashionHouse] = useState(false);
+  const [insideDealership, setInsideDealership] = useState(false);
+  const [insideUniversity, setInsideUniversity] = useState(false);
+  const [insideHospital, setInsideHospital] = useState(false);
+  const [hospitalPanel, setHospitalPanel] = useState<HospitalPanelMode | null>(null);
+  const [campusPanel, setCampusPanel] = useState<CampusPanelMode | null>(null);
+  const [dealershipOpen, setDealershipOpen] = useState(false);
+  const [dealershipModelId, setDealershipModelId] = useState(VEHICLE_CATALOG[0].id);
+  const [, setDrivingVehicleId] = useState<string | null>(null);
   const [decorPlacement, setDecorPlacement] = useState<DecorPlacementSession | null>(null);
   const decorCommitInProgress = useRef(false);
   const [restaurantVendor, setRestaurantVendor] = useState<FoodVendor | null>(null);
@@ -362,12 +398,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const completeRestaurantDelivery = useCallback(() => setRestaurantDeliveryReady(true), []);
   const persistedDecor = character.homeDecor ?? EMPTY_HOME_DECOR;
   const interior = useMemo(() => {
-    const baseInterior = insideFashionHouse ? FASHION_HOUSE_INTERIOR
+    const baseInterior = insideDealership ? CAR_DEALERSHIP_INTERIOR
+      : insideUniversity && district.id === UNIVERSITY.districtId ? UNIVERSITY_INTERIOR
+      : insideHospital && district.id === HOSPITAL.districtId ? HOSPITAL_INTERIOR
+      : insideFashionHouse ? FASHION_HOUSE_INTERIOR
       : insideOffice && district.id === OFFICE_WORKPLACE.districtId
         ? OFFICE_INTERIOR
         : insideRestaurant && restaurantVendor ? RESTAURANT_INTERIOR
           : home ? interiorFor(home) : null;
-    if (!baseInterior || !home || insideFashionHouse || insideOffice || insideRestaurant) return baseInterior;
+    if (!baseInterior || !home || insideDealership || insideUniversity || insideHospital || insideFashionHouse || insideOffice || insideRestaurant) return baseInterior;
     return {
       ...baseInterior,
       furniture: [
@@ -375,28 +414,33 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         ...furnitureForHome(persistedDecor.filter((item) => item.id !== decorPlacement?.placementId), home.id),
       ],
     };
-  }, [insideFashionHouse, insideOffice, district.id, insideRestaurant, restaurantVendor, home, persistedDecor, decorPlacement?.placementId]);
+  }, [insideDealership, insideUniversity, insideHospital, insideFashionHouse, insideOffice, district.id, insideRestaurant, restaurantVendor, home, persistedDecor, decorPlacement?.placementId]);
   const roomLayout = useMemo(() => {
     if (!interior) return null;
     const layout = interiorLayout(interior);
+    if (insideDealership) return { ...layout, id: 'interior.dealership' };
+    if (insideUniversity) return { ...layout, id: 'interior.university' };
+    if (insideHospital) return { ...layout, id: 'interior.hospital' };
     if (insideFashionHouse) return { ...layout, id: 'interior.fashion-house' };
     if (insideOffice) return { ...layout, id: 'interior.office' };
     if (insideRestaurant) return { ...layout, id: 'interior.restaurant' };
     return layout;
-  }, [interior, insideFashionHouse, insideOffice, insideRestaurant]);
-  const indoors = !!roomLayout && (insideFashionHouse
+  }, [interior, insideDealership, insideUniversity, insideHospital, insideFashionHouse, insideOffice, insideRestaurant]);
+  const indoors = !!roomLayout && (insideDealership || insideUniversity || insideHospital || (insideFashionHouse
     ? true
     : insideOffice
       ? district.id === OFFICE_WORKPLACE.districtId
     : insideRestaurant
       ? !!restaurantVendor
-      : inside && !!home && home.district === district.id);
+      : inside && !!home && home.district === district.id));
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : district.layout;
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
   useEffect(() => {
     insideRef.current = indoors;
-  }, [indoors]);
+    insideUniversityRef.current = indoors && insideUniversity;
+    insideHospitalRef.current = indoors && insideHospital;
+  }, [indoors, insideUniversity, insideHospital]);
   useEffect(() => {
     districtRef.current = district;
     // Arriving in a district (or loading a save there) puts you at its arrival point
@@ -502,6 +546,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     controls.object.position.set(x + Math.sin(d) * 4.2, CAMERA_TARGET_HEIGHT + 5.3, z + Math.cos(d) * 4.2);
     controls.update();
   }, [controller]);
+  const snapHomeCamera = useCallback(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const { x, z } = controller.position;
+    controls.target.set(x, CAMERA_TARGET_HEIGHT, z);
+    controls.object.position.set(x + 0.01, CAMERA_TARGET_HEIGHT + 17, z + 0.01);
+    controls.update();
+  }, [controller]);
   const snapFashionCamera = useCallback(() => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -518,6 +570,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setVendor(null);
     setRestaurantVendor(foodVendor);
     setInsideRestaurant(true);
+    setInsideDealership(false);
     setInside(false);
     setInsideOffice(false);
     setRestaurantStage('host');
@@ -535,6 +588,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setInside(false);
     setInsideOffice(false);
     setInsideRestaurant(false);
+    setInsideDealership(false);
     setInsideFashionHouse(true);
     setHomePanel(null);
     const [x, doorZ] = doorSpot(FASHION_HOUSE_INTERIOR);
@@ -542,13 +596,28 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setStore('shop');
     snapFashionCamera();
   };
+  const enterDealership = () => {
+    if (!district.carDealership) return;
+    setInside(false);
+    setInsideOffice(false);
+    setInsideRestaurant(false);
+    setInsideFashionHouse(false);
+    setInsideDealership(true);
+    setDealershipOpen(false);
+    setDealershipModelId(VEHICLE_CATALOG[0].id);
+    setStore(null);
+    const [x, z] = doorSpot(CAR_DEALERSHIP_INTERIOR);
+    placePlayer([x, 0, z], 0);
+    setMovementBlocked(false);
+    snapIndoorCamera();
+  };
   const goInside = useCallback(() => {
-    if (!interior || insideOffice || insideRestaurant || insideFashionHouse) return;
+    if (!interior || insideOffice || insideRestaurant || insideFashionHouse || insideDealership) return;
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
-    snapIndoorCamera();
-  }, [interior, insideOffice, insideRestaurant, insideFashionHouse, snapIndoorCamera, setHomePanel, setInside]);
+    snapHomeCamera();
+  }, [interior, insideOffice, insideRestaurant, insideFashionHouse, insideDealership, snapHomeCamera, setHomePanel, setInside]);
   const goIntoOffice = useCallback(() => {
     if (district.id !== OFFICE_WORKPLACE.districtId || insideOffice) return;
     setHomePanel(null);
@@ -558,8 +627,40 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     placePlayer([x, 0, z], 0);
     snapIndoorCamera();
   }, [district.id, insideOffice, snapIndoorCamera, setHomePanel, setInside, setInsideOffice]);
+  const goIntoUniversity = useCallback(() => {
+    if (district.id !== UNIVERSITY.districtId || insideUniversity) return;
+    setHomePanel(null);
+    setInside(false);
+    setInsideUniversity(true);
+    const [x, z] = doorSpot(UNIVERSITY_INTERIOR);
+    placePlayer([x, 0, z], 0);
+    setMovementBlocked(false);
+    snapIndoorCamera();
+  }, [district.id, insideUniversity, snapIndoorCamera, setHomePanel, setInside]);
+  const goIntoHospital = useCallback(() => {
+    if (district.id !== HOSPITAL.districtId || insideHospital) return;
+    setHomePanel(null);
+    setInside(false);
+    setInsideHospital(true);
+    const [x, z] = doorSpot(HOSPITAL_INTERIOR);
+    placePlayer([x, 0, z], 0);
+    setMovementBlocked(false);
+    snapIndoorCamera();
+  }, [district.id, insideHospital, snapIndoorCamera, setHomePanel, setInside]);
   const goOutside = () => {
-    if (insideFashionHouse) {
+    if (insideHospital) {
+      setInsideHospital(false);
+      setHospitalPanel(null);
+      placePlayer([HOSPITAL.position[0], 0, HOSPITAL.position[2]], -Math.PI / 2);
+    } else if (insideUniversity) {
+      setInsideUniversity(false);
+      setCampusPanel(null);
+      placePlayer([UNIVERSITY.position[0], 0, UNIVERSITY.position[2]], Math.PI / 2);
+    } else if (insideDealership && district.carDealership) {
+      setInsideDealership(false);
+      setDealershipOpen(false);
+      placePlayer(district.carDealership.position, Math.PI);
+    } else if (insideFashionHouse) {
       setInsideFashionHouse(false);
       setStore(null);
       setTryOn({});
@@ -643,6 +744,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     if (e.use === 'shop') return counterAt(district, x, z) === 'fashion';
     if (e.use === 'gadgets') return counterAt(district, x, z) === 'gadgets';
     if (e.use === 'travel') return counterAt(district, x, z) === 'travel';
+    if (e.use === 'dealership') return !!district.carDealership
+      && Math.hypot(district.carDealership.position[0] - x, district.carDealership.position[2] - z) <= 4;
     if (e.use === 'home') { const h = homeAtDoor(district.id, x, z); return !!h && `${district.id}.home.${h.id}` === e.id; }
     return false;
   };
@@ -652,7 +755,40 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     else if (e.use === 'shop') enterFashionHouse();
     else if (e.use === 'gadgets') setGadgets(true);
     else if (e.use === 'travel') setTravelOpen(true);
+    else if (e.use === 'dealership') {
+      enterDealership();
+      setDealershipModelId(VEHICLE_CATALOG[0].id);
+      setDealershipOpen(true);
+    }
     else if (e.use === 'home') { const h = district.homes.find((h) => `${district.id}.home.${h.id}` === e.id); if (h) setHomePanel(h); }
+  };
+  const takeVehicleOut = (modelId: string): boolean => {
+    const owned = stateRef.current.ownedVehicles.find((vehicle) => vehicle.modelId === modelId);
+    if (!owned || controller.drivingVehicleId) return false;
+    const spawn: readonly [number, number, number] = [38.5, 0, 20];
+    const pedestrians = residentsIn(district.id).map(residentPosition);
+    if (!isVehicleSpawnClear(
+      { x: spawn[0], z: spawn[2] },
+      [...district.layout.obstacles, ...movingObstacles],
+      pedestrians,
+    )) return false;
+    setMovementBlocked(false);
+    if (!enterVehicle(modelId, spawn, -Math.PI / 2)) return false;
+    setInsideDealership(false);
+    setDealershipOpen(false);
+    setDrivingVehicleId(modelId);
+    const model = VEHICLE_CATALOG.find((vehicle) => vehicle.id === modelId);
+    if (model) setArrival(`${model.name} is ready outside. W/S drive, A/D steer, E exits.`);
+    snapCamera();
+    return true;
+  };
+  const leaveVehicle = () => {
+    if (!exitVehicle()) {
+      setArrival('There is no clear space beside the car to exit.');
+      return;
+    }
+    setDrivingVehicleId(null);
+    snapCamera();
   };
   const phone = hasMap(state.equipment);
   // At your own front door you sleep at home; anywhere else is sleeping rough
@@ -816,6 +952,130 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       setArrival('You spend 15 minutes in the bathroom.');
     }
   };
+  const interactWithUniversity = (action: UniversityInteraction) => {
+    if (!insideUniversity || !indoors) return;
+    if (action === 'door') {
+      goOutside();
+      return;
+    }
+    if (action === 'info' || action === 'services' || action === 'centre') {
+      setCampusPanel(action);
+      return;
+    }
+    if (action === 'cafeteria') {
+      if (state.balance < CAFETERIA_MEAL_PRICE) setArrival(`A cafeteria meal costs ${CAFETERIA_MEAL_PRICE} ⓒ.`);
+      else {
+        eat(CAFETERIA_MEAL_PRICE, 40);
+        setArrival(`You buy a cafeteria lunch for ${CAFETERIA_MEAL_PRICE} ⓒ.`);
+      }
+      return;
+    }
+    if (character.career !== 'student') {
+      setArrival('Only enrolled students can use lectures, the study desks and assignments. Choose the Student career to enrol.');
+      return;
+    }
+    setCampusPanel(action);
+  };
+  const campusDay = Math.floor(state.time.totalMinutes / 1440);
+  const campusToday = campusForDay(state.campus, campusDay);
+  const attendSlot = (slotId: ClassSlot['id']) => {
+    const { x, z } = controller.position;
+    const result = attendClass(campusToday, slotId, state.time.hour * 60 + state.time.minute, isInLectureHall(x, z));
+    if (result.result !== 'ok') {
+      setArrival('You need to be in the lecture hall while the class is open.');
+      return;
+    }
+    campusClass(slotId, true);
+    setCampusPanel(null);
+    const slot = CLASS_SLOTS.find((entry) => entry.id === slotId);
+    setArrival(`You attended ${slot?.title ?? 'class'}. +1 credit.`);
+  };
+  const submitCampusAssignment = (choice: number) => {
+    const { x, z } = controller.position;
+    const result = submitAssignment(campusToday, campusDay, choice, isInLibrary(x, z));
+    if (result.result !== 'ok') return;
+    campusAssignment(choice, true);
+    setCampusPanel(null);
+    setArrival(result.correct
+      ? 'Assignment submitted: correct answer. It counts towards your average.'
+      : `Assignment submitted: incorrect. The right answer was "${assignmentForDay(campusDay).options[assignmentForDay(campusDay).answer]}".`);
+  };
+  const studyAtLibrary = () => {
+    const { x, z } = controller.position;
+    if (!isInLibrary(x, z)) return;
+    campusStudy(true);
+    setCampusPanel(null);
+    setArrival('You studied for 30 minutes in the library.');
+  };
+  const takeNotes = () => {
+    const { x, z } = controller.position;
+    if (!isInLectureHall(x, z) || campusToday.attended.length === 0) return;
+    campusStudy(true);
+    setCampusPanel(null);
+    setArrival('You took notes for 30 minutes.');
+  };
+  const hospitalDay = Math.floor(state.time.totalMinutes / 1440);
+  const hospitalToday = hospitalForDay(state.hospital, hospitalDay);
+  const minuteNow = state.time.hour * 60 + state.time.minute;
+  const interactWithHospital = (action: HospitalInteraction) => {
+    if (!insideHospital || !indoors) return;
+    if (action === 'door') {
+      goOutside();
+      return;
+    }
+    if (action === 'pharmacy') {
+      setHospitalPanel('pharmacy');
+      return;
+    }
+    if (character.career !== 'doctor') {
+      setArrival('Only hospital doctors can work here. Choose the Doctor career to join the staff.');
+      return;
+    }
+    setHospitalPanel(action);
+  };
+  const hospitalPos = () => controller.position;
+  const doClockIn = () => {
+    const result = hospitalClockInRule(hospitalToday, minuteNow, action2Reception());
+    if (result.result === 'ok') {
+      hospitalClockIn(true);
+      setHospitalPanel(null);
+      setArrival('You clocked in. Find the supervisor for your briefing.');
+    } else if (result.result === 'not-open') setArrival('Clock-in opens at 09:00.');
+    else if (result.result === 'too-late') setArrival('It is too late to start a shift today.');
+  };
+  const action2Reception = () => {
+    const { x, z } = hospitalPos();
+    return hospitalInteractionAt(HOSPITAL_INTERIOR, x, z) === 'reception';
+  };
+  const doClockOut = () => {
+    const result = hospitalClockOutRule(hospitalToday, action2Reception());
+    if (result.result !== 'ok') return;
+    hospitalClockOut(true);
+    setHospitalPanel(null);
+    setArrival(result.completed ? 'Shift complete. Your pay has been added through the normal ledger.' : 'You clocked out before seeing all patients.');
+  };
+  const doBrief = () => {
+    const { x, z } = hospitalPos();
+    const result = hospitalBriefRule(hospitalToday, isInSupervisorOffice(x, z));
+    if (result.result !== 'ok') {
+      setArrival('Go to the supervisor\u2019s office, then take the briefing.');
+      return;
+    }
+    hospitalBrief(true);
+    setHospitalPanel(null);
+    setArrival('Briefing complete. See your patients on the ward.');
+  };
+  const doTreat = (choice: number) => {
+    const { x, z } = hospitalPos();
+    const result = hospitalTreatRule(hospitalToday, hospitalDay, choice, isInWard(x, z));
+    if (result.result !== 'ok') {
+      setArrival('You need to be on the ward to see patients.');
+      return;
+    }
+    hospitalPatient(choice, true);
+    setHospitalPanel(null);
+    setArrival(result.correct ? `Correct. ${result.note}` : `Not the best call. ${result.note}`);
+  };
   const officeActionAt = (): OfficeInteraction | null => {
     if (!insideOffice || !indoors || !interior) return null;
     return officeInteractionAt(interior, controller.position.x, controller.position.z);
@@ -876,13 +1136,34 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         return;
       }
       if (e.key.toLowerCase() !== 'e' || e.target instanceof HTMLInputElement) return;
+      if (dealershipOpen) return;
+      if (controller.drivingVehicleId) {
+        leaveVehicle();
+        return;
+      }
       // E on a seat gets you up; on the way to one it does nothing
       if (sit.session) {
         if (sit.session.phase === 'seated') sit.cancel();
         return;
       }
       if (indoors && interior) {
-        if (insideRestaurant && restaurantVendor) {
+        if (insideHospital) {
+          const action = hospitalInteractionAt(interior, controller.position.x, controller.position.z);
+          if (action) interactWithHospital(action);
+        } else if (insideUniversity) {
+          const action = universityInteractionAt(interior, controller.position.x, controller.position.z);
+          if (action) interactWithUniversity(action);
+        } else if (insideDealership) {
+          const action = dealershipInteractionAt(controller.position.x, controller.position.z);
+          if (action === 'door') goOutside();
+          else if (action === 'salesperson') {
+            setDealershipModelId(VEHICLE_CATALOG[0].id);
+            setDealershipOpen(true);
+          } else if (action) {
+            setDealershipModelId(action.modelId);
+            setDealershipOpen(true);
+          }
+        } else if (insideRestaurant && restaurantVendor) {
           const action = restaurantInteractionAt(controller.position.x, controller.position.z);
           if (action === 'door') goOutside();
           else if (action === 'host') setVendor(restaurantVendor);
@@ -905,11 +1186,20 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const door = homeAtDoor(district.id, x, z);
       const officeEntrance = district.id === OFFICE_WORKPLACE.districtId
         && Math.hypot(OFFICE_WORKPLACE.position[0] - x, OFFICE_WORKPLACE.position[2] - z) <= OFFICE_WORKPLACE.radius;
+      const dealershipEntrance = district.carDealership
+        && Math.hypot(district.carDealership.position[0] - x, district.carDealership.position[2] - z) <= 4;
+      const universityEntrance = district.id === UNIVERSITY.districtId
+        && Math.hypot(UNIVERSITY.position[0] - x, UNIVERSITY.position[2] - z) <= UNIVERSITY.radius;
+      const hospitalEntrance = district.id === HOSPITAL.districtId
+        && Math.hypot(HOSPITAL.position[0] - x, HOSPITAL.position[2] - z) <= HOSPITAL.radius;
       if (near) enterRestaurant(near);
       else if (counter === 'fashion') enterFashionHouse();
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
+      else if (dealershipEntrance) enterDealership();
       else if (officeEntrance) goIntoOffice();
+      else if (universityEntrance) goIntoUniversity();
+      else if (hospitalEntrance) goIntoHospital();
       else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
       else if (parkAt(district.park, x, z)) setParkOpen(true);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
@@ -921,9 +1211,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || officePanel !== null || locationsOpen || nightOpen || parkOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || officePanel !== null || campusPanel !== null || hospitalPanel !== null || locationsOpen || nightOpen || parkOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, officePanel, locationsOpen, nightOpen, parkOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, officePanel, campusPanel, hospitalPanel, locationsOpen, nightOpen, parkOpen, dealershipOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1039,7 +1329,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const homeRoom = interiorFor(home);
       const [x, z] = doorSpot(homeRoom);
       placePlayer([x, 0, z + 1.6], 0);
-      snapIndoorCamera();
+      snapHomeCamera();
     }
     setStore(null);
     setTryOn({});
@@ -1158,6 +1448,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onDeleteOutfit={(i) => onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, outfits: (wardrobe.outfits ?? []).filter((_, k) => k !== i) } })}
           mode={store}
           wardrobe={wardrobe}
+          skinTone={character.skinTone}
+          skinColor={character.skinColor}
+          onSkinChange={(skinTone, skinColor) => onCharacterUpdate({ ...character, skinTone, skinColor })}
           homeId={home?.id ?? null}
           homeDecor={persistedDecor}
           balance={state.balance}
@@ -1298,6 +1591,40 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={() => setOfficePanel(null)}
         />
       )}
+      {campusPanel && (
+        <CampusPanel
+          mode={campusPanel}
+          campus={campusToday}
+          time={state.time}
+          day={campusDay}
+          inLectureHall={isInLectureHall(controller.position.x, controller.position.z)}
+          onAttend={attendSlot}
+          onStudy={studyAtLibrary}
+          onNotes={takeNotes}
+          onRelax={() => {
+            wait(15);
+            setCampusPanel(null);
+            setArrival('You spend 15 minutes with classmates in the student centre.');
+          }}
+          onAnswer={submitCampusAssignment}
+          onClose={() => setCampusPanel(null)}
+        />
+      )}
+      {hospitalPanel && (
+        <HospitalPanel
+          mode={hospitalPanel}
+          hospital={hospitalToday}
+          time={state.time}
+          day={hospitalDay}
+          hourlyPay={hourlyPay}
+          todayIncome={state.today.income}
+          onClockIn={doClockIn}
+          onClockOut={doClockOut}
+          onBrief={doBrief}
+          onAnswer={doTreat}
+          onClose={() => setHospitalPanel(null)}
+        />
+      )}
       {state.summary && (
         <DailyLogModal
           income={state.summary.income}
@@ -1338,12 +1665,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior
-                key={insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`}
+                key={insideHospital ? 'hospital' : insideUniversity ? 'university' : insideDealership ? 'dealership' : insideFashionHouse ? 'fashion-house' : insideOffice ? 'office' : insideRestaurant ? 'restaurant' : `home-${home?.id ?? 'unknown'}`}
                 interior={interior}
                 gameTime={state.time}
                 doorOpen={Math.hypot(controller.position.x, controller.position.z - doorSpot(interior)[1]) < 1.8}
               >
+                {insideHospital && <HospitalScene player={controller} />}
+                {insideUniversity && <UniversityScene player={controller} />}
                 {insideFashionHouse && <FashionHouseScene player={controller} />}
+                {insideDealership && <CarDealershipScene player={controller} />}
                 {insideRestaurant && <RestaurantScene
                   tableId={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantTableId : null}
                   dish={restaurantStage === 'served' || restaurantStage === 'eating' ? restaurantOrder : null}
@@ -1367,6 +1697,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 tryOn={tryOn}
                 homeId={state.home}
                 district={district}
+                ownedVehicles={state.ownedVehicles}
                 talkingTo={talking?.id ?? null}
                 hugSession={hugging}
                 onHugComplete={finishHug}
@@ -1426,6 +1757,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           {arrival}
         </p>
       )}
+      {dealershipOpen && (
+        <DealershipPanel
+          balance={state.balance}
+          purchasePaused={!!state.summary}
+          ownedVehicles={state.ownedVehicles}
+          initialModelId={dealershipModelId}
+          onBuy={buyVehicle}
+          onPaint={paintVehicle}
+          onSpawn={takeVehicleOut}
+          onClose={() => setDealershipOpen(false)}
+        />
+      )}
       <HUD
         district={district}
         onOpenTravel={() => setTravelOpen(true)}
@@ -1438,14 +1781,53 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         character={character}
         balance={state.balance}
         gameTime={state.time}
+        today={state.today}
+        summaryShown={!!state.summary}
         neighborhood={neighborhood}
         onExitToMenu={onExitToMenu}
         onRest={() => rest(atHome())}
         homeId={state.home}
         onOpenHome={setHomePanel}
         insideHome={indoors && interior ? {
-          name: insideFashionHouse ? district.fashionHouse.name : insideOffice ? OFFICE_WORKPLACE.name : insideRestaurant ? restaurantVendor?.name ?? 'Restaurant' : home!.name,
+          name: insideHospital ? HOSPITAL.name : insideUniversity ? UNIVERSITY.name : insideDealership ? district.carDealership?.name ?? 'Car dealership' : insideFashionHouse ? district.fashionHouse.name : insideOffice ? OFFICE_WORKPLACE.name : insideRestaurant ? restaurantVendor?.name ?? 'Restaurant' : home!.name,
           interactionAt: (x, z) => {
+            if (insideHospital) {
+              const action = hospitalInteractionAt(interior, x, z);
+              return action ? ({
+                door: { verb: 'Leave hospital through', place: 'the main entrance', onOpen: () => interactWithHospital('door'), icon: DoorOpen },
+                reception: { verb: 'Clock in or out at', place: 'reception', onOpen: () => interactWithHospital('reception'), icon: BriefcaseBusiness },
+                pharmacy: { verb: 'Visit', place: 'the pharmacy', onOpen: () => interactWithHospital('pharmacy'), icon: Users },
+                supervisor: { verb: 'Speak to', place: 'the supervisor', onOpen: () => interactWithHospital('supervisor'), icon: Users },
+                patient: { verb: 'See a patient on', place: 'the ward', onOpen: () => interactWithHospital('patient'), icon: BedDouble },
+              })[action] : null;
+            }
+            if (insideUniversity) {
+              const action = universityInteractionAt(interior, x, z);
+              return action ? ({
+                door: { verb: 'Leave campus through', place: 'the main entrance', onOpen: () => interactWithUniversity('door'), icon: DoorOpen },
+                info: { verb: 'Check the', place: 'university directory', onOpen: () => interactWithUniversity('info'), icon: GraduationCap },
+                services: { verb: 'Visit', place: 'student services', onOpen: () => interactWithUniversity('services'), icon: GraduationCap },
+                lecture: { verb: 'Attend class in', place: 'Lecture Hall A', onOpen: () => interactWithUniversity('lecture'), icon: GraduationCap },
+                study: { verb: 'Study at', place: 'the library desk', onOpen: () => interactWithUniversity('study'), icon: BookOpen },
+                assignment: { verb: 'Submit work at', place: 'the computer lab', onOpen: () => interactWithUniversity('assignment'), icon: Monitor },
+                cafeteria: { verb: 'Buy lunch at', place: 'the cafeteria', onOpen: () => interactWithUniversity('cafeteria'), icon: Utensils },
+                centre: { verb: 'Relax in', place: 'the student centre', onOpen: () => interactWithUniversity('centre'), icon: Users },
+              })[action] : null;
+            }
+            if (insideDealership) {
+              const action = dealershipInteractionAt(x, z);
+              if (action && typeof action === 'object') {
+                const model = VEHICLE_CATALOG.find((vehicle) => vehicle.id === action.modelId);
+                return model ? { verb: 'Ask about', place: model.name, onOpen: () => {
+                  setDealershipModelId(model.id);
+                  setDealershipOpen(true);
+                }, icon: CarFront } : null;
+              }
+              return action ? ({
+                door: { verb: 'Leave through', place: 'the showroom entrance', onOpen: goOutside, icon: DoorOpen },
+                salesperson: { verb: 'Talk to', place: 'the salesperson', onOpen: () => setDealershipOpen(true), icon: Users },
+              })[action] : null;
+            }
             if (insideFashionHouse) {
               const action = fashionHouseInteractionAt(x, z);
               return action ? ({
@@ -1484,7 +1866,34 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             })[action] : null;
           },
         } : undefined}
-        insidePlaceLabel={insideFashionHouse ? `Fashion House · ${district.city.name}` : insideOffice ? `At work · ${district.city.name}` : insideRestaurant ? `Dining · ${district.city.name}` : undefined}
+        insidePlaceLabel={insideHospital ? `Hospital · ${district.city.name}` : insideUniversity ? `Campus · ${district.city.name}` : insideDealership ? `Marina Motors · ${district.city.name}` : insideFashionHouse ? `Fashion House · ${district.city.name}` : insideOffice ? `At work · ${district.city.name}` : insideRestaurant ? `Dining · ${district.city.name}` : undefined}
+        outsideDealership={!indoors && district.carDealership
+          && Math.hypot(district.carDealership.position[0] - controller.position.x, district.carDealership.position[2] - controller.position.z) <= 4
+          ? { name: district.carDealership.name, onOpen: enterDealership }
+          : undefined}
+        onExitVehicle={leaveVehicle}
+        onCampus={(insideUniversity || insideHospital) && indoors}
+        hospitalStatus={{
+          onShift: hospitalToday.onShift,
+          patientsToday: hospitalToday.patientsToday,
+          patientsTarget: HOSPITAL_PATIENTS_PER_SHIFT,
+          shiftsCompleted: state.hospital.shiftsCompleted,
+        }}
+        outsideHospital={!indoors && district.id === HOSPITAL.districtId
+          && Math.hypot(HOSPITAL.position[0] - controller.position.x, HOSPITAL.position[2] - controller.position.z) <= HOSPITAL.radius
+          ? { name: HOSPITAL.name, onOpen: goIntoHospital }
+          : undefined}
+        campusStatus={{
+          classesToday: campusToday.attended.length,
+          classesTotal: CLASS_SLOTS.length,
+          assignmentDone: campusToday.assignmentDone,
+          credits: state.campus.credits,
+          standing: academicStanding(state.campus),
+        }}
+        outsideUniversity={!indoors && district.id === UNIVERSITY.districtId
+          && Math.hypot(UNIVERSITY.position[0] - controller.position.x, UNIVERSITY.position[2] - controller.position.z) <= UNIVERSITY.radius
+          ? { name: UNIVERSITY.name, onOpen: goIntoUniversity }
+          : undefined}
         outsideOffice={!indoors && district.id === OFFICE_WORKPLACE.districtId
           && Math.hypot(OFFICE_WORKPLACE.position[0] - controller.position.x, OFFICE_WORKPLACE.position[2] - controller.position.z) <= OFFICE_WORKPLACE.radius
           ? { name: OFFICE_WORKPLACE.name, onOpen: goIntoOffice }

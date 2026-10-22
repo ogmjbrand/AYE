@@ -80,6 +80,12 @@ describe('character save', () => {
     expect(parseCharacter(old)?.skinTone).toBe('original');
   });
 
+  it('persists a validated custom skin colour without affecting older saves', () => {
+    expect(parseCharacter({ ...character, skinTone: 'custom', skinColor: '#8a5237' })?.skinColor).toBe('#8a5237');
+    expect(parseCharacter({ ...character, skinColor: 'not-a-colour' })?.skinColor).toBeUndefined();
+    expect(parseCharacter(character)?.skinColor).toBeUndefined();
+  });
+
   it('drops unknown or unowned wardrobe items', () => {
     const c = parseCharacter({
       ...character,
@@ -121,6 +127,16 @@ describe('progress save', () => {
     expect(loadProgress(character, s)).toEqual(state);
   });
 
+  it('persists owned vehicle models and paint across a progress reload', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(5_500, createTime(13, 5, 4)),
+      ownedVehicles: [{ modelId: 'epe-city', colour: 'lagoon-blue' }],
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).ownedVehicles).toEqual(state.ownedVehicles);
+  });
+
   it('loads progress saved before work shifts existed', () => {
     const s = new MemoryStorage();
     s.setItem('aye_progress', JSON.stringify({
@@ -137,6 +153,7 @@ describe('progress save', () => {
     expect(p.fashionMissionItemId).toBeNull();
     expect(p.fashionMissionCompleted).toBe(false);
     expect(p.workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 0 });
+    expect(p.ownedVehicles).toEqual([]);
   });
 
   it('persists fashion mission progress and ignores unknown catalogue items', () => {

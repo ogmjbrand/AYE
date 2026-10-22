@@ -79,6 +79,84 @@ worn by the current player avatar. Four hairstyles are already converted and
 registered for the Rocketbox head attachment; the remaining pack hair has not
 been converted.
 
+## User-supplied avatar archives (local development only)
+
+All three RAR5 archives passed integrity checks and were extracted only to a
+temporary inspection directory. The original archives were left untouched.
+No archive included a licence, credits file, or reliable source/provenance
+record. This does not establish that the assets are prohibited; it means
+redistribution rights remain unverified. The FBX metadata identifies Blender
+as the exporter but leaves author/comment fields empty; exact model filenames
+also returned no public GitHub code-search matches. Neither fact identifies
+the original creator or grants permission.
+
+| Archive | Exact model/scene files | Rig, UV and geometry findings |
+|---|---|---|
+| `Tasha.rar` (23 entries) | `Tasha .fbx`, `Tasha .obj`, `Tasha .mtl`, `Tasha 4.0.blend`, `Tasha 4.5.blend`, `Tasha 5.2.blend` | 10 FBX meshes; Blender scene has 9 UV-mapped render meshes. Body: 49,801 vertices / 98,880 polygons. No armature, vertex groups, or animation actions. |
+| `The+Girl.rar` (34 entries) | `The Girl .fbx`, `The Girl .obj`, `The Girl .mtl`, `The Girl 4.0.blend`, `The Girl 4.5.blend`, `The Girl 5.0.blend`, `The Girl 5.2.blend` | 12 FBX meshes; Blender scene has 11 UV-mapped render meshes. Body: 45,114 vertices / 44,760 polygons; scene total 215,861 triangles. No armature, vertex groups, or animation actions. |
+| `Rainy(1).rar` (28 entries) | `Rainny DS.fbx`, `Rainny DS.obj`, `Rainny DS.mtl`, `Rainny 4.0.blend`, `Rainny 4.5.blend`, `Rainny 5.0.blend` | 11 weighted render meshes; 177,259 triangles total. `rig` has 559 bones, 144 marked deform; `body` has 33,323 vertices / 66,646 triangles and 135 vertex groups. No animation actions. |
+
+The body material is the actual skin surface, not a complete character:
+`body_basecolor.png` is the skin albedo, with separate `body_normal.png`,
+`body_roughness.png`, and `body_specular.png` maps in each package (case
+differs for Rainny: `Body_Roughness.png` and `Body_specular.png`). Each body
+albedo is 8192×8192 and each body normal is 12288×12288. The supplied models
+are approximately 3.2–3.4 Blender units tall; their physical scale has not
+been validated against AYE's world scale.
+
+Additional texture files found under each package's `textures/` folder:
+
+- **Tasha:** `bra_alpha.png`, `bra_basecolor.png`, `bra_normal.png`,
+  `dress_basecolor.png`, `dress_normal.png`, `Eye_green_BaseColor.png`,
+  `eyelashes_basecolor_opacity.png`, `eyelashes_normal.png`,
+  `hair_alpha.png`, `hair_basecolor.png`, `sock_basecolor.png`,
+  `sock_normal.png`, and `sock_roughness.png`.
+- **The Girl:** `bra_alpha.png`, `bra_basecolor.png`, `bra_normal.png`,
+  `bunny_ear_basecolor.png`, `bunny_ear_normal.png`,
+  `bunny_ear_roughness.png`, `cloth_normal_2.dds`, `dress_alpha.png`,
+  `dress_basecolor.png`, `dress_Normal.png`, `dress_Roughness.png`,
+  `Eye_green_BaseColor.png`, `eyelashes_basecolor_opacity.png`,
+  `eyelashes_normal.png`, `hair_alpha.png`, `hair_basecolor.jpg`,
+  `pussy_hair_alpha.png`, `sexy_sock_basecolor.png`,
+  `sexy_sock_normal.png`, `sexy_sock_roughness.png`, `shirt_basecolor.png`,
+  `shirt_normal.png`, and `shirt_ORM.png`. The DDS map was present, but its
+  use by the exported materials is not verified.
+- **Rainny:** `Dress_basecolor.png`, `dress_metallic.png`, `dress_normal.png`,
+  `dress_roughness.png`, `Eye_brown_BaseColor.png`,
+  `eyelashes_basecolor_opacity.png`, `eyelashes_normal.png`,
+  `hair_alpha.png`, `hair_basecolor.png`, `pant_basecolor.png`,
+  `pant_normal.png`, `pant_roughness.png`, `pant_specular.png`,
+  `shirt_basecolor.png`, `shirt_normal.png`, `shirt_roughness.png`, and
+  `shirt_specular.png`.
+
+The Rainny scene contains the only supplied rig, but its deform bone names
+(`root.x`, `spine_01.x`, `thigh_stretch.l`, etc.) differ from AYE's
+`Bip01` Rocketbox rig. The scene has no authored animations. Its teeth
+material references four missing files under `demo/Asian cute girl/textures/`:
+`teeth_basecolor.png`, `teeth_normal.png`, `teeth_roughness.png`, and
+`teeth_specular.png`. The private preview conversion uses a plainly named
+neutral material on only those teeth/tongue meshes; it does not invent or
+claim to restore the missing textures. The archive also contains
+`rig tools.rar`, listing `auto_rig_pro_3.77.10.zip`,
+`proxy_picker_1.1.10.zip`, and `rig_tools_3.77.10.zip`; those nested tools were
+not installed or redistributed.
+
+For local source inspection, `scripts/characters/export-private-avatar.py`
+exports selected scene meshes and downsizes used maps to at most 2K. The
+original optimized GLB previews remain in the ignored
+`assets-src/private-avatars/` directory. Tasha and The Girl body base-colour,
+normal, and roughness maps are extracted under the ignored
+`assets-src/private-avatars/source-textures/` directory. They are reference
+material only: the baked UV-transfer maps and the script that made them were
+removed, nothing from them is loaded by the game, and no standalone gallery
+route exists. Character creation and the in-game wardrobe share one complexion
+control with a freely adjustable colour applied by the existing avatar shader.
+
+The Tasha and The Girl archives have no recorded licence or provenance
+evidence. Do not copy source maps to `public/`, distribute them, or include
+them in a production build until rights are established. No private avatar
+models or source maps are listed in the public asset manifest.
+
 ## Integration boundary
 
 The optional road, pavement and ground textures are enabled in

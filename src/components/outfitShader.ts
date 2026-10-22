@@ -199,10 +199,13 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);')
+      .replace('#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);`,
+      )
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v3-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v5-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }

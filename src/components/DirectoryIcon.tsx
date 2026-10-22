@@ -1,6 +1,7 @@
 import {
   BriefcaseBusiness,
   Bus,
+  CarFront,
   Dumbbell,
   GraduationCap,
   HeartPulse,
@@ -22,6 +23,7 @@ const ICONS: Record<DirectoryCategory, LucideIcon> = {
   food: Utensils,
   restaurants: Utensils,
   shopping: ShoppingBag,
+  vehicles: CarFront,
   education: GraduationCap,
   universities: GraduationCap,
   health: HeartPulse,

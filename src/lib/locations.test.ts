@@ -10,7 +10,7 @@ describe('locationsFor', () => {
   it('lists every built place from the district data', () => {
     const built = entries.filter((e) => e.built);
     expect(built.length).toBe(
-      marina.vendors.length + 3 /* fashion, gadgets, travel */ + marina.homes.length + Object.keys(marina.workplaces).length + 1 /* park */,
+      marina.vendors.length + 4 /* fashion, gadgets, travel, dealership */ + marina.homes.length + Object.keys(marina.workplaces).length + 1 /* park */,
     );
     for (const v of marina.vendors) expect(entries.find((e) => e.id === `${marina.id}.${v.id}`)?.position).toEqual(v.position);
   });

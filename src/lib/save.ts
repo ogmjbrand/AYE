@@ -15,8 +15,11 @@ import { sanitiseEquipment } from './equipment';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
 import { sanitiseOfficeCareer } from './officeCareer';
+import { sanitiseCampus } from './campus';
+import { sanitiseHospital } from './hospital';
 import { sanitiseHomeDecor } from './homeDecor';
-import { DEFAULT_SKIN_TONE, isSkinToneId } from './skinTone';
+import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId } from './skinTone';
+import { sanitiseOwnedVehicles } from './vehicleCatalog';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -77,6 +80,7 @@ export function parseCharacter(data: unknown): Character | null {
     // Saves from before body shape start average
     shape: sanitiseShape(c.shape),
     skinTone: isSkinToneId(c.skinTone) ? c.skinTone : DEFAULT_SKIN_TONE,
+    skinColor: isSkinColor(c.skinColor) ? c.skinColor : undefined,
   };
 }
 
@@ -128,6 +132,7 @@ export function loadProgress(character: Character, storage: Storage = localStora
       expenses: today.expenses,
       // Saves from before work shifts have no minutes recorded
       minutesWorked: isInt(today.minutesWorked, 0, 24 * 60) ? today.minutesWorked : 0,
+      ...(isInt(today.purchases, 0, 1000) ? { purchases: today.purchases } : {}),
     },
     minutesWorkedThisHour: isNum(p.minutesWorkedThisHour, 0, 60) ? p.minutesWorkedThisHour : 0,
     // Saves from before hunger existed start fed
@@ -138,6 +143,7 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
+    ownedVehicles: sanitiseOwnedVehicles(p.ownedVehicles),
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
@@ -155,10 +161,12 @@ export function loadProgress(character: Character, storage: Storage = localStora
       poor: performanceCount(performanceData.poor),
     },
     officeCareer: sanitiseOfficeCareer(p.officeCareer),
+    campus: sanitiseCampus(p.campus),
+    hospital: sanitiseHospital(p.hospital),
   };
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital }));
 }

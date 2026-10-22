@@ -28,10 +28,12 @@ export function HomeInterior({ interior, gameTime, doorOpen = false, children }:
   const windowBottom = windowY - windowHeight / 2;
   const windowFrame = interior.architecture === 'office' ? '#343a3d'
     : interior.architecture === 'boutique' ? '#b99658'
-      : interior.architecture === 'restaurant' ? '#4b3829' : '#60452f';
+      : interior.architecture === 'restaurant' ? '#4b3829'
+        : interior.architecture === 'dealership' ? '#9a8760' : '#60452f';
   const ceilingColor = interior.architecture === 'restaurant' ? '#382d26'
     : interior.architecture === 'boutique' ? '#24201e'
-      : interior.architecture === 'office' ? '#e1e0dc' : '#eeeae2';
+      : interior.architecture === 'office' ? '#e1e0dc'
+        : interior.architecture === 'dealership' ? '#e3e0d8' : '#eeeae2';
   // Daylight or a night city outside the window
   const sky = night > 0.5 ? '#1b2536' : night > 0.1 ? '#e0a46c' : '#bcd6e8';
 

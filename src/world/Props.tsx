@@ -265,7 +265,12 @@ export function Car({ vehicle }: { vehicle: Vehicle }) {
   const paint = useMemo(() => new MeshStandardMaterial({ color: vehicle.color, roughness: 0.3, metalness: 0.4 }), [vehicle.color]);
   const glass = useMemo(() => new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }), []);
   const dark = useMemo(() => new MeshStandardMaterial({ color: '#191919', roughness: 0.85 }), []);
-  const w = 1.8, l = 4.2;
+  const style = vehicle.bodyStyle ?? 'hatchback';
+  const w = style === 'sports' || style === 'pickup' ? 2 : style === 'suv' || style === 'luxury' ? 1.95 : 1.8;
+  const l = style === 'pickup' || style === 'luxury' ? 4.8 : style === 'sports' ? 4.1 : 4.3;
+  const cabinHeight = style === 'suv' || style === 'pickup' ? 0.68 : style === 'sports' ? 0.4 : 0.54;
+  const roofY = style === 'suv' || style === 'pickup' ? 1.65 : style === 'sports' ? 1.28 : 1.48;
+  const cabinLength = style === 'sedan' || style === 'luxury' ? 0.45 : style === 'sports' ? 0.42 : 0.52;
   return (
     <group position={vehicle.position} rotation={[0, vehicle.heading, 0]}>
       {/* lower body */}
@@ -273,16 +278,22 @@ export function Car({ vehicle }: { vehicle: Vehicle }) {
         <boxGeometry args={[w, 0.62, l]} />
       </mesh>
       {/* cabin with glass all round */}
-      <mesh position={[0, 1.18, -0.2]} material={glass} castShadow>
-        <boxGeometry args={[w - 0.12, 0.5, l * 0.52]} />
+      <mesh position={[0, roofY - cabinHeight / 2, -0.2]} material={glass} castShadow>
+        <boxGeometry args={[w - 0.12, cabinHeight, l * cabinLength]} />
       </mesh>
-      <mesh position={[0, 1.45, -0.2]} material={paint} castShadow>
-        <boxGeometry args={[w - 0.1, 0.06, l * 0.54]} />
+      <mesh position={[0, roofY, -0.2]} material={paint} castShadow>
+        <boxGeometry args={[w - 0.1, 0.06, l * (cabinLength + 0.02)]} />
       </mesh>
+      {style === 'pickup' && <mesh position={[0, 0.95, -l * 0.34]} material={dark} castShadow><boxGeometry args={[w * 0.86, 0.42, l * 0.25]} /></mesh>}
       {/* bumpers */}
       {[-1, 1].map((s) => (
         <mesh key={s} position={[0, 0.42, s * (l / 2 + 0.04)]} material={dark}>
           <boxGeometry args={[w, 0.18, 0.1]} />
+        </mesh>
+      ))}
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[side * w * 0.31, 0.68, l / 2 + 0.055]} material={glass}>
+          <boxGeometry args={[0.3, 0.14, 0.025]} />
         </mesh>
       ))}
       {/* wheels */}

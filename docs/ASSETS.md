@@ -15,8 +15,9 @@ so the game always starts.
 
 **Start with [ASSET_CHECKLIST.md](ASSET_CHECKLIST.md)**: exact slots, folders,
 file names, budgets and licence rules, including the `concrete` surface, the
-`danfo` vehicle model and the git-ignored `public/assets/private/` folder for
-files that may not be shared publicly. Shrink models first with
+`danfo` vehicle model and the local-only avatar preview workflow. Never put
+private or unverified assets under `public/`: Vite copies that folder into
+production builds, even when a file is git-ignored. Shrink models first with
 `npm.cmd run assets:optimize -- input.glb output.glb`.
 
 ## 1. Road, pavement, ground and roof textures

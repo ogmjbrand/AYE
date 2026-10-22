@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   INTERIORS,
+  CAR_DEALERSHIP_INTERIOR,
   FASHION_HOUSE_INTERIOR,
   RESTAURANT_INTERIOR,
   RESTAURANT_TABLES,
   bedSpot,
   doorSpot,
   fashionHouseInteractionAt,
+  dealershipInteractionAt,
   homeInteractionAt,
   interiorFor,
   interiorLayout,
@@ -113,6 +115,22 @@ describe('restaurant interior', () => {
     expect(restaurantInteractionAt(...door)).toBe('door');
     expect(restaurantInteractionAt(...host.at)).toBe('host');
     expect(restaurantInteractionAt(0, -4.8)).toBeNull();
+  });
+
+  describe('car dealership interior', () => {
+    const layout = interiorLayout(CAR_DEALERSHIP_INTERIOR);
+    const free = (x: number, z: number) => {
+      const resolved = resolveCollisions(x, z, PLAYER_RADIUS, layout.obstacles);
+      return Math.hypot(resolved.x - x, resolved.z - z) < 0.01;
+    };
+
+    it('keeps the showroom entrance walkable and exposes salesperson and car interactions', () => {
+      const door = doorSpot(CAR_DEALERSHIP_INTERIOR);
+      expect(free(...door)).toBe(true);
+      expect(dealershipInteractionAt(...door)).toBe('door');
+      expect(dealershipInteractionAt(0, -3.6)).toBe('salesperson');
+      expect(dealershipInteractionAt(6, 1.4)).toEqual({ type: 'vehicle', modelId: 'ikorodu-sport' });
+    });
   });
 
   describe('Fashion House interior', () => {

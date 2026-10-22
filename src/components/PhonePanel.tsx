@@ -8,6 +8,8 @@ export interface PhoneApp {
   detail: string;
   icon: LucideIcon;
   onOpen?: () => void;
+  /** Small count or tag shown on the app icon. */
+  badge?: string | number;
 }
 
 export function PhonePanel({
@@ -64,7 +66,7 @@ export function PhonePanel({
             </header>
 
             <nav aria-label="Phone apps" className="grid grid-cols-3 gap-x-3 gap-y-5">
-              {apps.map(({ label, detail, icon: Icon, onOpen }) => (
+              {apps.map(({ label, detail, icon: Icon, onOpen, badge }) => (
                 <button
                   key={label}
                   type="button"
@@ -76,10 +78,12 @@ export function PhonePanel({
                   title={detail}
                   className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl p-1 text-center transition enabled:hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d4b36d]"
                 >
-                  <span className="flex size-14 items-center justify-center rounded-[1.1rem] border border-white/10 bg-gradient-to-br from-[#35383c] to-[#1c1e22] text-[#ead29a] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition group-enabled:group-hover:border-[#d4b36d]/60 group-enabled:group-hover:from-[#4a4437]">
+                  <span className="relative flex size-14 items-center justify-center rounded-[1.1rem] border border-white/10 bg-gradient-to-br from-[#35383c] to-[#1c1e22] text-[#ead29a] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition group-enabled:group-hover:border-[#d4b36d]/60 group-enabled:group-hover:from-[#4a4437]">
                     <Icon size={23} strokeWidth={1.7} aria-hidden="true" />
+                    {badge ? <span className="absolute -right-1 -top-1 rounded-full bg-[#d2b36f] px-1.5 text-[9px] font-bold text-black">{badge}</span> : null}
                   </span>
                   <span className="text-xs font-medium text-white/90">{label}</span>
+                  {!onOpen && <span className="text-[9px] uppercase tracking-wider text-white/45">Coming soon</span>}
                   <span className="sr-only">{detail}</span>
                 </button>
               ))}

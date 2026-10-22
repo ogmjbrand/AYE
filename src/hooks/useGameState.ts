@@ -6,6 +6,7 @@ import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
 import type { Wardrobe } from '../lib/fashion';
 import type { OfficeTaskId } from '../lib/officeCareer';
+import type { ClassSlot } from '../lib/campus';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -64,8 +65,17 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     officeTask: (taskId: OfficeTaskId, choice: number, atStation: OfficeTaskId | null) =>
       dispatch({ type: 'officeTask', taskId, choice, atStation }),
     officeClockOut: (atReception: boolean) => dispatch({ type: 'officeClockOut', atReception }),
+    campusClass: (slot: ClassSlot['id'], inHall: boolean) => dispatch({ type: 'campusClass', slot, inHall }),
+    campusAssignment: (choice: number, atDesk: boolean) => dispatch({ type: 'campusAssignment', choice, atDesk }),
+    campusStudy: (atLibrary: boolean) => dispatch({ type: 'campusStudy', atLibrary }),
+    hospitalClockIn: (atReception: boolean) => dispatch({ type: 'hospitalClockIn', atReception }),
+    hospitalBrief: (atSupervisor: boolean) => dispatch({ type: 'hospitalBrief', atSupervisor }),
+    hospitalPatient: (choice: number, atWard: boolean) => dispatch({ type: 'hospitalPatient', choice, atWard }),
+    hospitalClockOut: (atReception: boolean) => dispatch({ type: 'hospitalClockOut', atReception }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number) => dispatch({ type: 'eat', price, fullness }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),
+    buyVehicle: (modelId: string, colour: string) => dispatch({ type: 'buyVehicle', modelId, colour }),
+    paintVehicle: (modelId: string, colour: string) => dispatch({ type: 'paintVehicle', modelId, colour }),
   };
 }

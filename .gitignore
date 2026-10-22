@@ -23,8 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# Licensed assets that may not be redistributed (Mixamo, Fab Standard, paid packs).
-# The game loads them locally; they never go to the public repository.
+# Private assets under public/ are still copied into production builds.
+# Keep private or unverified source assets outside public/.
 public/assets/private/*
 !public/assets/private/README.md
+assets-src/private-avatars/
 assets-src/makehuman/base/

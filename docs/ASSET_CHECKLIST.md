@@ -39,30 +39,36 @@ anyone.
 |---|---|---|
 | CC0 (ambientCG, Poly Haven, Kenney, Quaternius) | `public/assets/textures/…`, `public/assets/models/…` | Yes |
 | CC-BY (many Sketchfab models) | same as CC0, **plus** a credit line in `CREDITS.md` | Yes |
-| Mixamo, Fab "Standard licence", Sketchfab "Standard/Editorial", paid packs, MetaHuman exports | `public/assets/private/…` | **No** (git-ignored) |
+| Private, non-redistributable, or unverified assets | Outside `public/`; `assets-src/private-avatars/` is reserved for the local avatar lab | No; never include in a production build |
 
-Files in `public/assets/private/` load in the game on your laptop like any
-other asset; they just never leave your machine. Keep your own backup.
+**Do not put private assets in `public/`, even in a git-ignored folder.** Vite
+copies everything under `public/` into the production build, whether or not Git
+tracks it. The legacy `public/assets/private/` folder is not a safe place for
+unlicensed or non-redistributable files.
 
-Paths in `manifest.json` are relative to `public/assets/`, so a private file
-is listed as `"private/characters/player.glb"`.
+Only assets cleared for distribution belong in `public/assets/` or
+`public/assets/manifest.json`. The local avatar lab reads from
+`assets-src/private-avatars/` during development; it is not part of the game
+manifest or production build.
 
 ---
 
 ## 1. Detailed human character (GLB)
 
-- [ ] **File:** `public/assets/private/characters/player.glb`
-      (or `public/assets/models/characters/player.glb` if CC0/CC-BY).
-- [ ] **Manifest:** `"avatar": { "url": "private/characters/player.glb", "height": 1.78 }`.
+- [ ] **File:** `public/assets/models/characters/player.glb` only after its
+      source and redistribution licence are verified.
+- [ ] **Manifest:** `"avatar": { "url": "models/characters/player.glb", "height": 1.78 }`.
       `height` is the standing height in metres; allowed range 1.2–2.3.
+- [ ] If rights are not verified, keep the asset outside `public/` and do not
+      register it in the production manifest.
 
 **Where to get one**
 
 | Source | Realism | Licence notes |
 |---|---|---|
 | Mixamo (mixamo.com, free Adobe account) | Medium | Free for games; files may not be redistributed, so use `private/`. |
-| Reallusion Character Creator 4 + ActorCore (paid) | High; good African skin, hair and clothing options | Game export needs the right Reallusion export licence. Check before buying. Use `private/`. |
-| MetaHuman (Epic) | Highest | Epic's licence terms changed in 2025. Read the current MetaHuman EULA about use outside Unreal before exporting. Raw exports are far too heavy and need heavy reduction (below). Use `private/`. |
+| Reallusion Character Creator 4 + ActorCore (paid) | High; good African skin, hair and clothing options | Game export needs the right Reallusion export licence. Check before buying; keep uncleared exports outside `public/`. |
+| MetaHuman (Epic) | Highest | Epic's licence terms changed in 2025. Read the current MetaHuman EULA about use outside Unreal before exporting. Raw exports are far too heavy and need heavy reduction (below); keep uncleared exports outside `public/`. |
 | Sketchfab, filtered by *Downloadable* and *CC-BY* or *CC0*, searching "rigged African man" or "rigged character PBR" | Varies | CC-BY needs credit. Check that it is actually rigged. |
 
 **Technical requirements (`assets:check` tests the ones marked ✓)**
@@ -144,7 +150,8 @@ The assets and ambientCG CC0 licence are recorded in `public/assets/CREDITS.md`.
 
 ### Danfo (slot ready)
 
-- [ ] **File:** `public/assets/models/vehicles/danfo.glb` (CC0/CC-BY) or `public/assets/private/vehicles/danfo.glb`.
+- [ ] **File:** `public/assets/models/vehicles/danfo.glb` only when cleared
+      for redistribution.
 - [ ] **Manifest:** `"vehicles": { "danfo": { "url": "models/vehicles/danfo.glb", "length": 5, "rotateY": 0 } }`.
   - `length`: bumper to bumper in metres (2–20). The game rescales the model to it.
   - `rotateY`: 0, 90, 180 or 270. Use it if the model appears backwards or sideways.
@@ -157,7 +164,34 @@ The assets and ambientCG CC0 licence are recorded in `public/assets/CREDITS.md`.
   - ideally one material.
 - Where to look:
   - Sketchfab (*Downloadable*, licence CC-BY/CC0), searching "danfo", "Lagos bus" and "Volkswagen T3 van" (the classic danfo base vehicle). Repaint it yellow with the two black stripes.
-  - Fab.com: check the licence; "Standard" goes in `private/`.
+  - Fab.com: check the licence; non-redistributable files must stay outside
+    `public/` and must not be listed in the production manifest.
+
+### Marina Motors (temporary procedural vehicle models)
+
+The dealership catalogue currently uses low-poly procedural vehicle shapes
+with different body silhouettes and saved paint colours. They are explicitly
+labelled as temporary previews; the game does not contain production-quality
+car models yet.
+
+The supplied Downloads were inspected without importing them into the game:
+
+- `GLTF.rar` contains `GLTF/1.glb` (263,104,868 bytes after extraction), with
+  195 meshes and 71 materials. Its model parts have generic names and the
+  archive contains no licence or provenance document; it is also far beyond
+  the game's recommended runtime asset budget.
+- `texture.rar` contains motorcycle-part texture maps (fairings, handlebars,
+  wheels and related parts), not a compatible car model.
+- `Final_3Ds+Max+2021_Vray.rar` contains an Acura 3ds Max scene and a single
+  `Main Body.obj` mesh, but no car-ready glTF, material library or licence file.
+- `FBX.rar` contains an anonymous 240 MB FBX and baked maps, but no licence
+  document. `CGT_Free_Pack.zip` has no car or vehicle model entries.
+
+None of these files is imported or redistributed by this change. To replace
+the placeholders, provide a car-ready, licensed glTF for the catalogue (or
+distinct compatible variants), ideally under 40,000 triangles, 2K textures,
+and 15 MB per model after optimization. Record its source and licence in
+`public/assets/CREDITS.md`, then register it through the vehicle asset manifest.
 
 ### Buildings (no slot yet)
 

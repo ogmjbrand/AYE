@@ -36,6 +36,7 @@ function texture(path: string, color: boolean): Texture {
 
 function floorTile(interior: Interior): TileSet {
   if (interior.architecture === 'boutique') return 'tiles074';
+  if (interior.architecture === 'dealership') return 'tiles076';
   if (interior.tier === 'penthouse') return 'tiles076';
   if (interior.architecture === 'office') return 'tiles075';
   return 'tiles078';
@@ -58,7 +59,7 @@ export function interiorFloorMaterial(interior: Interior): MeshStandardMaterial 
     map: repeat(texture(`environment/${set}/${base}_Color.jpg`, true)),
     normalMap: repeat(texture(`environment/${set}/${base}_NormalGL.jpg`, false)),
     roughnessMap: repeat(texture(`environment/${set}/${base}_Roughness.jpg`, false)),
-    roughness: interior.architecture === 'boutique' || interior.architecture === 'office' ? 0.52 : 0.78,
+    roughness: interior.architecture === 'boutique' || interior.architecture === 'office' || interior.architecture === 'dealership' ? 0.52 : 0.78,
     metalness: 0,
   });
   material.normalScale.setScalar(0.45);

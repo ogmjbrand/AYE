@@ -7,7 +7,7 @@ import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { formatHome } from '../lib/places';
 import { DISTRICTS } from '../lib/geography';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
-import { UserRound } from 'lucide-react';
+import { FolderOpen, UserRound } from 'lucide-react';
 import { CloudAccountPanel } from './CloudAccountPanel';
 
 interface EntryScreenProps {
@@ -19,13 +19,22 @@ interface EntryScreenProps {
   onNewLife: () => void;
 }
 
-type Panel = 'menu' | 'confirm-new' | 'help' | 'settings' | 'account';
+type Panel = 'splash' | 'menu' | 'confirm-new' | 'help' | 'settings' | 'account';
 
 const QUALITY_INFO: Record<QualityMode, { label: string; detail: string }> = {
   auto: { label: 'Automatic', detail: 'Starts on High and switches to Low if the frame rate drops. Recommended.' },
   high: { label: 'High', detail: 'Ambient occlusion, soft contact shadows and sharper shadows. Needs a capable graphics chip.' },
   low: { label: 'Low', detail: 'Fewer effects and a lower resolution, for laptops with integrated graphics and phones.' },
 };
+
+// Dusk skyline drawn in CSS: layered tower silhouettes with lit windows under a purple-to-teal sky
+const NIGHT_CITY = {
+  backgroundColor: '#07080d',
+  backgroundImage:
+    'repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,214,140,0.10) 38px 40px, transparent 40px 71px), ' +
+    'linear-gradient(180deg, rgba(7,8,13,0) 55%, rgba(7,8,13,0.95) 100%), ' +
+    'linear-gradient(180deg, #1a1030 0%, #1b2a48 45%, #0f2530 80%)',
+} as const;
 
 const PRIMARY =
   'w-full rounded-lg bg-cc-gold px-4 py-3 font-display font-bold tracking-wide text-cc-bg transition hover:bg-cc-gold-strong ' +
@@ -41,12 +50,12 @@ const LINK =
  * how to play and settings. Saving is per device for now, and the screen says so.
  */
 export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife }: EntryScreenProps) {
-  const [panel, setPanel] = useState<Panel>('menu');
+  const [panel, setPanel] = useState<Panel>('splash');
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   // Move focus to each panel's heading so keyboard and screen-reader users follow the change
   useEffect(() => {
-    if (panel !== 'menu') headingRef.current?.focus();
+    if (panel !== 'menu' && panel !== 'splash') headingRef.current?.focus();
   }, [panel]);
 
   useEffect(() => {
@@ -56,6 +65,91 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
   }, []);
 
   const startNew = () => (saved ? setPanel('confirm-new') : onNewLife());
+
+  const preview = saved && (
+    <CharacterPreview
+      outfitColor={`rgb(${saved.colorR}, ${saved.colorG}, ${saved.colorB})`}
+      lookId={saved.lookId}
+      heightCm={saved.heightCm}
+      styles={resolveStyles(saved.wardrobe.equipped)}
+      shape={saved.shape}
+      skinTone={saved.skinTone}
+      hairstyleItemId={saved.wardrobe.equipped.hairstyle}
+    />
+  );
+
+  if (panel === 'splash') {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto text-cc-ink" style={NIGHT_CITY}>
+        <div className="mx-auto grid min-h-full max-w-6xl items-center gap-6 px-6 py-10 lg:grid-cols-2">
+          <main className="flex flex-col items-center text-center lg:items-start lg:text-left">
+            <h1 className="sr-only">AYE</h1>
+            <img
+              src={`${import.meta.env.BASE_URL}assets/brand/              aye-mark.webp`}
+              alt="AYE"
+                            className="h-auto w-56 drop-shadow-[0_12px_40px_rgba(0,0,0,0.7)] sm:w-72"
+            />
+            <p className="mt-4 text-balance font-display text-sm font-bold uppercase tracking-[0.22em] text-emerald-300 sm:text-base">Your life. Your choices. Your world.</p>
+            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-cc-muted">A global life simulation game</p>
+            <button
+              type="button"
+              onClick={() => setPanel('menu')}
+              autoFocus
+              className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-6 py-4 font-display text-lg font-bold text-white shadow-[0_0_28px_rgba(16,185,129,0.45)] transition hover:from-emerald-400 hover:to-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+            >
+              Play Now
+            </button>
+          </main>
+          <div className="relative hidden h-[min(72dvh,42rem)] lg:block" aria-label={saved ? `${saved.name}, your saved character` : undefined}>
+            {preview}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (panel === 'menu') {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto text-cc-ink" style={NIGHT_CITY}>
+        <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 py-8 sm:px-8 sm:py-12">
+          <div className="flex flex-1 flex-col justify-center">
+            <h1 className="text-center font-display text-3xl font-bold uppercase tracking-[0.12em] text-cc-gold-strong sm:text-4xl">Welcome to AYE</h1>
+            <p className="mt-2 text-center text-cc-muted">How would you like to start?</p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={startNew}
+                className="group flex min-h-72 flex-col items-center justify-end rounded-2xl border-2 border-emerald-500/70 bg-black/60 p-6 text-center shadow-[0_0_30px_rgba(16,185,129,0.25)] backdrop-blur transition hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+              >
+                <UserRound size={44} className="text-emerald-400" aria-hidden="true" />
+                <span className="mt-3 font-display text-xl font-bold">Start New Game</span>
+                <span className="mt-1 text-sm text-cc-muted">Create your character and begin your journey</span>
+              </button>
+              <button
+                type="button"
+                onClick={onContinue}
+                disabled={!saved}
+                className="group relative flex min-h-72 flex-col items-center justify-end overflow-hidden rounded-2xl border border-cc-line bg-black/60 p-6 text-center backdrop-blur transition enabled:hover:border-cc-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cc-gold disabled:opacity-50"
+              >
+                {saved && <div className="pointer-events-none absolute inset-x-0 top-0 h-3/5">{preview}</div>}
+                <FolderOpen size={36} className="relative text-cc-gold" aria-hidden="true" />
+                <span className="relative mt-3 font-display text-xl font-bold">{saved ? `Continue as ${saved.name}` : 'Continue Game'}</span>
+                <span className="relative mt-1 text-sm text-cc-muted">{saved ? 'Load your saved life and continue where you left off' : 'No saved game on this device yet'}</span>
+              </button>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
+              <button type="button" onClick={() => setPanel('account')} className={LINK}>AYE Connect account</button>
+              <button type="button" onClick={() => setPanel('help')} className={LINK}>How to play</button>
+              <button type="button" onClick={() => setPanel('settings')} className={LINK}>Settings</button>
+            </div>
+          </div>
+          <footer className="mt-8 text-center text-xs text-cc-muted">
+            Early build · Your life is saved in this browser only; online accounts are coming · In-game money (ⓒ) is virtual and has no cash value
+          </footer>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -78,28 +172,6 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
             </div>
 
             <section className="mt-8 rounded-2xl border border-cc-line bg-cc-panel/90 p-5 shadow-2xl shadow-black/40 sm:p-6" aria-live="polite">
-              {panel === 'menu' && (
-                <div className="grid gap-3">
-                  <h1 className="sr-only">AYE</h1>
-                  {saved && (
-                    <button type="button" onClick={onContinue} className={PRIMARY}>
-                      Continue as {saved.name}
-                    </button>
-                  )}
-                  <button type="button" onClick={startNew} className={saved ? SECONDARY : PRIMARY}>
-                    Start a new life
-                  </button>
-                  <button type="button" onClick={() => setPanel('account')} className={`${SECONDARY} inline-flex items-center justify-center gap-2`}>
-                    <UserRound size={17} aria-hidden="true" />
-                    AYE Connect account
-                  </button>
-                  <div className="mt-1 flex justify-center gap-4">
-                    <button type="button" onClick={() => setPanel('help')} className={LINK}>How to play</button>
-                    <button type="button" onClick={() => setPanel('settings')} className={LINK}>Settings</button>
-                  </div>
-                </div>
-              )}
-
               {panel === 'confirm-new' && saved && (
                 <PanelBody title="Start a new life?" headingRef={headingRef}>
                   <p className="text-sm text-cc-muted">

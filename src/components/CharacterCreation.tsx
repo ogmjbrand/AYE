@@ -11,7 +11,8 @@ import type { HomeDecorPlacement } from '../lib/homeDecor';
 import { AVERAGE_SHAPE, SHAPE_PRESETS, SHAPE_SLIDERS, presetFor, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl } from '../lib/assetManifest';
-import { DEFAULT_SKIN_TONE, SKIN_TONES, type SkinToneId } from '../lib/skinTone';
+import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, type SkinToneId } from '../lib/skinTone';
+import { SkinTonePicker } from './SkinTonePicker';
 
 export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
 export type Career =
@@ -40,8 +41,10 @@ export interface Character {
   heightCm: number;
   /** Build, muscle, curves and belly (lib/bodyShape.ts). */
   shape: BodyShape;
-  /** Appearance tint applied only to unmasked Rocketbox skin pixels. */
+  /** Skin surface and complexion used by the avatar material system. */
   skinTone?: SkinToneId;
+  /** Player-selected colour multiplier for the chosen skin surface. */
+  skinColor?: string;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
   /** Furniture owned and placed in the player's homes. Older saves omit this. */
@@ -63,8 +66,18 @@ interface CharacterCreationProps {
   onBack?: () => void;
 }
 
+const CREATION_TABS = [
+  { id: 'identity', label: 'Identity' },
+  { id: 'home', label: 'Home' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'life', label: 'Life' },
+] as const;
+type CreationTab = (typeof CREATION_TABS)[number]['id'];
+const LAST_TAB: CreationTab = 'life';
+
 export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreationProps) {
   const [name, setName] = useState('');
+  const [tab, setTab] = useState<CreationTab>('identity');
   const [lifestyle, setLifestyle] = useState<Character['lifestyle']>('ordinary');
   const [career, setCareer] = useState<Character['career']>('none');
   const [diet, setDiet] = useState<Diet>('everything');
@@ -80,6 +93,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
   const [heightCm, setHeightCm] = useState(defaultHeightCm('feminine'));
   const [shape, setShape] = useState<BodyShape>(AVERAGE_SHAPE);
   const [skinTone, setSkinTone] = useState<SkinToneId>(DEFAULT_SKIN_TONE);
+  const [skinColor, setSkinColor] = useState<string>(skinToneById('custom').color);
   const [countries] = useState(countryOptions);
 
   const chooseBody = (next: BodyType) => {
@@ -119,6 +133,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
       heightCm,
       shape,
       skinTone,
+      skinColor: isSkinColor(skinColor) ? skinColor : skinToneById(skinTone).color,
       wardrobe: { owned: [], equipped: {} },
       homeDecor: [],
       colorR,
@@ -136,7 +151,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
   const previewColor = `rgb(${colorR}, ${colorG}, ${colorB})`;
 
   return (
-    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm} shape={shape} skinTone={skinTone}>
+    <Shell previewColor={previewColor} previewName={name.trim() || 'Your character'} previewSub={`${formatHome(country, region)} · ${CAREER_LABEL[career]}`} lookId={lookId} heightCm={heightCm} shape={shape} skinTone={skinTone} skinColor={skinColor}>
       <form onSubmit={handleCreate} className="space-y-8" aria-labelledby="create-title">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">New life</p>
@@ -144,7 +159,21 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
           <p className="text-sm text-cc-muted mt-2">Choose who you are and how you live. You can change your path later in the game.</p>
         </div>
 
-        <fieldset className="space-y-4">
+        <div role="tablist" aria-label="Creation steps" className="flex gap-1 overflow-x-auto rounded-xl border border-cc-line bg-cc-field p-1">
+          {CREATION_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${tab === t.id ? 'bg-emerald-600 text-white' : 'text-cc-muted hover:text-cc-ink'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <fieldset className={`space-y-4 ${tab === 'identity' ? '' : 'hidden'}`}>
           <legend className={SECTION_LABEL}>Identity</legend>
           <Field id="character-name" label="Character name">
             <input
@@ -176,7 +205,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
           </Field>
         </fieldset>
 
-        <fieldset className="space-y-4">
+        <fieldset className={`space-y-4 ${tab === 'home' ? '' : 'hidden'}`}>
           <legend className={SECTION_LABEL}>Home</legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="country" label="Country">
@@ -197,7 +226,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
           </div>
         </fieldset>
 
-        <fieldset className="space-y-4">
+        <fieldset className={`space-y-4 ${tab === 'appearance' ? '' : 'hidden'}`}>
           <legend className={SECTION_LABEL}>Appearance</legend>
           {!bodyForGender(gender) && (
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Body type">
@@ -221,20 +250,14 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
             </div>
             <p className="mt-2 text-xs text-cc-muted">Real people from the Rocketbox library. Choose a skin tint independently of identity and heritage.</p>
           </div>
-          <div>
-            <p className="mb-2 text-sm font-medium text-cc-ink">Skin tone</p>
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Skin tone">
-              {SKIN_TONES.map((tone) => (
-                <button key={tone.id} type="button" role="radio" aria-checked={skinTone === tone.id} aria-label={tone.label} title={tone.label}
-                  onClick={() => setSkinTone(tone.id)}
-                  className={`relative grid h-9 w-9 place-items-center rounded-full border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cc-gold ${skinTone === tone.id ? 'border-cc-gold ring-2 ring-cc-gold/40' : 'border-cc-line hover:border-cc-gold/60'}`}
-                  style={{ backgroundColor: tone.id === 'original' ? '#e7ded2' : tone.color }}>
-                  {tone.id === 'original' && <span aria-hidden="true" className="text-xs font-semibold text-cc-muted">O</span>}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-cc-muted">Selected: {SKIN_TONES.find((tone) => tone.id === skinTone)?.label}. Tints exposed skin while preserving texture detail, clothing and hair.</p>
-          </div>
+          <SkinTonePicker
+            skinTone={skinTone}
+            skinColor={skinColor}
+            onChange={(tone, color) => {
+              setSkinTone(tone);
+              setSkinColor(color);
+            }}
+          />
           <div className="grid grid-cols-[4rem_1fr_3.5rem] items-center gap-3">
             <label htmlFor="height" className="text-sm text-cc-muted">Height</label>
             <input id="height" type="range" min={HEIGHT_RANGE.min} max={HEIGHT_RANGE.max} value={heightCm}
@@ -271,7 +294,7 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
           </div>
         </fieldset>
 
-        <fieldset className="space-y-4">
+        <fieldset className={`space-y-4 ${tab === 'life' ? '' : 'hidden'}`}>
           <legend className={SECTION_LABEL}>Life</legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="lifestyle" label="Lifestyle">
@@ -300,8 +323,12 @@ export function CharacterCreation({ onCharacterCreate, onBack }: CharacterCreati
 
 
         <div className="space-y-3">
-          <button type="submit" disabled={!name.trim()} className={PRIMARY_BUTTON}>Create &amp; play</button>
-          {!name.trim() && <p className="text-xs text-cc-muted text-center">Enter a name to continue.</p>}
+          {tab !== LAST_TAB ? (
+            <button type="button" onClick={() => setTab(CREATION_TABS[CREATION_TABS.findIndex((t) => t.id === tab) + 1].id)} className={PRIMARY_BUTTON}>Continue →</button>
+          ) : (
+            <button type="submit" disabled={!name.trim()} className={PRIMARY_BUTTON}>Create &amp; play</button>
+          )}
+          {tab === LAST_TAB && !name.trim() && <p className="text-xs text-cc-muted text-center">Enter a name in Identity to continue.</p>}
           {onBack && (
             <button type="button" onClick={onBack} className="w-full text-sm text-cc-muted hover:text-cc-ink py-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold rounded">
               ← Back
@@ -333,11 +360,12 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 }
 
 /** Two columns on wide screens (controls | live preview); stacked on phones. */
-function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm, styles, shape, skinTone }: {
+function Shell({ children, previewColor, previewName, previewSub, lookId, heightCm, styles, shape, skinTone, skinColor }: {
   children: ReactNode; previewColor: string; previewName: string; previewSub: string; lookId: string; heightCm: number;
   shape?: BodyShape;
   styles?: Partial<Record<Slot, Style>>;
   skinTone?: SkinToneId;
+  skinColor?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-cc-bg text-cc-ink" style={{ backgroundImage: 'radial-gradient(1200px 600px at 75% 30%, rgba(201,164,92,0.08), transparent 60%)' }}>
@@ -350,8 +378,8 @@ function Shell({ children, previewColor, previewName, previewSub, lookId, height
           <div className="order-2 lg:order-1 rounded-2xl border border-cc-line bg-cc-panel p-5 sm:p-8 shadow-2xl shadow-black/40">
             {children}
           </div>
-          <aside className="order-1 lg:order-2 relative min-h-[22rem] lg:sticky lg:top-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:self-start rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
-            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} />
+          <aside className="order-1 lg:order-2 relative min-h-[28rem] lg:sticky lg:top-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:self-start rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg overflow-hidden" aria-label="Character preview">
+            <CharacterPreview outfitColor={previewColor} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinColor={skinColor} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6 bg-gradient-to-t from-cc-bg/90 to-transparent">
               <p className="font-display text-2xl font-bold text-cc-ink truncate">{previewName}</p>
               <p className="text-sm text-cc-muted">{previewSub}</p>

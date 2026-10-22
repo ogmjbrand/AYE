@@ -47,6 +47,22 @@ skeleton as compatible. A future MakeHuman kit must supply its own verified
 profile, rigged model, clothing weights, and animation mapping before it can
 be selected in gameplay.
 
+### User-supplied skin references
+
+The local Tasha and The Girl GLBs are reference sources only. Their static
+meshes, hair, clothing, rigs, and animations are not used by the game. The
+original archives and extracted PBR maps remain in git-ignored
+`assets-src/private-avatars/` staging directories; do not move them into
+`public/` or ship them while provenance and usage rights are unverified.
+
+The earlier UV-baked skin maps and `bake-private-skin-maps.py` were removed.
+Character creation and the in-game wardrobe share one complexion control,
+including a freely adjustable colour, applied to the Rocketbox skin by the
+existing shader. The optional skin tone and colour are save-compatible. No
+standalone preview route or production player replacement is part of this
+workflow. See `ASSET_INVENTORY.md` for the inspected files and current
+blockers.
+
 Conclusion: AYE now has a safer customization foundation on the existing
 character system, but not yet the parametric human pipeline described below.
 Facial morphs and modular fitted garments require a compatible base mesh and

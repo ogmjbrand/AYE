@@ -15,11 +15,12 @@ import { OFFICE_WORKPLACE } from './officeCareer';
 
 export type Category =
   | 'restaurants' | 'shopping' | 'universities' | 'hospitals' | 'gyms'
-  | 'workplaces' | 'parks' | 'nightlife' | 'residential' | 'transport';
+  | 'workplaces' | 'parks' | 'nightlife' | 'residential' | 'transport' | 'vehicles';
 
 export const CATEGORIES: readonly { id: Category; label: string }[] = [
   { id: 'restaurants', label: 'Restaurants' },
   { id: 'shopping', label: 'Shops & malls' },
+  { id: 'vehicles', label: 'Car dealerships' },
   { id: 'universities', label: 'Universities' },
   { id: 'hospitals', label: 'Hospitals' },
   { id: 'gyms', label: 'Gyms' },
@@ -77,6 +78,14 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
     },
     { id: id('travel'), name: district.travelDesk.name, kind: district.travelDesk.kind, categories: ['transport'], status: 'open', note: 'Book a flight or coach to another city', position: at(district.travelDesk.position) },
   );
+  if (district.carDealership) {
+    out.push({
+      id: id('car-dealership'), name: district.carDealership.name, kind: 'Car dealership',
+      categories: ['vehicles', 'shopping'], status: 'open',
+      note: 'Browse cars, buy and customise a vehicle, or take an owned car out',
+      position: at(district.carDealership.position),
+    });
+  }
   for (const h of district.homes) {
     const yours = h.id === homeId;
     out.push({

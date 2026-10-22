@@ -18,6 +18,8 @@ function useStillController(): PlayerHandle {
       direction: 0,
       velocity: new Vector3(),
       trafficWarning: false,
+      drivingVehicleId: null,
+      vehicleSpeed: 0,
       applyMovement: () => {},
       faceTowards: () => {},
       moveToPose: () => {},
@@ -47,17 +49,26 @@ function Placeholder({ color }: { color: string }) {
   );
 }
 
+function PreviewError() {
+  return (
+    <div role="alert" className="grid h-full place-items-center px-6 text-center text-sm text-red-300">
+      The character preview could not load. Check the Vite console and private texture files; saved character data is unchanged.
+    </div>
+  );
+}
+
 /**
  * Live 3D preview of the in-game character model (the same GLB the game uses),
  * turning slowly, with the chosen look, height and clothes applied.
  */
-export function CharacterPreview({ outfitColor, lookId, heightCm, styles, shape, skinTone = DEFAULT_SKIN_TONE, hairstyleItemId }: {
+export function CharacterPreview({ outfitColor, lookId, heightCm, styles, shape, skinTone = DEFAULT_SKIN_TONE, skinColor, hairstyleItemId }: {
   outfitColor: string;
   shape?: BodyShape;
   lookId?: string;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
   skinTone?: SkinToneId;
+  skinColor?: string;
   hairstyleItemId?: string | null;
 }) {
   const still = useStillController();
@@ -78,9 +89,9 @@ export function CharacterPreview({ outfitColor, lookId, heightCm, styles, shape,
         </Suspense>
       </ErrorBoundary>
       <Turntable>
-        <ErrorBoundary fallback={<Placeholder color={outfitColor} />}>
+        <ErrorBoundary fallback={<PreviewError />}>
           <Suspense fallback={<Placeholder color={outfitColor} />}>
-            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} hairstyleItemId={hairstyleItemId} />
+            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

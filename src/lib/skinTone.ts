@@ -6,6 +6,7 @@ export const SKIN_TONES = [
   { id: 'golden', label: 'Golden brown', color: '#c4875a' },
   { id: 'warm', label: 'Warm tan', color: '#d6a078' },
   { id: 'light', label: 'Light', color: '#efc8a1' },
+  { id: 'custom', label: 'Custom', color: '#c4875a' },
 ] as const;
 
 export type SkinToneId = (typeof SKIN_TONES)[number]['id'];
@@ -17,4 +18,8 @@ export function isSkinToneId(value: unknown): value is SkinToneId {
 
 export function skinToneById(id: SkinToneId) {
   return SKIN_TONES.find((tone) => tone.id === id) ?? SKIN_TONES[0];
+}
+
+export function isSkinColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 }

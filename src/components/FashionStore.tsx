@@ -8,6 +8,7 @@ import {
   Shirt,
   ShoppingBag,
   Sparkles,
+  UserRound,
   Wallet,
   X,
   type LucideIcon,
@@ -29,6 +30,8 @@ import { fashionShowcaseResult } from '../lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from '../lib/fashionMission';
 import { GarmentPreviewPanel } from './GarmentPreviewPanel';
 import { assetUrl } from '../lib/assetManifest';
+import { SkinTonePicker } from './SkinTonePicker';
+import type { SkinToneId } from '../lib/skinTone';
 
 interface FashionStoreProps {
   mode: 'shop' | 'wardrobe' | 'decor';
@@ -53,10 +56,13 @@ interface FashionStoreProps {
   onPreviewDecor: (itemId: string) => string | null;
   onMoveDecor: (placementId: string) => string | null;
   onRemoveDecor: (placementId: string) => void;
+  skinTone?: SkinToneId;
+  skinColor?: string;
+  onSkinChange: (tone: SkinToneId, color: string) => void;
   onClose: () => void;
 }
 
-type Category = 'clothes' | 'shoes' | 'hair' | 'accessories' | 'decor' | 'fitting-room';
+type Category = 'clothes' | 'shoes' | 'hair' | 'accessories' | 'decor' | 'fitting-room' | 'skin';
 
 const CATEGORY_ICONS: Record<Category, LucideIcon> = {
   clothes: Shirt,
@@ -65,6 +71,7 @@ const CATEGORY_ICONS: Record<Category, LucideIcon> = {
   accessories: Sparkles,
   decor: Armchair,
   'fitting-room': ScanEye,
+  skin: UserRound,
 };
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -74,6 +81,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
   accessories: 'Accessories',
   decor: 'Decor',
   'fitting-room': 'Fitting Room',
+  skin: 'Skin & Tone',
 };
 
 const CATEGORY_SLOT: Partial<Record<Category, Slot>> = {
@@ -109,6 +117,9 @@ export function FashionStore({
   onPreviewDecor,
   onMoveDecor,
   onRemoveDecor,
+  skinTone = 'original',
+  skinColor,
+  onSkinChange,
   onClose,
 }: FashionStoreProps) {
   const [category, setCategory] = useState<Category>(mode === 'shop' ? 'clothes' : mode === 'decor' ? 'decor' : 'fitting-room');
@@ -284,7 +295,14 @@ export function FashionStore({
             </details>
           )}
 
-          {category === 'decor' ? (
+          {category === 'skin' ? (
+            <SkinTonePicker
+              skinTone={skinTone}
+              skinColor={skinColor}
+              onChange={onSkinChange}
+              variant="dark"
+            />
+          ) : category === 'decor' ? (
             <>
               <nav className="mb-3 flex gap-1 overflow-x-auto" aria-label="Home décor room">
                 {(['All', 'Living Room', 'Bedroom', 'Kitchen', 'Bathroom'] as const).map((room) => (
@@ -573,6 +591,8 @@ export function FashionStore({
         <footer className="border-t border-white/10 px-4 py-2 text-[10px] text-white/55" aria-live="polite">
           {message || (category === 'decor'
             ? 'Preview in your 3D home before purchasing; placed furniture remains saved to that home.'
+            : category === 'skin'
+              ? 'Skin texture and colour update on your character immediately and save with your appearance.'
             : category === 'hair'
             ? 'Choose a real CC0 hairstyle model, or switch to Hair colour to recolour the built-in hair.'
             : 'Previews apply fabric and print to the clothing currently modeled; distinct garment meshes are not yet available.')}
@@ -583,7 +603,7 @@ export function FashionStore({
         aria-label="Fashion House categories"
         className="pointer-events-auto absolute bottom-4 left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-x-auto border border-white/15 bg-[#171615]/95 shadow-xl max-sm:bottom-2"
       >
-        {(Object.keys(CATEGORY_LABELS) as Category[]).map((itemCategory) => {
+        {(Object.keys(CATEGORY_LABELS) as Category[]).filter((itemCategory) => mode === 'wardrobe' || itemCategory !== 'skin').map((itemCategory) => {
           const Icon = CATEGORY_ICONS[itemCategory];
           const unavailable = itemCategory === 'accessories';
           const selected = category === itemCategory;

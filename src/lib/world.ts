@@ -3,6 +3,7 @@
  * Units are metres. The main boulevard runs north–south along Z, crossed by
  * one east–west street. Buildings sit back from the pavements.
  */
+import type { VehicleBodyStyle } from './vehicleCatalog';
 
 export type BuildingStyle = 'tower' | 'office' | 'residential' | 'shop';
 
@@ -41,6 +42,7 @@ export interface Vehicle {
   stripes?: boolean;
   /** A minibus (default) or an ordinary car. Both take up DANFO_SIZE for collisions. */
   kind?: VehicleKind;
+  bodyStyle?: VehicleBodyStyle;
 }
 
 /** Minibus (danfo, tro-tro, matatu), car, motor tricycle (keke, tuk-tuk, bajaj) or Philippine jeepney. */

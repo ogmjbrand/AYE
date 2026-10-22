@@ -5,6 +5,7 @@
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import type { Home } from './homes';
+import { VEHICLE_CATALOG } from './vehicleCatalog';
 
 export type FurnitureKind =
   | 'bed' | 'sofa' | 'table' | 'counter' | 'wardrobe' | 'tv' | 'rug' | 'plant' | 'desk' | 'lamp'
@@ -34,7 +35,7 @@ export interface Furniture {
 
 export interface Interior {
   tier: 'room' | 'flat' | 'apartment' | 'penthouse';
-  architecture: 'residential' | 'office' | 'restaurant' | 'boutique';
+  architecture: 'residential' | 'office' | 'restaurant' | 'boutique' | 'dealership';
   width: number;
   depth: number;
   wallColor: string;
@@ -201,6 +202,43 @@ export const FASHION_HOUSE_INTERIOR: Interior = {
     f('plant', 7.7, -5.1, 0.55, 1.3, 0.55, '#486b45'),
   ],
 };
+
+export const CAR_DEALERSHIP_INTERIOR: Interior = {
+  tier: 'apartment',
+  architecture: 'dealership',
+  width: 22,
+  depth: 18,
+  wallColor: '#293237',
+  floorColor: '#c6c3bb',
+  window: 'wide',
+  partitions: [
+    { position: [-7.2, 1.35, 4.2], size: [6, 2.7, 0.12], material: 'glass' },
+    { position: [7.2, 1.35, 4.2], size: [6, 2.7, 0.12], material: 'glass' },
+  ],
+  furniture: [
+    f('reception', 0, -4.8, 4.2, 1.05, 1.0, '#3c3832'),
+    f('display-shelf', -8.2, 0.5, 0.5, 1.65, 2.2, '#5d5547'),
+    f('display-shelf', 8.2, 0.5, 0.5, 1.65, 2.2, '#5d5547'),
+    f('plant', -9.1, -6.4, 0.75, 1.5, 0.75, '#517247'),
+    f('plant', 9.1, -6.4, 0.75, 1.5, 0.75, '#517247'),
+  ],
+};
+
+export type DealershipInteraction = 'door' | 'salesperson' | { type: 'vehicle'; modelId: string };
+
+export function dealershipInteractionAt(x: number, z: number): DealershipInteraction | null {
+  const [doorX, doorZ] = doorSpot(CAR_DEALERSHIP_INTERIOR);
+  if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
+  const displayed = VEHICLE_CATALOG.slice(0, 3).find((_, index) =>
+    Math.hypot(x - (index * 6 - 6), z - 1.4) <= USE_RADIUS + 1.2,
+  );
+  if (displayed) return { type: 'vehicle', modelId: displayed.id };
+  const desk = CAR_DEALERSHIP_INTERIOR.furniture.find((item) => item.kind === 'reception');
+  if (!desk) return null;
+  const dx = Math.max(Math.abs(x - desk.at[0]) - desk.size[0] / 2, 0);
+  const dz = Math.max(Math.abs(z - desk.at[1]) - desk.size[2] / 2, 0);
+  return Math.hypot(dx, dz) <= USE_RADIUS ? 'salesperson' : null;
+}
 
 export type FashionHouseInteraction = 'door' | 'catalogue';
 

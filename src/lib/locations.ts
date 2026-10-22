@@ -19,11 +19,13 @@ export type LocationCategory =
   | 'recreation'
   | 'nightlife'
   | 'stays'
-  | 'travel';
+  | 'travel'
+  | 'vehicles';
 
 export const LOCATION_CATEGORIES: readonly { id: LocationCategory; label: string; color: string }[] = [
   { id: 'food', label: 'Restaurants & cafés', color: '#f0a35e' },
   { id: 'shopping', label: 'Malls & boutiques', color: '#c39be0' },
+  { id: 'vehicles', label: 'Car dealerships', color: '#d2b56f' },
   { id: 'education', label: 'Universities & libraries', color: '#8ab4d8' },
   { id: 'health', label: 'Hospitals & clinics', color: '#e07a7a' },
   { id: 'fitness', label: 'Gyms & sports', color: '#7cc4b0' },
@@ -40,7 +42,7 @@ export const CATEGORY_LABEL: Record<LocationCategory, string> = Object.fromEntri
 ) as Record<LocationCategory, string>;
 
 /** What standing at a location lets the player do with the game's existing panels. */
-export type LocationUse = 'food' | 'shop' | 'gadgets' | 'travel' | 'home';
+export type LocationUse = 'food' | 'shop' | 'gadgets' | 'travel' | 'home' | 'dealership';
 
 type Spot = readonly [number, number, number];
 
@@ -119,6 +121,16 @@ export function locationsFor(district: District, career: Career, homeId: string 
     id: `${district.id}.gadgets`, name: gadgets.name, category: 'shopping', description: gadgets.kind, area: at(gadgets.position),
     position: gadgets.position, built: true, activities: ['Buy equipment that raises your pay'], use: 'gadgets',
   });
+
+  if (district.carDealership) {
+    entries.push({
+      id: `${district.id}.car-dealership`, name: district.carDealership.name, category: 'vehicles',
+      description: 'Browse and buy vehicles, customise paint, and take owned cars onto the road',
+      area: at(district.carDealership.position), position: district.carDealership.position, built: true,
+      activities: ['View vehicle specifications', 'Purchase cars with GHAI', 'Select an owned car for driving'],
+      use: 'dealership',
+    });
+  }
 
   const desk = district.travelDesk;
   entries.push({

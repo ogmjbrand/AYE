@@ -2,7 +2,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
+import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type DayLedger, type GameTime } from '../lib/gameState';
 import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { perfStats } from '../world/quality';
@@ -16,25 +16,40 @@ import { venueAt } from '../lib/nightlife';
 import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
-import { HOURLY_WAGE } from '../lib/gameState';
+import { HOURLY_WAGE, WORK_END_HOUR, WORK_START_HOUR } from '../lib/gameState';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
+import { CAREER_LABEL } from '../lib/labels';
+import { dailyGoals, formatGameDate, goalDay, parseFlags, updateFlags, type GoalFlags } from '../lib/dailyGoals';
 import { assetUrl } from '../lib/assetManifest';
 import { PhonePanel, type PhoneApp } from './PhonePanel';
+import { Minimap } from './Minimap';
 import {
   Apple,
   Armchair,
   BedDouble,
   BriefcaseBusiness,
+  CalendarDays,
+  Camera,
+  CarFront,
+  GraduationCap,
+  Check,
+  ChevronDown,
+  ChevronRight,
   House as HouseIcon,
+  Contact,
+  Landmark,
   Map,
   MapPin,
   Menu,
+  MessageCircle,
+  Moon,
   Music2,
   Package,
   Settings2,
   Shirt,
   ShoppingBag,
   Smartphone,
+  Sun,
   TreePine,
   Utensils,
   UserRound,
@@ -50,6 +65,10 @@ interface HUDProps {
   balance: number;
   gameTime: GameTime;
   neighborhood?: Neighborhood | null;
+  /** Today's money and purchases, which drive the daily goals. */
+  today?: DayLedger;
+  /** The end-of-day summary is showing: the player has rested. */
+  summaryShown?: boolean;
   /** Back to the entry screen (nothing is lost; the game saves as you play). */
   onExitToMenu?: () => void;
   onRest?: () => void;
@@ -77,6 +96,13 @@ interface HUDProps {
   };
   insidePlaceLabel?: string;
   outsideOffice?: { name: string; onOpen: () => void };
+  outsideUniversity?: { name: string; onOpen: () => void };
+  outsideHospital?: { name: string; onOpen: () => void };
+  hospitalStatus?: { onShift: boolean; patientsToday: number; patientsTarget: number; shiftsCompleted: number };
+  onCampus?: boolean;
+  campusStatus?: { classesToday: number; classesTotal: number; assignmentDone: boolean; credits: number; standing: string };
+  outsideDealership?: { name: string; onOpen: () => void };
+  onExitVehicle?: () => void;
   onOpenWardrobe?: () => void;
   onOpenDecor?: () => void;
   onOpenRestaurantPanel?: () => void;
@@ -86,7 +112,7 @@ interface HUDProps {
   onOpenMap?: () => void;
   /** Routes to the assigned home and enters after reaching its front door. */
   onGoHome?: () => void;
-  /** The ⋯ city locations directory. */
+  /** The city locations directory. */
   onOpenLocations?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
@@ -102,12 +128,12 @@ interface HUDProps {
 
 type Prompt = { verb: string; place: string; onOpen: () => void; icon?: LucideIcon };
 
-const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const EMPTY_LEDGER: DayLedger = { income: 0, expenses: 0, minutesWorked: 0 };
 
-/** Opaque enough to stay readable over a bright midday sky, without a costly backdrop blur. */
-const PANEL = 'rounded-xl border border-ui-line/70 bg-ui-panel/85 shadow-[0_8px_24px_rgba(0,0,0,0.35)]';
-const BUTTON =
-  'pointer-events-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-ui-line bg-ui-panel/85 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ui-ink transition hover:border-ui-accent hover:text-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent sm:px-3 sm:tracking-[0.14em]';
+const PANEL = 'rounded-2xl border border-white/10 bg-[#0c0e11]/80 shadow-[0_8px_28px_rgba(0,0,0,0.45)]';
+const GOLD = 'text-[#e3bd70]';
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e3bd70]';
+const ICON_BUTTON = `pointer-events-auto grid size-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-[#0c0e11]/80 text-white/85 shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition hover:border-[#e3bd70]/70 hover:text-[#f0d797] disabled:cursor-not-allowed disabled:opacity-45 sm:size-12 ${FOCUS}`;
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -118,20 +144,57 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** "E — do something here" prompt for food vendors and shops. */
+/** "E — do something here" prompt for food vendors, shops and home fixtures. */
 function PlacePrompt({ verb, place, onOpen, icon: Icon }: Prompt) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent`}
+      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-[#e3bd70]/70 ${FOCUS}`}
     >
-      {Icon && <Icon size={17} aria-hidden="true" className="shrink-0 text-ui-accent-strong" strokeWidth={1.8} />}
-      <kbd className="hidden rounded border border-ui-line bg-ui-panel px-1.5 font-mono text-xs text-ui-accent-strong sm:inline">E</kbd>
+      {Icon && <Icon size={17} aria-hidden="true" className={`shrink-0 ${GOLD}`} strokeWidth={1.8} />}
+      <kbd className={`hidden rounded border border-white/20 bg-black/40 px-1.5 font-mono text-xs sm:inline ${GOLD}`}>E</kbd>
       <span>
         {verb} <span className="font-semibold">{place}</span>
       </span>
     </button>
+  );
+}
+
+function GoalsPanel({ goals }: { goals: ReturnType<typeof dailyGoals> }) {
+  const [open, setOpen] = useState(true);
+  const firstOpen = goals.find((goal) => !goal.done)?.id;
+  return (
+    <section className={`${PANEL} pointer-events-auto w-60 p-3`} aria-label="Today's goals">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between text-left text-sm font-semibold text-white ${FOCUS}`}
+      >
+        Today&apos;s Goals
+        <ChevronDown size={16} aria-hidden="true" className={`text-white/60 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && (
+        <ul className="m-0 mt-2 list-none space-y-1 p-0">
+          {goals.map((goal) => (
+            <li
+              key={goal.id}
+              className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] ${goal.id === firstOpen ? 'bg-white/10 text-white' : goal.done ? 'text-white/55' : 'text-white/75'}`}
+            >
+              <span
+                className={`grid size-4 shrink-0 place-items-center rounded-full border ${goal.done ? 'border-[#e3bd70] bg-[#e3bd70]/20 text-[#f0d797]' : 'border-white/30'}`}
+                aria-hidden="true"
+              >
+                {goal.done && <Check size={11} strokeWidth={3} />}
+              </span>
+              <span className={goal.done ? 'line-through decoration-white/30' : ''}>{goal.label}</span>
+              <span className="sr-only">{goal.done ? 'completed' : 'not completed'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -141,6 +204,8 @@ export function HUD({
   balance,
   gameTime,
   neighborhood,
+  today = EMPTY_LEDGER,
+  summaryShown = false,
   onExitToMenu,
   onRest,
   qualityLabel,
@@ -158,6 +223,13 @@ export function HUD({
   insideHome,
   insidePlaceLabel,
   outsideOffice,
+  outsideUniversity,
+  outsideHospital,
+  hospitalStatus,
+  onCampus,
+  campusStatus,
+  outsideDealership,
+  onExitVehicle,
   onOpenWardrobe,
   onOpenDecor,
   onOpenRestaurantPanel,
@@ -178,18 +250,19 @@ export function HUD({
     const id = setInterval(() => setFrame((n) => n + 1), 100);
     return () => clearInterval(id);
   }, []);
-  const [showDetails, setShowDetails] = useState(false);
-  // Phones start with a slim one-row panel so the street stays visible
-  const [expanded, setExpanded] = useState(false);
+  const [panel, setPanel] = useState<'profile' | 'settings' | null>(null);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const closePhone = useCallback(() => setPhoneOpen(false), []);
+  const togglePanel = (next: 'profile' | 'settings') => setPanel((current) => (current === next ? null : next));
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
   const { x: px, z: pz } = controller.position;
   const vendor = nearestVendor(district.vendors, px, pz);
   const counter = counterAt(district, px, pz);
   // One prompt at a time: a food vendor, then a shop or desk, then a front door
-  const prompt = vendor && onOpenVendor
+  const prompt = outsideDealership
+    ? { verb: 'Enter dealership', place: outsideDealership.name, onOpen: outsideDealership.onOpen, icon: CarFront }
+    : vendor && onOpenVendor
     ? { verb: 'Enter', place: vendor.name, onOpen: () => onOpenVendor(vendor), icon: Utensils }
     : counter === 'fashion' && onOpenShop
       ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop, icon: ShoppingBag }
@@ -208,47 +281,81 @@ export function HUD({
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident), icon: UserRound }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen, icon: BriefcaseBusiness } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door), icon: HouseIcon }
-    : null) ?? (outsideOffice
+    : null) ?? (outsideUniversity
+      ? { verb: 'Enter campus at', place: outsideUniversity.name, onOpen: outsideUniversity.onOpen, icon: GraduationCap }
+      : null) ?? (outsideHospital
+      ? { verb: 'Enter hospital at', place: outsideHospital.name, onOpen: outsideHospital.onOpen, icon: BriefcaseBusiness }
+      : null) ?? (outsideOffice
       ? { verb: 'Enter workplace', place: outsideOffice.name, onOpen: outsideOffice.onOpen, icon: BriefcaseBusiness }
       : null);
-  const placePrompt = busy ? null : insideHome ? insideHome.interactionAt(px, pz) : streetPrompt;
-  const shiftHours = isWorkingHours(gameTime) && character?.career !== 'none';
+  const placePrompt = controller.drivingVehicleId ? null : busy ? null : insideHome ? insideHome.interactionAt(px, pz) : streetPrompt;
+  const hasCareer = !!character && character.career !== 'none';
+  const shiftHours = isWorkingHours(gameTime) && hasCareer;
   const status = !shiftHours
     ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
-    : workplaceStatus.isAtWorkplace
-      ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
+    : workplaceStatus.isAtWorkplace || onCampus
+      ? { label: 'Working', dot: 'bg-[#e3bd70]', text: GOLD }
       : { label: 'Not at work', dot: 'bg-ui-warn', text: 'text-ui-warn' };
 
   const hungry = fullness < HUNGRY_THRESHOLD;
-  const hungerBar = hungry ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-ui-accent';
+  const hungerBar = hungry ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-[#e3bd70]';
 
   const x = controller.position.x.toFixed(1);
   const z = controller.position.z.toFixed(1);
   const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
   const speed = Math.sqrt(controller.velocity.x ** 2 + controller.velocity.z ** 2).toFixed(1);
   const homeScene = !!insideHome && !insidePlaceLabel;
-  const careerAction = workTask?.onOpen ?? outsideOffice?.onOpen
-    ?? (character && character.career !== 'none' ? onOpenLocations : undefined);
-  const dockItems: { label: string; icon: LucideIcon; onClick?: () => void; active?: boolean }[] = [
-    { label: 'Home', icon: HouseIcon, onClick: homeScene ? undefined : onGoHome, active: homeScene },
-    { label: 'Phone', icon: Smartphone, onClick: onOpenMap ? () => setPhoneOpen(true) : undefined },
-    { label: 'Map', icon: Map, onClick: onOpenLocations },
-    { label: 'Wardrobe', icon: ShoppingBag, onClick: onOpenWardrobe },
-    { label: 'Career', icon: BriefcaseBusiness, onClick: careerAction },
-    { label: 'Social', icon: Users, onClick: resident && onTalk ? () => onTalk(resident) : undefined },
+  const careerAction = workTask?.onOpen ?? outsideUniversity?.onOpen ?? outsideHospital?.onOpen ?? outsideOffice?.onOpen
+    ?? (hasCareer ? onOpenLocations : undefined);
+  const level = hasCareer && character ? levelIndex(character.career, workMinutes) + 1 : 1;
+
+  // Daily goals: derived from the ledger plus the few actions the ledger does not record
+  const outfitSignature = JSON.stringify(character?.wardrobe?.equipped ?? {});
+  const goalKey = `aye.dailyGoals.v1.${character?.name ?? 'guest'}`;
+  const [goalFlags, setGoalFlags] = useState<GoalFlags | null>(() => {
+    try { return parseFlags(window.localStorage.getItem(goalKey)); } catch { return null; }
+  });
+  const inDowntown = !insideHome && neighborhood?.id === 'downtown';
+  const nextFlags = updateFlags(goalFlags, goalDay(gameTime), outfitSignature, inDowntown);
+  if (nextFlags !== goalFlags) setGoalFlags(nextFlags);
+  useEffect(() => {
+    try { if (goalFlags) window.localStorage.setItem(goalKey, JSON.stringify(goalFlags)); } catch { /* storage unavailable */ }
+  }, [goalFlags, goalKey]);
+  const goals = dailyGoals(nextFlags, today, today.minutesWorked > 0, summaryShown);
+
+  const phoneEnabled = !!onOpenMap;
+  const phoneTitle = phoneEnabled ? 'Phone' : 'Buy a phone at the gadget hub to unlock it';
+  const dockItems: { label: string; icon: LucideIcon; onClick?: () => void; active?: boolean; title?: string }[] = [
+    { label: 'Home', icon: HouseIcon, onClick: homeScene ? undefined : onGoHome, active: homeScene, title: homeScene ? 'You are home' : homeId ? 'Walk home' : 'Rent a home to enable this' },
+    { label: 'Phone', icon: Smartphone, onClick: phoneEnabled ? () => setPhoneOpen(true) : undefined, title: phoneTitle },
+    { label: 'Map', icon: Map, onClick: onOpenLocations, title: onOpenLocations ? 'City locations' : 'Go outside to use the city map' },
+    { label: 'Inventory', icon: Package, title: 'Inventory is not implemented yet' },
+    { label: 'Fashion', icon: Shirt, onClick: onOpenWardrobe, title: 'Wardrobe and clothing' },
+    { label: 'Social', icon: Users, onClick: resident && onTalk ? () => onTalk(resident) : undefined, title: resident ? `Talk to ${resident.name}` : 'Stand near someone to talk' },
   ];
-  if (homeScene && onOpenDecor) dockItems.splice(4, 0, { label: 'Decor', icon: Armchair, onClick: onOpenDecor });
+  if (homeScene && onOpenDecor) dockItems.splice(5, 0, { label: 'Decor', icon: Armchair, onClick: onOpenDecor, title: 'Decorate this home' });
   if (insidePlaceLabel?.startsWith('Dining') && onOpenRestaurantPanel) {
-    dockItems.splice(4, 0, { label: 'Restaurant', icon: Utensils, onClick: onOpenRestaurantPanel, active: true });
+    dockItems.splice(5, 0, { label: 'Restaurant', icon: Utensils, onClick: onOpenRestaurantPanel, active: true });
   }
   const phoneApps: PhoneApp[] = [
+    { label: 'Messages', detail: 'Messaging is not implemented yet', icon: MessageCircle },
     { label: 'Map', detail: 'Open the district map', icon: Map, onOpen: onOpenMap },
-    { label: 'Places', detail: 'Browse city locations', icon: MapPin, onOpen: onOpenLocations },
-    { label: 'Style', detail: 'Open wardrobe and clothing', icon: Shirt, onOpen: onOpenWardrobe },
-    { label: 'Career', detail: 'Open your current work task or workplace directory', icon: BriefcaseBusiness, onOpen: careerAction },
-    { label: 'Home', detail: homeId ? 'Go to your home' : 'Rent a home to enable this app', icon: HouseIcon, onOpen: onGoHome },
+    { label: 'Jobs', detail: 'Open your current work task or workplace directory', icon: BriefcaseBusiness, onOpen: careerAction },
+    { label: 'Fashion', detail: 'Open wardrobe and clothing', icon: Shirt, onOpen: onOpenWardrobe },
+    { label: 'Shop', detail: 'Browse shops and restaurants in the city directory', icon: ShoppingBag, onOpen: onOpenLocations },
+    { label: 'Bank', detail: 'Banking is not implemented yet', icon: Landmark },
     { label: 'Social', detail: resident ? `Talk to ${resident.name}` : 'Find someone nearby to talk to', icon: Users, onOpen: resident && onTalk ? () => onTalk(resident) : undefined },
+    { label: 'Camera', detail: 'The camera is not implemented yet', icon: Camera },
+    { label: 'Settings', detail: 'Cycle graphics quality', icon: Settings2, onOpen: onCycleQuality },
+    { label: 'Calendar', detail: 'Calendar is not implemented yet', icon: CalendarDays },
+    { label: 'Contacts', detail: 'Contacts are not implemented yet', icon: Contact },
+    { label: 'Real Estate', detail: 'Homes to let are listed in the city directory', icon: HouseIcon, onOpen: onOpenLocations },
   ];
+
+  const isNight = gameTime.period === 'night' || gameTime.period === 'evening';
+  const PeriodIcon = isNight ? Moon : Sun;
+  const locationName = insideHome ? insideHome.name : neighborhood?.name;
+  const locationSub = insidePlaceLabel ?? (insideHome ? district.name : district.city.name);
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
@@ -261,349 +368,349 @@ export function HUD({
           onClose={closePhone}
         />
       )}
-      {/* Identity, location, and account stay visible while the world remains open. */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4">
-        <div className={`${PANEL} flex min-w-0 items-center gap-2.5 px-3 py-2 sm:min-w-[10rem]`}>
-          {character ? (
-            <img
-              src={assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`)}
-              alt=""
-              className="size-10 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="" className="h-8 w-auto shrink-0" />
-          )}
-          <div className="min-w-0">
-            <p className="m-0 truncate font-display text-sm font-semibold leading-tight sm:text-base">
-              {character?.name ?? 'AYE'}
-            </p>
-            <p className="m-0 mt-0.5 whitespace-nowrap text-[10px] text-ui-muted">
-              {DAY_SHORT[gameTime.dayOfWeek]} {formatGameTime(gameTime)}
-            </p>
-          </div>
-        </div>
 
-        {(insideHome || neighborhood) && (
-          <div className={`${PANEL} absolute left-1/2 top-3 flex max-w-[min(24rem,50vw)] -translate-x-1/2 items-center gap-3 px-4 py-2 text-center`}>
-            {insidePlaceLabel?.startsWith('Dining')
-              ? <Utensils size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />
-              : insidePlaceLabel?.startsWith('At work')
-                ? <BriefcaseBusiness size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />
-                : <HouseIcon size={22} className="shrink-0 text-[#e3bd70]" aria-hidden="true" />}
-            <div className="min-w-0">
-              <p className="m-0 truncate text-xs font-semibold uppercase tracking-[0.1em] text-white">
-                {insideHome ? insideHome.name : neighborhood!.name}
-              </p>
-              <p className="m-0 mt-0.5 truncate text-[10px] uppercase tracking-[0.12em] text-[#e3bd70]">
-                {insidePlaceLabel ?? (insideHome ? district.name : district.city.name)}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {controller.trafficWarning && (
-          <p role="status" className="absolute left-1/2 top-24 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg sm:top-20 sm:text-sm">
-            <TriangleAlert size={16} aria-hidden="true" />
-            Vehicle approaching — waiting for a safe gap.
-          </p>
-        )}
-
-        <div className="flex flex-col items-end gap-2">
-          <div className={`${PANEL} flex items-center gap-2 px-2 py-1.5`}>
-            <span className="whitespace-nowrap px-1 text-xs font-semibold tabular-nums text-white">GHAI {balance.toLocaleString()}</span>
-            {(insideHome ? [onRest && homeScene ? {
-              label: 'Rest', icon: BedDouble, action: onRest,
-            } : null] : [
-              onCycleQuality ? { label: `Settings, graphics quality ${qualityLabel}`, icon: Settings2, action: onCycleQuality } : null,
-              onExitToMenu ? { label: 'Main menu', icon: Menu, action: onExitToMenu } : null,
-            ]).filter((item): item is { label: string; icon: LucideIcon; action: () => void } => item !== null).map(({ label, icon: Icon, action }) => (
-              <button key={label} type="button" onClick={action} aria-label={label} title={label} className="pointer-events-auto grid size-8 place-items-center rounded-full border border-white/10 text-white/80 hover:border-[#d2b36f] hover:text-[#f0d797]">
-                <Icon size={16} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-          <div className={`flex flex-wrap justify-end gap-1.5 sm:gap-2 ${insideHome ? 'hidden' : ''}`}>
-            {onOpenLocations && (
-              <button type="button" onClick={onOpenLocations} className={BUTTON} title="City locations: restaurants, shops, homes, workplaces" aria-label="Locations">
-                <MapPin size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Locations</span>
-              </button>
-            )}
-            {onOpenMap && (
-              <button type="button" onClick={onOpenMap} className={BUTTON} title="Open the city map on your phone (M)" aria-label="Phone map">
-                <Smartphone size={15} aria-hidden="true" strokeWidth={1.8} />
-                <Map size={15} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Map</span>
-              </button>
-            )}
-            {onGoHome && (
-              <button type="button" onClick={onGoHome} className={BUTTON} title="Walk to your assigned home and go inside" aria-label="Go Home">
-                <HouseIcon size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Go Home</span>
-              </button>
-            )}
-            {onOpenWardrobe && (
-              <button type="button" onClick={onOpenWardrobe} className={BUTTON} title="Change into clothes you own" aria-label="Wardrobe">
-                <Shirt size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Wardrobe</span>
-              </button>
-            )}
-            {onOpenDecor && (
-              <button type="button" onClick={onOpenDecor} className={BUTTON} title="Preview and place furniture in this home" aria-label="Decorate home">
-                <Armchair size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Decorate</span>
-              </button>
-            )}
-            <button type="button" disabled className={`${BUTTON} cursor-not-allowed opacity-50`} title="Inventory is not implemented yet" aria-label="Inventory unavailable">
-              <Package size={16} aria-hidden="true" strokeWidth={1.8} />
-              <span className="hidden sm:inline">Inventory · soon</span>
-            </button>
-            {onCycleQuality && (
-              <button
-                type="button"
-                onClick={onCycleQuality}
-                title="Settings: graphics quality; Auto lowers detail if the frame rate drops"
-                aria-label={`Settings, graphics quality ${qualityLabel}`}
-                className={BUTTON}
-              >
-                <Settings2 size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Settings · </span>
-                <span className="capitalize">{qualityLabel}</span>
-              </button>
-            )}
-            {onRest && (
-              <button type="button" onClick={onRest} className={BUTTON} title="Sleep until 07:00" aria-label="Rest">
-                <BedDouble size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Rest</span>
-              </button>
-            )}
-            {onExitToMenu && (
-              <button type="button" onClick={onExitToMenu} className={BUTTON} title="Back to the main menu (your life is saved)" aria-label="Main menu">
-                <Menu size={16} aria-hidden="true" strokeWidth={1.8} />
-                <span className="hidden sm:inline">Menu</span>
-              </button>
-            )}
-          </div>
-          <p className={`m-0 rounded-md bg-ui-panel/70 px-2 py-0.5 font-mono text-[11px] text-ui-muted ${insideHome ? 'hidden' : ''}`} aria-label="Frames per second">
-            {perfStats.fps} FPS
-          </p>
-        </div>
-      </div>
-
-      {/* City locations: the ⋯ button and the destination being tracked, under the clock on the left */}
-      {onOpenLocations && (
-        <div className="absolute left-3 top-[5.25rem] flex max-w-60 flex-col items-start gap-2 sm:left-5 sm:top-28">
+      {/* Top row: identity on the left, clock in the centre, account and menus on the right */}
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:p-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <img src={assetUrl('brand/aye-mark.webp')} alt="AYE" className="hidden h-12 w-auto shrink-0 object-contain drop-shadow-lg sm:block" />
           <button
             type="button"
-            onClick={onOpenLocations}
-            aria-label="City locations"
-            title="City locations"
-            className={`${PANEL} pointer-events-auto flex h-10 w-10 items-center justify-center text-lg font-bold leading-none tracking-widest text-ui-ink hover:border-ui-accent focus-visible:outline-2 focus-visible:outline-ui-accent`}
+            onClick={() => togglePanel('profile')}
+            aria-expanded={panel === 'profile'}
+            aria-label="Player profile"
+            className={`${PANEL} pointer-events-auto flex min-w-0 items-center gap-2.5 py-1.5 pl-1.5 pr-4 text-left ${FOCUS}`}
           >
-            ⋯
-          </button>
-          {tracked && (
-            <div role="status" className={`${PANEL} pointer-events-auto flex items-center gap-2.5 px-3 py-2 text-xs`}>
-              <div className="min-w-0">
-                <p className="m-0 truncate font-semibold">{tracked.name}</p>
-                <p className="m-0 tabular-nums text-ui-muted">
-                  {(() => {
-                    const d = Math.hypot(tracked.position[0] - px, tracked.position[2] - pz);
-                    return d < ARRIVE_RADIUS ? "You're here" : `${Math.round(d)} m ${compass(tracked.position[0] - px, tracked.position[2] - pz)}`;
-                  })()}
-                </p>
-              </div>
-              {onStopTracking && (
-                <button
-                  type="button"
-                  onClick={onStopTracking}
-                  aria-label="Stop tracking"
-                  className="shrink-0 rounded px-1.5 py-0.5 text-ui-muted hover:text-ui-ink focus-visible:outline-2 focus-visible:outline-ui-accent"
+            {character ? (
+              <img
+                src={assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`)}
+                alt=""
+                className="size-10 shrink-0 rounded-full border border-[#e3bd70]/50 object-cover object-top sm:size-11"
+              />
+            ) : (
+              <UserRound size={22} aria-hidden="true" className="m-2 shrink-0 text-white/70" />
+            )}
+            <span className="min-w-0">
+              <span className="block truncate font-display text-sm font-semibold leading-tight sm:text-base">{character?.name ?? 'AYE'}</span>
+              <span className="mt-0.5 flex items-center gap-2 text-[11px] text-white/65">
+                <span className="whitespace-nowrap">Level {level}</span>
+                <span className="whitespace-nowrap md:hidden">{formatGameTime(gameTime)}</span>
+                <span
+                  className="block h-1 w-10 overflow-hidden rounded-full bg-white/15"
+                  role="meter"
+                  aria-label="Fullness"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(fullness)}
                 >
-                  ✕
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Prompt when standing at a vendor or shop (desktop: bottom centre) */}
-      {placePrompt && (
-        <div className={`absolute left-1/2 hidden -translate-x-1/2 sm:block ${insideHome ? 'top-20' : 'bottom-24'}`}>
-          <PlacePrompt {...placePrompt} />
-        </div>
-      )}
-
-      {/* Player panel: the numbers that drive decisions first, profile second, telemetry on request */}
-      <div className="absolute bottom-0 left-0 flex w-full flex-col gap-2 p-3 sm:w-auto sm:p-5">
-        {/* Touch screens get a thumb-stick; on phones the food prompt shares its row so nothing overlaps */}
-        <div className="flex items-end justify-between gap-2">
-          <TouchStick />
-          {placePrompt && (
-            <div className="ml-auto sm:hidden">
-              <PlacePrompt {...placePrompt} />
-            </div>
-          )}
-        </div>
-        <section className={`${PANEL} w-full sm:w-72 ${insideHome ? 'hidden' : ''}`} aria-label="Player status">
-          {character && !expanded && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              aria-expanded={false}
-              aria-label="Show player details"
-              className="pointer-events-auto flex w-full items-center gap-3 px-3.5 py-2.5 text-left sm:hidden"
-            >
-              <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} aria-hidden />
-              <span className="font-display text-lg font-semibold tabular-nums leading-none">
-                {balance.toLocaleString()} <span className="text-sm text-ui-muted">ⓒ</span>
-              </span>
-              <span className="ml-auto flex min-w-0 items-center gap-2 text-xs">
-                <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-muted'}>{hungerLabel(fullness)}</span>
-                <span className="block h-1.5 w-12 overflow-hidden rounded-full bg-ui-line" aria-hidden>
                   <span className={`block h-full rounded-full ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
                 </span>
               </span>
-              <span aria-hidden className="text-xs text-ui-faint">▴</span>
-            </button>
-          )}
-          <div className={`${expanded ? 'block' : 'hidden'} px-4 py-3.5 sm:block`}>
-            {character && (
-              <>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                            <p className="m-0 flex items-center gap-1.5 truncate text-sm font-semibold"><UserRound size={14} aria-hidden="true" className="shrink-0 text-ui-accent-strong" />{character.name}</p>
-                            <p className="m-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-ui-muted">
-                              <BriefcaseBusiness size={13} aria-hidden="true" className="shrink-0" />
-                              {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
-                    </p>
-                  </div>
-                  <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
-                    <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
-                    {status.label}
-                  </span>
-                </div>
+            </span>
+          </button>
+        </div>
 
-                {insideHome && (
-                  <nav
-                    aria-label="Quick navigation"
-                    className="pointer-events-auto fixed bottom-3 left-1/2 z-30 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-x-auto rounded-2xl border border-white/10 bg-[#111418]/95 px-1.5 py-1.5 shadow-2xl backdrop-blur-sm"
-                  >
-                    {dockItems.map(({ label, icon: Icon, onClick, active }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={onClick}
-                        disabled={!onClick}
-                        aria-current={active ? 'page' : undefined}
-                        aria-label={label}
-                        title={label}
-                        className={`flex min-w-[4.1rem] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d2b36f] ${active ? 'bg-[#d2b36f]/15 text-[#f0d797]' : 'text-white/70 hover:bg-white/5 hover:text-white'} disabled:cursor-default disabled:opacity-90`}
-                      >
-                        <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
-                        <span className="whitespace-nowrap">{label}</span>
-                      </button>
-                    ))}
-                  </nav>
-                )}
-
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="m-0 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-ui-faint"><Wallet size={13} aria-hidden="true" />Balance</p>
-                    <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
-                      {balance.toLocaleString()} <span className="text-base text-ui-muted">ⓒ</span>
-                    </p>
-                  </div>
-                  {character.career !== 'none' && !insideHome && (
-                    <p className="m-0 text-right text-xs text-ui-muted">
-                      <span className="flex items-center justify-end gap-1"><BriefcaseBusiness size={13} aria-hidden="true" />Workplace</span>
-                      <span className={`block text-sm ${workplaceStatus.isAtWorkplace ? 'text-ui-accent-strong' : 'text-ui-ink'}`}>
-                        {workplaceStatus.isAtWorkplace ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
-                      </span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="flex items-center gap-1.5 text-ui-muted"><Apple size={13} aria-hidden="true" />Hunger</span>
-                    <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
-                  </div>
-                  <div
-                    className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line"
-                    role="meter"
-                    aria-label="Fullness"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={Math.round(fullness)}
-                  >
-                    <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                  </div>
-                  {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
-                </div>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowDetails((v) => !v)}
-              aria-expanded={showDetails}
-              className="pointer-events-auto mt-3 flex w-full items-center justify-between border-t border-ui-line/70 pt-2.5 text-[11px] uppercase tracking-[0.14em] text-ui-faint hover:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent"
-            >
-              <span className="flex items-center gap-1.5"><UserRound size={14} aria-hidden="true" />Profile & details</span>
-              <span aria-hidden className={`transition-transform ${showDetails ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-            {showDetails && (
-              <dl className="m-0 mt-2 space-y-1 text-xs">
-                {character && (
-                  <>
-                    {character.career !== 'none' && (() => {
-                      const left = hoursToNextLevel(character.career, workMinutes);
-                      const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
-                      return (
-                        <>
-                          <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} ⓒ an hour</Row>
-                          <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
-                        </>
-                      );
-                    })()}
-                    <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
-                    <Row label="From">{formatHome(character.country, character.region)}</Row>
-                    <Row label="Gender">{genderLabel(character.gender)}</Row>
-                    <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
-                    <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>
-                  </>
-                )}
-                <Row label="Period">
-                  <span className="capitalize">{gameTime.period}</span>
-                </Row>
-                <Row label="Position">
-                  <span className="font-mono text-ui-muted">
-                    {x}, {z}
-                  </span>
-                </Row>
-                <Row label="Direction">
-                  <span className="font-mono text-ui-muted">{direction}°</span>
-                </Row>
-                <Row label="Speed">
-                  <span className="font-mono text-ui-muted">{speed} m/s</span>
-                </Row>
-              </dl>
-            )}
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="pointer-events-auto mt-3 w-full rounded-lg border border-ui-line/70 py-1.5 text-[11px] uppercase tracking-[0.14em] text-ui-muted sm:hidden"
-            >
-              Show less
-            </button>
+        <div className={`${PANEL} absolute left-1/2 top-3 hidden -translate-x-1/2 items-center gap-4 px-5 py-2 md:flex sm:top-4`} aria-label="Date and time">
+          <CalendarDays size={22} aria-hidden="true" className="text-white/70" />
+          <div className="leading-tight">
+            <p className="m-0 text-[11px] text-white/65">{formatGameDate(gameTime)}</p>
+            <p className="m-0 font-display text-xl font-semibold tabular-nums">{formatGameTime(gameTime)}</p>
           </div>
-        </section>
+          <span aria-hidden="true" className="h-8 w-px bg-white/15" />
+          <div className="flex items-center gap-2">
+            <PeriodIcon size={20} aria-hidden="true" className={GOLD} />
+            <span className="text-sm capitalize text-white/85">{gameTime.period}</span>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-1.5 sm:gap-2">
+          <p className={`${PANEL} m-0 hidden h-11 items-center gap-2 px-4 text-sm font-semibold tabular-nums sm:flex sm:h-12`} aria-label="Balance">
+            <span className="grid size-5 place-items-center rounded-full bg-[#e3bd70] text-[10px] font-black text-black" aria-hidden="true">G</span>
+            <span className="text-white/70">GHAI</span>
+            <span className="text-white">{balance.toLocaleString()}</span>
+          </p>
+          <button type="button" className={ICON_BUTTON} disabled={!phoneEnabled} onClick={() => setPhoneOpen(true)} aria-label="Phone" title={phoneTitle}>
+            <Smartphone size={20} aria-hidden="true" strokeWidth={1.8} />
+          </button>
+          <button type="button" className={ICON_BUTTON} disabled aria-label="Bag (coming soon)" title="Inventory is not implemented yet">
+            <ShoppingBag size={20} aria-hidden="true" strokeWidth={1.8} />
+          </button>
+          <button type="button" className={ICON_BUTTON} onClick={() => togglePanel('profile')} aria-expanded={panel === 'profile'} aria-label="Profile" title="Profile and details">
+            <UserRound size={20} aria-hidden="true" strokeWidth={1.8} />
+          </button>
+          <button type="button" className={ICON_BUTTON} onClick={() => togglePanel('settings')} aria-expanded={panel === 'settings'} aria-label="Settings" title="Settings">
+            <Settings2 size={20} aria-hidden="true" strokeWidth={1.8} />
+          </button>
+        </div>
       </div>
 
+      {controller.trafficWarning && (
+        <p role="status" className="absolute left-1/2 top-24 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg sm:top-24 sm:text-sm">
+          <TriangleAlert size={16} aria-hidden="true" />
+          Vehicle approaching — waiting for a safe gap.
+        </p>
+      )}
+
+      {/* Left column: daily goals and the destination being tracked */}
+      <div className="absolute left-3 top-[4.75rem] flex max-w-60 flex-col items-start gap-2 sm:left-4 sm:top-24">
+        <div className="hidden sm:block">
+          <GoalsPanel goals={goals} />
+        </div>
+        {tracked && (
+          <div role="status" className={`${PANEL} pointer-events-auto flex items-center gap-2.5 px-3 py-2 text-xs`}>
+            <MapPin size={15} aria-hidden="true" className={`shrink-0 ${GOLD}`} />
+            <div className="min-w-0">
+              <p className="m-0 truncate font-semibold">{tracked.name}</p>
+              <p className="m-0 tabular-nums text-ui-muted">
+                {(() => {
+                  const d = Math.hypot(tracked.position[0] - px, tracked.position[2] - pz);
+                  return d < ARRIVE_RADIUS ? "You're here" : `${Math.round(d)} m ${compass(tracked.position[0] - px, tracked.position[2] - pz)}`;
+                })()}
+              </p>
+            </div>
+            {onStopTracking && (
+              <button
+                type="button"
+                onClick={onStopTracking}
+                aria-label="Stop tracking"
+                className={`shrink-0 rounded px-1.5 py-0.5 text-ui-muted hover:text-ui-ink ${FOCUS}`}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right column: active career */}
+      <section className={`${PANEL} absolute right-4 top-[6.25rem] hidden w-64 lg:block`} aria-label="Active career">
+        <p className="m-0 px-4 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+          {character?.career === 'student' ? 'Active Status' : 'Active Career'}
+        </p>
+        {(() => {
+          const body = (
+            <>
+              <span className={`grid size-11 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 ${GOLD}`}>
+                <BriefcaseBusiness size={22} aria-hidden="true" strokeWidth={1.7} />
+              </span>
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block truncate text-sm font-semibold text-white">
+                  {hasCareer && character ? CAREER_LABEL[character.career] : 'No career yet'}
+                </span>
+                <span className={`flex items-center gap-1.5 text-xs ${hasCareer ? status.text : 'text-white/60'}`}>
+                  {hasCareer && <span className={`size-1.5 rounded-full ${status.dot}`} aria-hidden="true" />}
+                  {hasCareer && character ? `${status.label} · ${careerLevel(character.career, workMinutes).title}` : 'Choose one in your profile'}
+                </span>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-white/60" />
+            </>
+          );
+          return careerAction ? (
+            <button type="button" onClick={careerAction} title="Career details" className={`pointer-events-auto flex w-full items-center gap-3 px-4 pb-3 pt-2 ${FOCUS}`}>
+              {body}
+            </button>
+          ) : (
+            <div className="flex w-full items-center gap-3 px-4 pb-3 pt-2">{body}</div>
+          );
+        })()}
+        {hasCareer && character && (
+          <dl className="m-0 space-y-2 border-t border-white/10 px-4 pb-3 pt-2.5 text-xs">
+            <div className="flex justify-between gap-2"><dt className="text-white/55">Shift</dt><dd className="m-0 tabular-nums text-white">{String(WORK_START_HOUR).padStart(2, '0')}:00 – {String(WORK_END_HOUR).padStart(2, '0')}:00</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-white/55">{character.career === 'student' ? 'Allowance' : 'Income rate'}</dt><dd className={`m-0 tabular-nums ${GOLD}`}>GHAI {HOURLY_WAGE[character.career]} / game hour</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-white/55">Today's earnings</dt><dd className={`m-0 tabular-nums ${GOLD}`}>GHAI {today.income.toLocaleString()}</dd></div>
+            <div>
+              <div className="flex justify-between gap-2"><dt className="text-white/55">{character.career === 'student' ? 'Time in class' : 'Time on shift'}</dt><dd className="m-0 tabular-nums text-white">{Math.floor(today.minutesWorked / 60)}h {today.minutesWorked % 60}m / {WORK_END_HOUR - WORK_START_HOUR}h</dd></div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={(WORK_END_HOUR - WORK_START_HOUR) * 60} aria-valuenow={Math.min(today.minutesWorked, (WORK_END_HOUR - WORK_START_HOUR) * 60)} aria-label="Shift progress">
+                <div className="h-full rounded-full bg-[#e3bd70]" style={{ width: `${Math.min(100, (today.minutesWorked / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100)}%` }} />
+              </div>
+            </div>
+            {campusStatus && character.career === 'student' && (
+              <>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Classes today</dt><dd className="m-0 tabular-nums text-white">{campusStatus.classesToday} / {campusStatus.classesTotal}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Assignment</dt><dd className="m-0 text-white">{campusStatus.assignmentDone ? 'Submitted' : 'Due today'}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Credits · standing</dt><dd className="m-0 text-white">{campusStatus.credits} · {campusStatus.standing}</dd></div>
+              </>
+            )}
+            {hospitalStatus && character.career === 'doctor' && (
+              <>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Shift</dt><dd className="m-0 text-white">{hospitalStatus.onShift ? 'Clocked in' : 'Clocked out'}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Patients today</dt><dd className="m-0 tabular-nums text-white">{hospitalStatus.patientsToday} / {hospitalStatus.patientsTarget}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-white/55">Shifts completed</dt><dd className="m-0 tabular-nums text-white">{hospitalStatus.shiftsCompleted}</dd></div>
+              </>
+            )}
+          </dl>
+        )}
+      </section>
+
+      {/* Profile and settings drop-downs */}
+      {panel === 'profile' && (
+        <section className={`${PANEL} pointer-events-auto absolute right-3 top-[4.75rem] z-20 max-h-[calc(100dvh-10rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto px-4 py-3.5 sm:right-4 sm:top-[5.5rem]`} aria-label="Player status">
+          {character && (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="m-0 flex items-center gap-1.5 truncate text-sm font-semibold"><UserRound size={14} aria-hidden="true" className={`shrink-0 ${GOLD}`} />{character.name}</p>
+                  <p className="m-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-ui-muted">
+                    <BriefcaseBusiness size={13} aria-hidden="true" className="shrink-0" />
+                    {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
+                  </p>
+                </div>
+                <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
+                  <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
+                  {status.label}
+                </span>
+              </div>
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div>
+                  <p className="m-0 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-ui-faint"><Wallet size={13} aria-hidden="true" />Balance</p>
+                  <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
+                    {balance.toLocaleString()} <span className="text-base text-ui-muted">GHAI</span>
+                  </p>
+                </div>
+                {hasCareer && !insideHome && (
+                  <p className="m-0 text-right text-xs text-ui-muted">
+                    <span className="flex items-center justify-end gap-1"><BriefcaseBusiness size={13} aria-hidden="true" />Workplace</span>
+                    <span className={`block text-sm ${workplaceStatus.isAtWorkplace || onCampus ? GOLD : 'text-ui-ink'}`}>
+                      {workplaceStatus.isAtWorkplace || onCampus ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <div className="mt-3">
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-ui-muted"><Apple size={13} aria-hidden="true" />Hunger</span>
+                  <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line">
+                  <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
+                </div>
+                {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
+              </div>
+            </>
+          )}
+          <dl className="m-0 mt-3 space-y-1 border-t border-white/10 pt-3 text-xs">
+            {character && (
+              <>
+                {character.career !== 'none' && (() => {
+                  const left = hoursToNextLevel(character.career, workMinutes);
+                  const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
+                  return (
+                    <>
+                      <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} GHAI an hour</Row>
+                      <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
+                    </>
+                  );
+                })()}
+                <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
+                <Row label="From">{formatHome(character.country, character.region)}</Row>
+                <Row label="Gender">{genderLabel(character.gender)}</Row>
+                <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
+                <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>
+              </>
+            )}
+            <Row label="Period"><span className="capitalize">{gameTime.period}</span></Row>
+            <Row label="Position"><span className="font-mono text-ui-muted">{x}, {z}</span></Row>
+            <Row label="Direction"><span className="font-mono text-ui-muted">{direction}°</span></Row>
+            <Row label="Speed"><span className="font-mono text-ui-muted">{speed} m/s</span></Row>
+          </dl>
+        </section>
+      )}
+      {panel === 'settings' && (
+        <section className={`${PANEL} pointer-events-auto absolute right-3 top-[4.75rem] z-20 w-[min(17rem,calc(100vw-1.5rem))] space-y-2 p-3 sm:right-4 sm:top-[5.5rem]`} aria-label="Settings">
+          {onCycleQuality && (
+            <button type="button" onClick={onCycleQuality} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} aria-label={`Graphics quality ${qualityLabel}`} title="Auto lowers detail if the frame rate drops">
+              <Settings2 size={17} aria-hidden="true" className={GOLD} />
+              <span className="flex-1">Graphics quality</span>
+              <span className="capitalize text-white/70">{qualityLabel}</span>
+            </button>
+          )}
+          {onRest && (!insideHome || homeScene) && (
+            <button type="button" onClick={() => { onRest(); setPanel(null); }} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} title="Sleep until 07:00">
+              <BedDouble size={17} aria-hidden="true" className={GOLD} />
+              <span className="flex-1">Rest until morning</span>
+            </button>
+          )}
+          {onExitToMenu && (
+            <button type="button" onClick={onExitToMenu} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} title="Back to the main menu (your life is saved)">
+              <Menu size={17} aria-hidden="true" className={GOLD} />
+              <span className="flex-1">Main menu</span>
+            </button>
+          )}
+          <p className="m-0 px-1 font-mono text-[11px] text-ui-muted" aria-label="Frames per second">{perfStats.fps} FPS</p>
+        </section>
+      )}
+
+      {/* Prompt when standing at a vendor, shop or home fixture (desktop: above the navigation bar) */}
+      {placePrompt && (
+        <div className="absolute bottom-24 left-1/2 hidden -translate-x-1/2 sm:block">
+          <PlacePrompt {...placePrompt} />
+        </div>
+      )}
+      {controller.drivingVehicleId && (
+        <div className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-[#e3bd70]/50 bg-ui-panel/90 px-3 py-2 text-xs text-ui-ink shadow-lg">
+          <span className="flex items-center gap-2 font-semibold"><CarFront size={16} className={GOLD} />Driving · {Math.round(Math.abs(controller.vehicleSpeed) * 3.6)} km/h</span>
+          <span className="hidden text-ui-muted sm:inline">W/S drive · A/D steer · E exit</span>
+        </div>
+      )}
+      {controller.drivingVehicleId && onExitVehicle && (
+        <button type="button" onClick={onExitVehicle} className={`fixed bottom-28 right-4 z-40 rounded-lg border border-[#e3bd70]/70 bg-ui-panel/90 px-4 py-3 text-xs font-bold uppercase tracking-wider ${GOLD} shadow-lg transition hover:bg-[#e3bd70]/10 sm:bottom-28 sm:right-6 ${FOCUS}`}>
+          Exit car
+        </button>
+      )}
+
+      {/* Bottom left: thumb-stick on touch screens, minimap and neighbourhood */}
+      <div className="absolute bottom-[4.9rem] left-0 flex flex-col items-start gap-2 p-3 sm:p-4 lg:bottom-0">
+        <div className="flex items-end justify-between gap-2">
+          <TouchStick />
+        </div>
+        {placePrompt && (
+          <div className="sm:hidden">
+            <PlacePrompt {...placePrompt} />
+          </div>
+        )}
+        {!insideHome && (
+          <div className="hidden size-36 overflow-hidden rounded-full border-2 border-white/25 bg-[#1b2128] shadow-[0_8px_28px_rgba(0,0,0,0.55)] md:block lg:size-44">
+            <Minimap district={district} controller={controller} tracked={tracked} />
+          </div>
+        )}
+        {locationName && (
+          <div className={`${PANEL} flex max-w-[16rem] items-center gap-2.5 px-3.5 py-2`}>
+            {insidePlaceLabel?.startsWith('Dining')
+              ? <Utensils size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />
+              : insidePlaceLabel?.startsWith('At work')
+                ? <BriefcaseBusiness size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />
+                : insideHome ? <HouseIcon size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" /> : <MapPin size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />}
+            <div className="min-w-0">
+              <p className="m-0 truncate text-sm font-semibold text-white">{locationName}</p>
+              <p className="m-0 truncate text-[10px] uppercase tracking-[0.12em] text-white/55">{locationSub}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom navigation: the same destinations in every scene, state is never reset */}
+      <nav
+        aria-label="Quick navigation"
+        className={`${PANEL} pointer-events-auto fixed bottom-3 left-1/2 z-30 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 overflow-x-auto p-1.5 sm:bottom-4`}
+      >
+        {dockItems.map(({ label, icon: Icon, onClick, active, title }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={onClick}
+            disabled={!onClick}
+            aria-current={active ? 'page' : undefined}
+            aria-label={label}
+            title={title ?? label}
+            className={`flex min-w-[3.9rem] shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-[11px] transition sm:min-w-[4.6rem] ${FOCUS} ${active ? 'border-[#e3bd70]/80 bg-[#e3bd70]/15 text-[#f0d797]' : 'border-transparent text-white/75 hover:bg-white/5 hover:text-white'} disabled:cursor-default ${active ? '' : 'disabled:opacity-45'}`}
+          >
+            <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+            <span className="whitespace-nowrap">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* Keyboard hint: desktop only, hidden on touch screens */}
-      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] md:block pointer-coarse:hidden">
+      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] xl:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
         <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
       </div>
