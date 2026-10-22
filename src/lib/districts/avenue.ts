@@ -33,6 +33,8 @@ export const AVENUE: DistrictSpec = {
       b(12, -14, 6, 10, 7, 'shop', '#e9d3b0', 'Second'),
       b(14, -32, 10, 14, 40, 'tower', '#3f5f73', 'Home D'),
       b(28, -30, 10, 10, 14, 'residential', '#efe3c8', 'Home C'),
+      // Car showroom south of the cross street, its glass front facing it
+      b(26, 5, 10, 10, 12, 'shop', '#2a2c30', 'Motors'),
       // West side, south of the cross street
       b(-12, 4, 6, 10, 16, 'office', '#d6cdbd', 'Business'),
       b(-12, -8, 6, 8, 7, 'shop', '#e0b98f', 'Arts'),
@@ -85,6 +87,7 @@ export const AVENUE: DistrictSpec = {
   fashionHouse: { name: 'Fashion', kind: 'Boutique', position: [6.5, 0, 40] },
   gadgetHub: { name: 'Gadgets', kind: 'Gadgets', position: [-6.5, 0, 40.5] },
   travelDesk: { name: 'Travel', kind: 'Flights & coaches', position: [6.5, 0, -24] },
+  dealership: { id: 'motors', name: 'Motors', kind: 'Car dealership', door: [26, 0, 10.6], facing: 0 },
   park: { id: 'park', name: 'Park', kind: 'Public park', position: [-26.5, 0, -1.5], description: '' },
   nightlife: { id: 'lounge', name: 'Lounge', kind: 'Live music lounge', position: [6.5, 0, 6], cover: 250, description: '' },
   homes: [

@@ -97,7 +97,7 @@ export const TEMPLATES = {
       'Labone Court': 'home:0', 'Osu Heights': 'home:1', 'Cantonments Towers': 'home:2',
       'Accra Tech Hub': 'work:engineer', 'Kente Loft': 'fashion', 'Osu Gadgets': 'gadgets', 'Osu Nights': 'night',
       'Accra Business School': 'work:student', 'Osu Clinic': 'work:doctor', 'Labadi Arts Centre': 'work:artist',
-      'Osu Coworking': 'work:entrepreneur', 'Airline Crew Centre': 'work:pilot', 'Accra Sports Arena': 'work:athlete',
+      'Osu Coworking': 'work:entrepreneur', 'Airline Crew Centre': 'work:pilot', 'Accra Sports Arena': 'work:athlete', 'Osu Motors': 'dealer',
     },
     neighborhoods: {
       'oxford-street': { name: 'Main Road', description: 'Shops, kitchens and nightlife' },
@@ -119,7 +119,7 @@ export const TEMPLATES = {
       Kitchen: 'vendor:kitchen', Second: 'vendor:second',
       'Home A': 'home:0', 'Home B': 'home:1', 'Home C': 'home:2', 'Home D': 'home:3',
       Tech: 'work:engineer', Gadgets: 'gadgets', College: 'work:student', Hospital: 'work:doctor',
-      Lounge: 'night', Arts: 'work:artist', Fashion: 'fashion', Business: 'work:entrepreneur',
+      Lounge: 'night', Arts: 'work:artist', Fashion: 'fashion', Business: 'work:entrepreneur', Motors: 'dealer',
     },
     neighborhoods: {
       avenue: { name: 'Main Avenue', description: 'Shops, kitchens and offices' },

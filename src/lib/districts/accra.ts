@@ -34,6 +34,8 @@ export const ACCRA_OSU: DistrictSpec = {
       b(13, -34, 8, 12, 10, 'office', '#d3c6b0', 'Airline Crew Centre'),
       b(28, -30, 12, 16, 42, 'tower', '#3e5e70', 'Cantonments Towers'),
       b(28, -6, 14, 14, 12, 'office', '#bfc8c2', 'Accra Sports Arena'),
+      // Car showroom north of the cross street, its glass front facing it
+      b(26, 20, 10, 6, 9, 'shop', '#2a2c30', 'Osu Motors'),
     ],
     palms: { x: 8, spacing: 16, offset: 6 },
     lamps: { x: 5.6, spacing: 14, offset: 3 },
@@ -93,6 +95,7 @@ export const ACCRA_OSU: DistrictSpec = {
   fashionHouse: { name: 'Kente Loft', kind: 'Kente, prints & salon', position: [-7, 0, -4] },
   gadgetHub: { name: 'Osu Gadgets', kind: 'Phones, laptops & work kit', position: [-7, 0, -16] },
   travelDesk: { name: 'Osu Travel', kind: 'Flights & coaches', position: [7, 0, 40] },
+  dealership: { id: 'osu-motors', name: 'Osu Motors', kind: 'Car dealership', door: [26, 0, 16.4], facing: Math.PI },
   park: {
     id: 'osu-green', name: 'Osu Green', kind: 'Public park', position: [-26, 0, -10.5],
     description: 'A patch of green behind Oxford Street with neem trees and benches. Quiet in the day, busy with chatter in the evening.',
