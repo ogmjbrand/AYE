@@ -15,14 +15,16 @@ export function DealershipFront({ night }: { night: number }) {
   const sign = useMemo(() => (d ? plainSign(d.name.toUpperCase(), d.kind) : null), [d]);
   const b = useMemo(() => (d ? district.layout.buildings.find((x) => x.name === d.name) : undefined), [district, d]);
   if (!d || !b || !sign) return null;
-  // The front faces +z (towards the cross street)
-  const faceZ = b.position[2] + b.size[2] / 2 + 0.03;
+  // The front is the side with the door (+z on the Lagos plan; −z where a city's plan is mirrored)
+  const side = d.door[2] >= b.position[2] ? 1 : -1;
+  const faceZ = b.position[2] + side * (b.size[2] / 2 + 0.03);
   const x0 = b.position[0];
   const w = b.size[0];
   const base = groundHeightAt(d.door[0], d.door[2]);
   const lit = 0.35 + 0.65 * night;
   return (
-    <group position={[0, base, 0]}>
+    // Drawn for a +z front, then mirrored round the front's own line when it faces −z
+    <group position={[0, base, side > 0 ? 0 : 2 * faceZ]} scale={[1, 1, side]}>
       {/* Glass showroom wall with slim black mullions */}
       <mesh position={[x0, 2.0, faceZ]}>
         <planeGeometry args={[w - 0.2, 3.8]} />

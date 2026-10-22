@@ -109,3 +109,23 @@ describe('generated districts', () => {
     expect(districtById('lagos.marina').layout.streetStyle ?? 'painted').toBe('painted');
   });
 });
+
+import { DISTRICTS as ALL } from '../geography';
+import { resolveCollisions as resolve } from '../world';
+describe('car dealers in generated cities', () => {
+  it('each dealer is named for its city, with a clear door in front of its own showroom', () => {
+    let n = 0;
+    for (const d of ALL) {
+      const id = d.id;
+      if (!d.dealership) continue;
+      n++;
+      const b = d.layout.buildings.find((x) => x.name === d.dealership!.name);
+      expect(b, `${id} showroom`).toBeTruthy();
+      const [x, , z] = d.dealership.door;
+      const r = resolve(x, z, undefined, d.layout.obstacles);
+      expect(Math.hypot(r.x - x, r.z - z), `${id} door clear`).toBeLessThan(0.3);
+      expect(Math.abs(z - b!.position[2])).toBeGreaterThan(b!.size[2] / 2);
+    }
+    expect(n).toBeGreaterThan(10);
+  });
+});

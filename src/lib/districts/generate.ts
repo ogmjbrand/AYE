@@ -41,7 +41,7 @@ const SIGNS: Record<Variant, readonly [1 | -1, 1 | -1]> = {
 };
 
 /** What every vendor, home and building in a street plan is for, so it can be renamed. */
-type Role = `vendor:${'kitchen' | 'snacks' | 'second'}` | `home:${number}` | 'fashion' | 'gadgets' | 'night' | `work:${WorkCareer}`;
+type Role = `vendor:${'kitchen' | 'snacks' | 'second'}` | `home:${number}` | 'fashion' | 'gadgets' | 'night' | 'dealer' | `work:${WorkCareer}`;
 
 interface Template {
   spec: DistrictSpec;
@@ -73,7 +73,7 @@ export const TEMPLATES = {
       'Mama Put': 'vendor:kitchen', 'Taste of Africa': 'vendor:second',
       'Marina Court': 'home:0', 'Palm View': 'home:1', 'Eko Gardens': 'home:2', 'Marina Heights': 'home:3',
       'Tech Campus': 'work:engineer', 'Gadget Hub': 'gadgets', University: 'work:student', 'General Hospital': 'work:doctor',
-      'Lagoon Live': 'night', 'Art Studio': 'work:artist', 'Fashion House': 'fashion',
+      'Lagoon Live': 'night', 'Art Studio': 'work:artist', 'Fashion House': 'fashion', 'Eko Motors': 'dealer',
     },
     neighborhoods: {
       downtown: { name: 'City Centre', description: 'Banks, offices and the main junction' },
@@ -321,6 +321,11 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     id: slug(loungeName), name: loungeName, description: S.lounge.description,
     position: at(T.spec.nightlife.position), cover: round10(T.spec.nightlife.cover * seed.cost),
   };
+  // The car showroom, where the plan has one: named for the city
+  const dealerName = `${seed.name} Motors`;
+  const dealership = T.spec.dealership
+    ? { ...T.spec.dealership, id: slug(dealerName), name: dealerName, door: at(T.spec.dealership.door), facing: face(f, T.spec.dealership.facing) }
+    : undefined;
   const parkName = `${seed.name} ${pick(S.park.names, `${seed.id}:park`)}`;
   const park = { ...T.spec.park, id: slug(parkName), name: parkName, description: S.park.description, position: at(T.spec.park.position) };
 
@@ -329,7 +334,7 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     if (role.startsWith('vendor:')) return vendors[T.vendors.indexOf(role.slice(7) as 'kitchen')]?.name;
     if (role.startsWith('home:')) return homeBuildings[Number(role.slice(5))];
     if (role.startsWith('work:')) return work[role.slice(5) as WorkCareer].name;
-    return { fashion: fashionHouse.name, gadgets: gadgetHub.name, night: nightlife.name }[role as 'fashion'];
+    return { fashion: fashionHouse.name, gadgets: gadgetHub.name, night: nightlife.name, dealer: dealership?.name }[role as 'fashion'];
   };
   const layout = layLayout(T.spec.layout, f, id);
   const walls = S.walls;
@@ -375,6 +380,7 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     workplaces,
     nightlife,
     park,
+    ...(dealership ? { dealership } : {}),
   };
 }
 
