@@ -133,5 +133,5 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 -0.5. **Fashion request (Oct 2026 references)**: evening gowns, heels, bags, nails and wigs, with your own colour choice in the shop. These need new 3D garments and hair (see 0). No brand logos; no faces taken from photos of real people.
 
 0. **New garments**: dresses, jackets and accessories as real 3D clothes on the character (see `CHARACTER_PIPELINE.md`), so the boutique can sell them.
-1. **Cars, next steps**: parking spots, and a driving camera tuned for speed.
+1. **Cars, next steps**: parking spots and car sounds (the chase camera is in).
 4. **Accounts** (steps 1–2) as soon as the Supabase project is approved.

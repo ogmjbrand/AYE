@@ -108,7 +108,7 @@ import type { ShiftHud } from './components/StudentPanels';
 import { DealershipPanel } from './components/DealershipPanel';
 import { carById, fuelCost, type OwnedCar } from './lib/cars';
 import { dealershipAt } from './lib/geography';
-import { setDriving } from './hooks/usePlayerController';
+import { isDriving, setDriving } from './hooks/usePlayerController';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -172,10 +172,30 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
     if (followShift.lengthSq() < 12 * 12) followShift.multiplyScalar(0.1);
     controls.target.add(followShift);
     camera.position.add(followShift);
+    // At the wheel: a chase camera, further back and a little higher, swinging in behind the car as it moves
+    if (isDriving()) {
+      followOffset.copy(camera.position).sub(controls.target);
+      const horiz = Math.hypot(followOffset.x, followOffset.z) || 1;
+      let dx = followOffset.x / horiz, dz = followOffset.z / horiz;
+      if (Math.hypot(controller.velocity.x, controller.velocity.z) > 1) {
+        const bx = -Math.sin(controller.direction), bz = -Math.cos(controller.direction);
+        dx += (bx - dx) * 0.04;
+        dz += (bz - dz) * 0.04;
+        const n = Math.hypot(dx, dz) || 1;
+        dx /= n; dz /= n;
+      }
+      const dist = horiz + (DRIVE_CAMERA_DISTANCE - horiz) * 0.05;
+      const up = followOffset.y + (DRIVE_CAMERA_HEIGHT - followOffset.y) * 0.05;
+      camera.position.set(controls.target.x + dx * dist, controls.target.y + up, controls.target.z + dz * dist);
+    }
     controls.update();
   });
   return null;
 }
+const followOffset = new Vector3();
+/** Chase-camera distance and height above the look-at point while driving. */
+const DRIVE_CAMERA_DISTANCE = 9;
+const DRIVE_CAMERA_HEIGHT = 3.2;
 
 /** Soft contact shadow that stays under the player's feet (high quality only). */
 function FootShadow({ controller }: { controller: ReturnType<typeof usePlayerController> }) {
