@@ -25,7 +25,17 @@ describe('character save', () => {
   it('round-trips a valid character', () => {
     const s = new MemoryStorage();
     saveCharacter(character, s);
-    expect(loadCharacter(s)).toEqual(character);
+    expect(loadCharacter(s)).toEqual({ ...character, region: 'Darsuna' });
+  });
+
+  it('shows a Songhai home region saved as a former real state as its Songhai state, keeping everything else', () => {
+    const s = new MemoryStorage();
+    saveCharacter({ ...character, region: 'Lagos' }, s);
+    expect(loadCharacter(s)).toEqual({ ...character, region: 'Aderan' });
+    saveCharacter({ ...character, country: 'GH', region: 'Ashanti' }, s);
+    expect(loadCharacter(s)?.region).toBe('Ashanti');
+    saveCharacter({ ...character, region: 'Somewhere new' }, s);
+    expect(loadCharacter(s)?.region).toBe('Somewhere new');
   });
 
   it.each([

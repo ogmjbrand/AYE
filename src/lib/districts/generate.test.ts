@@ -50,7 +50,8 @@ describe('generated districts', () => {
   it('name the shops and homes after the city, and price them for it', () => {
     const abuja = DISTRICTS.find((d) => d.city.id === 'abuja')!;
     const yenagoa = DISTRICTS.find((d) => d.city.id === 'yenagoa')!;
-    expect(abuja.travelDesk.name).toBe('Abuja Travel');
+    // Built from the city's ID-stable plan, shown with its Songhai name
+    expect(abuja.travelDesk.name).toBe('Wusara Travel');
     expect(abuja.layout.buildings.some((b) => b.name === abuja.nightlife.name)).toBe(true);
     expect(Math.max(...abuja.homes.map((h) => h.rentPerNight))).toBeGreaterThan(Math.max(...yenagoa.homes.map((h) => h.rentPerNight)));
   });

@@ -1,3 +1,4 @@
+import { songhaiText } from './songhai';
 /**
  * Food, diets and places to eat. A player's diet is part of who they are:
  * menus show the dishes that suit it, and dishes that don't can't be bought.
@@ -32,7 +33,7 @@ export interface Dish {
 const d = (
   id: string, name: string, origin: string, price: number, fullness: number,
   contains: AnimalProduct[], description: string, note?: string,
-): Dish => ({ id, name, origin, price, fullness, contains, description, note });
+): Dish => ({ id, name, origin: songhaiText(origin), price, fullness, contains, description: songhaiText(description), note });
 
 export const DISHES: readonly Dish[] = [
   // Mama Put: Nigerian buka food

@@ -76,7 +76,7 @@ export const STUDY: Record<StudyKind, { label: string; minutes: number; progress
 
 /** Assignments, handed in one after another. */
 export const ASSIGNMENTS: readonly string[] = [
-  'Market entry plan for a Lagos start-up',
+  'Market entry plan for an Ayemara start-up',
   'Spreadsheet model of a family budget',
   'Essay: how mobile money changed West Africa',
   'Data report on city transport',

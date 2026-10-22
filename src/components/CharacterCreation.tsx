@@ -6,6 +6,7 @@ import { MAX_TRAITS, TRAITS, type DreamId, type TraitId } from '../lib/lifeState
 import { DREAMS } from '../lib/life';
 import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
 import { moveInFee } from '../lib/homes';
+import { SONGHAI, stateById } from '../lib/songhai';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
@@ -90,7 +91,7 @@ const FOCUS: Record<StageId, PreviewFocus> = {
 
 /** "Create your life": seven stages with a live, rotatable 3D preview of the in-game model. */
 export function CharacterCreation({ onCharacterCreate, onBack, editing }: CharacterCreationProps) {
-  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFrom(editing) : { ...newDraft(DEFAULT_COUNTRY), region: 'Lagos' }));
+  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFrom(editing) : { ...newDraft(DEFAULT_COUNTRY), region: stateById(SONGHAI.capitalStateId)!.name }));
   const stageIds: readonly StageId[] = editing ? EDIT_STAGES : STAGES.map((s) => s.id);
   const [stageIndex, setStageIndex] = useState(0);
   const stage = STAGES.find((s) => s.id === stageIds[stageIndex])!;
@@ -504,7 +505,7 @@ function StartChoicesFields({ draft, set }: StageProps) {
         </select>
       </Field>
       <div>
-        <p className={SECTION_LABEL}>First home in Lagos (optional)</p>
+        <p className={SECTION_LABEL}>First home in {districtById(DEFAULT_DISTRICT_ID).city.name} (optional)</p>
         <div className="grid gap-2" role="radiogroup" aria-label="First home">
           <button type="button" role="radio" aria-checked={!draft.homeId} onClick={() => set({ homeId: null })}
             className={`rounded-lg border px-3 py-2 text-left text-sm transition ${!draft.homeId ? 'border-cc-gold bg-cc-gold/10' : 'border-cc-line hover:border-cc-gold/60'}`}>

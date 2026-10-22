@@ -127,6 +127,20 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 - Categories on the left, the model in the middle with Face/Body camera and Randomise, and controls on the right. On phones it stacks.
 - Skin-tone swatches. The skin shader now darkens in linear colour, so "Deepest" really is deep.
 
+## Songhai (the fictional home country)
+
+`src/lib/songhai.ts` is the single source of truth: the country (name, motto, flag colours, capital), 12 states (ID, name, capital, cities, planned towns, identity), each city's Songhai name, original area names, and the former real state names for old saves.
+
+**IDs never changed.** Districts, homes, places and residents keep the IDs saves use (`lagos.marina`, `marina-court-room`, `lagos.marina.cars.eko-motors`, `tunde`). Names are mapped for display when districts are built (`lib/geography.ts`) and for residents, menus and coursework. The country keeps the internal code `NG` and shows as "Songhai". A home region saved as a former real state shows as its Songhai state; nothing is rewritten in storage.
+
+**Playable:** all 37 Songhai cities are walkable districts in 12 states. The national capital is Ayemara (Lagoon Boulevard) in Aderan, where a new life starts. Each state also lists one planned town marked "Coming later", which can't be booked.
+
+**Directory:** the travel desk has a Songhai tab with the flag, states, capitals, playable cities (with real booking) and planned towns.
+
+**Checks:** `validateSonghai` finds duplicate IDs or names, capitals outside their state, cities in two states or none, and dangling references. The tests run it, scan every Songhai display string for real Nigerian place names, and confirm saved IDs still resolve.
+
+**Not changed:** other countries are still the real world (Ghana, Kenya, the UK and so on). Characters' self-described heritage and ethnic group are untouched. Food, music and clothes keep their cultural names (jollof, aso-oke, highlife).
+
 ## Next task (pick up here)
 
 

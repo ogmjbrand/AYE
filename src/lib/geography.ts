@@ -18,6 +18,7 @@ import { ACCRA_OSU } from './districts/accra';
 import { generateDistrict } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
 import { AFRICA } from './districts/africa';
+import { AREA_NAMES, CITY_NAMES, SONGHAI_CODE, songhaiText, stateOfCity } from './songhai';
 import { WORLD } from './districts/world';
 
 export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
@@ -133,7 +134,38 @@ function buildDistrict(spec: DistrictSpec): District {
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,
     })),
   ];
-  return { ...spec, layout: buildLayout(spec.layout), places };
+  const district = { ...spec, layout: buildLayout(spec.layout), places };
+  return spec.city.country === SONGHAI_CODE ? songhaiNames(district) : district;
+}
+
+/**
+ * The names a Songhai district shows: its city's and state's Songhai names, an
+ * original area name, and shop, home and landmark text without real place
+ * names. Only names and descriptions change; every ID stays as it was, so
+ * saves keep pointing at the same district, home, places and people.
+ */
+function songhaiNames(d: District): District {
+  const t = songhaiText;
+  const named = <T extends { name: string }>(x: T): T => ({ ...x, name: t(x.name) });
+  const state = stateOfCity(d.city.id);
+  return {
+    ...d,
+    city: { ...d.city, name: CITY_NAMES[d.city.id] ?? t(d.city.name), region: state?.name ?? t(d.city.region) },
+    name: AREA_NAMES[d.id] ?? t(d.name),
+    neighborhoods: d.neighborhoods.map((n) => ({ ...n, name: t(n.name), description: t(n.description) })),
+    vendors: d.vendors.map((v) => ({ ...named(v), kind: t(v.kind) })),
+    fashionHouse: named(d.fashionHouse),
+    gadgetHub: named(d.gadgetHub),
+    travelDesk: named(d.travelDesk),
+    park: { ...named(d.park), description: t(d.park.description) },
+    nightlife: { ...named(d.nightlife), description: t(d.nightlife.description) },
+    ...(d.restaurant ? { restaurant: named(d.restaurant) } : {}),
+    ...(d.dealership ? { dealership: named(d.dealership) } : {}),
+    homes: d.homes.map((h) => ({ ...named(h), building: t(h.building), description: t(h.description) })),
+    workplaces: Object.fromEntries(Object.entries(d.workplaces).map(([k, w]) => [k, { ...named(w), description: t(w.description) }])) as District['workplaces'],
+    layout: { ...d.layout, buildings: d.layout.buildings.map((b) => (b.name ? { ...b, name: t(b.name) } : b)) },
+    places: d.places.map(named),
+  };
 }
 
 /** Hand-built districts first (Lagos is where a new life starts), then the generated ones. */

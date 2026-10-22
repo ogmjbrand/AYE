@@ -14,6 +14,7 @@ import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { sanitiseCars } from './cars';
 import { sanitiseSchool } from './school';
+import { SONGHAI_CODE, songhaiRegion } from './songhai';
 import { sanitiseShift } from './hospital';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
@@ -73,7 +74,8 @@ export function parseCharacter(data: unknown): Character | null {
     heritage: HERITAGES.some((h) => h.id === c.heritage) ? (c.heritage as string) : 'unspecified',
     ethnicGroup: str(c.ethnicGroup, 40),
     country: COUNTRY_CODES.includes(c.country as string) ? (c.country as string) : DEFAULT_COUNTRY,
-    region: str(c.region, 60),
+    // A home region saved as a former real state shows as its Songhai state
+    region: c.country === SONGHAI_CODE ? songhaiRegion(str(c.region, 60)) : str(c.region, 60),
     // A look must match the body; otherwise fall back to the first look for that body
     lookId: look.body === body ? look.id : LOOKS.find((l) => l.body === body)!.id,
     body,

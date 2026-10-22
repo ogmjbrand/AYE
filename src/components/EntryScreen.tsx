@@ -6,6 +6,7 @@ import { genderLabel } from '../lib/identity';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { formatHome } from '../lib/places';
 import { DISTRICTS } from '../lib/geography';
+import { SONGHAI } from '../lib/songhai';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
 
 interface EntryScreenProps {
@@ -117,7 +118,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
               {panel === 'help' && (
                 <PanelBody title="How to play" headingRef={headingRef} onBack={() => setPanel('menu')}>
                   <p className="text-sm text-cc-muted">
-                    Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.length - 1} other cities: the capital of every country, and every state capital in Nigeria.
+                    Your life starts in {DISTRICTS[0].name}, {DISTRICTS[0].city.name}, the capital of {SONGHAI.name}. Work, eat, dress and rest; the clock keeps moving and your bills come every hour. Travel desks fly or drive you to {DISTRICTS.length - 1} other cities: the capital of every country, and every state capital in Nigeria.
                   </p>
                   <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                     <Key k="Click">Click or tap the ground to go there; you find your own way round (Shift-click to stroll)</Key>

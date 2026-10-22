@@ -3,7 +3,8 @@
  * names come from the browser's own locale data (Intl.DisplayNames), so no
  * third-party country dataset is shipped. Countries with a known list of
  * states/regions get a dropdown; everywhere else the player types it.
- */
+ */import { SONGHAI, songhaiRegion, stateNames } from './songhai';
+
 
 /** UN member states, plus observers and widely used territories. */
 export const COUNTRY_CODES: readonly string[] = [
@@ -25,8 +26,9 @@ export const COUNTRY_CODES: readonly string[] = [
 export const DEFAULT_COUNTRY = 'NG';
 
 let displayNames: Intl.DisplayNames | null = null;
-/** English name of a country code, e.g. "NG" -> "Nigeria". */
+/** English name of a country code, e.g. "GH" -> "Ghana"; AYE's own country, NG, is Songhai. */
 export function countryName(code: string): string {
+  if (code === SONGHAI.code) return SONGHAI.name;
   try {
     displayNames ??= new Intl.DisplayNames(['en'], { type: 'region' });
     return displayNames.of(code) ?? code;
@@ -47,15 +49,8 @@ interface Subdivisions {
 }
 
 export const SUBDIVISIONS: Readonly<Record<string, Subdivisions>> = {
-  NG: {
-    term: 'State',
-    names: [
-      'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta',
-      'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'Federal Capital Territory', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano',
-      'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau',
-      'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
-    ],
-  },
+  // Songhai, AYE's fictional country, keeps the code NG (characters save it); its states come from lib/songhai.ts
+  NG: { term: 'State', names: stateNames() },
   GH: {
     term: 'Region',
     names: [
@@ -120,5 +115,6 @@ export const regionTerm = (country: string) => SUBDIVISIONS[country]?.term ?? 'S
 /** "Lagos, Nigeria", or just the country when no region is given. */
 export function formatHome(country: string, region: string): string {
   const name = countryName(country);
-  return region.trim() ? `${region.trim()}, ${name}` : name;
+  const r = country === SONGHAI.code ? songhaiRegion(region.trim()) : region.trim();
+  return r ? `${r}, ${name}` : name;
 }

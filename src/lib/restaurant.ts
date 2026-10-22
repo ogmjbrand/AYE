@@ -64,7 +64,7 @@ export const PALMS_MENU: readonly MenuItem[] = [
   m('spring-rolls', 'Vegetable Spring Rolls', 'starter', 180, 20, 12, { fun: 4 }, [], 'Crisp rolls of cabbage, carrot and peppers, with sweet chilli dip.'),
   m('avocado-salad', 'Avocado & Mango Salad', 'starter', 200, 18, 12, { fun: 4 }, [], 'Avocado, mango, cucumber and toasted groundnuts with lime.'),
   // Drinks
-  m('chapman', 'Chapman', 'drink', 120, 6, 10, { fun: 5 }, [], 'The Lagos classic: fruity, fizzy and bright red, with cucumber and orange.'),
+  m('chapman', 'Chapman', 'drink', 120, 6, 10, { fun: 5 }, [], 'The Ayemara classic: fruity, fizzy and bright red, with cucumber and orange.'),
   m('zobo', 'Zobo Spritz', 'drink', 90, 5, 10, { fun: 4 }, [], 'Chilled hibiscus with ginger, pineapple and sparkling water.'),
   m('orange-juice', 'Fresh Orange Juice', 'drink', 110, 8, 8, { fun: 3 }, [], 'Squeezed to order.'),
   m('palm-mocktail', 'The Palms Mocktail', 'drink', 150, 6, 12, { fun: 6 }, [], 'Passion fruit, lime and mint over crushed ice. Alcohol-free.'),
