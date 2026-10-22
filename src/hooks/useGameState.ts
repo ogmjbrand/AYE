@@ -82,6 +82,9 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     joinClub: (id: string) => dispatch({ type: 'joinClub', id }),
     campusChat: (room: CampusRoom) => dispatch({ type: 'campusChat', room }),
     freshenUp: (room: CampusRoom) => dispatch({ type: 'freshenUp', room }),
+    clockIn: () => dispatch({ type: 'clockIn' }),
+    clockOut: () => dispatch({ type: 'clockOut' }),
+    seePatient: (patientId: string) => dispatch({ type: 'seePatient', patientId }),
     setSavingsGoal: (amount: number | null) => dispatch({ type: 'setSavingsGoal', amount }),
   };
 }

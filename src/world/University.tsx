@@ -2,7 +2,7 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import {
-  Color, DoubleSide, Euler, MeshPhysicalMaterial, MeshStandardMaterial, Vector3, type Group, type Material, type Mesh,
+  Color, DoubleSide, Euler, MeshStandardMaterial, Vector3, type Group, type Material, type Mesh,
 } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { GameTime } from '../lib/gameState';
@@ -24,6 +24,7 @@ import { CarBody } from './CarBody';
 import { Downlight } from './VenueShell';
 import { UNIFORMS } from '../lib/uniforms';
 import { useQuality } from './quality';
+import { useMats } from './buildingMats';
 
 /**
  * AYE Global University (lib/university.ts has the plan): the street and
@@ -38,39 +39,9 @@ import { useQuality } from './quality';
 
 // ---------------------------------------------------------------- materials (shared)
 
-let shared: ReturnType<typeof makeMats> | null = null;
-function makeMats() {
-  const std = (color: string, roughness = 0.8, metalness = 0) => new MeshStandardMaterial({ color, roughness, metalness });
-  return {
-    plaster: std('#f1ece3', 0.9),
-    plasterWarm: std('#e9dfcf', 0.9),
-    navyWall: std('#1d2a4a', 0.8),
-    stone: std('#d9c9ab', 0.85),
-    stoneDark: std('#b9a27c', 0.85),
-    glass: new MeshPhysicalMaterial({ color: '#a9c4d4', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.32, side: DoubleSide, depthWrite: false }),
-    facadeGlass: new MeshPhysicalMaterial({ color: '#5f7f93', roughness: 0.08, metalness: 0.6, clearcoat: 1, emissive: '#2a3a44', emissiveIntensity: 0.25 }),
-    frame: std('#2c2f33', 0.4, 0.7),
-    gold: std('#c9a052', 0.28, 0.85),
-    wood: std('#8a5f3c', 0.6),
-    woodLight: std('#c39a6b', 0.6),
-    white: std('#f5f4f0', 0.5),
-    black: std('#151618', 0.5),
-    seat: std('#2b3a5c', 0.8),
-    seatGrey: std('#4a4d52', 0.8),
-    hedge: std('#2f5a2a', 0.95),
-    soil: std('#5a4330', 1),
-    water: new MeshPhysicalMaterial({ color: '#4a8fb0', roughness: 0.05, metalness: 0.1, transmission: 0, clearcoat: 1, emissive: '#0d3b52', emissiveIntensity: 0.3 }),
-    screen: new MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.9, toneMapped: false }),
-    lightPanel: new MeshStandardMaterial({ color: '#ffffff', emissive: '#fff6e6', emissiveIntensity: 1.6, toneMapped: false }),
-    red: std('#c0392b', 0.6),
-    rubber: std('#1b1b1b', 0.9),
-    sofa: std('#b5763a', 0.9),
-    sofaBlue: std('#2a4a7a', 0.9),
-  };
-}
-const useMats = () => (shared ??= makeMats());
 
-function B({ p, s, m, r, cast = true }: { p: [number, number, number]; s: [number, number, number]; m: Material; r?: [number, number, number]; cast?: boolean }) {
+
+export function B({ p, s, m, r, cast = true }: { p: [number, number, number]; s: [number, number, number]; m: Material; r?: [number, number, number]; cast?: boolean }) {
   return (
     <mesh position={p} rotation={r} material={m} castShadow={cast} receiveShadow>
       <boxGeometry args={s} />
@@ -79,7 +50,7 @@ function B({ p, s, m, r, cast = true }: { p: [number, number, number]; s: [numbe
 }
 
 /** A flat picture (sign, screen, poster) facing +z, unless turned. */
-function Pic({ p, w, h, map, ry = 0, glow = 0.35 }: { p: [number, number, number]; w: number; h: number; map: import('three').Texture; ry?: number; glow?: number }) {
+export function Pic({ p, w, h, map, ry = 0, glow = 0.35 }: { p: [number, number, number]; w: number; h: number; map: import('three').Texture; ry?: number; glow?: number }) {
   return (
     <mesh position={p} rotation={[0, ry, 0]}>
       <planeGeometry args={[w, h]} />
@@ -92,10 +63,10 @@ const v3 = (x: number, y: number, z: number) => new Vector3(x, y, z);
 
 // ---------------------------------------------------------------- chairs (instanced)
 
-interface ChairSpot { x: number; z: number; facing: number }
+export interface ChairSpot { x: number; z: number; facing: number }
 
 /** Office/classroom chairs: a seat, a back and a stem, many at once. */
-function Chairs({ list, material }: { list: readonly ChairSpot[]; material: Material }) {
+export function Chairs({ list, material }: { list: readonly ChairSpot[]; material: Material }) {
   const m = useMats();
   const { seats, backs, stems } = useMemo(() => {
     const seats: Placement[] = [], backs: Placement[] = [], stems: Placement[] = [];
@@ -467,10 +438,16 @@ function segmentHitsBox(ax: number, az: number, bx: number, bz: number, cx: numb
 }
 
 /** Interior and outer walls; any wall standing between the camera and you is hidden. */
-function Walls({ player }: { player: PlayerHandle }) {
+export function Walls({ player, walls = WALLS, midZ = (BUILDING.z0 + BUILDING.z1) / 2, height = STOREY }: {
+  player: PlayerHandle;
+  walls?: readonly WallSeg[];
+  /** The building's middle, to tell an outer wall's outside face (stone) from its inside (plaster). */
+  midZ?: number;
+  height?: number;
+}) {
   const m = useMats();
   const refs = useRef<(Mesh | null)[]>([]);
-  const boxes = useMemo(() => WALLS.map((w) => ({ w, ...wallBox(w) })), []);
+  const boxes = useMemo(() => walls.map((w) => ({ w, ...wallBox(w) })), [walls]);
   useFrame(({ camera }) => {
     const px = player.position.x, pz = player.position.z;
     boxes.forEach((b, i) => {
@@ -487,7 +464,7 @@ function Walls({ player }: { player: PlayerHandle }) {
     if (!w.outer) return m.plaster;
     // Stone outside, plaster inside: box faces are +x, −x, +y, −y, +z, −z
     const alongX = w.z0 === w.z1;
-    const outsideIsPositive = alongX ? w.z0 > (BUILDING.z0 + BUILDING.z1) / 2 : w.x0 > 0;
+    const outsideIsPositive = alongX ? w.z0 > midZ : w.x0 > 0;
     const faces = [m.plaster, m.plaster, m.stone, m.stone, m.plaster, m.plaster];
     faces[alongX ? (outsideIsPositive ? 4 : 5) : outsideIsPositive ? 0 : 1] = m.stone;
     return faces;
@@ -495,8 +472,8 @@ function Walls({ player }: { player: PlayerHandle }) {
   return (
     <>
       {boxes.map((b, i) => (
-        <mesh key={i} ref={(el) => { refs.current[i] = el; }} position={[b.x, STOREY / 2, b.z]} material={materialFor(b.w)} castShadow={!b.w.glass} receiveShadow>
-          <boxGeometry args={[b.sx, STOREY, b.sz]} />
+        <mesh key={i} ref={(el) => { refs.current[i] = el; }} position={[b.x, height / 2, b.z]} material={materialFor(b.w)} castShadow={!b.w.glass} receiveShadow>
+          <boxGeometry args={[b.sx, height, b.sz]} />
         </mesh>
       ))}
     </>

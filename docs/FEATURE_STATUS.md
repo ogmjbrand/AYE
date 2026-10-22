@@ -21,7 +21,7 @@ now shown under its official name).
 | 7 | Playable home: furniture, catalogue, needs, time, mood, balance | **Done** | Needs (energy, hygiene, fun, social) plus hunger, a mood that changes pay and work bonuses, the Home Decor catalogue (40 pieces by room, with a Luxe collection, 3D pictures and a Preview you can turn), delivery into your home, moving/turning/storing/selling, wall art, and furniture you use (shower, bath, sofa, TV, games, books, music, cooking, study). The penthouse is a Victoria Island apartment furnished in Luxe. Open-plan "dolls' house" room with no ceiling, as before. **Missing:** drag-to-place on the floor (pieces are moved with arrow buttons). |
 | 8 | Home → outdoor city transition | **Done** | Front door in and out, camera snaps behind you. |
 | 9 | Interactive 3D city map, labels, filters, landmarks | **Partial** | 3D districts in 235 cities; phone map; City Locations directory by category with walk-there routing; world map at the travel desk. **Missing:** a labelled overhead map of a district with pins and filters like the reference. |
-| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, The Palms (a walk-in fine-dining restaurant in Lagos), the Fashion House (a walk-in boutique and salon in every city), gadget shop, lounge, park, travel desk. **University: AYE Global University, walk-in in every city (see below).** **In progress (not wired yet): car dealership, owning a car, driving.** **Missing: dresses, jackets and accessories (need new 3D garments).** |
+| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, The Palms (a walk-in fine-dining restaurant in Lagos), the Fashion House (a walk-in boutique and salon in every city), gadget shop, lounge, park, travel desk. **University: AYE Global University, walk-in in every city (see below).** **Cars: Eko Motors in Lagos sells five cars (colour of your choice, sold back for half); Drive/Park on the bar turns you into your car on the street, with fuel billed from GHAI as you drive (one GHAI at a time, no free distance) and parking when you run out.** **Missing: dresses, jackets and accessories (need new 3D garments).** |
 | 11 | Business advertising platform | **Not started** | Needs accounts, a review/approval process, payments and legal review first. Billboards exist in the world but only show built-in art. |
 | 12a | Character Life OS, missions, wishes, dreams, perks, achievements | **Done (this milestone)** | See below. |
 | 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled and labelled so; there are no fake player counts. |
@@ -109,13 +109,31 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 - Campus NPCs walk set loops or sit; they're labelled computer-controlled.
 - The software renderer used for testing manages only about 1 fps here (the city is the same).
 
+## Hospital milestone (verified in the browser)
+
+**AYE General Hospital** (`src/lib/hospital.ts`, `src/world/Hospital.tsx`): E at any city's Hospital marker. It has a forecourt with an ambulance bay and a canopy sign. Inside are reception and waiting (with visitors), Emergency, the staff room, a corridor, two consulting rooms and a four-bed general ward. Collisions come from the same plan as the walls, and tests reach every room, spot and patient from the street.
+
+**Doctor's shift** (`GameState.shift`, saved):
+- Clock in with Dr. Bello (supervisor) between 09:00 and 17:00.
+- Seven patients wait in the ward, the consulting rooms and Emergency. Seeing one takes 15–30 game minutes on shift and counts once a day; the daily target is 4.
+- Pay is the doctor's existing hourly rate for clocked-in minutes inside the hospital. There is no per-patient money, so nothing is paid twice.
+- Leaving the building, sleeping, travelling or the end of the day clock you out.
+
+**HUD:** Today's Goals (go, clock in, patients x/4, clock out) and an Active Status panel (level, on/off shift, room, pay per hour, earned today, waiting, patients today). Staff, patients and visitors are computer-controlled and labelled.
+
+**Change for doctors:** pay now comes only from shifts inside the hospital, no longer from standing at the street marker.
+
+**Character creator (studio layout):**
+- Categories on the left, the model in the middle with Face/Body camera and Randomise, and controls on the right. On phones it stacks.
+- Skin-tone swatches. The skin shader now darkens in linear colour, so "Deepest" really is deep.
+
 ## Next task (pick up here)
 
--1. **Hospital career environment** (Victoria General Hospital): a campus-style venue at each city's Hospital marker. It needs reception, wards, an emergency room, a supervisor (clock in and out), patients seen as work tasks, and the doctor's hourly pay in the HUD. Reuse `lib/university.ts`'s plan, wall and spot pattern.
+
 -0.5. **Fashion request (Oct 2026 references)**: evening gowns, heels, bags, nails and wigs, with your own colour choice in the shop. These need new 3D garments and hair (see 0). No brand logos; no faces taken from photos of real people.
 
 0. **New garments**: dresses, jackets and accessories as real 3D clothes on the character (see `CHARACTER_PIPELINE.md`), so the boutique can sell them.
-1. **Car dealership, ownership and driving** (step 10): a dealer counter per city, cars as owned items, get in at your parking spot, drive with the existing controls on the roads (traffic and collisions already exist), fuel/parking costs.
+1. **Cars, next steps**: dealers in other cities (only Lagos has Eko Motors), parking spots, and a driving camera tuned for speed.
 2. **Onboarding flow** (steps 3–6): split character creation into steps with a progress bar (Identity → Look → Body → Personality & goals → Starting life → First home), add traits, goals and background that affect needs decay, pay or friendships, and pick the first home there.
 3. **District map with pins and filters** (step 9).
 4. **Accounts** (steps 1–2) as soon as the Supabase project is approved.

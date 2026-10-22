@@ -100,62 +100,60 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
     else setStageIndex((i) => i + 1);
   };
 
+  const [focusOverride, setFocusOverride] = useState<PreviewFocus | null>(null);
+  const focus = focusOverride ?? FOCUS[stage.id];
+  const go = (i: number) => { setFocusOverride(null); setStageIndex(i); };
+  const nav = stageIds.map((id, i) => ({
+    id,
+    label: STUDIO_LABEL[id],
+    active: i === stageIndex,
+    // The name comes first; everything else is open once you have one
+    disabled: i > stageIndex && stage.id === 'identity' && !canLeaveIdentity,
+    onClick: () => go(i),
+  }));
+
   return (
     <Shell
-      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={FOCUS[stage.id]}
+      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={focus}
       bodyFigure={stage.id === 'proportions' && draft.body === 'feminine'}
-      previewName={draft.name.trim() || 'Your character'}
+      avatarName={draft.name.trim() || 'New avatar'}
       previewSub={`${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
+      nav={nav}
+      title={stage.title}
+      kicker={editing ? 'Change your appearance' : 'Create your life'}
+      onFocus={setFocusOverride}
       onRandomise={stage.id === 'identity' || stage.id === 'review' ? undefined : () => setDraft((d) => randomise(d))}
-    >
-      <div className="flex h-full flex-col">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-cc-gold">{editing ? 'Change your appearance' : 'Create your life'}</p>
-          <h1 id="create-title" className="mt-2 font-display text-2xl font-bold text-cc-ink sm:text-3xl">{stage.title}</h1>
-        </div>
-        <ol className="m-0 mt-4 flex list-none gap-1 p-0" aria-label="Steps">
-          {stageIds.map((id, i) => {
-            const s = STAGES.find((x) => x.id === id)!;
-            const reachable = i <= stageIndex || (stage.id !== 'identity' || canLeaveIdentity);
-            return (
-              <li key={id} className="min-w-0 flex-1">
-                <button type="button" disabled={!reachable} onClick={() => setStageIndex(i)} aria-current={i === stageIndex ? 'step' : undefined}
-                  className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold disabled:cursor-not-allowed">
-                  <span className={`block h-1 rounded-full ${i < stageIndex ? 'bg-cc-gold' : i === stageIndex ? 'bg-cc-gold-strong' : 'bg-cc-line'}`} />
-                  <span className={`mt-1 block truncate text-[10px] uppercase tracking-[0.08em] ${i === stageIndex ? 'text-cc-ink' : 'text-cc-muted'}`}>{s.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-
-        <div className="mt-6 min-h-0 flex-1 space-y-6">
-          {stage.id === 'identity' && <IdentityStage draft={draft} set={set} />}
-          {stage.id === 'body' && <BodyStage draft={draft} set={set} setDraft={setDraft} />}
-          {stage.id === 'proportions' && <ProportionsStage draft={draft} set={set} />}
-          {stage.id === 'face' && <FaceStage draft={draft} set={set} />}
-          {stage.id === 'hair' && <HairStage draft={draft} set={set} editing={editing} />}
-          {stage.id === 'clothes' && <ClothesStage draft={draft} set={set} editing={editing} />}
-          {stage.id === 'review' && <ReviewStage draft={draft} set={set} editing={editing} />}
-        </div>
-
-        <div className="mt-8 space-y-2">
-          {stage.id === 'identity' && !canLeaveIdentity && <p className="text-center text-xs text-cc-muted">Enter a name to continue.</p>}
-          {last && issues.length > 0 && <p className="text-center text-xs text-cc-muted">{issues.join(' ')}</p>}
+      footer={(
+        <div className="space-y-2">
+          {stage.id === 'identity' && !canLeaveIdentity && <p className="m-0 text-center text-xs text-cc-muted">Enter a name to continue.</p>}
+          {last && issues.length > 0 && <p className="m-0 text-center text-xs text-cc-muted">{issues.join(' ')}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={() => (stageIndex === 0 ? onBack?.() : setStageIndex((i) => i - 1))} disabled={stageIndex === 0 && !onBack}
-              className="rounded-lg border border-cc-line px-4 py-3 text-sm text-cc-muted transition hover:text-cc-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold disabled:opacity-40">
+            <button type="button" onClick={() => (stageIndex === 0 ? onBack?.() : go(stageIndex - 1))} disabled={stageIndex === 0 && !onBack}
+              className="rounded-full border border-cc-line px-4 py-2.5 text-sm text-cc-muted transition hover:text-cc-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold disabled:opacity-40">
               ← Back
             </button>
             <button type="button" onClick={next} disabled={(stage.id === 'identity' && !canLeaveIdentity) || (last && issues.length > 0)} className={PRIMARY_BUTTON}>
-              {last ? (editing ? 'Save changes' : 'Create & play') : `Next: ${STAGES.find((s) => s.id === stageIds[stageIndex + 1])!.label}`}
+              {last ? (editing ? 'Save changes' : 'Create & play') : `Next: ${STUDIO_LABEL[stageIds[stageIndex + 1]]}`}
             </button>
           </div>
         </div>
-      </div>
+      )}
+    >
+      {stage.id === 'identity' && <IdentityStage draft={draft} set={set} />}
+      {stage.id === 'body' && <BodyStage draft={draft} set={set} setDraft={setDraft} />}
+      {stage.id === 'proportions' && <ProportionsStage draft={draft} set={set} />}
+      {stage.id === 'face' && <FaceStage draft={draft} set={set} />}
+      {stage.id === 'hair' && <HairStage draft={draft} set={set} editing={editing} />}
+      {stage.id === 'clothes' && <ClothesStage draft={draft} set={set} editing={editing} />}
+      {stage.id === 'review' && <ReviewStage draft={draft} set={set} editing={editing} />}
     </Shell>
   );
 }
+
+/** The studio's category names, in the style of a character-creator suite. */
+const STUDIO_LABEL: Record<StageId, string> = {
+  identity: 'Avatar', body: 'Person', proportions: 'Body', face: 'Skin', hair: 'Hair', clothes: 'Wardrobe', review: 'Life',
+};
 
 interface StageProps {
   draft: Draft;
@@ -314,12 +312,19 @@ function FaceStage({ draft, set }: StageProps) {
         <p className={SECTION_LABEL}>Skin tone</p>
         <Slider id="skin" label="Skin" min={-1} max={1} step={0.05} value={draft.skinTone} onChange={(v) => set({ skinTone: v })} ends={['Lighter', 'Deeper']}
           display={draft.skinTone === 0 ? 'Natural' : draft.skinTone > 0 ? `${Math.round(draft.skinTone * 100)}% deeper` : `${Math.round(-draft.skinTone * 100)}% lighter`} />
-        <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected.</p>
+        <div className="grid grid-cols-8 gap-2" role="radiogroup" aria-label="Skin tone presets">
+          {SKIN_STEPS.map((t) => (
+            <button key={t.value} type="button" role="radio" aria-checked={Math.abs(draft.skinTone - t.value) < 0.01} aria-label={t.label} title={t.label} onClick={() => set({ skinTone: t.value })}
+              className={`aspect-square rounded-full border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${Math.abs(draft.skinTone - t.value) < 0.01 ? 'border-cc-gold scale-110' : 'border-transparent hover:border-cc-gold/60'}`}
+              style={{ background: t.color }} />
+          ))}
+        </div>
+        <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>
       </div>
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
-        <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person on the Body step for a different face.</p>
+        <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person under Person for a different face.</p>
       </div>
     </>
   );
@@ -333,7 +338,7 @@ function HairStage({ draft, set, editing }: StageProps & { editing?: Character }
       <div>
         <p className={SECTION_LABEL}>Hairstyle</p>
         <p className="text-sm text-cc-ink">{look.hair}</p>
-        <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (Body step). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>
+        <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>
       </div>
       <div>
         <p className={SECTION_LABEL}>{look.covered ? 'Headwear colour' : 'Hair colour'}</p>
@@ -428,6 +433,18 @@ function ReviewStage({ draft, set, editing }: StageProps & { editing?: Character
   );
 }
 
+/** Tone steps for the swatch row (relative to the person's own skin, as the slider is). */
+const SKIN_STEPS: readonly { value: number; label: string; color: string }[] = [
+  { value: -0.75, label: 'Much lighter', color: '#d9a882' },
+  { value: -0.4, label: 'Lighter', color: '#c38f6a' },
+  { value: 0, label: 'Natural', color: 'linear-gradient(135deg,#b07a55,#7a4a2c)' },
+  { value: 0.25, label: 'A little deeper', color: '#94603d' },
+  { value: 0.45, label: 'Deeper', color: '#7b4b2e' },
+  { value: 0.65, label: 'Rich', color: '#623a22' },
+  { value: 0.85, label: 'Deep', color: '#4a2b19' },
+  { value: 1, label: 'Deepest', color: '#352013' },
+];
+
 const SECTION_LABEL = 'text-xs font-semibold uppercase tracking-[0.18em] text-cc-gold mb-2';
 const INPUT =
   'w-full rounded-lg border border-cc-line bg-cc-field px-3.5 py-2.5 text-cc-ink placeholder:text-cc-muted/70 ' +
@@ -447,40 +464,76 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
   );
 }
 
-/** Two columns on wide screens (controls | live preview); stacked on phones. */
-function Shell({ children, previewName, previewSub, lookId, heightCm, styles, shape, skinTone, focus, onRandomise, bodyFigure = false }: {
+interface NavEntry { id: string; label: string; active: boolean; disabled: boolean; onClick: () => void }
+
+/**
+ * A character-creator studio: categories down the left, the live 3D model in
+ * the middle, the controls for the category on the right and a toolbar under
+ * the model. On phones it stacks: categories as a scrolling row, the model,
+ * then the controls.
+ */
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, focus, onFocus, onRandomise, bodyFigure = false }: {
   bodyFigure?: boolean;
-  children: ReactNode; previewName: string; previewSub: string; lookId: string; heightCm: number;
-  shape: BodyShape; skinTone: number; focus: PreviewFocus;
+  children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
+  nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
+  shape: BodyShape; skinTone: number; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
   onRandomise?: () => void;
 }) {
+  const tool = 'flex items-center gap-1.5 rounded-full border border-cc-line bg-cc-bg/70 px-3 py-1.5 text-xs font-semibold backdrop-blur transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold';
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-cc-bg text-cc-ink" style={{ backgroundImage: 'radial-gradient(1200px 600px at 75% 30%, rgba(201,164,92,0.08), transparent 60%)' }}>
-      <div className="mx-auto flex min-h-full max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-8">
-        <header className="flex items-center gap-3 pb-5">
-          <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="AYE" className="h-10 w-auto" />
-          <span className="text-xs uppercase tracking-[0.25em] text-cc-muted">Your life. Your choices. Your world.</span>
-        </header>
-        <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] lg:gap-10">
-          <section aria-labelledby="create-title" className="order-2 rounded-2xl border border-cc-line bg-cc-panel p-5 shadow-2xl shadow-black/40 sm:p-7 lg:order-1">
-            {children}
-          </section>
-          <aside className="relative order-1 min-h-[24rem] overflow-hidden rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg lg:sticky lg:top-6 lg:order-2 lg:h-[calc(100dvh-7rem)] lg:min-h-[36rem] lg:self-start" aria-label="Character preview">
-            <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive figure={bodyFigure} />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cc-bg/90 to-transparent p-5 sm:p-6">
-              <p className="truncate font-display text-2xl font-bold text-cc-ink">{previewName}</p>
-              <p className="text-sm text-cc-muted">{previewSub}</p>
+    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-cc-bg text-cc-ink lg:overflow-hidden" style={{ backgroundImage: 'radial-gradient(1000px 700px at 50% 35%, rgba(201,164,92,0.10), transparent 60%)' }}>
+      {/* Top bar */}
+      <header className="flex shrink-0 items-center gap-4 border-b border-cc-line px-4 py-2.5 sm:px-6">
+        <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="AYE" className="h-8 w-auto" />
+        <span className="hidden text-[11px] uppercase tracking-[0.25em] text-cc-muted sm:inline">{kicker}</span>
+        <p className="m-0 ml-auto truncate text-xs uppercase tracking-[0.2em] text-cc-muted">Avatar name: <span className="text-cc-ink">{avatarName}</span></p>
+      </header>
+
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[13rem_minmax(0,1fr)_25rem]">
+        {/* Categories */}
+        <nav aria-label="Creator categories" className="flex shrink-0 gap-2 overflow-x-auto px-4 py-3 lg:flex-col lg:justify-center lg:gap-3 lg:overflow-visible lg:px-5">
+          {nav.map((n) => (
+            <button key={n.id} type="button" onClick={n.onClick} disabled={n.disabled} aria-current={n.active ? 'step' : undefined}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-[0.3em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold disabled:cursor-not-allowed disabled:opacity-40 lg:w-full lg:py-2 ${n.active ? 'border-cc-gold bg-cc-gold/10 text-cc-gold-strong' : 'border-cc-line/80 text-cc-ink/85 hover:border-cc-gold/60'}`}>
+              {n.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* The model */}
+        <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive figure={bodyFigure} />
+          <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
+          <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
+            <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>
+            <p className="m-0 text-xs text-cc-muted">{previewSub}</p>
+          </div>
+          {/* Toolbar */}
+          <div className="absolute inset-x-0 bottom-3 flex flex-wrap justify-center gap-2 px-3">
+            <div className="flex overflow-hidden rounded-full border border-cc-line bg-cc-bg/70 backdrop-blur" role="radiogroup" aria-label="Camera">
+              {(['face', 'body'] as const).map((f) => (
+                <button key={f} type="button" role="radio" aria-checked={focus === f} onClick={() => onFocus(f)}
+                  className={`px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${focus === f ? 'bg-cc-gold/20 text-cc-gold-strong' : 'text-cc-muted hover:text-cc-ink'}`}>
+                  {f === 'face' ? 'Face camera' : 'Body camera'}
+                </button>
+              ))}
             </div>
-            <p className="pointer-events-none absolute left-4 top-4 text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
             {onRandomise && (
-              <button type="button" onClick={onRandomise}
-                className="absolute right-4 top-3 rounded-full border border-cc-gold/60 bg-cc-bg/70 px-3 py-1.5 text-xs font-semibold text-cc-gold-strong backdrop-blur hover:bg-cc-gold/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold">
-                Randomise
-              </button>
+              <button type="button" onClick={onRandomise} className={`${tool} border-cc-gold/60 text-cc-gold-strong hover:bg-cc-gold/15`}>Randomise</button>
             )}
-          </aside>
-        </div>
+          </div>
+        </section>
+
+        {/* Controls for this category */}
+        <section aria-labelledby="create-title" className="flex min-h-0 flex-col border-cc-line bg-cc-panel/95 lg:border-l">
+          <div className="border-b border-cc-line px-5 py-3 text-center">
+            <h1 id="create-title" className="m-0 font-display text-sm font-bold uppercase tracking-[0.3em] text-cc-gold-strong">{nav.find((n) => n.active)?.label}</h1>
+            <p className="m-0 mt-0.5 text-xs text-cc-muted">{title}</p>
+          </div>
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">{children}</div>
+          <div className="border-t border-cc-line px-5 py-3">{footer}</div>
+        </section>
       </div>
     </div>
   );

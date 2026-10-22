@@ -23,14 +23,23 @@ function useStillController(): PlayerHandle {
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Turns slowly until the player takes over (drags); holds a three-quarter view instead when they prefer reduced motion. */
-function Turntable({ children, spin }: { children: ReactNode; spin: { current: boolean } }) {
+/**
+ * Turns slowly until the player takes over (drags); holds a three-quarter view instead when they prefer
+ * reduced motion. In the face view it stops and turns the person to face the camera, so you see the face.
+ */
+function Turntable({ children, spin, faceFront }: { children: ReactNode; spin: { current: boolean }; faceFront: boolean }) {
   const ref = useRef<Group>(null);
   const still = useMemo(() => reducedMotion(), []);
-  useFrame((_, delta) => {
-    if (!ref.current) return;
-    if (still) ref.current.rotation.y = -0.6;
-    else if (spin.current) ref.current.rotation.y += delta * 0.35;
+  useFrame(({ camera }, delta) => {
+    const g = ref.current;
+    if (!g) return;
+    if (faceFront) {
+      // The model faces +z at rotation 0: turn the shortest way round to the camera's side
+      const want = Math.atan2(camera.position.x, camera.position.z);
+      const diff = Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y));
+      g.rotation.y += diff * Math.min(1, delta * 4);
+    } else if (still) g.rotation.y = -0.6;
+    else if (spin.current) g.rotation.y += delta * 0.35;
   });
   return <group ref={ref}>{children}</group>;
 }
@@ -109,7 +118,7 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, st
           <Environment files={assetUrl('hdri/venice_sunset_1k.hdr')} environmentIntensity={0.5} />
         </Suspense>
       </ErrorBoundary>
-      <Turntable spin={spin}>
+      <Turntable spin={spin} faceFront={interactive && focus === 'face'}>
         <ErrorBoundary fallback={<Placeholder color={outfitColor} />}>
           <Suspense fallback={<Placeholder color={outfitColor} />}>
             {figure && shape ? (

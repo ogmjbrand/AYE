@@ -14,6 +14,7 @@ import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { sanitiseCars } from './cars';
 import { sanitiseSchool } from './school';
+import { sanitiseShift } from './hospital';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
 import { sanitiseNeeds } from './needs';
@@ -148,12 +149,13 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before Life OS start with a fresh profile, skills and goals
     life: sanitiseLife(p.life),
     school: sanitiseSchool(p.school),
+    shift: sanitiseShift(p.shift),
   };
   // A save from before Life OS: recognise what was already achieved, without paying for it again
   return p.life === undefined ? recogniseExisting(loaded, character.career) : loaded;
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift }));
 }

@@ -433,6 +433,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('cities-3', 'Frequent flyer', 'Visit 3 cities.', 'explore', 400, (c) => c.state.life.cities.length >= 3),
   a('first-class', 'Front row', 'Attend a class at AYE Global University.', 'explore', 200, (c) => c.state.school.classesTotal >= 1),
   a('first-assignment', 'Handed in', 'Hand in your first assignment.', 'explore', 300, (c) => c.state.school.assignmentsDone >= 1),
+  a('first-patient', 'First patient', 'See a patient on shift at the hospital.', 'explore', 200, (c) => c.state.shift.patientsTotal >= 1),
   a('first-car', 'First wheels', 'Buy a car.', 'home', 300, (c) => c.state.cars.length >= 1),
   a('road-trip', 'Road trip', 'Drive 10 km in your own car.', 'explore', 400, (c) => c.state.life.stats.driven >= 10_000),
   a('home', 'A place of your own', 'Rent a home.', 'home', 150, (c) => !!c.state.home),

@@ -41,6 +41,7 @@ import { interiorFor, type Interior } from './interiors';
 import { emptyLife, modifiers, type LifeState } from './lifeState';
 import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
+import { clockIn, clockOut, emptyShift, patientById, rollShift, saw, type ShiftState } from './hospital';
 import { STUDY, emptySchool, handIn, joinClub, leaveClass, minutesLeftInClass, participate, rollDay, schoolMinute, startClass, studied, visit, type CampusRoom, type CampusVisit, type SchoolState, type StudyKind } from './school';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -110,6 +111,8 @@ export interface GameState {
   life: LifeState;
   /** Classes, assignments and academic record at AYE Global University (lib/school.ts). */
   school: SchoolState;
+  /** A doctor's shift at AYE General Hospital (lib/hospital.ts). */
+  shift: ShiftState;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -131,6 +134,11 @@ export type GameAction =
   /** Chatting with classmates in the student centre or courtyard. */
   | { type: 'campusChat'; room: CampusRoom }
   | { type: 'freshenUp'; room: CampusRoom }
+  /** Clock in or out with the hospital supervisor (doctors). */
+  | { type: 'clockIn' }
+  | { type: 'clockOut' }
+  /** See a patient: time passes on shift (paid as hospital work), counted once per patient per day. */
+  | { type: 'seePatient'; patientId: string }
   | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
   | { type: 'moveOut' }
@@ -248,7 +256,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool() };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift() };
 }
 
 export function emptyLedger(): DayLedger {
@@ -625,6 +633,20 @@ function campusAction(state: GameState, action: GameAction, career: Career, life
       const next = campusMinutes({ ...state, school }, CHAT_MINUTES, career, lifestyle);
       return { ...next, needs: addNeeds(next.needs, { social: 15, fun: 5 }), school: visit(next.school, 'students', next.time.totalMinutes) };
     }
+    case 'clockIn':
+      if (career !== 'doctor') return state;
+      return { ...state, shift: clockIn(state.shift, t.totalMinutes) };
+    case 'clockOut':
+      return { ...state, shift: clockOut(rollShift(state.shift, t.totalMinutes)) };
+    case 'seePatient': {
+      const shift = rollShift(state.shift, t.totalMinutes);
+      const p = patientById(action.patientId);
+      if (career !== 'doctor' || !p || !shift.clockedIn || shift.seen.includes(p.id)) return state;
+      let next: GameState = { ...state, shift };
+      // On shift in the hospital, so each of these minutes is paid work at the doctor's rate
+      for (let i = 0; i < p.minutes; i++) next = tick(next, career, lifestyle, true);
+      return { ...next, shift: saw(rollShift(next.shift, next.time.totalMinutes), p.id) };
+    }
     case 'freshenUp': {
       if (action.room !== 'restrooms') return state;
       const next = campusMinutes({ ...state, school }, FRESHEN_MINUTES, career, lifestyle);
@@ -646,12 +668,13 @@ export function gameReducer(
   if (action.type === 'tick') {
     if (state.summary) return state;
     const next = tick(state, career, lifestyle, action.atWorkplace);
-    return { ...next, school: schoolMinute(next.school, next.time.totalMinutes, action.onCampus === true) };
+    return { ...next, school: schoolMinute(next.school, next.time.totalMinutes, action.onCampus === true), shift: rollShift(next.shift, next.time.totalMinutes) };
   }
   const next = baseReducer(state, action, career, lifestyle);
   // Anything else that passes time (sleep, travel, a park bench…) happens off campus: a class you were in ends
-  if (next !== state && next.time.totalMinutes !== state.time.totalMinutes && next.school.inClass) {
-    return { ...next, school: rollDay(leaveClass(next.school), next.time.totalMinutes) };
+  if (next !== state && next.time.totalMinutes !== state.time.totalMinutes && (next.school.inClass || next.shift.clockedIn)) {
+    // Sleeping, travelling or a park bench happens off campus and off shift
+    return { ...next, school: rollDay(leaveClass(next.school), next.time.totalMinutes), shift: clockOut(rollShift(next.shift, next.time.totalMinutes)) };
   }
   return next;
 }

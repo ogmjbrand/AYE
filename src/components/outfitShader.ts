@@ -190,8 +190,9 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           // Skin tone, before any fabric: deeper darkens and enriches, lighter lifts, both keeping the texture
           float ayeSkinW = ${cutout ? '0.0' : isHead ? '1.0 - ayeMask.r' : '1.0 - max(max(ayeMask.r, ayeMask.g), ayeMask.b)'};
           if (ayeSkinW > 0.001 && abs(uAyeSkin) > 0.001) {
-            // Deeper: towards a warm deep-brown palette, keeping the texel's own light and shade (lum / typical skin lum)
-            vec3 ayeDeep = vec3(0.36, 0.22, 0.15) * clamp(ayeLum / 0.5, 0.3, 1.35);
+            // Deeper: towards a warm deep brown (sRGB about #4a2b19), keeping the texel's own light and shade
+            // (lum / typical skin lum). Colours here are linear, as diffuseColor is.
+            vec3 ayeDeep = vec3(0.068, 0.026, 0.011) * clamp(ayeLum / 0.3, 0.45, 1.6);
             vec3 ayeSkinCol = uAyeSkin > 0.0
               ? mix(diffuseColor.rgb, ayeDeep, uAyeSkin * 0.92)
               : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));

@@ -98,6 +98,17 @@ import { CAFETERIA_MENU, LATE_LIMIT, ROOM_NAMES, STUDY, TIMETABLE, classOpenNow,
 import { University } from './world/University';
 import { CafeteriaPanel, ClassPanel, ClubsPanel, DirectoryPanel, RecordsPanel, type CampusPanelMode } from './components/CampusPanel';
 import type { StudentHud } from './components/StudentPanels';
+import { DealershipFront } from './world/DealershipFront';
+import {
+  DAILY_TARGET, H_ARRIVE, HOSPITAL_ID, HOSPITAL_NAME, PATIENTS, ROOM_LABEL as HOSPITAL_ROOM, hospitalLayout, hospitalRoomAt, hospitalSpotAt, insideHospital,
+  patientById, rollShift, shiftHours, type HospitalRoom,
+} from './lib/hospital';
+import { Hospital } from './world/Hospital';
+import type { ShiftHud } from './components/StudentPanels';
+import { DealershipPanel } from './components/DealershipPanel';
+import { carById, fuelCost, type OwnedCar } from './lib/cars';
+import { dealershipAt } from './lib/geography';
+import { setDriving } from './hooks/usePlayerController';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -112,6 +123,8 @@ interface CityProps {
   district: District;
   /** The resident the player is talking with, if any. */
   talkingTo: string | null;
+  /** The car you're driving, if any. */
+  car: OwnedCar | null;
 }
 
 interface CameraFollowProps {
@@ -137,6 +150,7 @@ const PALMS_LAYOUT = restaurantLayout();
 const BOUTIQUE_LAYOUT = boutiqueLayout();
 const BOUTIQUE_ID = 'fashion-house';
 const CAMPUS_LAYOUT = universityLayout();
+const HOSPITAL_LAYOUT = hospitalLayout();
 /** How close to a city's university marker you go in through its gate. */
 const CAMPUS_DOOR_RADIUS = 3;
 
@@ -188,7 +202,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo, car }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -200,13 +214,14 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <Props night={night} />
       <VenueFront hour={gameTime.hour} night={night} />
       <PalmsFront hour={gameTime.hour} night={night} />
+      <DealershipFront night={night} />
       <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
       <Residents player={controller} talkingTo={talkingTo} />
       <Traffic player={controller} />
       {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} />
+      <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} car={car} />
     </>
   );
 }
@@ -301,11 +316,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
   const campusRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const hospitalRef = useRef(false);
+  const onShiftRef = useRef(false);
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
+    // A doctor's workplace is the hospital: paid only while clocked in there
     () => (campusRef.current ? character.career === 'student'
-      : character.career !== 'none' && !!districtRef.current && !insideRef.current &&
+      : hospitalRef.current ? character.career === 'doctor' && onShiftRef.current
+      : character.career !== 'none' && character.career !== 'doctor' && !!districtRef.current && !insideRef.current &&
         isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z)),
     () => campusRef.current,
   );
@@ -337,11 +356,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inPalms = !indoors && venue !== null && district.restaurant?.id === venue;
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
   const inCampus = !indoors && venue === CAMPUS_ID;
+  const inHospital = !indoors && venue === HOSPITAL_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
-  const offStreet = indoors || inPalms || inBoutique || inCampus;
+  const offStreet = indoors || inPalms || inBoutique || inCampus || inHospital;
   // Collision and ground height follow where you are (set before this frame's movement)
-  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : district.layout;
-  useEffect(() => { campusRef.current = inCampus; }, [inCampus]);
+  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : inHospital ? HOSPITAL_LAYOUT : district.layout;
+  useEffect(() => { campusRef.current = inCampus; hospitalRef.current = inHospital; }, [inCampus, inHospital]);
+  useEffect(() => { onShiftRef.current = rollShift(state.shift, state.time.totalMinutes).clockedIn; }, [state.shift, state.time.totalMinutes]);
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
   useEffect(() => {
     insideRef.current = offStreet;
@@ -371,6 +392,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [campusPanel, setCampusPanel] = useState<CampusPanelMode | null>(null);
   const [campusGuide, setCampusGuide] = useState<CampusDestination | null>(null);
   const [campusHere, setCampusHere] = useState<{ room: CampusRoom; indoors: boolean }>({ room: 'outside', indoors: false });
+  const [hospitalHere, setHospitalHere] = useState<{ room: HospitalRoom; indoors: boolean }>({ room: 'outside', indoors: false });
   const guideRef = useRef<CampusDestination | null>(null);
   useEffect(() => { guideRef.current = campusGuide; }, [campusGuide]);
   useEffect(() => {
@@ -390,10 +412,22 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     }, 500);
     return () => clearInterval(id);
   }, [inCampus, controller]);
+  useEffect(() => {
+    if (!inHospital) return;
+    const id = setInterval(() => {
+      const { x, z } = controller.position;
+      const room = hospitalRoomAt(x, z);
+      const indoorsNow = insideHospital(x, z);
+      setHospitalHere((h) => (h.room === room && h.indoors === indoorsNow ? h : { room, indoors: indoorsNow }));
+    }, 500);
+    return () => clearInterval(id);
+  }, [inHospital, controller]);
   const book = (to: District, mode: TravelMode) => {
     const option = travelOption(district.city, to.city, mode);
     if (!option || state.balance < option.fare) return;
     travel(to.id, mode);
+    // Your car stays parked at home
+    setDrivingCar(null);
     setInside(false);
     setTravelOpen(false);
     setArrival(`You arrived in ${to.city.name} after ${formatDuration(option.minutes)} by ${option.label.toLowerCase()}.`);
@@ -421,6 +455,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     snapCamera();
   };
   const goOutside = () => {
+    if (venue === HOSPITAL_ID) {
+      const w = district.workplaces.doctor.position;
+      if (state.shift.clockedIn) clockOut();
+      if (sit.session) sit.cancel();
+      setVenue(null);
+      placePlayer(w, w[0] > 0 ? -Math.PI / 2 : Math.PI / 2);
+      snapCamera();
+      return;
+    }
     if (venue === CAMPUS_ID) {
       const w = district.workplaces.student.position;
       if (state.school.inClass) leaveClass();
@@ -495,6 +538,61 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
 
   // Sitting down somewhere (park benches, the lounge terrace): see sitInPark and sitOnTerrace below
   const sit = useSitSession(controller, wait);
+  // ---------------------------------------------------------------- cars
+  const [dealerOpen, setDealerOpen] = useState(false);
+  /** The car you're driving (one you own), or null when on foot. */
+  const [driving, setDrivingCar] = useState<OwnedCar | null>(null);
+  const myCar = state.cars.length ? state.cars[state.cars.length - 1] : null;
+  // Drive only on the street, in a car you still own
+  const canDrive = !offStreet && !sit.session;
+  const drivingNow = driving && canDrive && state.cars.some((c) => c.id === driving.id) ? driving : null;
+  useEffect(() => {
+    setDriving(drivingNow ? carById(drivingNow.id) ?? null : null);
+    return () => setDriving(null);
+  }, [drivingNow]);
+  // Fuel is paid as you go, from the game's own balance
+  const fuelRef = useRef({ x: 0, z: 0, metres: 0 });
+  const balanceRef = useRef(state.balance);
+  useEffect(() => { balanceRef.current = state.balance; }, [state.balance]);
+  // useGameState's actions are new functions every render: keep the latest without restarting the meter
+  const fuelAction = useRef(fuel);
+  useEffect(() => { fuelAction.current = fuel; });
+  useEffect(() => {
+    if (!drivingNow) return;
+    const car = carById(drivingNow.id);
+    if (!car) return;
+    fuelRef.current = { x: controller.position.x, z: controller.position.z, metres: 0 };
+    const id = setInterval(() => {
+      const f = fuelRef.current;
+      const { x, z } = controller.position;
+      const step = Math.hypot(x - f.x, z - f.z);
+      f.x = x; f.z = z;
+      // A jump (going through a door, travelling) isn't driving
+      if (step < 30) f.metres += step;
+      // Billed a whole GHAI at a time, as each one's worth of fuel is used, so no distance goes unpaid
+      const perGhai = 1000 / car.fuelPerKm;
+      const units = Math.floor(f.metres / perGhai);
+      if (units < 1) return;
+      const metres = units * perGhai;
+      const cost = fuelCost(car, metres);
+      if (balanceRef.current < cost) {
+        setDrivingCar(null);
+        setArrival(`You're out of GHAI for fuel, so you've parked the ${car.name}.`);
+        f.metres = 0;
+        return;
+      }
+      fuelAction.current(car.id, metres);
+      f.metres -= metres;
+    }, 1000);
+    return () => clearInterval(id);
+  }, [drivingNow, controller]);
+  const toggleDrive = () => {
+    if (drivingNow) { setDrivingCar(null); setArrival('Parked. You’re on foot again.'); return; }
+    if (!myCar || !canDrive) return;
+    setDrivingCar(myCar);
+    setArrival(`You get into your ${carById(myCar.id)?.name ?? 'car'}. W/S to drive and reverse, A/D to steer, Shift to crawl.`);
+  };
+  const atDealer = () => !offStreet && !drivingNow && !!dealershipAt(district, controller.position.x, controller.position.z);
 
   /** In through The Palms' front door (while it's open). */
   const enterPalms = () => {
@@ -645,6 +743,68 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       goals,
     };
   })();
+  // ---------------------------------------------------------------- AYE General Hospital
+  const doctor = character.career === 'doctor';
+  const shiftNow = rollShift(state.shift, state.time.totalMinutes);
+  const atHospitalDoor = () => {
+    const w = district.workplaces.doctor.position;
+    return !offStreet && Math.hypot(controller.position.x - w[0], controller.position.z - w[2]) <= CAMPUS_DOOR_RADIUS;
+  };
+  const enterHospital = () => {
+    setHomePanel(null);
+    setVenue(HOSPITAL_ID);
+    placePlayer([H_ARRIVE[0], 0, H_ARRIVE[1]], 0);
+    snapCamera();
+    setArrival(doctor
+      ? `${HOSPITAL_NAME}. Clock in with Dr. Bello in the staff room (S1) to start your shift.`
+      : `${HOSPITAL_NAME}. Reception is straight ahead.`);
+  };
+  const hospitalPrompt = (): { verb: string; place: string; onOpen: () => void } | null => {
+    const spot = hospitalSpotAt(controller.position.x, controller.position.z);
+    if (!spot) return null;
+    switch (spot.id) {
+      case 'leave': return { verb: 'Leave the hospital for', place: district.name, onOpen: goOutside };
+      case 'reception': return { verb: 'Talk to', place: 'Adaeze at reception', onOpen: () => setArrival(doctor
+        ? 'Adaeze: “Morning, doctor! The board in the ward shows who is waiting. Dr. Bello is in the staff room.”'
+        : 'Adaeze: “Welcome to AYE General. The wards are for patients and staff; you can wait here.”') };
+      case 'supervisor':
+        if (!doctor) return { verb: 'Staff only:', place: 'Dr. Bello’s office', onOpen: () => setArrival('Dr. Bello: “This office is for hospital staff, I’m afraid.”') };
+        if (shiftNow.clockedIn) return { verb: 'Clock out with', place: `Dr. Bello (${shiftNow.seen.length}/${DAILY_TARGET} patients today)`, onOpen: () => { clockOut(); setArrival(`You clock out. ${shiftNow.seen.length} patient${shiftNow.seen.length === 1 ? '' : 's'} seen today.`); } };
+        if (!shiftHours(state.time.totalMinutes)) return { verb: 'Shifts run 09:00–17:00 ·', place: 'come back then', onOpen: () => setArrival('Dr. Bello: “Day shifts start at nine. Get some rest.”') };
+        return { verb: 'Clock in with', place: `Dr. Bello (target: ${DAILY_TARGET} patients)`, onOpen: () => { clockIn(); setArrival(`You’re on shift. Today’s target: ${DAILY_TARGET} patients. Pay is your hourly rate for time on shift.`); } };
+      case 'patient': {
+        const p = patientById(spot.patientId);
+        if (!p) return null;
+        if (!doctor) return { verb: 'Patient:', place: `${p.name} is waiting for a doctor`, onOpen: () => {} };
+        if (shiftNow.seen.includes(p.id)) return { verb: 'Already seen today:', place: p.name, onOpen: () => {} };
+        if (!shiftNow.clockedIn) return { verb: 'Clock in first to see', place: p.name, onOpen: () => setArrival('Clock in with Dr. Bello in the staff room first.') };
+        return { verb: `See ${p.name} (${p.minutes} min):`, place: p.complaint, onOpen: () => { seePatient(p.id); setArrival(`You see ${p.name}: ${p.complaint.toLowerCase()}. ${p.minutes} minutes on shift pass.`); } };
+      }
+      default: return null;
+    }
+  };
+  const shiftHud: ShiftHud | null = (() => {
+    if (!doctor) return null;
+    const hours = state.time.dayOfWeek <= 6 && shiftHours(state.time.totalMinutes);
+    return {
+      place: HOSPITAL_NAME,
+      title: careerLevel('doctor', state.workMinutes).title,
+      status: shiftNow.clockedIn ? (inHospital ? 'On shift' : 'On shift (left the building)') : hours ? 'Off shift' : 'Shift hours are 09:00–17:00',
+      tone: shiftNow.clockedIn ? 'good' : hours ? 'warn' : 'muted',
+      pay: hourlyPay,
+      seen: shiftNow.seen.length,
+      target: DAILY_TARGET,
+      waiting: PATIENTS.length - shiftNow.seen.length,
+      earnedToday: state.today.income,
+      room: inHospital ? HOSPITAL_ROOM[hospitalHere.room] : null,
+      goals: [
+        { label: 'Go to the hospital', done: inHospital || shiftNow.clockedIn || shiftNow.seen.length > 0 },
+        { label: 'Clock in with the supervisor', done: shiftNow.clockedIn || shiftNow.seen.length > 0 },
+        { label: `See patients (${Math.min(shiftNow.seen.length, DAILY_TARGET)}/${DAILY_TARGET})`, done: shiftNow.seen.length >= DAILY_TARGET },
+        { label: 'Clock out', done: !shiftNow.clockedIn && shiftNow.seen.length > 0 },
+      ],
+    };
+  })();
   const openSection = (s: BoutiqueSection) => { setAssistantOpen(false); setStore(null); setCatalogueOpen(false); setSection((cur) => (cur === s ? null : s)); };
   /** What E does where you stand inside the Fashion House. */
   const boutiquePrompt = () => {
@@ -718,18 +878,25 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         campusPrompt()?.onOpen();
         return;
       }
+      if (inHospital) {
+        hospitalPrompt()?.onOpen();
+        return;
+      }
       if (indoors && interior) {
         if (nearSpot(bedSpot(interior))) rest(true);
         else if (usableHere()) operateHere();
         else if (nearSpot(doorSpot(interior))) goOutside();
         return;
       }
+      if (drivingNow) return;
       const { x, z } = controller.position;
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
       const door = homeAtDoor(district.id, x, z);
       if (near) setVendor(near);
       else if (atCampusDoor()) enterCampus();
+      else if (atHospitalDoor()) enterHospital();
+      else if (atDealer()) setDealerOpen(true);
       else if (restaurantAt(district, x, z)) enterPalms();
       else if (counter === 'fashion') enterBoutique();
       else if (counter === 'gadgets') setGadgets(true);
@@ -745,9 +912,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -913,7 +1080,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const openOs = (tab: OsTab) => { setOsTab(tab); setOsOpen(true); };
   // The area you're in (indoors: where the building's door is)
   // Inside a building, the area is where its front door is
-  const doorNow = inCampus ? district.workplaces.student.position : inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : indoors && home ? home.door : null;
+  const doorNow = inHospital ? district.workplaces.doctor.position : inCampus ? district.workplaces.student.position : inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : indoors && home ? home.door : null;
   const areaHere = doorNow
     ? district.neighborhoods.find((n) => doorNow[0] >= n.bounds.minX && doorNow[0] <= n.bounds.maxX && doorNow[2] >= n.bounds.minZ && doorNow[2] <= n.bounds.maxZ) ?? null
     : neighborhood;
@@ -923,6 +1090,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     if (inPalms && district.restaurant) return { title: district.restaurant.name, subtitle: district.restaurant.kind, icon: 'restaurant' };
     if (inBoutique) return { title: district.fashionHouse.name, subtitle: district.fashionHouse.kind, icon: 'hanger' };
     if (inCampus) return { title: UNIVERSITY_NAME, subtitle: ROOM_NAMES[campusHere.room], icon: 'career' };
+    if (inHospital) return { title: HOSPITAL_NAME, subtitle: HOSPITAL_ROOM[hospitalHere.room], icon: 'career' };
     if (indoors && home) return { title: home.id === state.home && interior ? MY_HOME[interior.tier] : home.name, subtitle: areaName, icon: 'home' };
     const { x, z } = controller.position;
     const at = district.places.find((p) => Math.hypot(p.position[0] - x, p.position[2] - z) < PLATE_RADIUS);
@@ -953,7 +1121,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         else setLocationsOpen(true);
       },
     },
-    { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setStore('wardrobe'), active: store === 'wardrobe', title: 'Change into clothes you own' },
+    myCar && !offStreet
+      ? { id: 'drive', label: drivingNow ? 'Park' : 'Drive', icon: 'car', onClick: toggleDrive, active: !!drivingNow, title: drivingNow ? 'Park and walk' : `Drive your ${carById(myCar.id)?.name ?? 'car'} (fuel is paid as you go)` }
+      : { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setStore('wardrobe'), active: store === 'wardrobe', title: 'Change into clothes you own' },
     inPalms
       ? { id: 'restaurant', label: 'Restaurant', icon: 'restaurant', onClick: () => setMenuOpen((o) => !o), active: menuOpen, title: 'The menu' }
       : inCampus
@@ -962,8 +1132,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
   ];
   const whereabouts = {
-    place: inCampus ? `${UNIVERSITY_NAME}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
-    activity: inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
+    place: inHospital ? `${HOSPITAL_NAME}, ${district.city.name}` : inCampus ? `${UNIVERSITY_NAME}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
+    activity: inHospital ? (shiftNow.clockedIn ? 'On shift' : 'At the hospital') : drivingNow ? `Driving the ${carById(drivingNow.id)?.name ?? 'car'}` : inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
       : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
         : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
   };
@@ -1177,6 +1347,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <InteriorLighting gameTime={state.time} player={controller} indoor="boutique" />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </BoutiqueInterior>
+            ) : inHospital ? (
+              <Hospital player={controller} seen={shiftNow.seen}>
+                <InteriorLighting gameTime={state.time} player={controller} indoor={hospitalHere.indoors ? 'campus' : undefined} />
+                <Player controller={controller} character={character} tryOn={tryOn} />
+              </Hospital>
             ) : inCampus ? (
               <University player={controller} gameTime={state.time} route={guidePoints}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor={campusHere.indoors ? 'campus' : undefined} />
@@ -1188,7 +1363,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
@@ -1246,6 +1421,16 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           kitchenOpen={palmsOpen(state.time.hour)}
           onOrder={orderDish}
           onClose={() => setMenuOpen(false)}
+        />
+      )}
+      {dealerOpen && district.dealership && (
+        <DealershipPanel
+          name={district.dealership.name}
+          balance={state.balance}
+          owned={state.cars}
+          onBuy={(id, color) => buyCar(id, color)}
+          onSell={(id) => { if (drivingNow?.id === id) setDrivingCar(null); sellCar(id); }}
+          onClose={() => setDealerOpen(false)}
         />
       )}
       {inCampus && campusPanel === 'directory' && (
@@ -1335,7 +1520,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenTravel={() => setTravelOpen(true)}
         onOpenNightlife={() => setNightOpen(true)}
         onOpenPark={() => setParkOpen(true)}
-        busy={!!sit.session}
+        busy={!!sit.session || !!drivingNow}
         onTalk={setTalking}
         workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}
@@ -1346,10 +1531,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         onEnterRestaurant={enterPalms}
-        campusEntry={atCampusDoor() ? { name: `${UNIVERSITY_NAME} (${district.workplaces.student.name})`, onOpen: enterCampus } : null}
-        statusOverride={student && (inCampus || state.school.inClass) ? { label: state.school.inClass ? 'In class' : 'On campus', tone: 'good' } : null}
+        dealerEntry={atDealer() && district.dealership ? { name: district.dealership.name, onOpen: () => setDealerOpen(true) } : null}
+        campusEntry={atCampusDoor() ? { name: `${UNIVERSITY_NAME} (${district.workplaces.student.name})`, onOpen: enterCampus } : atHospitalDoor() ? { name: HOSPITAL_NAME, onOpen: enterHospital } : null}
+        statusOverride={student && (inCampus || state.school.inClass) ? { label: state.school.inClass ? 'In class' : 'On campus', tone: 'good' } : doctor ? (shiftNow.clockedIn ? { label: 'On shift', tone: 'good' } : shiftHours(state.time.totalMinutes) ? { label: 'Off shift', tone: 'warn' } : null) : null}
         student={studentHud}
-        insideHome={inCampus ? { name: UNIVERSITY_NAME, prompt: campusPrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
+        shift={shiftHud}
+        insideHome={inHospital ? { name: HOSPITAL_NAME, prompt: hospitalPrompt } : inCampus ? { name: UNIVERSITY_NAME, prompt: campusPrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
             const use = usableHere();

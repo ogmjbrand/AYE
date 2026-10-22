@@ -75,7 +75,7 @@ export interface WallSeg {
 }
 
 /** A wall from a to b along x (at z) or along z (at x), with gaps (centre, width) cut for doors. */
-function run(along: 'x' | 'z', fixed: number, from: number, to: number, gaps: readonly (readonly [number, number])[], extra: Partial<WallSeg> = {}): WallSeg[] {
+export function run(along: 'x' | 'z', fixed: number, from: number, to: number, gaps: readonly (readonly [number, number])[], extra: Partial<WallSeg> = {}): WallSeg[] {
   const cuts = [...gaps].sort((a, b) => a[0] - b[0]).map(([c, w]) => [c - w / 2, c + w / 2] as const);
   const out: WallSeg[] = [];
   let at = from;

@@ -16,6 +16,7 @@ export const ICON_PATHS = {
   close: 'M6 6l12 12M18 6L6 18',
   go: 'M5 12h14M13 6l6 6-6 6',
   check: 'M5 12.5l4.5 4.5L19 7.5',
+  car: 'M3 16v-3l2-5h14l2 5v3zM3 16v2h3v-2M18 16v2h3v-2M6.5 13h.01M17.5 13h.01M5 13h14',
   lock: 'M6 11h12v10H6zM8.5 11V7.5a3.5 3.5 0 0 1 7 0V11',
   spark: 'M12 2v6M12 16v6M2 12h6M16 12h6',
   home: 'M3 11l9-7 9 7M5 9.5V20h5v-6h4v6h5V9.5',
