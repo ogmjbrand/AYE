@@ -26,7 +26,7 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
-import { carById, carResale, fuelCost, type OwnedCar } from './cars';
+import { carById, carResale, fuelCost, type OwnedCar, type ParkedSpot } from './cars';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
 import { WAIT_OPTIONS } from './parks';
 
@@ -147,6 +147,8 @@ export type GameAction =
   | { type: 'sellCar'; id: string }
   /** Fuel for driving this many metres in this car. */
   | { type: 'fuel'; carId: string; metres: number }
+  /** Leave a car parked on the street (a spot), or take it with you (null) when you get in and drive. */
+  | { type: 'parkCar'; carId: string; spot: ParkedSpot | null }
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'nightOut'; residentId: string }
@@ -717,6 +719,16 @@ function baseReducer(
       if (!car || !state.cars.some((c) => c.id === car.id) || state.summary) return state;
       const value = carResale(car);
       return { ...state, cars: state.cars.filter((c) => c.id !== car.id), balance: state.balance + value, today: { ...state.today, income: state.today.income + value } };
+    }
+    case 'parkCar': {
+      if (!state.cars.some((c) => c.id === action.carId)) return state;
+      const spot = action.spot;
+      if (spot && ![spot.x, spot.z, spot.heading].every(Number.isFinite)) return state;
+      return { ...state, cars: state.cars.map((c) => {
+        if (c.id !== action.carId) return c;
+        const car: OwnedCar = { id: c.id, color: c.color };
+        return spot ? { ...car, parked: { ...spot } } : car;
+      }) };
     }
     case 'fuel': {
       const car = carById(action.carId);

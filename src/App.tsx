@@ -6,7 +6,7 @@ import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
 import { placePlayer, setMovementBlocked, setMoveTarget, usePlayerController } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { activeLayout, groundHeightAt, setActiveLayout } from './lib/world';
+import { activeLayout, groundHeightAt, parkedObstacles, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -66,6 +66,8 @@ import { Residents } from './world/Residents';
 import { ClickToMove } from './world/ClickToMove';
 import { VenueFront } from './world/VenueFront';
 import { Park } from './world/Park';
+import { ParkedCars } from './world/ParkedCars';
+import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout, type Furniture } from './lib/interiors';
@@ -106,7 +108,7 @@ import {
 import { Hospital } from './world/Hospital';
 import type { ShiftHud } from './components/StudentPanels';
 import { DealershipPanel } from './components/DealershipPanel';
-import { carById, fuelCost, type OwnedCar } from './lib/cars';
+import { carById, carToDrive, fuelCost, type OwnedCar } from './lib/cars';
 import { dealershipAt } from './lib/geography';
 import { isDriving, setDriving } from './hooks/usePlayerController';
 import './App.css';
@@ -125,6 +127,8 @@ interface CityProps {
   talkingTo: string | null;
   /** The car you're driving, if any. */
   car: OwnedCar | null;
+  /** Your cars parked in this district. */
+  parked: readonly OwnedCar[];
 }
 
 interface CameraFollowProps {
@@ -222,7 +226,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo, car }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, talkingTo, car, parked }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -240,6 +244,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <HomeMarkers homeId={homeId} />
       <Residents player={controller} talkingTo={talkingTo} />
       <Traffic player={controller} />
+      <ParkedCars cars={parked} />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} car={car} />
     </>
@@ -305,6 +310,8 @@ export default function App() {
       onQualityChange={changeQuality}
       showRoute={settings.showRoute}
       onShowRouteChange={(showRoute) => changeSettings({ showRoute })}
+      sound={settings.sound}
+      onSoundChange={(sound) => changeSettings({ sound })}
       onExitToMenu={() => setScreen('entry')}
       onCharacterUpdate={handleCharacterUpdate}
       onEditLook={() => { setEditFrom('play'); setScreen('edit'); }}
@@ -319,6 +326,9 @@ interface GameProps {
   /** Dotted route line on the ground for click-to-move trips. */
   showRoute: boolean;
   onShowRouteChange: (show: boolean) => void;
+  /** Game sounds on or off (Life OS → Settings). */
+  sound: boolean;
+  onSoundChange: (on: boolean) => void;
   /** Opens the character creator to change appearance (life and progress are kept). */
   onEditLook: () => void;
   /** Back to the entry screen; the game is already saved. */
@@ -329,7 +339,7 @@ interface GameProps {
 /** The district the player was last placed in, so returning from the menu keeps their spot. */
 let placedIn: string | null = null;
 
-function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, onExitToMenu, onCharacterUpdate, onEditLook }: GameProps) {
+function Game({ character, quality: qualityMode, onQualityChange, showRoute, onShowRouteChange, sound, onSoundChange, onExitToMenu, onCharacterUpdate, onEditLook }: GameProps) {
   const controller = usePlayerController();
   // Read on every game tick, so it always sees the district the player is in now
   const districtRef = useRef<District | null>(null);
@@ -338,7 +348,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -449,8 +459,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const book = (to: District, mode: TravelMode) => {
     const option = travelOption(district.city, to.city, mode);
     if (!option || state.balance < option.fare) return;
+    // Your car stays parked where you left it
+    if (drivingNow) leaveCar(drivingNow);
     travel(to.id, mode);
-    // Your car stays parked at home
     setDrivingCar(null);
     setInside(false);
     setTravelOpen(false);
@@ -567,6 +578,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   /** The car you're driving (one you own), or null when on foot. */
   const [driving, setDrivingCar] = useState<OwnedCar | null>(null);
   const myCar = state.cars.length ? state.cars[state.cars.length - 1] : null;
+  /** Leave the car on the street where it is now, facing the way it was going. */
+  const leaveCar = (car: OwnedCar) => parkCar(car.id, { districtId: district.id, x: controller.position.x, z: controller.position.z, heading: controller.direction });
+  const parkAction = useRef(leaveCar);
+  useEffect(() => { parkAction.current = leaveCar; });
   // Drive only on the street, in a car you still own
   const canDrive = !offStreet && !sit.session;
   const drivingNow = driving && canDrive && state.cars.some((c) => c.id === driving.id) ? driving : null;
@@ -600,6 +615,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const metres = units * perGhai;
       const cost = fuelCost(car, metres);
       if (balanceRef.current < cost) {
+        parkAction.current(drivingNow);
         setDrivingCar(null);
         setArrival(`You're out of GHAI for fuel, so you've parked the ${car.name}.`);
         f.metres = 0;
@@ -610,12 +626,47 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     }, 1000);
     return () => clearInterval(id);
   }, [drivingNow, controller]);
+  // The engine, while you drive and sound is on
+  useEffect(() => {
+    const car = drivingNow && sound ? carById(drivingNow.id) : null;
+    if (!car) return;
+    const engine = startEngine();
+    if (!engine) return;
+    const id = setInterval(() => engine.update(Math.hypot(controller.velocity.x, controller.velocity.z), car.speed), 100);
+    return () => { clearInterval(id); engine.stop(); };
+  }, [drivingNow, sound, controller]);
   const toggleDrive = () => {
-    if (drivingNow) { setDrivingCar(null); setArrival('Parked. You’re on foot again.'); return; }
+    if (drivingNow) {
+      leaveCar(drivingNow);
+      setDrivingCar(null);
+      setArrival(`Parked. Your ${carById(drivingNow.id)?.name ?? 'car'} stays here until you come back for it.`);
+      return;
+    }
     if (!myCar || !canDrive) return;
-    setDrivingCar(myCar);
-    setArrival(`You get into your ${carById(myCar.id)?.name ?? 'car'}. W/S to drive and reverse, A/D to steer, Shift to crawl.`);
+    const car = carToDrive(state.cars, district.id, controller.position.x, controller.position.z);
+    if (!car) {
+      // Every car you own is parked somewhere else: say where, rather than conjure it up
+      const parked = myCar.parked;
+      const away = parked && districtById(parked.districtId);
+      const there = !parked || !away ? 'somewhere else'
+        : parked.districtId === district.id ? `${Math.round(Math.hypot(parked.x - controller.position.x, parked.z - controller.position.z))} m away in ${district.name}`
+        : `in ${away.name}, ${away.city.name}`;
+      setArrival(`Your ${carById(myCar.id)?.name ?? 'car'} is parked ${there}. Walk back to it to drive.`);
+      return;
+    }
+    // Getting in: you're in the driver's seat, facing the way it's parked
+    if (car.parked) {
+      // Its footprint goes when you're in it (the street re-adds any other parked cars on the next render)
+      parkedObstacles.length = 0;
+      placePlayer([car.parked.x, 0, car.parked.z], car.parked.heading);
+    }
+    parkCar(car.id, null);
+    setDrivingCar({ id: car.id, color: car.color });
+    setArrival(`You get into your ${carById(car.id)?.name ?? 'car'}. W/S to drive and reverse, A/D to steer, Shift to crawl.`);
   };
+  /** Your parked car in this district (the one you'd walk back to), for the map and the street. */
+  const parkedHere = state.cars.filter((c) => c.parked?.districtId === district.id && c.id !== drivingNow?.id);
+  const mapCar = parkedHere.length ? parkedHere[parkedHere.length - 1] : null;
   const atDealer = () => !offStreet && !drivingNow && !!dealershipAt(district, controller.position.x, controller.position.z);
 
   /** In through The Palms' front door (while it's open). */
@@ -1308,6 +1359,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           district={district}
           controller={controller}
           homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
+          car={mapCar?.parked ? { name: carById(mapCar.id)?.name ?? 'car', ...mapCar.parked } : null}
           onGo={(p) => {
             if (drivingNow) return 'park the car first';
             const { x, z } = controller.position;
@@ -1394,7 +1446,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
@@ -1533,7 +1585,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           // Step outside first, so you come back to the street (the room isn't restored after the creator)
           onEditLook={() => { if (offStreet) goOutside(); onEditLook(); }}
           settings={{
-            quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange,
+            quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange, sound, onSoundChange,
             onRest: () => { setOsOpen(false); rest(atHome()); },
             restWhere: () => atHome() ? `In your bed at ${home!.name}.` : state.home ? 'Away from home: you\u2019ll sleep rough and wake less rested. Your bed is better.' : 'You have no home, so you\u2019ll sleep rough and wake less rested.',
             onExitToMenu,

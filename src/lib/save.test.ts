@@ -137,6 +137,15 @@ describe('progress save', () => {
     expect(loadProgress(character, s).districtId).toBe('lagos.marina');
   });
 
+  it('remembers where your car is parked, unless that place is gone', () => {
+    const s = new MemoryStorage();
+    const spot = { districtId: 'accra.osu', x: 2, z: 14, heading: 1 };
+    saveProgress('abc', { ...createGameState(100), cars: [{ id: 'hatch', color: '#f2f2ee', parked: spot }] }, s);
+    expect(loadProgress(character, s).cars[0].parked).toEqual(spot);
+    saveProgress('abc', { ...createGameState(100), cars: [{ id: 'hatch', color: '#f2f2ee', parked: { ...spot, districtId: 'atlantis' } }] }, s);
+    expect(loadProgress(character, s).cars[0]).toEqual({ id: 'hatch', color: expect.any(String) });
+  });
+
   it('drops a home that no longer exists', () => {
     const s = new MemoryStorage();
     saveProgress('abc', { ...createGameState(100), home: 'demolished' }, s);

@@ -151,7 +151,7 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
-    cars: sanitiseCars(p.cars),
+    cars: sanitiseCars(p.cars, isDistrictId),
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),

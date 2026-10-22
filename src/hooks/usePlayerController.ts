@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
-import { activeLayout, movingObstacles, resolveCollisions } from '../lib/world';
+import { activeLayout, obstaclesWithVehicles, resolveCollisions, type Obstacle } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
@@ -140,7 +140,7 @@ const playerHandle: PlayerHandle = {
       stuckFor += delta;
       if (stuckFor > STUCK_SECONDS) {
         // Probably traffic in the way: plan once more around where vehicles are now, else give up
-        const again = replanned ? null : planRoute(moveTarget, [...activeLayout().obstacles, ...movingObstacles]);
+        const again = replanned ? null : planRoute(moveTarget, obstaclesWithVehicles());
         replanned = true;
         stuckFor = 0;
         if (again) route = again;
@@ -164,7 +164,7 @@ export function setMovementBlocked(blocked: boolean) {
   if (blocked) releaseAllKeys();
 }
 
-function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Point[] | null {
+function planRoute(target: MoveTarget, obstacles: readonly Obstacle[] = activeLayout().obstacles): Point[] | null {
   const grid = obstacles === activeLayout().obstacles ? walkGridFor(obstacles) : buildWalkGrid(obstacles);
   return findPath(grid, { x: playerHandle.position.x, z: playerHandle.position.z }, target);
 }

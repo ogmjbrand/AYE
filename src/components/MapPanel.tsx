@@ -27,10 +27,16 @@ function compass(dx: number, dz: number) {
  * as a labelled pin. Filter by kind, zoom in on where you are, and pick a
  * place to walk there with the route finder.
  */
-export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
+/** The parked car's pin id (never a place id, which are dotted). */
+const CAR_PIN = 'my-car';
+const CAR_COLOR = '#e8c46a';
+
+export function MapPanel({ district, controller, homePlaceId, car = null, onGo, onClose }: {
   district: District;
   controller: PlayerHandle;
   homePlaceId: string | null;
+  /** Your car, where you parked it in this district. */
+  car?: { name: string; x: number; z: number; heading: number } | null;
   /** Walk to a place; returns why not, or null when the walk started. */
   onGo?: (place: { id: string; name: string; x: number; z: number }) => string | null;
   onClose: () => void;
@@ -53,7 +59,9 @@ export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
     .sort((a, b) => a.dist - b.dist);
   const places = all.filter((p) => !hidden.has(p.kind));
   const kinds = (Object.keys(KIND_LABEL) as PlaceKind[]).filter((k) => all.some((p) => p.kind === k));
-  const pick = all.find((p) => p.id === selected) ?? null;
+  const carSpot = car ? { id: CAR_PIN, name: `Your ${car.name}`, position: [car.x, 0, car.z] as const, dist: Math.hypot(car.x - x, car.z - z) } : null;
+  const pick = (selected === CAR_PIN ? carSpot : all.find((p) => p.id === selected)) ?? null;
+  const pickLabel = pick && 'kind' in pick ? KIND_LABEL[pick.kind] : 'Parked here';
   const B = WORLD_BOUND;
   const { roadHalfWidth: ROAD_HALF_WIDTH, crossStreet: CROSS_STREET, buildings } = district.layout;
   // Map x is mirrored so east (-x) is on the right, matching the compass
@@ -67,7 +75,9 @@ export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
   const toggle = (kind: PlaceKind) => setHidden((h) => { const n = new Set(h); if (n.has(kind)) n.delete(kind); else n.add(kind); return n; });
   const go = () => {
     if (!pick || !onGo) return;
-    const why = onGo({ id: pick.id, name: pick.name, x: pick.position[0], z: pick.position[2] });
+    // To your car: walk to the driver's door, beside it, not into it
+    const [gx, gz] = pick.id === CAR_PIN && car ? [car.x + Math.cos(car.heading) * 1.8, car.z - Math.sin(car.heading) * 1.8] : [pick.position[0], pick.position[2]];
+    const why = onGo({ id: pick.id, name: pick.name, x: gx, z: gz });
     if (why) setNote(why);
     else onClose();
   };
@@ -125,6 +135,18 @@ export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
                   </g>
                 );
               })}
+              {car && (
+                <g onClick={() => { setSelected(CAR_PIN); setNote(null); }} style={{ cursor: 'pointer' }}
+                  transform={`translate(${mx(car.x)} ${my(car.z)}) rotate(${(-car.heading * 180) / Math.PI}) scale(${k})`}>
+                  {/* Your car from above, nose first */}
+                  <rect x={-1.1} y={-2.1} width={2.2} height={4.2} rx={0.8} fill={CAR_COLOR} stroke={selected === CAR_PIN ? '#fff' : '#111'} strokeWidth={0.35} />
+                  <rect x={-0.8} y={-1.1} width={1.6} height={1.2} rx={0.3} fill="#1d2126" opacity={0.7} />
+                </g>
+              )}
+              {car && (
+                <text x={mx(car.x)} y={my(car.z) - 3.4 * k} fill={CAR_COLOR} fontSize={(selected === CAR_PIN ? 2.6 : 2) * k} textAnchor="middle"
+                  stroke="#1d2126" strokeWidth={0.6 * k} paintOrder="stroke" style={{ pointerEvents: 'none' }}>Your car</text>
+              )}
               <g transform={`translate(${mx(x)} ${my(z)}) rotate(${(-controller.direction * 180) / Math.PI}) scale(${k})`}>
                 <path d="M0 -2.6 L1.8 2 L0 1 L-1.8 2 Z" fill="#fff" stroke="#000" strokeWidth={0.3} />
               </g>
@@ -140,7 +162,7 @@ export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
             <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-ui-gold/40 p-3" aria-live="polite">
               <div className="min-w-0">
                 <p className="m-0 truncate text-sm font-semibold">{pick.name}{pick.id === homePlaceId && <span className="text-ui-muted"> · your home</span>}</p>
-                <p className="m-0 text-xs text-ui-muted">{KIND_LABEL[pick.kind]} · {Math.round(pick.dist)} m {compass(pick.position[0] - x, pick.position[2] - z)}{note ? ` · ${note}` : ''}</p>
+                <p className="m-0 text-xs text-ui-muted">{pickLabel} · {Math.round(pick.dist)} m {compass(pick.position[0] - x, pick.position[2] - z)}{note ? ` · ${note}` : ''}</p>
               </div>
               {onGo && (
                 <button type="button" onClick={go} className="shrink-0 rounded-full bg-ui-gold px-4 py-1.5 text-sm font-bold text-[#2a1c06] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">Go</button>
@@ -149,6 +171,18 @@ export function MapPanel({ district, controller, homePlaceId, onGo, onClose }: {
           )}
         </div>
         <ol className="m-0 min-h-0 flex-1 list-none overflow-y-auto border-t border-ui-line p-4 sm:border-l sm:border-t-0">
+          {carSpot && (
+            <li>
+              <button type="button" onClick={() => { setSelected(CAR_PIN); setNote(null); }} aria-pressed={selected === CAR_PIN}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${selected === CAR_PIN ? 'bg-ui-gold/10' : ''}`}>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: CAR_COLOR }} aria-hidden />
+                  <span className="truncate font-semibold">{carSpot.name}</span>
+                </span>
+                <span className="shrink-0 tabular-nums text-ui-muted">{Math.round(carSpot.dist)} m {compass(carSpot.position[0] - x, carSpot.position[2] - z)}</span>
+              </button>
+            </li>
+          )}
           {places.map((p) => (
             <li key={p.id}>
               <button type="button" onClick={() => { setSelected(p.id); setNote(null); }} aria-pressed={p.id === selected}

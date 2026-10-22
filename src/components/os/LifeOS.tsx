@@ -51,7 +51,7 @@ export interface LifeOSProps {
   /** Opens the character creator to change appearance. */
   onEditLook: () => void;
   settings: {
-    quality: string; onCycleQuality: () => void; showRoute: boolean; onShowRouteChange: (v: boolean) => void;
+    quality: string; onCycleQuality: () => void; showRoute: boolean; onShowRouteChange: (v: boolean) => void; sound: boolean; onSoundChange: (v: boolean) => void;
     /** Sleep until 07:00 where you are (your bed, a friend's, or rough). */
     onRest: () => void; restWhere: () => string;
     /** Back to the main menu (the game saves as you play). */
@@ -710,6 +710,16 @@ function Settings({ settings }: LifeOSProps) {
           <button type="button" onClick={settings.onCycleQuality} className="rounded-full border border-ui-line px-3 py-1.5 text-xs capitalize hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">{settings.quality}</button>
         </div>
       </Card>
+      <SectionTitle>Sound</SectionTitle>
+      <Card>
+        <label className="flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-sm font-semibold">Game sounds</span>
+            <span className="block text-[11px] text-ui-muted">Your car&rsquo;s engine while you drive. There&rsquo;s no music yet.</span>
+          </span>
+          <input type="checkbox" checked={settings.sound} onChange={(e) => settings.onSoundChange(e.target.checked)} className="h-4 w-4 accent-[var(--color-ui-accent)]" />
+        </label>
+      </Card>
       <SectionTitle>Controls</SectionTitle>
       <Card>
         <label className="flex items-center justify-between gap-3">
@@ -729,7 +739,7 @@ function Settings({ settings }: LifeOSProps) {
       <SectionTitle>Accessibility</SectionTitle>
       <Card><p className="m-0 text-xs text-ui-muted">AYE follows your device&rsquo;s reduced-motion setting: animations and transitions switch off when it&rsquo;s on. Every panel works with the keyboard.</p></Card>
       <SectionTitle>Account and privacy</SectionTitle>
-      <Card><p className="m-0 text-xs text-ui-muted">Your life is saved in this browser only. Online accounts, cloud saves and playing with other people aren&rsquo;t available yet, so there are no privacy settings to change: nothing leaves this device. There is no sound yet.</p></Card>
+      <Card><p className="m-0 text-xs text-ui-muted">Your life is saved in this browser only. Online accounts, cloud saves and playing with other people aren&rsquo;t available yet, so there are no privacy settings to change: nothing leaves this device.</p></Card>
     </>
   );
 }

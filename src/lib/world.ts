@@ -202,6 +202,17 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
 
 // Moving vehicles add themselves here each frame so the player can't walk through them
 export const movingObstacles: Obstacle[] = [];
+// Your cars parked in this district (world/ParkedCars keeps it up to date)
+export const parkedObstacles: Obstacle[] = [];
+/** The district's own obstacles plus every vehicle on the street right now. */
+export const obstaclesWithVehicles = (): readonly Obstacle[] =>
+  movingObstacles.length || parkedObstacles.length ? [...activeLayout().obstacles, ...movingObstacles, ...parkedObstacles] : activeLayout().obstacles;
+
+/** A parked car as a box on the ground: the footprint of a car this long, turned to face this way. */
+export function carFootprint(x: number, z: number, heading: number, length: number, width = 1.85): Obstacle {
+  const c = Math.abs(Math.cos(heading)), s = Math.abs(Math.sin(heading));
+  return { position: [x, 0, z], size: [width * c + length * s, 1.4, width * s + length * c] };
+}
 
 // The district the player is in. Collision and ground height default to it;
 // rendering reads the same layout through React context (world/LayoutContext).
@@ -222,7 +233,7 @@ export function resolveCollisions(
   x: number,
   z: number,
   radius = PLAYER_RADIUS,
-  obstacles: readonly Obstacle[] = movingObstacles.length ? [...activeLayout().obstacles, ...movingObstacles] : activeLayout().obstacles,
+  obstacles: readonly Obstacle[] = obstaclesWithVehicles(),
 ): { x: number; z: number } {
   for (const o of obstacles) {
     const halfW = o.size[0] / 2;

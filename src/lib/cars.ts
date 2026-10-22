@@ -32,10 +32,44 @@ export const CARS: readonly CarModel[] = [
 
 export const carById = (id: string | null | undefined) => CARS.find((c) => c.id === id);
 
-/** A car you own, in the colour you chose. */
+/** Where a car was left on the street: the district, the spot and which way it faces (radians, as the player's heading). */
+export interface ParkedSpot {
+  districtId: string;
+  x: number;
+  z: number;
+  heading: number;
+}
+
+/** A car you own, in the colour you chose. Parked somewhere, or (no spot) with you, ready to drive wherever you are. */
 export interface OwnedCar {
   id: string;
   color: string;
+  parked?: ParkedSpot;
+}
+
+/** How close you need to be to your parked car to get in, in metres. */
+export const PICKUP_RADIUS = 4;
+
+/** The car you'd get into here: a parked one within reach first, otherwise the newest one that's with you. */
+export function carToDrive(cars: readonly OwnedCar[], districtId: string, x: number, z: number): OwnedCar | null {
+  let near: OwnedCar | null = null;
+  let best = PICKUP_RADIUS;
+  for (const c of cars) {
+    if (!c.parked || c.parked.districtId !== districtId) continue;
+    const d = Math.hypot(c.parked.x - x, c.parked.z - z);
+    if (d <= best) { best = d; near = c; }
+  }
+  if (near) return near;
+  for (let i = cars.length - 1; i >= 0; i--) if (!cars[i].parked) return cars[i];
+  return null;
+}
+
+function sanitiseSpot(data: unknown): ParkedSpot | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const { districtId, x, z, heading } = data as Record<string, unknown>;
+  const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+  if (typeof districtId !== 'string' || !districtId || !finite(x) || !finite(z) || !finite(heading)) return undefined;
+  return { districtId, x, z, heading };
 }
 
 export const CAR_RESALE_SHARE = 0.5;
@@ -44,16 +78,18 @@ export const carResale = (c: CarModel) => Math.round(c.price * CAR_RESALE_SHARE)
 /** Fuel for a distance driven, in GHAI (rounded to whole GHAI, never below zero). */
 export const fuelCost = (car: CarModel, metres: number) => Math.max(0, Math.round((car.fuelPerKm * metres) / 1000));
 
-/** Keeps known cars in known colours, one of each model. */
-export function sanitiseCars(data: unknown): OwnedCar[] {
+/** Keeps known cars in known colours, one of each model; a parked spot in a district that doesn't exist (any more) is dropped, so the car is with you. */
+export function sanitiseCars(data: unknown, knownDistrict: (id: string) => boolean = () => true): OwnedCar[] {
   if (!Array.isArray(data)) return [];
   const out: OwnedCar[] = [];
   for (const raw of data.slice(0, 10)) {
     if (typeof raw !== 'object' || raw === null) continue;
-    const { id, color } = raw as Record<string, unknown>;
+    const { id, color, parked } = raw as Record<string, unknown>;
     const car = carById(typeof id === 'string' ? id : null);
     if (!car || out.some((o) => o.id === car.id)) continue;
-    out.push({ id: car.id, color: typeof color === 'string' && car.colors.includes(color) ? color : car.colors[0] });
+    const left = sanitiseSpot(parked);
+    const spot = left && knownDistrict(left.districtId) ? left : undefined;
+    out.push({ id: car.id, color: typeof color === 'string' && car.colors.includes(color) ? color : car.colors[0], ...(spot ? { parked: spot } : {}) });
   }
   return out;
 }

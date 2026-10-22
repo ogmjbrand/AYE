@@ -5,6 +5,7 @@ import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
 import { hasProgress, loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
+import type { ParkedSpot } from '../lib/cars';
 import type { Activity } from '../lib/people';
 import type { Needs } from '../lib/needs';
 import type { CampusRoom, CampusVisit, StudyKind } from '../lib/school';
@@ -55,6 +56,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     buyCar: (id: string, color: string) => dispatch({ type: 'buyCar', id, color }),
     sellCar: (id: string) => dispatch({ type: 'sellCar', id }),
     fuel: (carId: string, metres: number) => dispatch({ type: 'fuel', carId, metres }),
+    parkCar: (carId: string, spot: ParkedSpot | null) => dispatch({ type: 'parkCar', carId, spot }),
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     socialise: (residentId: string, activity: Activity) => dispatch({ type: 'socialise', residentId, activity }),
     nightOut: (residentId: string) => dispatch({ type: 'nightOut', residentId }),
