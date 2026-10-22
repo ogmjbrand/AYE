@@ -4,6 +4,7 @@
  * the saved character. The same draft is used to edit an existing
  * character's appearance (money, progress and owned clothes are kept).
  */
+import { MAX_TRAITS, TRAITS, type DreamId, type TraitId } from './lifeState';
 import type { Career, Character, Lifestyle } from '../components/CharacterCreation';
 import type { Diet } from './food';
 import type { Gender } from './identity';
@@ -45,6 +46,10 @@ export interface Draft {
   lifestyle: Lifestyle;
   career: Career;
   diet: Diet;
+  /** For a new life: up to two traits, a dream and a first home (applied once at the start). */
+  traits: TraitId[];
+  dream: DreamId | null;
+  homeId: string | null;
 }
 
 export const SKIN_TONE_RANGE = { min: -1, max: 1 } as const;
@@ -67,7 +72,7 @@ export function newDraft(country = 'NG'): Draft {
   return {
     name: '', gender: 'unspecified', heritage: 'unspecified', ethnicGroup: '', country, region: '',
     body, lookId: looksFor(body)[0].id, heightCm: defaultHeightCm(body), shape: AVERAGE_SHAPE, skinTone: 0,
-    outfit: {}, lifestyle: 'ordinary', career: 'none', diet: 'everything',
+    outfit: {}, lifestyle: 'ordinary', career: 'none', diet: 'everything', traits: [], dream: null, homeId: null,
   };
 }
 
@@ -76,7 +81,7 @@ export function draftFrom(c: Character): Draft {
   return {
     name: c.name, gender: c.gender, heritage: c.heritage, ethnicGroup: c.ethnicGroup, country: c.country, region: c.region,
     body: c.body, lookId: c.lookId, heightCm: c.heightCm, shape: sanitiseShape(c.shape), skinTone: c.skinTone ?? 0,
-    outfit: { ...c.wardrobe.equipped }, lifestyle: c.lifestyle, career: c.career, diet: c.diet,
+    outfit: { ...c.wardrobe.equipped }, lifestyle: c.lifestyle, career: c.career, diet: c.diet, traits: [], dream: null, homeId: null,
   };
 }
 
@@ -193,5 +198,8 @@ export function buildCharacter(d: Draft, opts: { existing?: Character; id?: stri
     balance: STARTING_BALANCE[d.lifestyle],
     createdAt: now,
     lastBalanceUpdate: now,
+    ...(d.traits.length || d.dream || d.homeId
+      ? { start: { traits: d.traits.filter((t) => TRAITS.some((x) => x.id === t)).slice(0, MAX_TRAITS), dream: d.dream, homeId: d.homeId } }
+      : {}),
   };
 }

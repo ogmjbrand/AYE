@@ -800,3 +800,17 @@ export function recogniseExisting(s: GameState, career: Career): GameState {
   const done = ACHIEVEMENTS.filter((x) => x.check(ctx)).map((x) => ({ id: x.id, t: s.time.totalMinutes }));
   return { ...s, life: { ...s.life, achievements: done, cities: [s.districtId] } };
 }
+
+/**
+ * A new life's opening choices (character creation), applied once through the
+ * normal rules: traits and a dream on the profile, then moving into the chosen
+ * home if the starting money covers its move-in fee.
+ */
+export function applyStart(state: GameState, start: { traits: readonly TraitId[]; dream: DreamId | null; homeId: string | null } | undefined, career: Career, lifestyle: Lifestyle): GameState {
+  if (!start) return state;
+  let s = state;
+  if (start.traits.length) s = lifeReducer(s, { type: 'setProfile', bio: s.life.profile.bio, traits: [...start.traits] }, career, lifestyle);
+  if (start.dream) s = lifeReducer(s, { type: 'setDream', dream: start.dream }, career, lifestyle);
+  if (start.homeId) s = lifeReducer(s, { type: 'moveIn', homeId: start.homeId }, career, lifestyle);
+  return s;
+}

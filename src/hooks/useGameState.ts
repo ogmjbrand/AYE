@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
 import type { FurnitureTarget, GameState } from '../lib/gameState';
-import { lifeReducer, type AnyAction } from '../lib/life';
+import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
-import { loadProgress, saveProgress } from '../lib/save';
+import { hasProgress, loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
 import type { Needs } from '../lib/needs';
@@ -31,7 +31,8 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
       lifeReducer(state, action, character.career, character.lifestyle),
     [character.career, character.lifestyle],
   );
-  const [state, dispatch] = useReducer(reducer, character, (c) => loadProgress(c));
+  // A brand-new life starts with the choices made at creation (traits, dream, first home)
+  const [state, dispatch] = useReducer(reducer, character, (c) => (hasProgress(c) ? loadProgress(c) : applyStart(loadProgress(c), c.start, c.career, c.lifestyle)));
 
   useEffect(() => {
     const interval = setInterval(

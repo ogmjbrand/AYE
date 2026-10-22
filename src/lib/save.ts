@@ -63,8 +63,11 @@ export function parseCharacter(data: unknown): Character | null {
   const gender = GENDERS.some((g) => g.id === c.gender) ? (c.gender as Gender) : 'unspecified';
   const look = LOOKS.find((l) => l.id === c.lookId) ?? lookById(undefined);
   const body: BodyType = c.body === 'feminine' || c.body === 'masculine' ? c.body : look.body;
+  // Opening choices are applied once in memory and never kept
+  const { start: _start, ...rest } = c;
+  void _start;
   return {
-    ...(c as unknown as Character),
+    ...(rest as unknown as Character),
     diet: (c.diet as Diet | undefined) ?? 'everything',
     gender,
     heritage: HERITAGES.some((h) => h.id === c.heritage) ? (c.heritage as string) : 'unspecified',
@@ -89,7 +92,15 @@ export function loadCharacter(storage: Storage = localStorage): Character | null
 }
 
 export function saveCharacter(character: Character, storage: Storage = localStorage) {
-  storage.setItem(CHARACTER_KEY, JSON.stringify(character));
+  const { start: _start, ...rest } = character;
+  void _start;
+  storage.setItem(CHARACTER_KEY, JSON.stringify(rest));
+}
+
+/** Whether this character already has saved progress (opening choices only apply to a brand-new life). */
+export function hasProgress(character: Pick<Character, 'id'>, storage: Storage = localStorage): boolean {
+  const data = readJson(storage, PROGRESS_KEY);
+  return typeof data === 'object' && data !== null && (data as Record<string, unknown>).characterId === character.id;
 }
 
 export function clearSave(storage: Storage = localStorage) {

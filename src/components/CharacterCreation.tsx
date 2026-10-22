@@ -2,6 +2,10 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { CharacterPreview, type PreviewFocus } from './CharacterPreview';
 import { BodyTypeChart } from './mh/BodyTypeChart';
 import { saveCharacter } from '../lib/save';
+import { MAX_TRAITS, TRAITS, type DreamId, type TraitId } from '../lib/lifeState';
+import { DREAMS } from '../lib/life';
+import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
+import { moveInFee } from '../lib/homes';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
@@ -56,6 +60,17 @@ export interface Character {
   balance: number;
   createdAt: number;
   lastBalanceUpdate: number;
+  /**
+   * Choices made when the life was created (traits, a dream, a first home),
+   * applied once when the game starts. Never saved with the character.
+   */
+  start?: StartChoices;
+}
+
+export interface StartChoices {
+  traits: TraitId[];
+  dream: DreamId | null;
+  homeId: string | null;
 }
 
 interface CharacterCreationProps {
@@ -427,6 +442,7 @@ function ReviewStage({ draft, set, editing }: StageProps & { editing?: Character
               {DIETS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
           </Field>
+          <StartChoicesFields draft={draft} set={set} />
         </div>
       )}
     </>
@@ -444,6 +460,67 @@ const SKIN_STEPS: readonly { value: number; label: string; color: string }[] = [
   { value: 0.85, label: 'Deep', color: '#4a2b19' },
   { value: 1, label: 'Deepest', color: '#352013' },
 ];
+
+/** Personality, a dream and a first home for a new life: the same choices the Life OS offers later. */
+function StartChoicesFields({ draft, set }: StageProps) {
+  const budget = STARTING_BALANCE[draft.lifestyle];
+  const homes = districtById(DEFAULT_DISTRICT_ID).homes;
+  const toggleTrait = (id: TraitId) => {
+    const on = draft.traits.includes(id);
+    if (!on && draft.traits.length >= MAX_TRAITS) return;
+    set({ traits: on ? draft.traits.filter((t) => t !== id) : [...draft.traits, id] });
+  };
+  // A home you can't afford with your starting money is dropped if the lifestyle changes
+  const chosen = homes.find((h) => h.id === draft.homeId);
+  const homeOk = !chosen || moveInFee(chosen) <= budget;
+  return (
+    <>
+      <div>
+        <p className={SECTION_LABEL}>Personality (up to {MAX_TRAITS})</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {TRAITS.map((t) => {
+            const on = draft.traits.includes(t.id);
+            const full = !on && draft.traits.length >= MAX_TRAITS;
+            return (
+              <button key={t.id} type="button" aria-pressed={on} disabled={full} onClick={() => toggleTrait(t.id)}
+                className={`rounded-lg border px-3 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold disabled:opacity-40 ${on ? 'border-cc-gold bg-cc-gold/10' : 'border-cc-line hover:border-cc-gold/60'}`}>
+                <span className="block text-sm font-semibold text-cc-ink">{t.label}</span>
+                <span className="block text-[11px] text-cc-muted">{t.effect}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <Field id="dream" label="Life dream (optional)" hint={draft.dream ? DREAMS.find((d) => d.id === draft.dream)?.description : 'A long-term goal with milestones and rewards. You can also pick one later in the Life OS.'}>
+        <select id="dream" value={draft.dream ?? ''} onChange={(e) => set({ dream: (e.target.value || null) as DreamId | null })} className={INPUT}>
+          <option value="">Decide later</option>
+          {DREAMS.filter((d) => !d.open).map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+        </select>
+      </Field>
+      <div>
+        <p className={SECTION_LABEL}>First home in Lagos (optional)</p>
+        <div className="grid gap-2" role="radiogroup" aria-label="First home">
+          <button type="button" role="radio" aria-checked={!draft.homeId} onClick={() => set({ homeId: null })}
+            className={`rounded-lg border px-3 py-2 text-left text-sm transition ${!draft.homeId ? 'border-cc-gold bg-cc-gold/10' : 'border-cc-line hover:border-cc-gold/60'}`}>
+            Find a home later <span className="text-xs text-cc-muted">· you can rent one at any front door</span>
+          </button>
+          {homes.map((h) => {
+            const fee = moveInFee(h);
+            const afford = fee <= budget;
+            return (
+              <button key={h.id} type="button" role="radio" aria-checked={draft.homeId === h.id} disabled={!afford} onClick={() => set({ homeId: h.id })}
+                className={`rounded-lg border px-3 py-2 text-left transition disabled:opacity-40 ${draft.homeId === h.id ? 'border-cc-gold bg-cc-gold/10' : 'border-cc-line hover:border-cc-gold/60'}`}>
+                <span className="block text-sm font-semibold text-cc-ink">{h.name} <span className="font-normal text-cc-muted">· {h.kind}</span></span>
+                <span className="block text-[11px] text-cc-muted">Move-in {fee.toLocaleString()} GHAI, then {h.rentPerNight.toLocaleString()} GHAI a night{afford ? '' : ' · more than your starting money'}</span>
+              </button>
+            );
+          })}
+        </div>
+        {!homeOk && <p className="mt-1 text-xs text-cc-muted">That home costs more than this lifestyle starts with, so you won’t move in. Choose another or a richer lifestyle.</p>}
+      </div>
+    </>
+  );
+}
 
 const SECTION_LABEL = 'text-xs font-semibold uppercase tracking-[0.18em] text-cc-gold mb-2';
 const INPUT =

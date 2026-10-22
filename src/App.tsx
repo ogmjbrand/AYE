@@ -329,6 +329,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     () => campusRef.current,
   );
   const district = districtById(state.districtId);
+  // Opening choices (traits, dream, first home) were applied as this life began: drop them so nothing applies them again
+  useEffect(() => {
+    if (character.start) onCharacterUpdate({ ...character, start: undefined });
+  }, [character, onCharacterUpdate]);
   const home = homeById(state.home);
   const [inside, setInside] = useState(false);
   // Inside a venue you walked into (The Palms), by its id
