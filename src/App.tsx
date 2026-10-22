@@ -1284,6 +1284,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           district={district}
           controller={controller}
           homePlaceId={state.home ? `${district.id}.home.${state.home}` : null}
+          onGo={(p) => {
+            if (drivingNow) return 'park the car first';
+            const { x, z } = controller.position;
+            if (Math.hypot(p.x - x, p.z - z) < 1) return 'you’re already here';
+            setMovementBlocked(false);
+            return setMoveTarget(makeTarget(x, z, p.x, p.z, false), { destinationId: p.id, label: p.name }) ? null : 'there’s no way to walk there from here';
+          }}
           onClose={() => setMapOpen(false)}
         />
       )}
