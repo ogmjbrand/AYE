@@ -80,6 +80,8 @@ export interface DistrictSpec {
   park: Park;
   /** A sit-down restaurant you walk into (lib/restaurant.ts), where the district has one. */
   restaurant?: RestaurantFront;
+  /** A car dealership (lib/cars.ts), where the district has one. */
+  dealership?: RestaurantFront;
 }
 
 export interface RestaurantFront {
@@ -103,6 +105,12 @@ export function restaurantAt(d: Pick<District, 'restaurant'>, x: number, z: numb
   const r = d.restaurant;
   return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
 }
+/** The car dealership whose door you're standing at, if any. */
+export function dealershipAt(d: Pick<District, 'dealership'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.dealership;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+
 /** Within this distance of a restaurant's door you can go in (E). */
 export const DOOR_RADIUS = 2;
 
@@ -119,6 +127,7 @@ function buildDistrict(spec: DistrictSpec): District {
     { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
     ...(spec.restaurant ? [{ id: id(`restaurant.${spec.restaurant.id}`), kind: 'food' as const, name: spec.restaurant.name, position: spec.restaurant.door }] : []),
+    ...(spec.dealership ? [{ id: id(`cars.${spec.dealership.id}`), kind: 'shop' as const, name: spec.dealership.name, position: spec.dealership.door }] : []),
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,

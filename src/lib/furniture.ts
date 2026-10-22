@@ -53,6 +53,8 @@ export interface CatalogueItem {
   room: DecorRoom;
   /** The Luxe collection: designer pieces with their own look. */
   style?: 'luxe';
+  /** Which Luxe design (beds and storage come in several). */
+  design?: string;
   price: number;
   /** Decides its 3D shape and what using it does. */
   kind: FurnitureKind;
@@ -69,8 +71,8 @@ export interface CatalogueItem {
 const item = (
   id: string, name: string, category: FurnitureCategory, price: number, kind: FurnitureKind,
   size: readonly [number, number, number], color: string, comfort: number, quality: number, description: string,
-  extra: { room?: DecorRoom; style?: 'luxe' } = {},
-): CatalogueItem => ({ id, name, category, room: extra.room ?? ROOM_OF[category], style: extra.style, price, kind, size, color, comfort, quality, description });
+  extra: { room?: DecorRoom; style?: 'luxe'; design?: string } = {},
+): CatalogueItem => ({ id, name, category, room: extra.room ?? ROOM_OF[category], style: extra.style, design: extra.design, price, kind, size, color, comfort, quality, description });
 
 const luxe = { style: 'luxe' as const };
 
@@ -114,7 +116,13 @@ export const CATALOGUE: readonly CatalogueItem[] = [
   item('luxe-wall-art', 'Wall Art', 'decor', 3200, 'art', [1.2, 0.9, 0.06], '#c9a052', 2, 1, 'An original abstract canvas in a gold frame, hung on the wall.', luxe),
   item('luxe-dining-table', 'Dining Table', 'tables', 12000, 'table', [2.0, 0.76, 1.7], '#f1ede6', 3, 1, 'Marble-topped, with four velvet chairs.', { ...luxe, room: 'kitchen' }),
   item('luxe-kitchen-island', 'Kitchen Island', 'kitchen', 11500, 'counter', [2.0, 0.95, 0.9], '#f1ede6', 3, 1.4, 'A marble island with a hob and bar stools. Cook like a chef.', luxe),
-  item('luxe-bed', 'Upholstered King Bed', 'beds', 14000, 'bed', [2.0, 0.6, 2.2], '#e9e3d8', 6, 1.4, 'A king bed with a tall channel-tufted headboard.', luxe),
+  item('luxe-bed', 'Chevron King Bed', 'beds', 14000, 'bed', [2.0, 0.6, 2.2], '#e9e3d8', 6, 1.4, 'Cream chevron headboard with gold strips, grey wings with LED mirrors and a storage frame.', { ...luxe, design: 'chevron' }),
+  item('luxe-bed-royal', 'Royal Leather King Bed', 'beds', 16500, 'bed', [2.0, 0.6, 2.2], '#1d3c8c', 6, 1.4, 'Royal-blue channel-tufted leather with gold bars, fluted white wings and wall sconces.', { ...luxe, design: 'royal' }),
+  item('luxe-bed-charcoal', 'Charcoal Arch King Bed', 'beds', 15500, 'bed', [2.0, 0.6, 2.2], '#3b3c41', 6, 1.4, 'An arched charcoal velvet headboard with gold strips, tufted wings and a bench footboard.', { ...luxe, design: 'arch' }),
+  item('luxe-bed-teal', 'Teal Sunburst King Bed', 'beds', 17500, 'bed', [2.0, 0.6, 2.2], '#1d5c60', 6, 1.4, 'Teal velvet arch with a gold sunburst, gold-barred frame and ring-handled storage.', { ...luxe, design: 'sunburst' }),
+  item('luxe-nightstand', 'Nightstand', 'storage', 2200, 'dresser', [0.5, 0.55, 0.45], '#8d8f93', 1, 1, 'Two upholstered drawers with gold handles, to stand beside the bed.', { ...luxe, design: 'nightstand' }),
+  item('luxe-dressing-table', 'Marble Dressing Table', 'storage', 6400, 'dresser', [1.2, 1.75, 0.45], '#f3f1ec', 2, 1, 'White marble laminate with a lit mirror, open shelves and gold handles.', { ...luxe, design: 'vanity' }),
+  item('luxe-wardrobe', 'Marble Wardrobe', 'storage', 9800, 'wardrobe', [2.0, 2.2, 0.6], '#f3f1ec', 2, 1, 'Four doors in white marble laminate with long gold handles.', { ...luxe, design: 'marble' }),
   item('luxe-bathtub', 'Stone Bathtub', 'bathroom', 9800, 'bathtub', [1.7, 0.6, 0.85], '#f4f2ee', 5, 1.4, 'A freestanding stone tub with brass taps.', luxe),
 ];
 
@@ -184,7 +192,7 @@ export function asFurniture(o: OwnedFurniture): Furniture | null {
   const i = catalogueItem(o.itemId);
   if (!i || !o.at) return null;
   const [w, d] = footprint(i, o.rot);
-  return { kind: i.kind, at: o.at, size: [w, i.size[1], d], color: i.color, style: i.style };
+  return { kind: i.kind, at: o.at, size: [w, i.size[1], d], color: i.color, style: i.style, ...(i.design ? { design: i.design } : {}) };
 }
 
 /** Rugs lie on the floor and art hangs on the wall: neither is in your way. */

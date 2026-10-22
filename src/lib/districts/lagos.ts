@@ -27,7 +27,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-21, -10.25, 12, 5.5, 7, 'shop', '#1f2c27'),
       // West side, south of the cross street
       b(-13, -36, 10, 12, 18, 'office', '#d6cdbd', 'University'),
-      b(-26, -36, 10, 10, 13, 'residential', '#e3cf9a'),
+      // Eko Motors car showroom, its glass front on the cross street side
+      b(-26, -36, 10, 10, 13, 'shop', '#2a2c30', 'Eko Motors'),
       // East side, north of the cross street
       b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
       b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
@@ -112,6 +113,7 @@ export const LAGOS_MARINA: DistrictSpec = {
     id: 'lagoon-live', name: 'Lagoon Live', kind: 'Live music lounge', position: [5.5, 0, 20], cover: 250,
     description: 'Afrobeats and highlife from a house band, small chops at the bar, open late.',
   },
+  dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   homes: [
     {

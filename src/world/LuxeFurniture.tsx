@@ -5,6 +5,7 @@ import type { Furniture } from '../lib/interiors';
 import { artTexture, marbleTexture, rugTexture } from './venueTextures';
 import { PottedPalm } from './PottedPalm';
 import { RealModel } from './RealModel';
+import { LuxeBed, LuxeNightstand, LuxeVanity, LuxeWardrobe } from './LuxeBedroom';
 
 /**
  * The Luxe collection's designer pieces (lib/furniture.ts), drawn at the
@@ -275,24 +276,6 @@ function KitchenIsland({ w, d, h }: { w: number; d: number; h: number }) {
   );
 }
 
-function Bed({ w, d, h, color }: { w: number; d: number; h: number; color: string }) {
-  return (
-    <>
-      <Soft p={[0, 0.2, 0]} s={[w, 0.32, d]} color={color} radius={0.06} />
-      <Soft p={[0, 0.48, -0.05]} s={[w - 0.08, 0.24, d - 0.15]} color="#f7f4ee" radius={0.06} />
-      {/* Duvet and an emerald throw at the foot */}
-      <Soft p={[0, 0.6, -0.25]} s={[w - 0.04, 0.06, d * 0.62]} color="#f1ede6" radius={0.03} />
-      <Soft p={[0, 0.635, -d / 2 + 0.35]} s={[w, 0.03, 0.42]} color="#1f5a47" radius={0.012} />
-      {[-1, 1].map((sx) => <Soft key={sx} p={[sx * w * 0.24, 0.66, d / 2 - 0.35]} s={[w * 0.4, 0.14, 0.32]} color="#ffffff" radius={0.06} />)}
-      {/* Tall channel-tufted headboard */}
-      {Array.from({ length: 7 }, (_, i) => (
-        <Soft key={i} p={[-w / 2 + (w / 7) * (i + 0.5), 0.75 + h * 0.4, d / 2 - 0.06]} s={[w / 7 - 0.01, 1.1, 0.12]} color={color} radius={0.05} />
-      ))}
-      <Brass p={[0, 0.05, -d / 2 + 0.03]} s={[w, 0.02, 0.02]} />
-    </>
-  );
-}
-
 function Bathtub({ w, d, h, color }: { w: number; d: number; h: number; color: string }) {
   return (
     <>
@@ -331,7 +314,10 @@ export function LuxePiece({ f }: { f: Furniture }) {
     case 'plant': return h > 1.2 ? <PottedPalm position={[0, 0, 0]} height={h} /> : <RealModel name="plant-potted" fit={[w, h, d]} fallback={<PottedPalm position={[0, 0, 0]} height={h} />} />;
     case 'art': return <WallArt f={f} />;
     case 'counter': return <Turned turned={turned}><KitchenIsland w={L} d={D} h={h} /></Turned>;
-    case 'bed': return <Turned turned={turned}><Bed w={L} d={D} h={h} color={f.color} /></Turned>;
+    // Like the basic bed, the headboard is always on +z
+    case 'bed': return <LuxeBed w={w} d={d} color={f.color} design={f.design} />;
+    case 'wardrobe': return <Turned turned={turned}><LuxeWardrobe w={L} h={h} d={D} /></Turned>;
+    case 'dresser': return f.design === 'vanity' ? <Turned turned={turned}><LuxeVanity w={L} h={h} d={D} /></Turned> : <LuxeNightstand w={w} h={h} d={d} color={f.color} />;
     case 'bathtub': return <Turned turned={turned}><Bathtub w={L} d={D} h={h} color={f.color} /></Turned>;
     default: return null;
   }

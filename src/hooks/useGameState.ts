@@ -7,6 +7,7 @@ import { loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
 import type { Activity } from '../lib/people';
 import type { Needs } from '../lib/needs';
+import type { CampusRoom, CampusVisit, StudyKind } from '../lib/school';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -17,10 +18,12 @@ export const MS_PER_GAME_MINUTE = 3000;
  *
  * `isAtWorkplace` is read on every tick to decide whether that minute is paid.
  */
-export function useGameState(character: Character, isAtWorkplace: () => boolean) {
+export function useGameState(character: Character, isAtWorkplace: () => boolean, isOnCampus: () => boolean = () => false) {
   const atWorkRef = useRef(isAtWorkplace);
+  const onCampusRef = useRef(isOnCampus);
   useEffect(() => {
     atWorkRef.current = isAtWorkplace;
+    onCampusRef.current = isOnCampus;
   });
 
   const reducer = useCallback(
@@ -32,7 +35,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
 
   useEffect(() => {
     const interval = setInterval(
-      () => dispatch({ type: 'tick', atWorkplace: atWorkRef.current() }),
+      () => dispatch({ type: 'tick', atWorkplace: atWorkRef.current(), onCampus: onCampusRef.current() }),
       MS_PER_GAME_MINUTE,
     );
     return () => clearInterval(interval);
@@ -48,6 +51,9 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     moveIn: (homeId: string) => dispatch({ type: 'moveIn', homeId }),
     moveOut: () => dispatch({ type: 'moveOut' }),
     buyEquipment: (id: string) => dispatch({ type: 'buyEquipment', id }),
+    buyCar: (id: string, color: string) => dispatch({ type: 'buyCar', id, color }),
+    sellCar: (id: string) => dispatch({ type: 'sellCar', id }),
+    fuel: (carId: string, metres: number) => dispatch({ type: 'fuel', carId, metres }),
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     socialise: (residentId: string, activity: Activity) => dispatch({ type: 'socialise', residentId, activity }),
     nightOut: (residentId: string) => dispatch({ type: 'nightOut', residentId }),
@@ -66,6 +72,16 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     setProfile: (bio: string, traits: TraitId[]) => dispatch({ type: 'setProfile', bio, traits }),
     setDream: (dream: DreamId) => dispatch({ type: 'setDream', dream }),
     dismissWish: (id: string) => dispatch({ type: 'dismissWish', id }),
+    startClass: (classId: string, room: CampusRoom) => dispatch({ type: 'startClass', classId, room }),
+    leaveClass: () => dispatch({ type: 'leaveClass' }),
+    participate: (what: 'notes' | 'asked') => dispatch({ type: 'participate', what }),
+    finishClass: () => dispatch({ type: 'finishClass' }),
+    study: (kind: StudyKind, room: CampusRoom) => dispatch({ type: 'study', kind, room }),
+    handIn: (room: CampusRoom) => dispatch({ type: 'handIn', room }),
+    campusVisit: (place: CampusVisit) => dispatch({ type: 'campusVisit', place }),
+    joinClub: (id: string) => dispatch({ type: 'joinClub', id }),
+    campusChat: (room: CampusRoom) => dispatch({ type: 'campusChat', room }),
+    freshenUp: (room: CampusRoom) => dispatch({ type: 'freshenUp', room }),
     setSavingsGoal: (amount: number | null) => dispatch({ type: 'setSavingsGoal', amount }),
   };
 }

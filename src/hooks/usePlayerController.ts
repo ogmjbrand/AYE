@@ -6,6 +6,7 @@ import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
 import { seatedSpot, standSpot, type Seat } from '../lib/seating';
 import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
+import { carTurnRate } from '../lib/cars';
 
 export interface PlayerHandle {
   position: Vector3;
@@ -24,6 +25,13 @@ export const WALK_SPEED = 1.4;
 /** Mood shows in how you move: a little brisker when happy, slower when low (see App). */
 let pace = 1;
 export function setPace(factor: number) { pace = Math.max(0.8, Math.min(1.1, factor)); }
+
+/** Driving your own car (lib/cars.ts): top speed in m/s, or null on foot. */
+let driving: { speed: number } | null = null;
+export function setDriving(car: { speed: number } | null) { driving = car; }
+export const isDriving = () => driving !== null;
+/** A car is about this wide: it keeps this far from walls and parked buses. */
+const CAR_RADIUS = 0.95;
 const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
 // Where a click or tap sent the player, until they arrive, steer themselves or get stuck
@@ -81,9 +89,12 @@ const playerHandle: PlayerHandle = {
         if (route.length === 0) endTrip('arrived');
       } else intent = s;
     }
-    const moveSpeed = (intent.walk ? WALK_SPEED : RUN_SPEED) * pace;
-    const rotationSpeed = 3; // radians per second
-    const acceleration = 6;
+    // In a car: much faster, slower to pick up speed, reverse at a crawl, and steering that tightens with speed
+    const reversing = !!driving && intent.forward < 0;
+    const moveSpeed = driving ? driving.speed * (intent.walk ? 0.45 : 1) * (reversing ? 0.35 : 1) : (intent.walk ? WALK_SPEED : RUN_SPEED) * pace;
+    const currentSpeed = Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z);
+    const rotationSpeed = driving ? carTurnRate(currentSpeed) * (reversing ? -1 : 1) : 3; // radians per second
+    const acceleration = driving ? 1.8 : 6;
     const damping = 0.92;
 
     // Forward matches the model's facing: rotation.y = θ points local +Z at (sin θ, cos θ).
@@ -113,6 +124,7 @@ const playerHandle: PlayerHandle = {
     const resolved = resolveCollisions(
       prevX + playerHandle.velocity.x * delta,
       prevZ + playerHandle.velocity.z * delta,
+      driving ? CAR_RADIUS : undefined,
     );
     playerHandle.position.x = resolved.x;
     playerHandle.position.z = resolved.z;

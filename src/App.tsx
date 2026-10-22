@@ -90,6 +90,14 @@ import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
 import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
+import {
+  ARRIVE_SPOT, CAMPUS_ID, HALL_SEATS, LAB_SEATS, UNIVERSITY_NAME, insideBuilding, roomAt, routeTo, spotAt, universityLayout,
+  type Destination as CampusDestination,
+} from './lib/university';
+import { CAFETERIA_MENU, LATE_LIMIT, ROOM_NAMES, STUDY, TIMETABLE, classOpenNow, classesToday, minutesLeftInClass, rollDay, type CampusRoom } from './lib/school';
+import { University } from './world/University';
+import { CafeteriaPanel, ClassPanel, ClubsPanel, DirectoryPanel, RecordsPanel, type CampusPanelMode } from './components/CampusPanel';
+import type { StudentHud } from './components/StudentPanels';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -128,6 +136,9 @@ const CAMERA_TARGET_HEIGHT = 1.25;
 const PALMS_LAYOUT = restaurantLayout();
 const BOUTIQUE_LAYOUT = boutiqueLayout();
 const BOUTIQUE_ID = 'fashion-house';
+const CAMPUS_LAYOUT = universityLayout();
+/** How close to a city's university marker you go in through its gate. */
+const CAMPUS_DOOR_RADIUS = 3;
 
 /** The title plate at home, by the kind of place it is. */
 const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment' };
@@ -289,10 +300,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const districtRef = useRef<District | null>(null);
   // Inside your own home (room coordinates): never counts as being at work
   const insideRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal } = useGameState(
+  const campusRef = useRef(false);
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
-    () => character.career !== 'none' && !!districtRef.current && !insideRef.current &&
-      isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z),
+    // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
+    () => (campusRef.current ? character.career === 'student'
+      : character.career !== 'none' && !!districtRef.current && !insideRef.current &&
+        isAtWorkplace(districtRef.current, character.career, controller.position.x, controller.position.z)),
+    () => campusRef.current,
   );
   const district = districtById(state.districtId);
   const home = homeById(state.home);
@@ -321,10 +336,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const indoors = inside && !!home && home.district === district.id && !!roomLayout;
   const inPalms = !indoors && venue !== null && district.restaurant?.id === venue;
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
+  const inCampus = !indoors && venue === CAMPUS_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
-  const offStreet = indoors || inPalms || inBoutique;
+  const offStreet = indoors || inPalms || inBoutique || inCampus;
   // Collision and ground height follow where you are (set before this frame's movement)
-  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : district.layout;
+  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : district.layout;
+  useEffect(() => { campusRef.current = inCampus; }, [inCampus]);
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
   useEffect(() => {
     insideRef.current = offStreet;
@@ -350,6 +367,29 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const id = setTimeout(() => setArrival(null), 6000);
     return () => clearTimeout(id);
   }, [arrival]);
+  // On campus: which room you're in, whether you're indoors (for the lighting), refreshed twice a second
+  const [campusPanel, setCampusPanel] = useState<CampusPanelMode | null>(null);
+  const [campusGuide, setCampusGuide] = useState<CampusDestination | null>(null);
+  const [campusHere, setCampusHere] = useState<{ room: CampusRoom; indoors: boolean }>({ room: 'outside', indoors: false });
+  const guideRef = useRef<CampusDestination | null>(null);
+  useEffect(() => { guideRef.current = campusGuide; }, [campusGuide]);
+  useEffect(() => {
+    if (!inCampus) return;
+    const id = setInterval(() => {
+      const { x, z } = controller.position;
+      // The guide clears itself when you arrive
+      const g = guideRef.current;
+      if (g && Math.hypot(x - g.at[0], z - g.at[1]) < 2) {
+        guideRef.current = null;
+        setCampusGuide(null);
+        setArrival(`You’ve reached ${g.name}.`);
+      }
+      const room = roomAt(x, z);
+      const indoorsNow = insideBuilding(x, z);
+      setCampusHere((h) => (h.room === room && h.indoors === indoorsNow ? h : { room, indoors: indoorsNow }));
+    }, 500);
+    return () => clearInterval(id);
+  }, [inCampus, controller]);
   const book = (to: District, mode: TravelMode) => {
     const option = travelOption(district.city, to.city, mode);
     if (!option || state.balance < option.fare) return;
@@ -381,6 +421,17 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     snapCamera();
   };
   const goOutside = () => {
+    if (venue === CAMPUS_ID) {
+      const w = district.workplaces.student.position;
+      if (state.school.inClass) leaveClass();
+      if (sit.session) sit.cancel();
+      setVenue(null);
+      setCampusPanel(null);
+      setCampusGuide(null);
+      placePlayer(w, w[0] > 0 ? -Math.PI / 2 : Math.PI / 2);
+      snapCamera();
+      return;
+    }
     if (venue === BOUTIQUE_ID) {
       const p = district.fashionHouse.position;
       setVenue(null);
@@ -462,6 +513,138 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     placePlayer([BOUTIQUE_DOOR[0], 0, BOUTIQUE_DOOR[1]], 0);
     snapCamera();
   };
+  // ---------------------------------------------------------------- AYE Global University
+  const student = character.career === 'student';
+  /** At this city's university marker on the street. */
+  const atCampusDoor = () => {
+    const w = district.workplaces.student.position;
+    return !offStreet && Math.hypot(controller.position.x - w[0], controller.position.z - w[2]) <= CAMPUS_DOOR_RADIUS;
+  };
+  /** Through the city's university marker to the street outside the campus gate. */
+  const enterCampus = () => {
+    setHomePanel(null);
+    setVenue(CAMPUS_ID);
+    placePlayer([ARRIVE_SPOT[0], 0, ARRIVE_SPOT[1]], 0);
+    snapCamera();
+    campusVisit('campus');
+    setArrival(`${UNIVERSITY_NAME}. The pedestrian gates are either side of the barrier; the campus directory is by the fountain.`);
+  };
+  // The seat you took for a class: getting up from it (E, or walking off) leaves the class, and the class ending gets you up
+  const classSeat = useRef<string | null>(null);
+  const inClass = state.school.inClass;
+  useEffect(() => {
+    if (!classSeat.current) return;
+    if (inClass && !sit.session) { classSeat.current = null; leaveClass(); return; }
+    if (!inClass && sit.session && sit.session.seat.id === classSeat.current) { classSeat.current = null; sit.cancel(); }
+    if (!inClass && !sit.session) classSeat.current = null;
+  });
+  const minuteNow = state.time.hour * 60 + state.time.minute;
+  /** Take a free seat in this room and sit the class that's open now. */
+  const attendClass = (room: CampusRoom) => {
+    const c = classOpenNow(state.school, state.time.totalMinutes, state.time.dayOfWeek, room);
+    if (!c || !student) return;
+    const seats = room === 'lab' ? LAB_SEATS : HALL_SEATS;
+    const seat = seats[(state.school.classesTotal * 3) % seats.length];
+    if (!sit.start({ seat, place: c.course, minutes: 0 })) { setArrival('There’s no way to reach a free seat from here.'); return; }
+    classSeat.current = seat.id;
+    startClass(c.id, room);
+  };
+  const studyHere = (kind: keyof typeof STUDY) => {
+    const st = STUDY[kind];
+    study(kind, campusHere.room === 'corridor' ? 'outside' : roomAt(controller.position.x, controller.position.z));
+    setArrival(`${st.label}: ${st.minutes} minutes pass. Your assignment moves on by ${st.progress}%.`);
+  };
+  /** What a class spot offers: attend, or why not, and when the next one is. */
+  const classPrompt = (room: CampusRoom) => {
+    const open = classOpenNow(state.school, state.time.totalMinutes, state.time.dayOfWeek, room);
+    if (!student) return { verb: 'Visitors can’t attend classes ·', place: 'see Student Services', onOpen: () => setCampusPanel('records') };
+    if (open) return { verb: 'Attend class:', place: `${open.course} (${String(Math.floor(open.start / 60)).padStart(2, '0')}:${String(open.start % 60).padStart(2, '0')})`, onOpen: () => attendClass(room) };
+    const next = TIMETABLE.find((c) => c.room === room && c.start > minuteNow && state.time.dayOfWeek <= 4);
+    return { verb: next ? `No class here now · next at ${String(Math.floor(next.start / 60)).padStart(2, '0')}:${String(next.start % 60).padStart(2, '0')}:` : 'No more classes here today ·', place: next ? next.course : 'check the timetable', onOpen: () => setCampusPanel('records') };
+  };
+  /** What E does where you stand on campus. */
+  const campusPrompt = (): { verb: string; place: string; onOpen: () => void } | null => {
+    if (state.school.inClass) return null;
+    const spot = spotAt(controller.position.x, controller.position.z);
+    if (!spot) return null;
+    const handInReady = student && state.school.assignment >= 100;
+    switch (spot.id) {
+      case 'leave': return { verb: 'Leave campus for', place: district.name, onOpen: goOutside };
+      case 'security': return { verb: 'Talk to', place: 'Musa, campus security', onOpen: () => setArrival('Musa (security): “Morning! Walkers use the side gates. The academic building is straight ahead past the fountain; the directory board will point you anywhere.”') };
+      case 'map-outdoor':
+      case 'directory': return { verb: 'Open', place: 'the campus directory', onOpen: () => setCampusPanel('directory') };
+      case 'reception': return { verb: 'Ask reception about', place: 'today’s timetable', onOpen: () => setCampusPanel('records') };
+      case 'study-together': return student
+        ? { verb: 'Study together with', place: 'Emeka and Aisha (30 min)', onOpen: () => studyHere('together') }
+        : { verb: 'Chat with', place: 'Emeka and Aisha (10 min)', onOpen: () => { campusChat('outside'); setArrival('You chat with Emeka and Aisha for ten minutes.'); } };
+      case 'lecture': return classPrompt('hall-a');
+      case 'lab-class': return classPrompt('lab');
+      case 'lab-pc': return !student ? null : handInReady
+        ? { verb: 'Hand in', place: 'your finished assignment', onOpen: () => { handIn('lab'); setArrival('Assignment handed in. +10 credits; the next one is on your record.'); } }
+        : { verb: 'Work on your assignment at', place: 'a lab computer (60 min)', onOpen: () => studyHere('computer') };
+      case 'library-desk': return !student ? null : handInReady
+        ? { verb: 'Hand in', place: 'your finished assignment', onOpen: () => { handIn('library'); setArrival('Assignment handed in. +10 credits; the next one is on your record.'); } }
+        : { verb: 'Study at', place: 'a library desk (45 min)', onOpen: () => studyHere('library') };
+      case 'library-pc': return student ? { verb: 'Research on', place: 'a library computer (30 min)', onOpen: () => studyHere('research') } : null;
+      case 'librarian': return { verb: 'Talk to', place: 'Mrs. Bello, the librarian', onOpen: () => setArrival('Mrs. Bello: “Desks are free in the middle; the computers by the shelves are for research. Finished work can be handed in here or at the lab.”') };
+      case 'cafe': return { verb: 'Buy food at', place: 'the AYE Cafeteria', onOpen: () => setCampusPanel('cafe') };
+      case 'students': return { verb: 'Chat with', place: 'classmates in the lounge (10 min)', onOpen: () => { campusChat('centre'); setArrival('You chat with Kwame and Zainab about classes and the weekend.'); } };
+      case 'clubs': return { verb: 'Browse', place: 'the campus clubs', onOpen: () => setCampusPanel('clubs') };
+      case 'services': return { verb: 'View your timetable & records at', place: 'Student Services', onOpen: () => setCampusPanel('records') };
+      case 'restroom': return { verb: 'Freshen up in', place: 'the restrooms (5 min)', onOpen: () => { freshenUp('restrooms'); setArrival('You freshen up. Five minutes pass.'); } };
+    }
+  };
+  // Mark the library and cafeteria as visited today when you walk in
+  useEffect(() => {
+    if (!inCampus) return;
+    const v = rollDay(state.school, state.time.totalMinutes).visited;
+    if (campusHere.room === 'library' && !v.includes('library')) campusVisit('library');
+    if (campusHere.room === 'cafeteria' && !v.includes('cafeteria')) campusVisit('cafeteria');
+  }, [inCampus, campusHere.room, state.school, state.time.totalMinutes, campusVisit]);
+  const buyCafeteria = (id: string) => {
+    const item = CAFETERIA_MENU.find((i) => i.id === id);
+    if (!item || state.balance < item.price) return;
+    eat(item.price, item.fullness, item.lift);
+    campusVisit('cafeteria');
+    setArrival(`You buy ${item.name} for ${item.price} GHAI and eat it here.`);
+  };
+  const guidePoints = inCampus && campusGuide ? [[controller.position.x, controller.position.z] as const, ...routeTo(controller.position.x, controller.position.z, campusGuide)] : null;
+  /** What the HUD shows a student (all from the save). */
+  const studentHud: StudentHud | null = (() => {
+    if (!student) return null;
+    const sc = rollDay(state.school, state.time.totalMinutes);
+    // Next: the first class still to come that you haven't sat (not the one you're in)
+    const nc = state.time.dayOfWeek <= 4 ? TIMETABLE.find((c) => c.start + LATE_LIMIT >= minuteNow && c.id !== sc.inClass?.classId && !sc.attended.includes(c.id)) ?? null : null;
+    const today = classesToday(state.time.dayOfWeek);
+    const slot = TIMETABLE.find((c) => c.id === sc.inClass?.classId);
+    const schoolHours = state.time.dayOfWeek <= 4 && minuteNow >= 9 * 60 && minuteNow < 17 * 60;
+    const status = slot ? { status: `In class · ${slot.course}`, tone: 'good' as const }
+      : inCampus ? { status: schoolHours ? 'On campus' : 'On campus (outside school hours)', tone: 'good' as const }
+        : { status: schoolHours ? 'Not on campus' : 'Off campus', tone: (schoolHours ? 'warn' : 'muted') as 'warn' | 'muted' };
+    const hh = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    const goals = today === 0 ? [] : [
+      { label: 'Go to school (University)', done: sc.visited.includes('campus') },
+      { label: `Attend classes (${sc.attended.length}/${today})`, done: sc.attended.length >= today },
+      { label: 'Work on your assignment', done: sc.studiedToday > 0 },
+      { label: 'Visit the library', done: sc.visited.includes('library') },
+      { label: 'Eat at the cafeteria', done: sc.visited.includes('cafeteria') },
+      { label: 'Meet other students', done: sc.visited.includes('students') },
+      { label: 'Return home', done: sc.visited.includes('campus') && indoors && minuteNow >= 15 * 60 },
+    ];
+    return {
+      university: UNIVERSITY_NAME,
+      title: careerLevel('student', state.workMinutes).title,
+      ...status,
+      next: nc ? `${nc.course}, ${hh(nc.start)}` : null,
+      allowance: hourlyPay,
+      attended: sc.attended.length,
+      classesToday: today,
+      assignment: sc.assignment,
+      credits: sc.credits,
+      room: inCampus ? ROOM_NAMES[campusHere.room] : null,
+      goals,
+    };
+  })();
   const openSection = (s: BoutiqueSection) => { setAssistantOpen(false); setStore(null); setCatalogueOpen(false); setSection((cur) => (cur === s ? null : s)); };
   /** What E does where you stand inside the Fashion House. */
   const boutiquePrompt = () => {
@@ -531,6 +714,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         boutiquePrompt()?.onOpen();
         return;
       }
+      if (inCampus) {
+        campusPrompt()?.onOpen();
+        return;
+      }
       if (indoors && interior) {
         if (nearSpot(bedSpot(interior))) rest(true);
         else if (usableHere()) operateHere();
@@ -542,6 +729,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       const counter = counterAt(district, x, z);
       const door = homeAtDoor(district.id, x, z);
       if (near) setVendor(near);
+      else if (atCampusDoor()) enterCampus();
       else if (restaurantAt(district, x, z)) enterPalms();
       else if (counter === 'fashion') enterBoutique();
       else if (counter === 'gadgets') setGadgets(true);
@@ -557,9 +745,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -725,7 +913,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const openOs = (tab: OsTab) => { setOsTab(tab); setOsOpen(true); };
   // The area you're in (indoors: where the building's door is)
   // Inside a building, the area is where its front door is
-  const doorNow = inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : indoors && home ? home.door : null;
+  const doorNow = inCampus ? district.workplaces.student.position : inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : indoors && home ? home.door : null;
   const areaHere = doorNow
     ? district.neighborhoods.find((n) => doorNow[0] >= n.bounds.minX && doorNow[0] <= n.bounds.maxX && doorNow[2] >= n.bounds.minZ && doorNow[2] <= n.bounds.maxZ) ?? null
     : neighborhood;
@@ -734,6 +922,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const plate: PlacePlate = (() => {
     if (inPalms && district.restaurant) return { title: district.restaurant.name, subtitle: district.restaurant.kind, icon: 'restaurant' };
     if (inBoutique) return { title: district.fashionHouse.name, subtitle: district.fashionHouse.kind, icon: 'hanger' };
+    if (inCampus) return { title: UNIVERSITY_NAME, subtitle: ROOM_NAMES[campusHere.room], icon: 'career' };
     if (indoors && home) return { title: home.id === state.home && interior ? MY_HOME[interior.tier] : home.name, subtitle: areaName, icon: 'home' };
     const { x, z } = controller.position;
     const at = district.places.find((p) => Math.hypot(p.position[0] - x, p.position[2] - z) < PLATE_RADIUS);
@@ -755,10 +944,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       : { id: 'home', label: 'Home', icon: 'home', onClick: () => onGo(state.home ? { to: 'home' } : { to: 'homes' }), title: state.home ? 'Walk home' : 'Find a home to rent' },
     { id: 'phone', label: 'Phone', icon: 'phone', onClick: () => toggleOs('today'), active: osOpen && osTab === 'today', title: 'Your Life OS: needs, goals and today (L)' },
     {
-      id: 'map', label: 'Map', icon: 'map', active: mapOpen || locationsOpen,
-      title: phone ? 'The map on your phone (M)' : 'Every place in the city',
+      id: 'map', label: inCampus ? 'Directory' : 'Map', icon: 'map', active: mapOpen || locationsOpen || campusPanel === 'directory',
+      title: inCampus ? 'The campus directory: every room, with a route' : phone ? 'The map on your phone (M)' : 'Every place in the city',
       onClick: () => {
-        if (phone) setMapOpen(true);
+        if (inCampus) setCampusPanel((m) => (m === 'directory' ? null : 'directory'));
+        else if (phone) setMapOpen(true);
         else if (offStreet) { goOutside(); setTimeout(() => setLocationsOpen(true), 150); }
         else setLocationsOpen(true);
       },
@@ -766,12 +956,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setStore('wardrobe'), active: store === 'wardrobe', title: 'Change into clothes you own' },
     inPalms
       ? { id: 'restaurant', label: 'Restaurant', icon: 'restaurant', onClick: () => setMenuOpen((o) => !o), active: menuOpen, title: 'The menu' }
-      : { id: 'career', label: 'Career', icon: 'career', onClick: () => toggleOs('career'), active: osOpen && osTab === 'career', title: 'Your job, pay and promotions' },
+      : inCampus
+        ? { id: 'career', label: 'School', icon: 'career', onClick: () => setCampusPanel((m) => (m === 'records' ? null : 'records')), active: campusPanel === 'records', title: 'Timetable and your academic record' }
+        : { id: 'career', label: 'Career', icon: 'career', onClick: () => toggleOs('career'), active: osOpen && osTab === 'career', title: 'Your job, pay and promotions' },
     { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
   ];
   const whereabouts = {
-    place: inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
-    activity: inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
+    place: inCampus ? `${UNIVERSITY_NAME}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
+    activity: inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
       : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
         : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
   };
@@ -985,6 +1177,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <InteriorLighting gameTime={state.time} player={controller} indoor="boutique" />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </BoutiqueInterior>
+            ) : inCampus ? (
+              <University player={controller} gameTime={state.time} route={guidePoints}>
+                <InteriorLighting gameTime={state.time} player={controller} indoor={campusHere.indoors ? 'campus' : undefined} />
+                <Player controller={controller} character={character} tryOn={tryOn} />
+              </University>
             ) : inPalms ? (
               <RestaurantInterior gameTime={state.time} served={served && tableSeat && served.seatId === tableSeat.id ? { seat: tableSeat, dishes: served.dishes } : null}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
@@ -1049,6 +1246,24 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           kitchenOpen={palmsOpen(state.time.hour)}
           onOrder={orderDish}
           onClose={() => setMenuOpen(false)}
+        />
+      )}
+      {inCampus && campusPanel === 'directory' && (
+        <DirectoryPanel onClose={() => setCampusPanel(null)} onGuide={(d) => { setCampusPanel(null); setCampusGuide(d); setArrival(`Follow the gold arrows to ${d.name}.`); }} />
+      )}
+      {inCampus && campusPanel === 'records' && (
+        <RecordsPanel school={rollDay(state.school, state.time.totalMinutes)} student={student} minute={minuteNow} dayOfWeek={state.time.dayOfWeek} levelTitle={careerLevel('student', state.workMinutes).title} hourlyPay={Math.round(HOURLY_WAGE.student * careerLevel('student', state.workMinutes).pay * equipmentPay(state.equipment, 'student'))} onClose={() => setCampusPanel(null)} />
+      )}
+      {inCampus && campusPanel === 'cafe' && <CafeteriaPanel balance={state.balance} onBuy={buyCafeteria} onClose={() => setCampusPanel(null)} />}
+      {inCampus && campusPanel === 'clubs' && <ClubsPanel joined={state.school.clubs} student={student} onJoin={(id) => { joinClub(id); setArrival('You joined the club. It’s on your student record.'); }} onClose={() => setCampusPanel(null)} />}
+      {state.school.inClass && (
+        <ClassPanel
+          school={state.school}
+          minutesLeft={minutesLeftInClass(state.school, state.time.totalMinutes)}
+          onNotes={() => participate('notes')}
+          onAsk={() => participate('asked')}
+          onFinish={() => finishClass()}
+          onLeave={() => { if (sit.session) sit.cancel(); else leaveClass(); }}
         />
       )}
       {inBoutique && section && (
@@ -1131,7 +1346,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         homeId={state.home}
         onOpenHome={setHomePanel}
         onEnterRestaurant={enterPalms}
-        insideHome={inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
+        campusEntry={atCampusDoor() ? { name: `${UNIVERSITY_NAME} (${district.workplaces.student.name})`, onOpen: enterCampus } : null}
+        statusOverride={student && (inCampus || state.school.inClass) ? { label: state.school.inClass ? 'In class' : 'On campus', tone: 'good' } : null}
+        student={studentHud}
+        insideHome={inCampus ? { name: UNIVERSITY_NAME, prompt: campusPrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
             const use = usableHere();

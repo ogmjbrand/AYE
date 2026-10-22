@@ -55,6 +55,9 @@ export type LifeEvent =
   | { kind: 'work'; minutes: number }
   | { kind: 'task'; quality: 'best' | 'ok' | 'poor' }
   | { kind: 'eatOut' }
+  /** Metres driven in your own car. */
+  | { kind: 'drive'; metres: number }
+  | { kind: 'buyCar' }
   | { kind: 'cook' }
   | { kind: 'wash' }
   | { kind: 'relax'; piece: FurnitureKind }
@@ -116,6 +119,9 @@ export function eventsFor(prev: GameState, action: GameAction, next: GameState, 
     case 'buyFurniture': out.push({ kind: 'buyFurniture' }); break;
     case 'purchase': out.push({ kind: 'shop' }); break;
     case 'buyEquipment': out.push({ kind: 'gadget' }); break;
+    case 'buyCar': if (next.cars.length > prev.cars.length) out.push({ kind: 'buyCar' }); break;
+    case 'study': if (next.school.assignment !== prev.school.assignment || next.school.studiedToday > prev.school.studiedToday) out.push({ kind: 'study' }); break;
+    case 'fuel': if (next.balance < prev.balance) out.push({ kind: 'drive', metres: action.metres }); break;
     case 'travel': out.push({ kind: 'trip', to: action.to }); break;
     case 'wait': out.push({ kind: 'park', minutes: action.minutes }); break;
     case 'exercise': out.push({ kind: 'run', minutes: action.minutes }); break;
@@ -425,6 +431,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('explorer-5', 'Explorer', 'Discover 5 places.', 'explore', 150, (c) => c.state.life.visited.length >= 5, 'top-explorer-kente'),
   a('explorer-25', 'Know your way around', 'Discover 25 places.', 'explore', 500, (c) => c.state.life.visited.length >= 25),
   a('cities-3', 'Frequent flyer', 'Visit 3 cities.', 'explore', 400, (c) => c.state.life.cities.length >= 3),
+  a('first-class', 'Front row', 'Attend a class at AYE Global University.', 'explore', 200, (c) => c.state.school.classesTotal >= 1),
+  a('first-assignment', 'Handed in', 'Hand in your first assignment.', 'explore', 300, (c) => c.state.school.assignmentsDone >= 1),
+  a('first-car', 'First wheels', 'Buy a car.', 'home', 300, (c) => c.state.cars.length >= 1),
+  a('road-trip', 'Road trip', 'Drive 10 km in your own car.', 'explore', 400, (c) => c.state.life.stats.driven >= 10_000),
   a('home', 'A place of your own', 'Rent a home.', 'home', 150, (c) => !!c.state.home),
   a('penthouse', 'Top floor', 'Live in a penthouse.', 'home', 1000, (c) => (homeById(c.state.home)?.rentPerNight ?? 0) >= 800),
   a('decorator', 'Decorator', 'Buy 5 pieces of furniture.', 'home', 250, (c) => c.state.life.stats.furnitureBought >= 5),
@@ -574,6 +584,7 @@ function applyEvents(s: GameState, events: readonly LifeEvent[], career: Career,
     const stat = STAT_OF[e.kind];
     if (stat) stats[stat] += 1;
     if (e.kind === 'earn') stats.earned += e.amount;
+    if (e.kind === 'drive') stats.driven += e.metres;
     if (e.kind === 'socialise' && e.isNew) stats.met += 1;
     if (e.kind === 'socialise') history.push({ who: e.residentId, what: ACTIVITY_WORD[e.activity], t: s.time.totalMinutes });
     if (e.kind === 'nightOut') history.push({ who: e.residentId, what: 'Night out', t: s.time.totalMinutes });

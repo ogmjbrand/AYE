@@ -11,7 +11,7 @@ import { Snapshot } from './snapshot/Snapshot';
 import type { SnapshotJob } from './snapshot/store';
 import { Icon } from './os/icons';
 
-const asPiece = (item: CatalogueItem) => ({ kind: item.kind, at: [0, 0] as const, size: item.size, color: item.color, style: item.style });
+const asPiece = (item: CatalogueItem) => ({ kind: item.kind, at: [0, 0] as const, size: item.size, color: item.color, style: item.style, design: item.design });
 
 /** The piece, rendered to a picture once per session. */
 const pieceJob = (item: CatalogueItem): SnapshotJob => ({

@@ -63,6 +63,10 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
   for (const v of district.vendors) {
     out.push({ id: id(v.id), name: v.name, kind: v.kind, categories: ['restaurants'], status: 'open', note: 'Order food here', position: at(v.position) });
   }
+  if (district.dealership) {
+    const r = district.dealership;
+    out.push({ id: id(`cars.${r.id}`), name: r.name, kind: r.kind, categories: ['shopping'], status: 'open', note: 'Buy a car, then drive it anywhere', position: at(r.door) });
+  }
   if (district.restaurant) {
     const r = district.restaurant;
     out.push({ id: id(`restaurant.${r.id}`), name: r.name, kind: r.kind, categories: ['restaurants'], status: 'open', note: 'Sit down to a three-course meal, 11:00–23:00', position: at(r.door) });

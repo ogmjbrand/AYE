@@ -21,7 +21,7 @@ now shown under its official name).
 | 7 | Playable home: furniture, catalogue, needs, time, mood, balance | **Done** | Needs (energy, hygiene, fun, social) plus hunger, a mood that changes pay and work bonuses, the Home Decor catalogue (40 pieces by room, with a Luxe collection, 3D pictures and a Preview you can turn), delivery into your home, moving/turning/storing/selling, wall art, and furniture you use (shower, bath, sofa, TV, games, books, music, cooking, study). The penthouse is a Victoria Island apartment furnished in Luxe. Open-plan "dolls' house" room with no ceiling, as before. **Missing:** drag-to-place on the floor (pieces are moved with arrow buttons). |
 | 8 | Home → outdoor city transition | **Done** | Front door in and out, camera snaps behind you. |
 | 9 | Interactive 3D city map, labels, filters, landmarks | **Partial** | 3D districts in 235 cities; phone map; City Locations directory by category with walk-there routing; world map at the travel desk. **Missing:** a labelled overhead map of a district with pins and filters like the reference. |
-| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, The Palms (a walk-in fine-dining restaurant in Lagos), the Fashion House (a walk-in boutique and salon in every city), gadget shop, lounge, park, travel desk. **Missing: car dealership, owning a car, driving; dresses, jackets and accessories (need new 3D garments).** |
+| 10 | Businesses, careers, restaurants, fashion, car dealers, cars, driving | **Partial** | Careers (7, five levels, hourly tasks), food vendors, The Palms (a walk-in fine-dining restaurant in Lagos), the Fashion House (a walk-in boutique and salon in every city), gadget shop, lounge, park, travel desk. **University: AYE Global University, walk-in in every city (see below).** **In progress (not wired yet): car dealership, owning a car, driving.** **Missing: dresses, jackets and accessories (need new 3D garments).** |
 | 11 | Business advertising platform | **Not started** | Needs accounts, a review/approval process, payments and legal review first. Billboards exist in the world but only show built-in art. |
 | 12a | Character Life OS, missions, wishes, dreams, perks, achievements | **Done (this milestone)** | See below. |
 | 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled and labelled so; there are no fake player counts. |
@@ -80,7 +80,39 @@ Checked in a browser with an isolated test profile:
 
 Also checked: desktop and phone layouts.
 
+## University milestone (verified in the browser)
+
+**AYE Global University** (`src/lib/university.ts`, `src/lib/school.ts`, `src/world/University.tsx`): E at any city's University marker takes you to one connected campus. The campus has:
+- the street with lane markings, a zebra crossing, a drop-off lane, a taxi and a direction sign;
+- the gate (stone pylons with the crest and "AYE GLOBAL UNIVERSITY", security booths, a barrier on the vehicle lane, open pedestrian gates and a computer-controlled guard);
+- a courtyard with a fountain, raised gardens, palms, benches, the directory board, a signpost, a noticeboard, bike racks and umbrella tables;
+- the academic building: stone and glass with banners, a canopy, the "Academic Building" sign and sliding glass doors.
+
+Inside, without any teleporting, are the lobby (reception, branding wall, directory and timetable screens), the corridor (room plates, noticeboard, fire exits), Lecture Hall A (G01), the Computer Laboratory (G05), the Library (G04), the Cafeteria (G02), the Student Centre (G08), Student Services (G07) and the Restrooms (G06).
+
+Walls, doors and collisions come from one plan. Tests prove every room, interaction spot and seat can be reached on foot from the street. Walls between the camera and you are cut away, and the roof lifts off indoors.
+
+**Student loop**, all saved in `GameState.school` and kept on reload:
+- Three classes every weekday on the timetable. You take a seat in the right room between 15 minutes before and 20 minutes after the start. A class counts once per day if you sit through 60% of it. Notes and a question add a credit each.
+- Study at a library desk, a library computer, a lab computer or with classmates. This takes game time and moves the assignment towards 100%, which you hand in once (+10 credits).
+- Cafeteria meals use the normal `eat` action, with the price shown first. You can also chat with classmates, join clubs (saved; no club events yet) and freshen up.
+- **Allowance:** this is the student career's existing hourly pay, 15 GHAI an hour times the level multiplier. It's paid for every minute on campus between 09:00 and 17:00, exactly like any other job's time at work. There is no second clock or second economy.
+
+**HUD:**
+- a Today's Goals panel and an Active Status panel (year, In class / On campus, next class, allowance, assignment %, credits, classes today);
+- a room label on the title plate;
+- the bar's Map becomes Directory (a gold route on the floor) and Career becomes School.
+
+**Honest limits:**
+- Everything is built from shapes, canvas-painted signs and textures, the game's palms and the existing character models. It is not photographic.
+- Upper floors are façade only; every room is on the ground floor.
+- Campus NPCs walk set loops or sit; they're labelled computer-controlled.
+- The software renderer used for testing manages only about 1 fps here (the city is the same).
+
 ## Next task (pick up here)
+
+-1. **Hospital career environment** (Victoria General Hospital): a campus-style venue at each city's Hospital marker. It needs reception, wards, an emergency room, a supervisor (clock in and out), patients seen as work tasks, and the doctor's hourly pay in the HUD. Reuse `lib/university.ts`'s plan, wall and spot pattern.
+-0.5. **Fashion request (Oct 2026 references)**: evening gowns, heels, bags, nails and wigs, with your own colour choice in the shop. These need new 3D garments and hair (see 0). No brand logos; no faces taken from photos of real people.
 
 0. **New garments**: dresses, jackets and accessories as real 3D clothes on the character (see `CHARACTER_PIPELINE.md`), so the boutique can sell them.
 1. **Car dealership, ownership and driving** (step 10): a dealer counter per city, cars as owned items, get in at your parking spot, drive with the existing controls on the roads (traffic and collisions already exist), fuel/parking costs.

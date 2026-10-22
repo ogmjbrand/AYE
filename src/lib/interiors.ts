@@ -21,6 +21,8 @@ export interface Furniture {
   color: string;
   /** The Luxe collection's designer look (lib/furniture.ts). */
   style?: 'luxe';
+  /** Which Luxe design, for kinds that come in several (beds, storage). */
+  design?: string;
 }
 
 export interface Interior {
@@ -38,8 +40,8 @@ export const WALL_HEIGHT = 2.9;
 /** Use radius for the bed and the door. */
 export const USE_RADIUS = 1.4;
 
-const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string, style?: 'luxe'): Furniture =>
-  ({ kind, at: [x, z], size: [w, h, d], color, ...(style ? { style } : {}) });
+const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string, style?: 'luxe', design?: string): Furniture =>
+  ({ kind, at: [x, z], size: [w, h, d], color, ...(style ? { style } : {}), ...(design ? { design } : {}) });
 
 export const INTERIORS: Record<Interior['tier'], Interior> = {
   room: {
@@ -86,8 +88,11 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
   penthouse: {
     tier: 'penthouse', width: 13, depth: 9, wallColor: '#ece6dc', floorColor: '#e8e2d8', window: 'full',
     furniture: [
-      f('bed', -4.8, 3.0, 2.2, 0.6, 2.3, '#e9e3d8', 'luxe'),
-      f('wardrobe', -2.3, 4.15, 2.2, 2.2, 0.6, '#3a3a3c'),
+      f('bed', -4.8, 3.0, 2.2, 0.6, 2.3, '#e9e3d8', 'luxe', 'chevron'),
+      // Gold-handled nightstands either side, and a marble wardrobe
+      f('dresser', -6.2, 4.2, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('dresser', -3.4, 4.2, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('wardrobe', -1.85, 4.15, 2.2, 2.2, 0.6, '#f3f1ec', 'luxe', 'marble'),
       f('desk', -5.6, -0.4, 0.8, 0.75, 1.8, '#2b2b2d'),
       f('sofa', 3.5, 1.4, 3.2, 0.85, 1.1, '#e9e3d8', 'luxe'),
       f('sofa', 5.6, -0.6, 1.0, 0.85, 2.4, '#e9e3d8', 'luxe'),

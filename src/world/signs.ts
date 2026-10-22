@@ -69,3 +69,25 @@ export function neonSign() {
   t.colorSpace = SRGBColorSpace;
   return t;
 }
+
+/** A simple illuminated name board: white letters on black, a thin accent line. */
+export function plainSign(title: string, subtitle: string, accent = '#c9a052') {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 256;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#0e0f11';
+  g.fillRect(0, 0, 1024, 256);
+  g.fillStyle = accent;
+  g.fillRect(0, 230, 1024, 8);
+  g.textAlign = 'center';
+  g.fillStyle = '#f4f4f2';
+  g.font = "800 112px Manrope, 'DM Sans', sans-serif";
+  g.fillText(title, 512, 130);
+  g.fillStyle = accent;
+  g.font = "600 34px 'DM Sans', sans-serif";
+  g.fillText(subtitle.toUpperCase().split('').join(' '), 512, 196);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}

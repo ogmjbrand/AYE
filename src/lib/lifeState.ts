@@ -123,7 +123,7 @@ export interface Celebration {
 
 export type StatKey =
   | 'goodTasks' | 'mealsOut' | 'mealsCooked' | 'washes' | 'runs' | 'chats' | 'nightsOut'
-  | 'furnitureBought' | 'clothesBought' | 'trips' | 'earned' | 'missionsDone' | 'wishesDone' | 'relaxed' | 'studied' | 'events' | 'met';
+  | 'furnitureBought' | 'clothesBought' | 'trips' | 'earned' | 'missionsDone' | 'wishesDone' | 'relaxed' | 'studied' | 'events' | 'met' | 'driven';
 
 export interface LifeState {
   profile: { bio: string; traits: TraitId[] };
@@ -157,7 +157,7 @@ export interface LifeState {
 }
 
 const SKILL_IDS = SKILLS.map((s) => s.id);
-const STAT_KEYS: readonly StatKey[] = ['goodTasks', 'mealsOut', 'mealsCooked', 'washes', 'runs', 'chats', 'nightsOut', 'furnitureBought', 'clothesBought', 'trips', 'earned', 'missionsDone', 'wishesDone', 'relaxed', 'studied', 'events', 'met'];
+const STAT_KEYS: readonly StatKey[] = ['goodTasks', 'mealsOut', 'mealsCooked', 'washes', 'runs', 'chats', 'nightsOut', 'furnitureBought', 'clothesBought', 'trips', 'earned', 'missionsDone', 'wishesDone', 'relaxed', 'studied', 'events', 'met', 'driven'];
 const DREAM_IDS: readonly DreamId[] = ['mogul', 'luxury', 'career', 'fashion', 'social', 'globetrotter', 'chef'];
 
 export function emptyLife(): LifeState {

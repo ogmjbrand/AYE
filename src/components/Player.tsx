@@ -8,6 +8,8 @@ import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
 import { resolveStyles, type Slot } from '../lib/fashion';
+import type { OwnedCar } from '../lib/cars';
+import { CarBody } from '../world/CarBody';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -16,6 +18,8 @@ interface PlayerProps {
   tryOn?: Partial<Record<Slot, string | null>>;
   /** Talking with a resident (gestures in turns). */
   conversing?: boolean;
+  /** Driving your car: the car is shown instead of you on foot. */
+  car?: OwnedCar | null;
 }
 
 /** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
@@ -34,7 +38,7 @@ function CapsuleFigure({ color }: { color: string }) {
   );
 }
 
-export function Player({ controller, character, tryOn, conversing = false }: PlayerProps) {
+export function Player({ controller, character, tryOn, conversing = false, car = null }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
@@ -77,11 +81,13 @@ export function Player({ controller, character, tryOn, conversing = false }: Pla
   const fallback = <CapsuleFigure color={bodyColor} />;
   return (
     <group ref={groupRef}>
+      {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
           <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} />
         </Suspense>
       </ErrorBoundary>
+      )}
     </group>
   );
 }

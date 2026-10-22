@@ -1,4 +1,5 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
+import { StudentStatus, TodaysGoals, type StudentHud } from './StudentPanels';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useRef, useState } from 'react';
@@ -57,6 +58,12 @@ interface HUDProps {
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
+  /** At a university's front marker on the street: in through the gate to the campus. */
+  campusEntry?: { name: string; onOpen: () => void } | null;
+  /** Overrides the work status line (e.g. "In class", read from the save). */
+  statusOverride?: { label: string; tone: 'good' | 'warn' } | null;
+  /** The student's goals and status panels (lib/school.ts). */
+  student?: StudentHud | null;
   /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   /** Opens the gadget shop when standing at it. */
@@ -262,6 +269,9 @@ export function HUD({
   busy = false,
   onTalk,
   workTask,
+  campusEntry,
+  statusOverride,
+  student,
   insideHome,
   onOpenGadgets,
   onEnterRestaurant,
@@ -310,9 +320,9 @@ export function HUD({
             : parkAt(district.park, px, pz) && onOpenPark
               ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark }
               : null;
-  const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const resident = !prompt && !campusEntry && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const streetPrompt = prompt ?? (resident && onTalk
+  const streetPrompt = prompt ?? (campusEntry ? { verb: 'Enter', place: campusEntry.name, onOpen: campusEntry.onOpen } : null) ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
@@ -320,7 +330,9 @@ export function HUD({
   const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
 
   const shiftHours = isWorkingHours(gameTime) && !!character && character.career !== 'none';
-  const status = !shiftHours ? null
+  const status = statusOverride
+    ? { label: statusOverride.label, dot: statusOverride.tone === 'good' ? 'bg-ui-accent' : 'bg-ui-warn', text: statusOverride.tone === 'good' ? 'text-ui-accent-strong' : 'text-ui-warn' }
+    : !shiftHours ? null
     : workplaceStatus.isAtWorkplace
       ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
       : { label: insideHome ? 'Not at work' : `Not at work · ${workplaceStatus.distanceToWorkplace} m`, dot: 'bg-ui-warn', text: 'text-ui-warn' };
@@ -359,7 +371,13 @@ export function HUD({
             {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}
           </div>
         )}
+        {student && !small && <TodaysGoals goals={student.goals} />}
       </div>
+      {student && !small && (
+        <div className="absolute right-5 top-[4.6rem]">
+          <StudentStatus s={student} />
+        </div>
+      )}
 
       {/* Top-centre: the venue or area */}
       {place && (
