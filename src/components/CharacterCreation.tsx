@@ -68,6 +68,8 @@ export interface Character {
 }
 
 export interface StartChoices {
+  /** A short background story, shown on your Life OS profile. */
+  bio?: string;
   traits: TraitId[];
   dream: DreamId | null;
   homeId: string | null;
@@ -491,6 +493,10 @@ function StartChoicesFields({ draft, set }: StageProps) {
           })}
         </div>
       </div>
+      <Field id="bio" label="Background story (optional)" hint={`${draft.bio.length}/280 · shown on your profile in the Life OS`}>
+        <textarea id="bio" value={draft.bio} onChange={(e) => set({ bio: e.target.value.slice(0, 280) })} rows={3} maxLength={280}
+          placeholder="e.g. Grew up in Surulere, first in the family to go to university, saving for a place of my own." className={INPUT} />
+      </Field>
       <Field id="dream" label="Life dream (optional)" hint={draft.dream ? DREAMS.find((d) => d.id === draft.dream)?.description : 'A long-term goal with milestones and rewards. You can also pick one later in the Life OS.'}>
         <select id="dream" value={draft.dream ?? ''} onChange={(e) => set({ dream: (e.target.value || null) as DreamId | null })} className={INPUT}>
           <option value="">Decide later</option>

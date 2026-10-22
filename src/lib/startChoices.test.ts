@@ -20,6 +20,11 @@ describe('opening choices for a new life', () => {
     expect(s.today.expenses).toBeGreaterThanOrEqual(moveInFee(home));
   });
 
+  it('puts the background story on the profile', () => {
+    const s = applyStart(createGameState(5000), { bio: 'From Ibadan.', traits: [], dream: null, homeId: null }, 'none', 'ordinary');
+    expect(s.life.profile.bio).toBe('From Ibadan.');
+  });
+
   it('skips a home the starting money cannot cover', () => {
     const s = applyStart(createGameState(100), { traits: [], dream: null, homeId: 'marina-heights-penthouse' }, 'none', 'student');
     expect(s.home).toBeNull();
@@ -29,7 +34,7 @@ describe('opening choices for a new life', () => {
   it('is part of a newly built character, but never saved or loaded', () => {
     const d = { ...newDraft(), name: 'Ada', traits: ['active' as const], dream: 'chef' as const, homeId: null };
     const c = buildCharacter(d, { id: 'c1', now: 1 });
-    expect(c.start).toEqual({ traits: ['active'], dream: 'chef', homeId: null });
+    expect(c.start).toEqual({ bio: '', traits: ['active'], dream: 'chef', homeId: null });
     const storage = memory();
     saveCharacter(c, storage);
     expect(JSON.parse(storage.getItem('aye_character')!).start).toBeUndefined();
