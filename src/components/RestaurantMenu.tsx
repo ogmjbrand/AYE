@@ -31,9 +31,11 @@ function Coin({ amount, className = '' }: { amount: number; className?: string }
  * a two-column grid of dishes with their pictures and prices, and a detail
  * view to order from. Ordering needs a seat (you can read the menu anywhere inside).
  */
-export function RestaurantMenu({ menu = PALMS_MENU, diet, balance, seated, eating, kitchenOpen, onOrder, onClose }: {
+export function RestaurantMenu({ menu = PALMS_MENU, title = 'Menu', diet, balance, seated, eating, kitchenOpen, onOrder, onClose }: {
   /** Which place's menu. */
   menu?: readonly MenuItem[];
+  /** The panel's heading. */
+  title?: string;
   diet: Diet;
   kitchenOpen: boolean;
   balance: number;
@@ -67,14 +69,14 @@ export function RestaurantMenu({ menu = PALMS_MENU, diet, balance, seated, eatin
           className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
           <Icon name="back" className="h-4 w-4" />
         </button>
-        <h2 className="m-0 font-display text-xl font-bold">{open ? open.name : 'Menu'}</h2>
+        <h2 className="m-0 font-display text-xl font-bold">{open ? open.name : title}</h2>
         <span className="ml-auto"><Coin amount={Math.round(balance)} className="text-sm" /></span>
       </header>
 
       {!open && (
         <>
           <div role="tablist" aria-label="Courses" className="flex shrink-0 gap-1 overflow-x-auto px-3 pt-3">
-            {COURSES.map((c) => (
+            {COURSES.filter((c) => c.id === 'all' || menu.some((i) => i.course === c.id)).map((c) => (
               <button key={c.id} type="button" role="tab" aria-selected={course === c.id} onClick={() => setCourse(c.id)}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${course === c.id ? 'bg-ui-gold text-[#2a1c06]' : 'border border-ui-gold/25 text-ui-ink/80 hover:border-ui-gold/60'}`}>
                 {c.label}

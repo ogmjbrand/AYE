@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DESK_SPOT, DOOR_SPOT, GUEST_ROOM, NIGHT_PRICE, ROOMS, WASH_HYGIENE, armchairSeats, basinSpot, bedSpot, checkoutFor, hotelLayout, roomById, roomDoorSpot,
-  roomInsideSpot, sanitiseStay, stayIsValid,
+  DESK_SPOT, DOOR_SPOT, GUEST_ROOM, HOTEL_DISH_IDS, NIGHT_PRICE, ROOMS, ROOM_SERVICE_MENU, VENDING, VENDING_MENU, VENDING_SPOT, WASH_HYGIENE, armchairSeats,
+  basinSpot, bedSpot, checkoutFor, hotelLayout, roomById, roomDoorSpot, roomInsideSpot, roomServiceSpot, sanitiseStay, stayIsValid, BUILDING, LOBBY,
 } from './hotel';
 import { findPath, walkGridFor } from './pathfinding';
 import { DISTRICTS, hotelAt } from './geography';
@@ -75,6 +75,26 @@ describe('Grand Lagoon Hotel', () => {
     // The other rooms are always taken
     const other = roomById('101')!;
     expect(findPath(open, from, pt(roomInsideSpot(other)))).toBeNull();
+  });
+
+  it('has a drinks machine in the lobby and room service in your room, all paid like any meal', () => {
+    expect(VENDING.x - VENDING.w / 2).toBeGreaterThan(BUILDING.x0);
+    expect(VENDING.z + VENDING.d / 2).toBeLessThan(LOBBY.z1);
+    const open = walkGridFor(hotelLayout(true).obstacles);
+    const from = pt(DOOR_SPOT);
+    expect(findPath(open, from, pt(VENDING_SPOT))).not.toBeNull();
+    expect(findPath(walkGridFor(hotelLayout(false).obstacles), from, pt(DESK_SPOT))).not.toBeNull();
+    expect(findPath(open, from, pt(roomServiceSpot(guest)))).not.toBeNull();
+    for (const item of [...ROOM_SERVICE_MENU, ...VENDING_MENU]) {
+      expect(item.price, item.id).toBeGreaterThan(0);
+      expect(HOTEL_DISH_IDS.has(item.id)).toBe(true);
+    }
+    expect(VENDING_MENU.every((i) => i.course === 'drink' && i.contains.length === 0)).toBe(true);
+    const s0 = createGameState(1000, createTime(20, 0));
+    const sub = ROOM_SERVICE_MENU.find((i) => i.id === 'room-sub')!;
+    const s1 = act(s0, { type: 'eat', price: sub.price, fullness: sub.fullness, lift: sub.lift });
+    expect(s1.balance).toBe(1000 - sub.price);
+    expect(s1.today.expenses).toBe(sub.price);
   });
 
   it('stands in Ayemara, with a door you can walk to from the street', () => {

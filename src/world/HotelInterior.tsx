@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode } from 'react';
+import { Suspense, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide, MeshStandardMaterial, type Group, type Mesh, type Texture } from 'three';
@@ -6,8 +6,10 @@ import type { GameTime } from '../lib/gameState';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { lightingAt } from './timeOfDay';
 import {
-  BUILDING, CORRIDOR, DESK, DOOR_W, GUEST_ROOM, HOTEL_NAME, LOBBY, RECEPTIONIST, ROOMS, ROOM_PLAN, STOREY, hotelWalls, roomById, roomDoor, roomPoint, type HotelRoom,
+  BUILDING, CORRIDOR, DESK, DOOR_W, GUEST_ROOM, HOTEL_NAME, LOBBY, RECEPTIONIST, ROOMS, ROOM_PLAN, STOREY, VENDING, hotelWalls, roomById, roomDoor, roomPoint, type HotelRoom,
 } from '../lib/hotel';
+import { RealModel } from './RealModel';
+import { HotelDish } from './HotelDishes';
 import { WALL_T, wallBox, type WallSeg } from '../lib/university';
 import {
   bathFloorTexture, curtainTexture, damaskTexture, flowerPrintTexture, hotelPlasterTexture, parquetTexture, rugTexture, stoneTileTexture, tileBorderTexture,
@@ -176,7 +178,7 @@ function Armchair() {
 }
 
 /** The guest room, furnished: every room in the hotel is built from this same plan and these same materials. */
-function GuestRoom({ room, player, gameTime, lit }: { room: HotelRoom; player: PlayerHandle; gameTime: GameTime; lit: number }) {
+function GuestRoom({ room, player, gameTime, lit, tray }: { room: HotelRoom; player: PlayerHandle; gameTime: GameTime; lit: number; tray: readonly string[] }) {
   const P = ROOM_PLAN;
   const at = (u: number, v: number, y = 0): [number, number, number] => { const [x, z] = roomPoint(room, u, v); return [x, y, z]; };
   // Facing the room's +u (towards the window) and +v (towards the bed wall), in the building's frame
@@ -298,6 +300,10 @@ function GuestRoom({ room, player, gameTime, lit }: { room: HotelRoom; player: P
         <mesh position={[0.7, 0.93, -0.08]}><cylinderGeometry args={[0.035, 0.035, 0.22, 12]} /><meshStandardMaterial color="#cfe0f0" roughness={0.1} transparent opacity={0.75} /></mesh>
         <mesh position={[0, 1.75, -P.dresser.depth / 2 + 0.03]}><boxGeometry args={[1.3, 0.75, 0.05]} /><meshStandardMaterial color="#141414" roughness={0.3} /></mesh>
         <mesh position={[0, 1.75, -P.dresser.depth / 2 + 0.056]}><planeGeometry args={[1.24, 0.69]} /><meshStandardMaterial color="#26282c" roughness={0.1} metalness={0.4} /></mesh>
+        {/* Room service, left on the dresser top between the telephone and the water */}
+        <Suspense fallback={null}>
+          {tray.slice(-3).map((id, i) => <group key={`${id}${i}`} position={[-0.25 + i * 0.36, 0.815, 0.02]}><HotelDish id={id} /></group>)}
+        </Suspense>
       </group>
       </OnWall>
       {/* Luggage bench in dark wood with a duffel bag */}
@@ -362,7 +368,12 @@ function GuestRoom({ room, player, gameTime, lit }: { room: HotelRoom; player: P
  * with the same damask, doors and lights throughout. The receptionist is
  * computer-controlled.
  */
-export function HotelInterior({ gameTime, player, hasKey, children }: { gameTime: GameTime; player: PlayerHandle; hasKey: boolean; children: ReactNode }) {
+export function HotelInterior({ gameTime, player, hasKey, tray = [], children }: {
+  gameTime: GameTime; player: PlayerHandle; hasKey: boolean;
+  /** Room service waiting in your room (menu ids, oldest first). */
+  tray?: readonly string[];
+  children: ReactNode;
+}) {
   const l = lightingAt(gameTime.hour, gameTime.minute);
   const lit = 0.6 + 0.4 * l.night;
   const w = BUILDING.x1 - BUILDING.x0, d = BUILDING.z1 - BUILDING.z0;
@@ -421,6 +432,13 @@ export function HotelInterior({ gameTime, player, hasKey, children }: { gameTime
           <RoundedBox args={[2.2, 0.5, 0.2]} radius={0.06} smoothness={3} position={[0, 0.62, -0.34]} castShadow><meshStandardMaterial color="#a8724a" roughness={0.6} /></RoundedBox>
         </group>
       ))}
+      {/* The drinks machine by the door (a CC-BY model with our own artwork, see CREDITS.md) */}
+      <group position={[VENDING.x, 0, VENDING.z]}>
+        <RealModel name="vending-machine" fit={[VENDING.w, VENDING.h, VENDING.d]} fallback={(
+          <mesh position={[0, VENDING.h / 2, 0]} castShadow><boxGeometry args={[VENDING.w, VENDING.h, VENDING.d]} /><meshStandardMaterial color="#1d6fd0" roughness={0.4} /></mesh>
+        )} />
+        <pointLight position={[0, 1.4, VENDING.d / 2 + 0.4]} intensity={0.8 + lit} distance={3} decay={1.8} color="#e8f2ff" />
+      </group>
       <mesh position={[-4.6, 0.22, -6]} castShadow><boxGeometry args={[1.0, 0.44, 0.7]} /><meshStandardMaterial color={DARK_WOOD} roughness={0.4} /></mesh>
       <group position={[BUILDING.x0 + FACE, 0, -6]} rotation={[0, Math.PI / 2, 0]}>
         <mesh position={[0, H / 2, 0]}><planeGeometry args={[4.5, H - 0.02]} /><meshStandardMaterial map={damask} roughness={0.8} /></mesh>
@@ -440,7 +458,7 @@ export function HotelInterior({ gameTime, player, hasKey, children }: { gameTime
       </group>
       {ROOMS.map((r) => <RoomDoor key={r.id} room={r} open={hasKey && r.id === GUEST_ROOM} dnd={r.id === '104' || r.id === '106'} />)}
 
-      {hasKey && <GuestRoom room={guest} player={player} gameTime={gameTime} lit={lit} />}
+      {hasKey && <GuestRoom room={guest} player={player} gameTime={gameTime} lit={lit} tray={tray} />}
 
       <hemisphereLight args={['#fff4e2', '#6a5a48', 0.55]} />
       <pointLight position={[0, 2.6, -6.5]} intensity={6 * lit + 2} distance={14} decay={1.5} color="#ffe6c4" />

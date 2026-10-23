@@ -1,4 +1,6 @@
 import { CantinaDish } from './CantinaDishes';
+import { HotelDish } from './HotelDishes';
+import { HOTEL_DISH_IDS } from '../lib/hotel';
 import { useMemo, type ReactNode } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide, LatheGeometry, Vector2 } from 'three';
@@ -516,8 +518,8 @@ export function DishModel({ id }: { id: string }) {
         </group>
       );
     default:
-      // Cantina Ayé's menu (and an empty plate for anything unknown)
-      return <CantinaDish id={id} />;
+      // The hotel's room service and vending drinks; Cantina Ayé's menu (and an empty plate for anything unknown)
+      return HOTEL_DISH_IDS.has(id) ? <HotelDish id={id} /> : <CantinaDish id={id} />;
   }
 }
 

@@ -5,7 +5,12 @@ import { assetUrl } from '../lib/assetManifest';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 /** Photoreal pieces built by scripts/khronos/build-furniture.mjs (CC0 / CC-BY 4.0, see CREDITS.md). */
-export type RealModelName = 'sofa-velvet-champagne' | 'sofa-velvet-blush' | 'chair-velvet-peacock' | 'chair-velvet-mango' | 'vase-flowers' | 'plant-potted';
+type FurnitureName = 'sofa-velvet-champagne' | 'sofa-velvet-blush' | 'chair-velvet-peacock' | 'chair-velvet-mango' | 'vase-flowers' | 'plant-potted';
+/** Props built by scripts/sketchfab/build-props.mjs (CC-BY 4.0, see CREDITS.md). */
+export type PropName = 'sub-sandwich' | 'bento-box' | 'vending-machine';
+export type RealModelName = FurnitureName | PropName;
+const PROPS: ReadonlySet<string> = new Set<PropName>(['sub-sandwich', 'bento-box', 'vending-machine']);
+const modelPath = (name: RealModelName) => `models/${PROPS.has(name) ? 'props' : 'furniture'}/${name}.glb`;
 
 interface Props {
   name: RealModelName;
@@ -18,7 +23,7 @@ interface Props {
 }
 
 function Model({ name, fit, rotationY = 0, recolor }: Props) {
-  const { scene } = useGLTF(assetUrl(`models/furniture/${name}.glb`), false, true);
+  const { scene } = useGLTF(assetUrl(modelPath(name)), false, true);
   // By value, so a new array with the same size doesn't re-clone the model
   const [fx, fy, fz] = fit;
   const dyeMatch = recolor ? recolor.match.source : null;
@@ -56,13 +61,18 @@ function Model({ name, fit, rotationY = 0, recolor }: Props) {
   );
 }
 
-/** A real model fitted to a footprint; `fallback` (the built-in shape) shows while it loads or if it can't. */
-export function RealModel({ fallback = null, ...props }: Props & { fallback?: ReactNode }) {
+/**
+ * A real model fitted to a footprint; `fallback` (the built-in shape) shows while it loads or if it can't.
+ * With `suspend`, loading suspends to the nearest Suspense above instead (so a snapshot waits for it).
+ */
+export function RealModel({ fallback = null, suspend = false, ...props }: Props & { fallback?: ReactNode; suspend?: boolean }) {
   return (
     <ErrorBoundary fallback={fallback}>
-      <Suspense fallback={fallback}>
-        <Model {...props} />
-      </Suspense>
+      {suspend ? <Model {...props} /> : (
+        <Suspense fallback={fallback}>
+          <Model {...props} />
+        </Suspense>
+      )}
     </ErrorBoundary>
   );
 }

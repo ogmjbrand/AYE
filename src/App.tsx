@@ -73,7 +73,8 @@ import { HotelFront } from './world/HotelFront';
 import { HotelInterior } from './world/HotelInterior';
 import {
   DESK_SPOT as HOTEL_DESK_SPOT, DOOR_SPOT as HOTEL_DOOR, GUEST_ROOM, HOTEL_NAME, NIGHT_PRICE, RECEPTIONIST, ROOMS as HOTEL_ROOMS,
-  WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, hotelLayout, roomById as hotelRoom, roomDoorSpot, stayIsValid,
+  ROOM_SERVICE_MENU, VENDING_MENU, VENDING_SPOT, WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, hotelLayout, roomById as hotelRoom,
+  roomDoorSpot, roomServiceSpot, stayIsValid,
 } from './lib/hotel';
 import {
   BAR_SPOT as CANTINA_BAR_SPOT, CANTINA_MENU, CANTINA_NAME, DOOR_SPOT as CANTINA_DOOR, FREE_SEATS as CANTINA_SEATS, OPEN_HOUR as CANTINA_OPEN_HOUR,
@@ -391,6 +392,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [assistantOpen, setAssistantOpen] = useState(false);
   // What you've ordered at your table (cleared when you get up)
   const [served, setServed] = useState<{ seatId: string; dishes: string[] } | null>(null);
+  // In the hotel: which menu is open (the lobby's drinks machine or room service), and the tray left in your room for this stay
+  const [hotelMenu, setHotelMenu] = useState<'vending' | 'room' | null>(null);
+  const [roomTray, setRoomTray] = useState<{ until: number; ids: string[] } | null>(null);
   const interior = home ? interiorFor(home) : null;
   // Furniture you bought and placed, alongside what the home came with
   const ownedPieces = useMemo(
@@ -409,6 +413,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inHotel = !indoors && venue !== null && district.hotel?.id === venue;
   /** Whether you hold the key to a hotel room (a night booked, before check-out). */
   const hotelKey = stayIsValid(state.hotel, state.time.totalMinutes);
+  const trayHere = hotelKey && roomTray && roomTray.until === state.hotel!.until ? roomTray.ids : [];
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
   const inCampus = !indoors && venue === CAMPUS_ID;
   const inHospital = !indoors && venue === HOSPITAL_ID;
@@ -725,6 +730,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const near = (p: readonly [number, number], r = USE_RADIUS) => Math.hypot(x - p[0], z - p[1]) <= r;
     const guest = hotelRoom(GUEST_ROOM)!;
     if (near(HOTEL_DOOR)) return { verb: 'Leave to', place: district.name, onOpen: goOutside };
+    if (near(VENDING_SPOT, 1.0)) return { verb: 'Buy a cold drink from', place: 'the vending machine', onOpen: () => setHotelMenu('vending') };
     if (near(HOTEL_DESK_SPOT, 1.3)) {
       if (hotelKey) return { verb: 'Your key: room 102, until noon. Ask', place: `${RECEPTIONIST.name} at the desk`, onOpen: () => setArrival(`${RECEPTIONIST.name}: “Room ${GUEST_ROOM} is yours until 12:00. Down the corridor, on the right.”`) };
       return {
@@ -743,11 +749,29 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     }
     if (hotelKey) {
       if (near(hotelBedSpot(guest), 1.0)) return { verb: 'Sleep in', place: 'your hotel bed', onOpen: () => { setMovementBlocked(false); rest(true); } };
+      if (near(roomServiceSpot(guest), 0.9)) return { verb: 'Order room service on', place: 'the telephone', onOpen: () => setHotelMenu('room') };
       if (near(basinSpot(guest), 0.9)) return { verb: 'Freshen up at', place: 'the basin', onOpen: () => { hotelWash(); setArrival(`You freshen up. ${WASH_MINUTES} minutes pass.`); } };
       const chair = armchairSeats(guest).find((c) => Math.hypot(x - c.x, z - c.z) <= 1.0 || Math.hypot(x - (c.approach?.x ?? c.x), z - (c.approach?.z ?? c.z)) <= 0.6);
       if (chair) return { verb: 'Sit in', place: 'the armchair', onOpen: () => sit.start({ seat: chair, place: HOTEL_NAME, minutes: 0 }) };
     }
     return null;
+  };
+  /** Pay for a drink from the lobby machine, or for room service brought up to your room (left on the dresser). */
+  const orderInHotel = (item: MenuItem) => {
+    if (!inHotel || state.balance < item.price || !suitsYou(item, character.diet)) return;
+    if (hotelMenu === 'room') {
+      if (!hotelKey) return;
+      eat(item.price, item.fullness, item.lift);
+      wait(item.minutes);
+      const until = state.hotel!.until;
+      setRoomTray((t) => ({ until, ids: [...(t && t.until === until ? t.ids : []), item.id] }));
+      setArrival(`Room service brings your ${item.name} up to room ${GUEST_ROOM}. ${item.minutes} minutes pass while it comes and you enjoy it.`);
+    } else if (hotelMenu === 'vending') {
+      eat(item.price, item.fullness, item.lift);
+      wait(item.minutes);
+      setArrival(`You tap your phone and the machine drops a cold ${item.name}. You drink it in the lobby.`);
+    }
+    setHotelMenu(null);
   };
   /** In through the Fashion House's front door. */
   const enterBoutique = () => {
@@ -1561,7 +1585,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </University>
             ) : inHotel ? (
-              <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey}>
+              <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey} tray={trayHere}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HotelInterior>
@@ -1646,6 +1670,19 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           kitchenOpen={cantinaOpen(state.time.hour)}
           onOrder={orderAtCantina}
           onClose={() => setMenuOpen(false)}
+        />
+      )}
+      {inHotel && hotelMenu && (
+        <RestaurantMenu
+          menu={hotelMenu === 'room' ? ROOM_SERVICE_MENU : VENDING_MENU}
+          title={hotelMenu === 'room' ? 'Room service' : 'Cold drinks'}
+          diet={character.diet}
+          balance={state.balance}
+          seated={hotelMenu === 'vending' || hotelKey}
+          eating={null}
+          kitchenOpen
+          onOrder={orderInHotel}
+          onClose={() => setHotelMenu(null)}
         />
       )}
       {dealerOpen && district.dealership && (

@@ -11,12 +11,17 @@
  * its bed is a full night's rest, like sleeping at home; the bathroom sink
  * freshens you up. The receptionist is computer-controlled.
  *
+ * The lobby has a drinks vending machine, and your room has 24-hour room
+ * service on the dresser telephone (both pay like any meal, lib/gameState.ts
+ * `eat`). The machine, sandwich and bento are CC-BY 4.0 models (CREDITS.md).
+ *
  * Coordinates are the building's own: the lobby is at the front (−z) with the
  * entrance in the middle, the corridor runs north with three rooms either side.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import { run, type WallSeg } from './university';
 import type { Seat } from './seating';
+import type { MenuItem } from './restaurant';
 
 export const HOTEL_NAME = 'Grand Lagoon Hotel';
 /** One night, in GHAI. */
@@ -116,6 +121,9 @@ export const ROOM_PLAN = {
   window: 7,
 } as const;
 
+/** Standing at the dresser, where the telephone is, to order room service (it's left on the dresser top). */
+export const roomServiceSpot = (room: HotelRoom) => roomPoint(room, (ROOM_PLAN.dresser.u0 + ROOM_PLAN.dresser.u1) / 2, -3 + ROOM_PLAN.dresser.depth + 0.55);
+
 /** Where you lie down (beside the bed) and where you wash (in front of the basin). */
 export const bedSpot = (room: HotelRoom) => roomPoint(room, ROOM_PLAN.bed.u - ROOM_PLAN.bed.w / 2 - 0.45, 1.9);
 export const basinSpot = (room: HotelRoom) => roomPoint(room, ROOM_PLAN.basin.u - 0.75, ROOM_PLAN.basin.v);
@@ -125,6 +133,34 @@ export const armchairSeats = (room: HotelRoom): Seat[] => ROOM_PLAN.armchairs.ma
   const [x, z] = roomPoint(room, a.u, a.v);
   return { id: `chair-${room.id}-${i}`, x, z, facing: room.side > 0 ? -Math.PI / 2 : Math.PI / 2, height: 0.46, approach: { x: x - room.side * 0.75, z } };
 });
+
+// ---------------------------------------------------------------- food and drink
+
+const m = (id: string, name: string, course: MenuItem['course'], price: number, fullness: number, minutes: number, lift: MenuItem['lift'], contains: MenuItem['contains'], description: string): MenuItem =>
+  ({ id, name, course, price, fullness, minutes, lift, contains, description });
+
+/** Room service, brought up to your room at any hour. Minutes include the wait for it to arrive. */
+export const ROOM_SERVICE_MENU: readonly MenuItem[] = [
+  m('room-sub', 'Club Sub Sandwich', 'main', 160, 50, 30, { fun: 4 }, ['meat', 'dairy'], 'A long toasted roll with sliced meats, cheese, lettuce and tomato, brought up on a tray.'),
+  m('room-bento', 'Bento Box', 'main', 240, 60, 35, { fun: 6 }, ['fish', 'egg'], 'A lacquered box of rice, grilled fish, rolled omelette and pickled vegetables.'),
+  m('vend-water', 'Bottled Water', 'drink', 20, 3, 15, { energy: 2 }, [], 'Still water, chilled.'),
+  m('vend-juice', 'Orange Juice', 'drink', 35, 8, 15, { energy: 3 }, [], 'Freshly pressed orange juice.'),
+];
+
+/** The lobby's drinks machine: cold drinks, paid in GHAI by tapping your phone. */
+export const VENDING_MENU: readonly MenuItem[] = [
+  m('vend-water', 'Bottled Water', 'drink', 20, 3, 2, { energy: 2 }, [], 'Still water, chilled.'),
+  m('vend-juice', 'Orange Juice', 'drink', 35, 8, 3, { energy: 3 }, [], 'Orange juice in a bottle, cold from the machine.'),
+  m('vend-soda', 'Ginger Soda', 'drink', 30, 4, 3, { fun: 3 }, [], 'A fizzy ginger soda in a can.'),
+  m('vend-tea', 'Iced Lemon Tea', 'drink', 30, 5, 3, { energy: 4 }, [], 'Sweet iced tea with lemon, in a bottle.'),
+];
+
+/** Every id on the two menus (their 3D models are in world/HotelDishes.tsx). */
+export const HOTEL_DISH_IDS: ReadonlySet<string> = new Set([...ROOM_SERVICE_MENU, ...VENDING_MENU].map((i) => i.id));
+
+/** The vending machine against the front wall of the lobby, east of the door (past the desk), facing in. */
+export const VENDING = { x: 7.0, z: BUILDING.z0 + 0.15 + 0.46, w: 1.3, d: 0.92, h: 1.85 } as const;
+export const VENDING_SPOT = [VENDING.x, VENDING.z + VENDING.d / 2 + 0.8] as const;
 
 /** Every wall: the shell, the corridor with its doors, the walls between rooms and the guest room's bathroom. */
 export function hotelWalls(): WallSeg[] {
@@ -179,6 +215,7 @@ export function hotelLayout(hasKey: boolean): DistrictLayout {
     solid(DESK.x, DESK.z + 1.3, DESK.w + 1, 1.4, 2),
     // Lobby sofas and the plant
     solid(-4.6, -7.6, 2.2, 0.9, 0.8), solid(-4.6, -4.4, 2.2, 0.9, 0.8), solid(-4.6, -6, 1.0, 0.7, 0.45),
+    solid(VENDING.x, VENDING.z, VENDING.w, VENDING.d, VENDING.h),
     // Closed doors: every room but yours (and yours too until you have the key)
     ...ROOMS.filter((r) => !(hasKey && r.id === GUEST_ROOM)).map((r) => {
       const [x, z] = roomDoor(r);

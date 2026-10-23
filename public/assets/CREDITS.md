@@ -30,3 +30,15 @@ From the Khronos glTF Sample Assets (github.com/KhronosGroup/glTF-Sample-Assets)
 | `plant-potted.glb` | DiffuseTransmissionPlant | Rico Cilliers (original, CC0), Eric Chadwick / Darmstadt Graphics Group (materials) | CC BY 4.0 |
 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ — changes made: colour variant baked in, textures resized and converted to WebP, meshes compressed, the vase model reduced to one vase.
+
+## Props (models/props/)
+
+From Sketchfab, rebuilt by `scripts/sketchfab/build-props.mjs` (WebP textures, meshopt compression).
+
+| File | Source model | Author | Licence |
+|---|---|---|---|
+| `sub-sandwich.glb` | "Sub Sandwich 3D Model [RapidAssets.ai]" (sketchfab.com/3d-models/sub-sandwich-3d-model-rapidassetsai-0b391970731a4096944a28646b9a785e) | RapidAssets | CC BY 4.0 |
+| `bento-box.glb` | "FREE Japanese Bento Box – 3D Food Model" (sketchfab.com/3d-models/free-japanese-bento-box-3d-food-model-519e3aeef157483bb9c4cc1652d6b70d) | Halabalo067 | CC BY 4.0 |
+| `vending-machine.glb` | "Vending Machine" (sketchfab.com/3d-models/vending-machine-3397acf75bf54f0e9bb0fff991be0989) | gabyyu | CC BY 4.0 |
+
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ — changes made: animations removed, textures resized and converted to WebP, meshes compressed. On the vending machine, every texture that showed real drinks brands (the front, the drinks on the shelves, the instructions panel) was replaced with original artwork made for this game, so no brand names or logos remain.
