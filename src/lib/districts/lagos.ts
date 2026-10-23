@@ -23,6 +23,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-11, 24, 6, 12, 17, 'residential', '#d8a47f', 'Palm View'),
       b(-23, 24, 10, 12, 22, 'office', '#c9ccc8', 'Tech Campus'),
       b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Gadget Hub'),
+      // The Grand Lagoon Hotel behind Gadget Hub, its entrance on the lane off the boulevard
+      b(-24, 38, 12, 10, 26, 'residential', '#d9cdb8'),
       // The Palms restaurant, fronting the cross street behind Mama Put
       b(-21, -10.25, 12, 5.5, 7, 'shop', '#1f2c27'),
       // Cantina Ayé, the bar next door to the west: yellow stucco on the cross street
@@ -118,6 +120,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   bar: { id: 'cantina-aye', name: 'Cantina Ayé', kind: 'Bar & cantina', door: [-33, 0, -14.3], facing: Math.PI },
+  hotel: { id: 'grand-lagoon', name: 'Grand Lagoon Hotel', kind: 'Hotel · rooms by the night', door: [-24, 0, 32.2], facing: Math.PI },
   homes: [
     {
       id: 'marina-court-room', district: 'lagos.marina', name: 'Marina Court, room 4B', kind: 'Room in a shared flat', building: 'Marina Court',

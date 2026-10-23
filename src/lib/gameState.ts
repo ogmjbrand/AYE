@@ -27,6 +27,7 @@ import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { carById, carResale, fuelCost, type OwnedCar, type ParkedSpot } from './cars';
+import { GUEST_ROOM, NIGHT_PRICE, WASH_HYGIENE, WASH_MINUTES, checkoutFor, stayIsValid, type HotelStay } from './hotel';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
 import { WAIT_OPTIONS } from './parks';
 
@@ -113,6 +114,8 @@ export interface GameState {
   school: SchoolState;
   /** A doctor's shift at AYE General Hospital (lib/hospital.ts). */
   shift: ShiftState;
+  /** A night booked at the Grand Lagoon Hotel (lib/hotel.ts), until check-out. */
+  hotel: HotelStay | null;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -149,6 +152,10 @@ export type GameAction =
   | { type: 'fuel'; carId: string; metres: number }
   /** Leave a car parked on the street (a spot), or take it with you (null) when you get in and drive. */
   | { type: 'parkCar'; carId: string; spot: ParkedSpot | null }
+  /** Pay for a night at the hotel: the guest room's key until noon tomorrow. */
+  | { type: 'bookHotel' }
+  /** Freshen up at the basin in your hotel room. */
+  | { type: 'hotelWash' }
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'nightOut'; residentId: string }
@@ -258,7 +265,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift() };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
 }
 
 export function emptyLedger(): DayLedger {
@@ -719,6 +726,22 @@ function baseReducer(
       if (!car || !state.cars.some((c) => c.id === car.id) || state.summary) return state;
       const value = carResale(car);
       return { ...state, cars: state.cars.filter((c) => c.id !== car.id), balance: state.balance + value, today: { ...state.today, income: state.today.income + value } };
+    }
+    case 'bookHotel': {
+      const now = state.time.totalMinutes;
+      if (state.summary || stayIsValid(state.hotel, now) || state.balance < NIGHT_PRICE) return state;
+      return {
+        ...state,
+        hotel: { room: GUEST_ROOM, until: checkoutFor(now) },
+        balance: state.balance - NIGHT_PRICE,
+        today: { ...state.today, expenses: state.today.expenses + NIGHT_PRICE },
+      };
+    }
+    case 'hotelWash': {
+      if (state.summary || !stayIsValid(state.hotel, state.time.totalMinutes)) return state;
+      let next = state;
+      for (let i = 0; i < WASH_MINUTES; i++) next = tick(next, career, lifestyle, false);
+      return { ...next, needs: addNeeds(next.needs, { hygiene: WASH_HYGIENE }) };
     }
     case 'parkCar': {
       if (!state.cars.some((c) => c.id === action.carId)) return state;
