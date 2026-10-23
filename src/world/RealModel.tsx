@@ -7,9 +7,9 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 /** Photoreal pieces built by scripts/khronos/build-furniture.mjs (CC0 / CC-BY 4.0, see CREDITS.md). */
 type FurnitureName = 'sofa-velvet-champagne' | 'sofa-velvet-blush' | 'chair-velvet-peacock' | 'chair-velvet-mango' | 'vase-flowers' | 'plant-potted';
 /** Props built by scripts/sketchfab/build-props.mjs (CC-BY 4.0, see CREDITS.md). */
-export type PropName = 'sub-sandwich' | 'bento-box' | 'vending-machine';
+export type PropName = 'sub-sandwich' | 'bento-box' | 'vending-machine' | 'motorhome';
 export type RealModelName = FurnitureName | PropName;
-const PROPS: ReadonlySet<string> = new Set<PropName>(['sub-sandwich', 'bento-box', 'vending-machine']);
+const PROPS: ReadonlySet<string> = new Set<PropName>(['sub-sandwich', 'bento-box', 'vending-machine', 'motorhome']);
 const modelPath = (name: RealModelName) => `models/${PROPS.has(name) ? 'props' : 'furniture'}/${name}.glb`;
 
 interface Props {

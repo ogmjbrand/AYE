@@ -7,11 +7,17 @@
  *   sub-sandwich.glb     "Sub Sandwich 3D Model [RapidAssets.ai]" by RapidAssets
  *   bento-box.glb        "FREE Japanese Bento Box – 3D Food Model" by Halabalo067
  *   vending-machine.glb  "Vending Machine" by gabyyu
+ *   motorhome.glb        "FREE GMC Motorhome reimagined low poly" by Karol Miklas
  *
  * The vending machine's own textures are photographs full of real drinks
  * brands, so every one of those is replaced here with original artwork (made
  * as SVG and rasterised): the machine front, the drinks on its shelves and
  * the instructions panel. No brand names or logos remain.
+ *
+ * The motorhome keeps its yellow paint; the badges are painted out (the maker's
+ * badge on the grille, the lettering on the tyres, two round badges and the
+ * modeller's stickers on the body, the fuel-company stickers on the windows),
+ * and the wheels use the yellow sheet instead of the blue one with its decals.
  *
  * Output: public/assets/models/props/*.glb (meshopt, WebP textures).
  */
@@ -110,13 +116,84 @@ async function replaceVendingArt(doc) {
   // The cherry-blossom decal stays (no text or logos)
 }
 
+// ---------------------------------------------------------------- the motorhome's badges, painted out
+
+/** The average colour of a ring of pixels just outside a rectangle. */
+function around(px, w, ch, [x0, y0, x1, y1], pad = 4) {
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let y = y0 - pad; y <= y1 + pad; y++) {
+    for (let x = x0 - pad; x <= x1 + pad; x++) {
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) continue;
+      const i = (y * w + x) * ch;
+      for (let k = 0; k < 3; k++) sum[k] += px[i + k];
+      n++;
+    }
+  }
+  return sum.map((v) => v / n);
+}
+
+/** Fills each rectangle (x0, y0, x1, y1 on a 1024 sheet) with the colour round it. */
+async function paintOut(image, rects) {
+  const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const s = info.width / 1024;
+  for (const r of rects) {
+    const [x0, y0, x1, y1] = r.map((v) => Math.round(v * s));
+    const c = around(data, info.width, info.channels, [x0, y0, x1, y1]);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = (y * info.width + x) * info.channels;
+      for (let k = 0; k < 3; k++) data[i + k] = c[k];
+    }
+  }
+  return sharp(data, { raw: info }).png().toBuffer();
+}
+
+/** The tyre's sidewall lettering: a ring round the wheel, filled with plain rubber. */
+async function plainTyre(image) {
+  const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const s = info.width / 1024;
+  const [cx, cy, r0, r1] = [905 * s, 102 * s, 43 * s, 58 * s];
+  for (let y = Math.floor(cy - r1); y <= cy + r1; y++) for (let x = Math.floor(cx - r1); x <= cx + r1; x++) {
+    const d = Math.hypot(x - cx, y - cy);
+    if (d < r0 || d > r1) continue;
+    const i = (y * info.width + x) * info.channels;
+    data[i] = data[i + 1] = data[i + 2] = 30;
+  }
+  return sharp(data, { raw: info }).png().toBuffer();
+}
+
+async function debadgeMotorhome(doc) {
+  const textures = doc.getRoot().listTextures();
+  const paint = textures[0];
+  let img = await paintOut(paint.getImage(), [
+    [211, 753, 237, 813], // the maker's badge on the grille
+    [62, 708, 101, 735], // a round badge by the headlamp
+    [66, 21, 106, 37], [99, 52, 116, 74], // stickers on the back
+    [866, 702, 901, 796], // the modeller's logo on the side
+    [724, 103, 772, 120], // a sticker by the roof
+  ]);
+  img = await plainTyre(img);
+  paint.setImage(img).setMimeType('image/png');
+  // The wheels used the blue sheet (decals all over); same layout, so give them the yellow one
+  const blue = textures[4];
+  for (const m of doc.getRoot().listMaterials()) if (m.getBaseColorTexture() === blue) m.setBaseColorTexture(paint);
+  // Window stickers: every bright mark on the glass sheet goes dark like the glass
+  const glass = textures[6];
+  const { data, info } = await sharp(glass.getImage()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] + data[i + 1] + data[i + 2] > 3 * 90) { data[i] = 24; data[i + 1] = 24; data[i + 2] = 26; }
+  }
+  glass.setImage(await sharp(data, { raw: info }).png().toBuffer()).setMimeType('image/png');
+}
+
 mkdirSync(OUT, { recursive: true });
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
-for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024]]) {
+for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024]]) {
   const doc = await io.read(`${SRC}/${name}.glb`);
   if (name === 'vending-machine') await replaceVendingArt(doc);
+  if (name === 'motorhome') await debadgeMotorhome(doc);
   for (const a of doc.getRoot().listAnimations()) a.dispose();
   await doc.transform(
     prune(),

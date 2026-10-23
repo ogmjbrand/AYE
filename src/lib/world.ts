@@ -84,6 +84,8 @@ export interface LayoutSpec {
   park: ParkLayout | null;
   /** Chairs on the pavement outside the lounge (solid), facing the street. */
   terraceChairs: readonly { x: number; z: number; facing: number }[];
+  /** Motorhomes parked off the street (solid): centre and heading (0 = along +z). */
+  campers?: readonly { x: number; z: number; heading: number }[];
   /** Painted black-and-yellow kerbs and yellow edge lines (default), or plain grey kerbs and white lines. */
   streetStyle?: 'painted' | 'plain';
   /** Distant city massing: seed and colours. */
@@ -100,6 +102,8 @@ export interface ParkLayout {
 }
 export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
 export const CHAIR_SIZE = 0.62;
+/** A parked motorhome: length, width and height in metres (world/Campers.tsx draws it at this size). */
+export const CAMPER_SIZE = { length: 7.8, width: 2.5, height: 2.7 } as const;
 
 export interface DistrictLayout extends LayoutSpec {
   palmSpots: Spot[];
@@ -191,6 +195,7 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
     ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
     ...spec.terraceChairs.map((c) => ({ position: [c.x, 0, c.z] as const, size: [CHAIR_SIZE, 1, CHAIR_SIZE] as const })),
+    ...(spec.campers ?? []).map((c) => carFootprint(c.x, c.z, c.heading, CAMPER_SIZE.length, CAMPER_SIZE.width)),
     ...(spec.park?.benches ?? []).map((b) => {
       // Benches face along an axis; their footprint swaps width and depth when turned sideways
       const sideways = Math.abs(Math.sin(b.facing)) > 0.5;

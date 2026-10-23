@@ -67,6 +67,7 @@ import { ClickToMove } from './world/ClickToMove';
 import { VenueFront } from './world/VenueFront';
 import { Park } from './world/Park';
 import { ParkedCars } from './world/ParkedCars';
+import { Campers } from './world/Campers';
 import { CantinaInterior } from './world/CantinaInterior';
 import { CantinaFront } from './world/CantinaFront';
 import { HotelFront } from './world/HotelFront';
@@ -263,6 +264,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <Residents player={controller} talkingTo={talkingTo} />
       <Traffic player={controller} />
       <ParkedCars cars={parked} />
+      <Campers />
       {quality.contactShadows && <FootShadow controller={controller} />}
       <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} car={car} />
     </>

@@ -254,6 +254,8 @@ function layLayout(L: LayoutSpec, f: Frame, id: string): LayoutSpec {
     billboard: L.billboard && pt(f, L.billboard),
     park,
     terraceChairs: L.terraceChairs.map((c) => ({ x: c.x * f.sx, z: c.z * f.sz, facing: face(f, c.facing) })),
+    // The motorhome belongs to a Grand Lagoon guest; other cities' plans have different buildings there
+    campers: [],
   };
 }
 

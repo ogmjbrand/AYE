@@ -106,4 +106,18 @@ describe('Grand Lagoon Hotel', () => {
     expect(findPath(street, { x: lagos.spawn[0], z: lagos.spawn[2] }, { x: door[0], z: door[2] })).not.toBeNull();
     expect(DISTRICTS.slice(1).every((d) => !d.hotel)).toBe(true);
   });
+
+  it('has a guest\'s motorhome parked beside it: solid, clear of the hotel, and not in the way of its door', () => {
+    const lagos = DISTRICTS[0];
+    const [camper] = lagos.layout.campers ?? [];
+    expect(camper).toBeDefined();
+    const box = lagos.layout.obstacles.find((o) => o.position[0] === camper.x && o.position[2] === camper.z)!;
+    expect(box.size[2]).toBeGreaterThan(7);
+    const overlaps = lagos.layout.buildings.some((b) =>
+      Math.abs(b.position[0] - camper.x) < (b.size[0] + box.size[0]) / 2 && Math.abs(b.position[2] - camper.z) < (b.size[2] + box.size[2]) / 2);
+    expect(overlaps).toBe(false);
+    const street = walkGridFor(lagos.layout.obstacles);
+    const door = lagos.hotel!.door;
+    expect(findPath(street, { x: lagos.spawn[0], z: lagos.spawn[2] }, { x: door[0], z: door[2] })).not.toBeNull();
+  });
 });
