@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { COLOUR_CHOICES, FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, recolourable, resolveStyles, sanitiseWardrobe, stockedIn, styleIn } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -73,5 +73,48 @@ describe('fashion catalogue', () => {
     expect(itemById('bottom-denim-classic')!.style.fabric!.weave).toBe(2);
     expect(itemById('top-kente-adweneasa')!.style.fabric!.name).toBe('handwoven');
     expect(itemById('shoes-metallic-gold')!.style.fabric!.metalness).toBeGreaterThan(0.5);
+  });
+});
+
+describe('choosing colours', () => {
+  const tote = itemById('bag-tote-leather')!;
+  const shoes = itemById('shoes-clean-white')!;
+  const ankara = itemById('top-ankara-royal')!;
+  const navy = COLOUR_CHOICES.find((c) => c.name === 'Navy')!.hex;
+
+  it('lets you pick the colour of plain pieces, but not prints, hair dye or rewards', () => {
+    expect(recolourable(tote)).toBe(true);
+    expect(recolourable(shoes)).toBe(true);
+    expect(recolourable(ankara)).toBe(false);
+    expect(recolourable(itemById('hair-copper')!)).toBe(false);
+    expect(recolourable(itemById('shoes-trail-emerald')!)).toBe(false);
+  });
+
+  it('wears the colour you chose, keeping the fabric and the bag shape', () => {
+    const s = styleIn(tote, navy);
+    expect(s.colors).toEqual([navy, navy, navy]);
+    expect(s.fabric).toBe(tote.style.fabric);
+    expect(s.bag).toBe('tote');
+    expect(styleIn(tote, '#123456')).toBe(tote.style);
+    expect(styleIn(ankara, navy)).toBe(ankara.style);
+    const styles = resolveStyles({ bag: tote.id, shoes: shoes.id }, undefined, { [tote.id]: navy });
+    expect(styles.bag?.colors[0]).toBe(navy);
+    expect(styles.shoes).toBe(shoes.style);
+  });
+
+  it('keeps chosen colours on load, dropping ones not on offer or for pieces that cannot change', () => {
+    const w = sanitiseWardrobe({ owned: [tote.id], equipped: { bag: tote.id }, colours: { [tote.id]: navy, [ankara.id]: navy, [shoes.id]: '#000001', nope: navy } });
+    expect(w.equipped.bag).toBe(tote.id);
+    expect(w.colours).toEqual({ [tote.id]: navy });
+    expect(sanitiseWardrobe({ owned: [], equipped: {} }).colours).toBeUndefined();
+  });
+
+  it('every bag has a shape and is sold in every country', () => {
+    const bags = FASHION_ITEMS.filter((i) => i.slot === 'bag');
+    expect(bags.length).toBe(5);
+    for (const b of bags) {
+      expect(b.style.bag).toBeTruthy();
+      expect(b.stockedIn).toBeUndefined();
+    }
   });
 });

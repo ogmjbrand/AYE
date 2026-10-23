@@ -10,6 +10,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { resolveStyles, type Slot } from '../lib/fashion';
 import type { OwnedCar } from '../lib/cars';
 import { CarBody } from '../world/CarBody';
+import { driverSeat } from '../lib/carShapes';
+import { LOOKS } from '../lib/looks';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -22,19 +24,14 @@ interface PlayerProps {
   car?: OwnedCar | null;
 }
 
-/** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
-function CapsuleFigure({ color }: { color: string }) {
+/** If your own look can't be loaded: the first built-in person, so you're still a real person on screen. */
+function DefaultPerson({ controller, sitHeight }: { controller: PlayerHandle; sitHeight?: number }) {
   return (
-    <>
-      <mesh position={[0, 0.9, 0]} castShadow>
-        <capsuleGeometry args={[0.28, 0.65, 4, 8]} />
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 1.65, 0]} castShadow>
-        <sphereGeometry args={[0.22, 12, 10]} />
-        <meshStandardMaterial color="#8b593e" roughness={0.8} />
-      </mesh>
-    </>
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <Avatar controller={controller} lookId={LOOKS[0].id} sitHeight={sitHeight} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
@@ -43,12 +40,9 @@ export function Player({ controller, character, tryOn, conversing = false, car =
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
 
-  const bodyColor = character
-    ? `rgb(${character.colorR}, ${character.colorG}, ${character.colorB})`
-    : '#252a33';
-
   const equipped = character?.wardrobe.equipped;
-  const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
+  const colours = character?.wardrobe.colours;
+  const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn, colours), [equipped, tryOn, colours]);
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
@@ -78,16 +72,19 @@ export function Player({ controller, character, tryOn, conversing = false, car =
     }
   });
 
-  const fallback = <CapsuleFigure color={bodyColor} />;
+  const person = (sitHeight?: number) => (
+    <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={car ? { ...styles, bag: undefined } : styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} sitHeight={sitHeight} />
+  );
+  // Nothing stands in for you while you load: a real person or no one
+  const seat = car ? driverSeat(car.id) : null;
   return (
     <group ref={groupRef}>
-      {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
-      <ErrorBoundary fallback={fallback}>
-        <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} />
+      {car && <CarBody model={car.id} color={car.color} lightsOn />}
+      <ErrorBoundary fallback={<DefaultPerson controller={controller} sitHeight={seat?.height} />}>
+        <Suspense fallback={null}>
+          {seat ? <group position={[seat.x, 0, seat.z]}>{person(seat.height)}</group> : person()}
         </Suspense>
       </ErrorBoundary>
-      )}
     </group>
   );
 }

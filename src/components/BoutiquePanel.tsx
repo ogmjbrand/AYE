@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Vector3 } from 'three';
-import { swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
+import { COLOUR_CHOICES, recolourable, styleIn, swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
 import { Avatar } from './Avatar';
 import { useSnapshot, type SnapshotJob } from './snapshot/store';
@@ -12,15 +12,16 @@ const SHAPE: Record<Slot, string> = {
   top: svg('M30 10 L44 5 Q50 13 56 5 L70 10 L90 30 L77 41 L70 34 L70 93 L30 93 L30 34 L23 41 L10 30 Z'),
   bottom: svg('M29 7 L71 7 L76 93 L57 93 L50 38 L43 93 L24 93 Z'),
   shoes: svg('M8 64 Q10 40 30 42 L44 46 Q55 28 67 40 L88 58 Q95 67 90 74 L10 74 Z'),
+  bag: svg('M34 34 C34 14 66 14 66 34 L60 34 C60 22 40 22 40 34 Z M18 34 L82 34 L88 90 L12 90 Z'),
   hair: svg('M50 6 C20 6 13 34 18 60 C20 78 14 90 9 95 L34 95 C30 80 34 64 34 50 C34 30 42 22 50 22 C58 22 66 30 66 50 C66 64 70 80 66 95 L91 95 C86 90 80 78 82 60 C87 34 80 6 50 6 Z'),
 };
 
 /** The garment's outline filled with its fabric, lit softly from above. */
-function Garment({ item, className = '', style }: { item: FashionItem; className?: string; style?: CSSProperties }) {
+function Garment({ item, colour, className = '', style }: { item: FashionItem; colour?: string; className?: string; style?: CSSProperties }) {
   const mask: CSSProperties = { WebkitMaskImage: SHAPE[item.slot], maskImage: SHAPE[item.slot], WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' };
   return (
     <span className={`relative block ${className}`} style={style} role="img" aria-label={item.name}>
-      <span className="absolute inset-0" style={{ ...mask, background: swatchCss(item.style) }} />
+      <span className="absolute inset-0" style={{ ...mask, background: swatchCss(styleIn(item, colour)) }} />
       <span className="absolute inset-0" style={{ ...mask, background: 'linear-gradient(160deg, rgba(255,255,255,0.22), rgba(0,0,0,0) 45%, rgba(0,0,0,0.28))' }} />
     </span>
   );
@@ -37,19 +38,20 @@ export interface WearerLook {
 }
 
 /** A picture of the piece on your character, framed on where it's worn (sets: the whole outfit). */
-function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
+function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, string> = {}): SnapshotJob {
   const h = (w.heightCm ?? 170) / 100;
-  const styles = Object.fromEntries(items.map((i) => [i.slot, i.style])) as Partial<Record<Slot, Style>>;
+  const styles = Object.fromEntries(items.map((i) => [i.slot, styleIn(i, colours[i.id])])) as Partial<Record<Slot, Style>>;
   const where = items.length > 1 ? 'set' : items[0].slot;
   const camera = {
     top: { position: [0.2, 0.74 * h, 1.05], target: [0, 0.72 * h, 0], fov: 32 },
     bottom: { position: [0.25, 0.34 * h, 1.5], target: [0, 0.3 * h, 0], fov: 32 },
     shoes: { position: [0.45, 0.22, 0.75], target: [0, 0.06, 0.05], fov: 30 },
     hair: { position: [0.3, 0.94 * h, 0.75], target: [0, 0.92 * h, 0], fov: 30 },
+    bag: { position: [1.0, 0.42 * h, 0.75], target: [0.2, 0.36 * h, 0], fov: 32 },
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {
-    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => i.id).join('+')}`,
+    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => `${i.id}${colours[i.id] ?? ''}`).join('+')}`,
     scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
     camera,
     size: 320,
@@ -57,12 +59,12 @@ function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
 }
 
 /** The piece on you once it's rendered; its fabric outline until then. */
-function Worn({ items, wearer }: { items: FashionItem[]; wearer: WearerLook }) {
-  const url = useSnapshot(wearJob(items, wearer));
+function Worn({ items, wearer, colours }: { items: FashionItem[]; wearer: WearerLook; colours?: Record<string, string> }) {
+  const url = useSnapshot(wearJob(items, wearer, colours));
   if (url) return <img src={url} alt="" className="h-full w-full object-cover" draggable={false} />;
   return items.length === 2
-    ? <><Garment item={items[0]} className="h-[46%] w-[46%]" /><Garment item={items[1]} className="h-[46%] w-[46%]" /></>
-    : <Garment item={items[0]} className="h-[82%] w-[82%]" />;
+    ? <><Garment item={items[0]} colour={colours?.[items[0].id]} className="h-[46%] w-[46%]" /><Garment item={items[1]} colour={colours?.[items[1].id]} className="h-[46%] w-[46%]" /></>
+    : <Garment item={items[0]} colour={colours?.[items[0].id]} className="h-[82%] w-[82%]" />;
 }
 
 function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
@@ -88,7 +90,7 @@ interface Card {
  * heart, add to the cart and check out. Tapping a piece tries it on your
  * character. Clothes restyle the fabric of what your character wears.
  */
-export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, onTryOn, onBuyMany, onWear, onToggleFavourite, onClose }: {
+export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, onTryOn, onBuyMany, onWear, onToggleFavourite, onPickColour, onClose }: {
   section: BoutiqueSection;
   /** Your character, so the pictures show each piece on you. */
   wearer: WearerLook;
@@ -100,6 +102,8 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
   onBuyMany: (items: FashionItem[]) => void;
   onWear: (item: FashionItem) => void;
   onToggleFavourite: (id: string) => void;
+  /** Choose a plain piece's colour (before or after you buy it); it's shown on you straight away. */
+  onPickColour: (item: FashionItem, hex: string) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ClothesTab>('all');
@@ -121,7 +125,8 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
   const owned = wardrobe.owned;
   const inCart = (c: Card) => c.items.every((i) => cart.includes(i.id) || owned.includes(i.id));
   // The cart keeps items from other tabs too, so look them up across everything this shop sells
-  const allItems = useMemo(() => [...rangeFor(districtId, 'clothes'), ...rangeFor(districtId, 'shoes'), ...rangeFor(districtId, 'hair')], [districtId]);
+  const allItems = useMemo(() => [...rangeFor(districtId, 'clothes'), ...rangeFor(districtId, 'shoes'), ...rangeFor(districtId, 'hair'), ...rangeFor(districtId, 'accessories')], [districtId]);
+  const colours = wardrobe.colours ?? {};
   const cartFull = cart.map((id) => allItems.find((i) => i.id === id)).filter((i): i is FashionItem => !!i);
   const total = cartTotal(cartFull, owned);
 
@@ -178,13 +183,26 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
                   <div className="relative">
                     <button type="button" onClick={() => c.items.forEach((i) => onTryOn(i.slot, i.id))} aria-label={`Try on ${c.name}`}
                       className="flex aspect-square w-full flex-col items-center justify-center gap-1 overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#3a3430,#16120f)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-                      <Worn items={c.items} wearer={wearer} />
+                      <Worn items={c.items} wearer={wearer} colours={colours} />
                     </button>
                     <button type="button" onClick={() => onToggleFavourite(c.id)} aria-pressed={fav} aria-label={fav ? `Remove ${c.name} from favourites` : `Add ${c.name} to favourites`}
                       className={`absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/85 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${fav ? 'text-[#d6455d]' : 'text-[#5a4a42]'}`}>
                       <Icon name="heart" className={`h-4 w-4 ${fav ? '[&_path]:fill-current' : ''}`} />
                     </button>
                   </div>
+                  {c.items.length === 1 && recolourable(c.items[0]) && (
+                    <div role="radiogroup" aria-label={`Colour of ${c.name}`} className="flex flex-wrap gap-1 px-2.5 pt-2">
+                      {COLOUR_CHOICES.map((col) => {
+                        const on = (colours[c.items[0].id] ?? c.items[0].style.colors[0]) === col.hex;
+                        return (
+                          <button key={col.hex} type="button" role="radio" aria-checked={on} aria-label={col.name} title={col.name}
+                            onClick={() => { onPickColour(c.items[0], col.hex); onTryOn(c.items[0].slot, c.items[0].id); }}
+                            className={`h-4 w-4 rounded-full border focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${on ? 'border-white ring-2 ring-ui-gold' : 'border-black/40'}`}
+                            style={{ background: col.hex }} />
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="flex flex-1 items-end justify-between gap-2 px-2.5 pb-2.5 pt-2">
                     <div className="min-w-0">
                       <p className="m-0 text-[13px] font-semibold leading-tight">{c.name}</p>
@@ -219,7 +237,9 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
             </button>
           </div>
         ) : (
-          <p className="m-0 text-[11px] text-ui-muted" aria-live="polite">{note ?? 'Tap a piece to try it on. Clothes restyle the fabric of what your character wears; new cuts are coming with new 3D clothes.'}</p>
+          <p className="m-0 text-[11px] text-ui-muted" aria-live="polite">{note ?? (section === 'accessories'
+            ? 'Tap a bag to carry it, and pick its colour from the dots. Jewellery and sunglasses aren’t in the game yet.'
+            : 'Tap a piece to try it on; plain pieces come in the colour you pick. Clothes restyle the fabric of what your character wears; new cuts are coming with new 3D clothes.')}</p>
         )}
       </footer>
     </aside>
@@ -249,6 +269,7 @@ export function AssistantPanel({ name, shop, onSection, onFitting, onDecor, onCl
         <button type="button" onClick={() => onSection('clothes')} className="rounded-full bg-gradient-to-b from-[#e9c77e] to-[#b8862f] px-4 py-2 text-sm font-semibold text-[#2a1c06] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">Explore new collections</button>
         <button type="button" onClick={() => onSection('shoes')} className={chip}>Shoes</button>
         <button type="button" onClick={() => onSection('hair')} className={chip}>Hair</button>
+        <button type="button" onClick={() => onSection('accessories')} className={chip}>Bags</button>
         <button type="button" onClick={onDecor} className={chip}>Decor</button>
         <button type="button" onClick={onFitting} className={chip}>Fitting Room</button>
         <button type="button" onClick={onClose} className="rounded-full px-3 py-2 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Not now</button>

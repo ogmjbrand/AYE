@@ -103,8 +103,8 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
   const styles = useMemo(() => {
     const equipped: Partial<Record<Slot, string>> = {};
     for (const [slot, id] of Object.entries(draft.outfit) as [Slot, string | null][]) if (id) equipped[slot] = id;
-    return resolveStyles(equipped);
-  }, [draft.outfit]);
+    return resolveStyles(equipped, undefined, editing?.wardrobe.colours);
+  }, [draft.outfit, editing]);
 
   const finish = () => {
     if (issues.length) return;
@@ -133,7 +133,6 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
   return (
     <Shell
       lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={focus}
-      bodyFigure={stage.id === 'proportions' && draft.body === 'feminine'}
       avatarName={draft.name.trim() || 'New avatar'}
       previewSub={`${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
       nav={nav}
@@ -292,7 +291,7 @@ function ProportionsStage({ draft, set }: StageProps) {
       {draft.body === 'feminine' ? (
         <div>
           <p className={SECTION_LABEL}>Body type</p>
-          <BodyTypeChart shape={shape} onPick={(s) => set({ shape: s })} />
+          <BodyTypeChart shape={shape} lookId={draft.lookId} heightCm={draft.heightCm} skinTone={draft.skinTone} onPick={(s) => set({ shape: s })} />
         </div>
       ) : (
       <div>
@@ -556,8 +555,7 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, focus, onFocus, onRandomise, bodyFigure = false }: {
-  bodyFigure?: boolean;
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, focus, onFocus, onRandomise }: {
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
   shape: BodyShape; skinTone: number; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
@@ -587,7 +585,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive figure={bodyFigure} />
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

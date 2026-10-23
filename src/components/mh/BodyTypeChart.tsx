@@ -1,20 +1,11 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, type OrthographicCamera } from 'three';
-import { MhFigure } from './MhFigure';
+import { Vector3 } from 'three';
+import { Avatar } from '../Avatar';
 import { FEMININE_SHAPE_PRESETS, presetFor, type BodyShape } from '../../lib/bodyShape';
-import type { MhHair } from '../../lib/mhBody';
 
-/** Each figure's skin and hair on the chart, so the line-up shows real variety (you choose your own skin and hair later). */
-const LOOK: Record<string, { tone: number; hair: MhHair }> = {
-  slim: { tone: 0.9, hair: 'crop' },
-  average: { tone: 0.55, hair: 'puff' },
-  athletic: { tone: 1, hair: 'bun' },
-  curvy: { tone: 0.6, hair: 'puff' },
-  hourglass: { tone: 0.35, hair: 'bun' },
-  full: { tone: 0.75, hair: 'afro' },
-  'plus-curvy': { tone: 0.85, hair: 'afro' },
-};
+const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
 
 const GAP = 0.7;
 
@@ -30,10 +21,11 @@ function FitWidth({ span }: { span: number }) {
 }
 
 /**
- * Women's body types as a line-up of 3D figures in a black two-piece (like a
- * body-type chart). Click a figure, or its label, to choose that body.
+ * Women's body types as a line-up of your own character in each shape (like a
+ * body-type chart): real people, not mannequins. Click one, or its label, to
+ * choose that body.
  */
-export function BodyTypeChart({ shape, onPick }: { shape: BodyShape; onPick: (s: BodyShape) => void }) {
+export function BodyTypeChart({ shape, lookId, heightCm, skinTone = 0, onPick }: { shape: BodyShape; lookId: string; heightCm?: number; skinTone?: number; onPick: (s: BodyShape) => void }) {
   const chosen = presetFor(shape, 'feminine')?.id;
   const [hover, setHover] = useState<string | null>(null);
   const list = FEMININE_SHAPE_PRESETS;
@@ -60,7 +52,7 @@ export function BodyTypeChart({ shape, onPick }: { shape: BodyShape; onPick: (s:
                 onPointerOver={(e) => { e.stopPropagation(); setHover(p.id); }}
                 onPointerOut={() => setHover((h) => (h === p.id ? null : h))}
               >
-                <MhFigure shape={p.shape} skinTone={LOOK[p.id]?.tone ?? 0.7} hair={LOOK[p.id]?.hair ?? 'afro'} />
+                <Avatar controller={STILL} own lookId={lookId} heightCm={heightCm} shape={p.shape} skinTone={skinTone} />
                 {(chosen === p.id || hover === p.id) && (
                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
                     <ringGeometry args={[0.2, 0.235, 40]} />

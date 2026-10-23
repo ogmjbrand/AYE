@@ -36,7 +36,7 @@ export const seatedSpot = (s: Seat) => ahead(s, -SEAT_BACK);
 /** Where to walk to before sitting, and where you end up when you get up. */
 export const standSpot = (s: Seat) => s.approach ?? ahead(s, STAND_OFF);
 /** How far to lower the character (its origin) so a body of this height rests on the seat. */
-export const seatDrop = (s: Seat, standingHeight: number) => s.height - SEAT_CONTACT_RATIO * standingHeight;
+export const seatDrop = (s: Pick<Seat, 'height'>, standingHeight: number) => s.height - SEAT_CONTACT_RATIO * standingHeight;
 
 /** Two places on every park bench, a little either side of its middle. */
 export function benchSeats(park: ParkLayout | null): Seat[] {

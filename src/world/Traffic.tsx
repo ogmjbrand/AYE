@@ -1,11 +1,33 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { Group } from 'three';
+import { Vector3, type Group } from 'three';
+import { Avatar } from '../components/Avatar';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { LOOKS } from '../lib/looks';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { initTraffic, stepTraffic, type Car as MovingCar } from '../lib/traffic';
 import { DANFO_SIZE, movingObstacles } from '../lib/world';
 import { BuiltInVehicle } from './Props';
 import { useLayout } from './DistrictContext';
+
+const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
+/** Keke riders: computer-controlled drivers, a different person in each, seated at the handlebars. */
+const RIDERS = LOOKS.filter((l) => l.body === 'masculine');
+const RIDER_SEAT = { z: 0.55, height: 0.85 };
+
+function Rider({ index, heading }: { index: number; heading: number }) {
+  return (
+    <group rotation={[0, heading, 0]} position={[0, 0, 0]}>
+      <group position={[0, 0, RIDER_SEAT.z]}>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <Avatar controller={STILL} own lookId={RIDERS[index % RIDERS.length].id} sitHeight={RIDER_SEAT.height} />
+          </Suspense>
+        </ErrorBoundary>
+      </group>
+    </group>
+  );
+}
 
 /** Minibuses, cars, tricycles and jeepneys driving the boulevard; they stop for the player and are solid to walk into. */
 export function Traffic({ player }: { player: PlayerHandle }) {
@@ -36,6 +58,8 @@ export function Traffic({ player }: { player: PlayerHandle }) {
       {looks.map((l, i) => (
         <group key={i} ref={(g) => { groups.current[i] = g; }} position={[l.x, 0, l.z]}>
           <BuiltInVehicle vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes, kind: l.kind }} />
+          {/* Open-sided kekes show their driver; the others have tinted glass */}
+          {l.kind === 'tricycle' && <Rider index={i} heading={l.heading} />}
         </group>
       ))}
     </>

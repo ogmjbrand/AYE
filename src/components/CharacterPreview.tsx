@@ -7,7 +7,6 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { assetUrl } from '../lib/assetManifest';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
-import { MhFigure } from './mh/MhFigure';
 import type { Slot, Style } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
 
@@ -71,25 +70,13 @@ function FocusRig({ focus, height, controls }: { focus: PreviewFocus; height: nu
   return null;
 }
 
-function Placeholder({ color }: { color: string }) {
-  return (
-    <mesh position={[0, 0.9, 0]}>
-      <capsuleGeometry args={[0.28, 0.65, 4, 8]} />
-      <meshStandardMaterial color={color} roughness={0.8} />
-    </mesh>
-  );
-}
-
 /**
  * Live 3D preview of the in-game character model (the same GLB the game uses),
  * with the chosen person, height, shape, skin tone and clothes applied. When
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, styles, shape, skinTone = 0, focus = 'body', interactive = false, figure = false }: {
-  /** Show the body-type figure (MakeHuman body in a two-piece) instead of the person. */
-  figure?: boolean;
-  outfitColor?: string;
+export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, focus = 'body', interactive = false }: {
   shape?: BodyShape;
   skinTone?: number;
   lookId?: string;
@@ -119,13 +106,9 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, st
         </Suspense>
       </ErrorBoundary>
       <Turntable spin={spin} faceFront={interactive && focus === 'face'}>
-        <ErrorBoundary fallback={<Placeholder color={outfitColor} />}>
-          <Suspense fallback={<Placeholder color={outfitColor} />}>
-            {figure && shape ? (
-              <group scale={height / 1.67}><MhFigure shape={shape} skinTone={Math.max(0.3, skinTone)} hair="afro" /></group>
-            ) : (
-              <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} />
-            )}
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

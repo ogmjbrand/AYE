@@ -6,9 +6,12 @@
  */
 import { districtById } from './geography';
 
-export type Slot = 'top' | 'bottom' | 'shoes' | 'hair';
-export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair'];
-export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour' };
+export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'bag';
+export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag'];
+export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour', bag: 'Bags' };
+
+/** A handbag's shape (world/HeldBag.tsx draws each): carried in the left hand. */
+export type BagShape = 'tote' | 'top-handle' | 'clutch' | 'bucket' | 'mini';
 
 /** Shader pattern ids (must match the GLSL in components/outfitShader.ts). */
 export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6, bogolan: 7, houndstooth: 8, batik: 9 } as const;
@@ -58,6 +61,8 @@ export interface Style {
   /** Repeats across the texture; larger = smaller motif. */
   scale: number;
   fabric?: Fabric;
+  /** Bags only: which shape to carry. */
+  bag?: BagShape;
 }
 
 export interface FashionItem {
@@ -65,7 +70,7 @@ export interface FashionItem {
   name: string;
   slot: Slot;
   price: number;
-  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Rewards';
+  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Accessories' | 'Rewards';
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
@@ -79,6 +84,11 @@ const item = (
   style: { pattern, colors: [colors[0], colors[1] ?? colors[0], colors[2] ?? colors[1] ?? colors[0]], scale, fabric: fabricFor(id, pattern) },
   ...(stockedIn ? { stockedIn } : {}),
 });
+
+const bagItem = (id: string, name: string, price: number, bag: BagShape, color: string): FashionItem => {
+  const base = item(id, 'bag', name, price, price >= 1500 ? 'Luxury' : 'Accessories', 'solid', [color]);
+  return { ...base, style: { ...base.style, bag } };
+};
 
 // Aso-oke and adire eleko in Nigeria, kente and batakari in Ghana
 const LAGOS = ['NG'] as const;
@@ -130,6 +140,12 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('hair-burgundy', 'hair', 'Burgundy', 300, 'Salon', 'solid', ['#5b1b26']),
   item('hair-honey-blonde', 'hair', 'Honey blonde', 300, 'Salon', 'solid', ['#b48748']),
   item('hair-platinum', 'hair', 'Platinum', 450, 'Salon', 'solid', ['#d8d2c4']),
+  // Bags: original designs, no brand marks; you choose the colour
+  bagItem('bag-tote-leather', 'Leather tote', 900, 'tote', '#94623a'),
+  bagItem('bag-tophandle-leather', 'Structured top-handle', 1800, 'top-handle', '#1b1b1d'),
+  bagItem('bag-clutch-metallic', 'Evening clutch · Metallic', 1200, 'clutch', '#c7a24f'),
+  bagItem('bag-bucket-suede', 'Suede bucket bag', 750, 'bucket', '#5c1f2b'),
+  bagItem('bag-mini-leather', 'Mini bag', 650, 'mini', '#e9dccb'),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
   item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),
@@ -140,6 +156,37 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
 ];
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
+
+/** Colours you can choose for a plain (single-colour) piece: shoes, bags and solid tops and bottoms. */
+export const COLOUR_CHOICES: readonly { name: string; hex: string }[] = [
+  { name: 'Black', hex: '#1b1b1d' },
+  { name: 'Ivory', hex: '#ece4d4' },
+  { name: 'Camel', hex: '#b48a5a' },
+  { name: 'Cognac', hex: '#94623a' },
+  { name: 'Chocolate', hex: '#4a2e1f' },
+  { name: 'Burgundy', hex: '#5c1f2b' },
+  { name: 'Red', hex: '#a8242f' },
+  { name: 'Blush', hex: '#e2b4ae' },
+  { name: 'Fuchsia', hex: '#b02a6f' },
+  { name: 'Emerald', hex: '#1d6e52' },
+  { name: 'Navy', hex: '#1d2a4a' },
+  { name: 'Sky', hex: '#8ab4d8' },
+  { name: 'Lilac', hex: '#a796c8' },
+  { name: 'Gold', hex: '#c7a24f' },
+  { name: 'Silver', hex: '#b9bcbf' },
+];
+
+/** Whether you can choose this piece's colour: single-colour pieces, but not hair dye (each dye is its own shade). */
+export const recolourable = (i: FashionItem) => i.style.pattern === 'solid' && i.slot !== 'hair' && i.collection !== 'Rewards';
+
+/** An item's style in the colour you chose for it (its own colour if none, or if the choice isn't one on offer). */
+export function styleIn(i: FashionItem, colour?: string): Style {
+  if (!colour || !recolourable(i) || !COLOUR_CHOICES.some((c) => c.hex === colour)) return i.style;
+  return { ...i.style, colors: [colour, colour, colour] };
+}
+
+/** The name of a colour choice, if it is one. */
+export const colourName = (hex: string | undefined) => COLOUR_CHOICES.find((c) => c.hex === hex)?.name;
 
 /** A saved look: a name and what to wear in each slot. */
 export interface Outfit {
@@ -157,6 +204,8 @@ export interface Wardrobe {
   outfits?: Outfit[];
   /** Pieces and sets hearted in the boutique, by id (absent until the player hearts one). */
   favourites?: string[];
+  /** The colour you chose for a plain piece, by item id (also for a piece you're about to buy). */
+  colours?: Record<string, string>;
 }
 
 /** Items a district's boutique sells: the basics, plus what's made in its country. */
@@ -189,16 +238,27 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
   const favourites = (Array.isArray((w as { favourites?: unknown }).favourites) ? (w as { favourites: unknown[] }).favourites : [])
     .filter((id): id is string => typeof id === 'string' && (!!itemById(id) || (id.startsWith('set-') && !!itemById(`top-${id.slice(4)}`))))
     .slice(0, 200);
-  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}), ...(favourites.length ? { favourites: [...new Set(favourites)] } : {}) };
+  const colours: Record<string, string> = {};
+  const rawColours = (w as { colours?: unknown }).colours;
+  if (typeof rawColours === 'object' && rawColours !== null) {
+    for (const [id, hex] of Object.entries(rawColours as Record<string, unknown>).slice(0, 200)) {
+      const it = itemById(id);
+      if (it && recolourable(it) && typeof hex === 'string' && COLOUR_CHOICES.some((c) => c.hex === hex)) colours[id] = hex;
+    }
+  }
+  return {
+    owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}), ...(favourites.length ? { favourites: [...new Set(favourites)] } : {}),
+    ...(Object.keys(colours).length ? { colours } : {}),
+  };
 }
 
-/** The styles to draw for each slot (equipped items, overridden by anything being tried on). */
-export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>) {
+/** The styles to draw for each slot (equipped items, overridden by anything being tried on), in the colours you chose. */
+export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>, colours?: Record<string, string>) {
   const out: Partial<Record<Slot, Style>> = {};
   for (const slot of SLOTS) {
     const id = tryOn && slot in tryOn ? tryOn[slot] : equipped[slot];
     const it = itemById(id);
-    if (it) out[slot] = it.style;
+    if (it) out[slot] = styleIn(it, colours?.[it.id]);
   }
   return out;
 }

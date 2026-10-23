@@ -2,15 +2,9 @@ import { useMemo } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { MeshPhysicalMaterial, MeshStandardMaterial } from 'three';
 import { carById } from '../lib/cars';
+import { CAR_SHAPE as SHAPE } from '../lib/carShapes';
 
-/** Shape of each model: body length, width, height of the shoulder and roof, cabin position and wheel size. */
-const SHAPE: Record<string, { l: number; w: number; body: number; roof: number; cabin: number; cabinLen: number; wheel: number; ground: number }> = {
-  hatch: { l: 3.8, w: 1.7, body: 0.62, roof: 1.48, cabin: -0.15, cabinLen: 0.6, wheel: 0.3, ground: 0.16 },
-  saloon: { l: 4.4, w: 1.78, body: 0.62, roof: 1.44, cabin: -0.05, cabinLen: 0.48, wheel: 0.32, ground: 0.15 },
-  suv: { l: 4.6, w: 1.86, body: 0.82, roof: 1.72, cabin: -0.2, cabinLen: 0.58, wheel: 0.38, ground: 0.22 },
-  executive: { l: 4.9, w: 1.86, body: 0.64, roof: 1.46, cabin: -0.12, cabinLen: 0.47, wheel: 0.34, ground: 0.15 },
-  coupe: { l: 4.7, w: 1.88, body: 0.56, roof: 1.28, cabin: -0.35, cabinLen: 0.4, wheel: 0.34, ground: 0.12 },
-};
+
 
 /**
  * A car in the game's own style, front towards +z: a rounded body in glossy
@@ -22,7 +16,7 @@ export function CarBody({ model, color, lightsOn = false }: { model: string; col
   const car = carById(model);
   const l = car?.length ?? s.l;
   const paint = useMemo(() => new MeshPhysicalMaterial({ color, roughness: 0.32, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.06 }), [color]);
-  const glass = useMemo(() => new MeshPhysicalMaterial({ color: '#0d1318', roughness: 0.05, metalness: 0.2, clearcoat: 1, transparent: true, opacity: 0.88 }), []);
+  const glass = useMemo(() => new MeshPhysicalMaterial({ color: '#0d1318', roughness: 0.05, metalness: 0.2, clearcoat: 1, transparent: true, opacity: 0.6 }), []);
   const chrome = useMemo(() => new MeshStandardMaterial({ color: '#d9dcdf', roughness: 0.12, metalness: 1 }), []);
   const rubber = useMemo(() => new MeshStandardMaterial({ color: '#121212', roughness: 0.9 }), []);
   const rim = useMemo(() => new MeshStandardMaterial({ color: '#b9bcbf', roughness: 0.25, metalness: 0.9 }), []);

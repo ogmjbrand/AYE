@@ -169,10 +169,9 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
           {saved && (
             <aside className="relative hidden h-[min(70dvh,40rem)] overflow-hidden rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg lg:block" aria-label={`${saved.name}, your saved character`}>
               <CharacterPreview
-                outfitColor={`rgb(${saved.colorR}, ${saved.colorG}, ${saved.colorB})`}
                 lookId={saved.lookId}
                 heightCm={saved.heightCm}
-                styles={resolveStyles(saved.wardrobe.equipped)}
+                styles={resolveStyles(saved.wardrobe.equipped, undefined, saved.wardrobe.colours)}
                 shape={saved.shape}
                 skinTone={saved.skinTone}
               />

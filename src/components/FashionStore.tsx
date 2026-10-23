@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, itemById, resolveStyles, stockedIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
+import { COLOUR_CHOICES, FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, colourName, itemById, recolourable, resolveStyles, stockedIn, styleIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
 
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
@@ -17,6 +17,8 @@ interface FashionStoreProps {
   onTryOn: (slot: Slot, id: string | null) => void;
   onBuy: (item: FashionItem) => void;
   onEquip: (slot: Slot, id: string | null) => void;
+  /** Choose a plain piece's colour (free). */
+  onPickColour?: (item: FashionItem, hex: string) => void;
   onClose: () => void;
 }
 
@@ -26,7 +28,7 @@ const BUTTON = 'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition
  * Boutique and wardrobe. A side panel so the player's 3D character stays in
  * view: "Try on" shows an item on the character without buying it.
  */
-export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfit, onDeleteOutfit, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onClose }: FashionStoreProps) {
+export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfit, onDeleteOutfit, wardrobe, balance, tryOn, onTryOn, onBuy, onEquip, onPickColour, onClose }: FashionStoreProps) {
   const [slot, setSlot] = useState<Slot>('top');
   const [message, setMessage] = useState('');
 
@@ -75,7 +77,7 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
             {outfits.length === 0 && <p className="m-0 mt-1 text-xs text-ui-muted">Save what you're wearing to change back into it in one tap.</p>}
             <ul className="m-0 mt-2 grid list-none gap-1.5 p-0">
               {outfits.map((o, i) => {
-                const looks = resolveStyles(o.equipped);
+                const looks = resolveStyles(o.equipped, undefined, wardrobe.colours);
                 return (
                   <li key={i} className="flex items-center gap-2">
                     <span className="flex shrink-0 gap-0.5" aria-hidden>
@@ -99,8 +101,8 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
           </section>
         )}
         <ItemRow
-          title={slot === 'hair' ? 'Natural colour' : 'Original'}
-          subtitle={slot === 'hair' ? 'Your own hair colour' : 'What you were wearing'}
+          title={slot === 'hair' ? 'Natural colour' : slot === 'bag' ? 'No bag' : 'Original'}
+          subtitle={slot === 'hair' ? 'Your own hair colour' : slot === 'bag' ? 'Hands free' : 'What you were wearing'}
           swatch="repeating-linear-gradient(45deg, #2a2d33 0 6px, #353a42 6px 12px)"
           active={shownId === null}
           actions={
@@ -124,8 +126,22 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
               key={item.id}
               title={item.name}
               subtitle={`${item.style.fabric ? `${item.style.fabric.name[0].toUpperCase()}${item.style.fabric.name.slice(1)} · ` : ''}${item.collection}${owned ? ' · Owned' : ` · ${item.price.toLocaleString()} GHAI`}`}
-              swatch={swatchCss(item.style)}
+              swatch={swatchCss(styleIn(item, wardrobe.colours?.[item.id]))}
               active={shownId === item.id}
+              below={onPickColour && recolourable(item) ? (
+                <div role="radiogroup" aria-label={`Colour of ${item.name}`} className="flex flex-wrap items-center gap-1">
+                  {COLOUR_CHOICES.map((col) => {
+                    const on = (wardrobe.colours?.[item.id] ?? item.style.colors[0]) === col.hex;
+                    return (
+                      <button key={col.hex} type="button" role="radio" aria-checked={on} aria-label={col.name} title={col.name}
+                        onClick={() => { onPickColour(item, col.hex); if (!wearing) onTryOn(slot, item.id); }}
+                        className={`h-4 w-4 rounded-full border focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${on ? 'border-white ring-2 ring-ui-accent' : 'border-black/40'}`}
+                        style={{ background: col.hex }} />
+                    );
+                  })}
+                  <span className="ml-1 text-[11px] text-ui-muted">{colourName(wardrobe.colours?.[item.id]) ?? 'Original colour'}</span>
+                </div>
+              ) : undefined}
               actions={
                 <>
                   {mode === 'shop' && !wearing && (
@@ -162,17 +178,20 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
   );
 }
 
-function ItemRow({ title, subtitle, swatch, active, actions }: {
-  title: string; subtitle: string; swatch: string; active: boolean; actions: React.ReactNode;
+function ItemRow({ title, subtitle, swatch, active, actions, below }: {
+  title: string; subtitle: string; swatch: string; active: boolean; actions: React.ReactNode; below?: React.ReactNode;
 }) {
   return (
-    <div className={`flex items-center gap-3 rounded-xl border p-2.5 ${active ? 'border-ui-accent bg-ui-accent/10' : 'border-ui-line/70 bg-ui-panel'}`}>
-      <span className="h-11 w-11 shrink-0 rounded-lg border border-ui-line" style={{ background: swatch }} aria-hidden />
-      <div className="min-w-0 flex-1">
-        <p className="m-0 truncate text-sm font-medium">{title}</p>
-        <p className="m-0 truncate text-xs text-ui-muted">{subtitle}</p>
+    <div className={`rounded-xl border p-2.5 ${active ? 'border-ui-accent bg-ui-accent/10' : 'border-ui-line/70 bg-ui-panel'}`}>
+      <div className="flex items-center gap-3">
+        <span className="h-11 w-11 shrink-0 rounded-lg border border-ui-line" style={{ background: swatch }} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="m-0 truncate text-sm font-medium">{title}</p>
+          <p className="m-0 truncate text-xs text-ui-muted">{subtitle}</p>
+        </div>
+        <div className="flex shrink-0 gap-1.5">{actions}</div>
       </div>
-      <div className="flex shrink-0 gap-1.5">{actions}</div>
+      {below && <div className="mt-2 pl-14">{below}</div>}
     </div>
   );
 }

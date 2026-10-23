@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Diet } from '../lib/food';
-import { COURSES, menuFor, orderProblem, suitsYou, type Course, type MenuItem } from '../lib/restaurant';
+import { COURSES, PALMS_MENU, orderProblem, suitsYou, type Course, type MenuItem } from '../lib/restaurant';
 import { NEED_LABEL, type NeedKey } from '../lib/needs';
 import { DishModel } from '../world/Dishes';
 import { Snapshot } from './snapshot/Snapshot';
@@ -27,11 +27,13 @@ function Coin({ amount, className = '' }: { amount: number; className?: string }
 }
 
 /**
- * The Palms' menu: tabs for each course, a two-column grid of dishes with
- * their pictures and prices, and a detail view to order from. Ordering needs
- * a seat at a table (you can read the menu anywhere inside).
+ * A sit-down menu (The Palms' unless another is given): tabs for each course,
+ * a two-column grid of dishes with their pictures and prices, and a detail
+ * view to order from. Ordering needs a seat (you can read the menu anywhere inside).
  */
-export function RestaurantMenu({ diet, balance, seated, eating, kitchenOpen, onOrder, onClose }: {
+export function RestaurantMenu({ menu = PALMS_MENU, diet, balance, seated, eating, kitchenOpen, onOrder, onClose }: {
+  /** Which place's menu. */
+  menu?: readonly MenuItem[];
   diet: Diet;
   kitchenOpen: boolean;
   balance: number;
@@ -52,7 +54,7 @@ export function RestaurantMenu({ diet, balance, seated, eating, kitchenOpen, onO
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-  const items = menuFor(course);
+  const items = course === 'all' ? menu : menu.filter((i) => i.course === course);
   const problem = open ? (!kitchenOpen ? 'The kitchen is closed' : eating ? `Finish your ${eating} first` : orderProblem(open, diet, balance, seated)) : null;
   return (
     <aside

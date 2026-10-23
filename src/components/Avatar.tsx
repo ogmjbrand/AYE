@@ -15,6 +15,7 @@ import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
+import { HeldBag } from '../world/HeldBag';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
@@ -102,6 +103,8 @@ function privateCopy(shared: Object3D): Object3D {
   copy.position.set(0, 0, 0);
   copy.rotation.set(0, 0, 0);
   copy.scale.set(1, 1, 1);
+  // Bones carry the original's world matrices until updated: measure the copy as authored
+  copy.updateMatrixWorld(true);
   copy.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
@@ -117,10 +120,12 @@ function privateCopy(shared: Object3D): Object3D {
   return copy;
 }
 
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false, own = false }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false, own = false, sitHeight }: {
   controller: PlayerHandle;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
   own?: boolean;
+  /** Always seated on a seat this high (metres), e.g. at the wheel of a car. */
+  sitHeight?: number;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
@@ -199,12 +204,14 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       return gestures[state];
     };
     // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
-    const seat = getSeated();
+    const seat = sitHeight !== undefined ? { height: sitHeight } : getSeated();
     const sitting = !!seat && !!gestures.Sit;
     updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, sitting);
     const g = group.current;
     if (g) {
-      const drop = sitting ? seatDrop(seat, targetHeight) : 0;
+      const drop = sitting && seat ? seatDrop(seat, targetHeight) : 0;
+      // At a wheel, wait for the sitting pose rather than stand up through the roof
+      g.visible = sitHeight === undefined || sitting;
       g.position.y += (drop - g.position.y) * Math.min(1, delta * 5);
     }
   });
@@ -213,6 +220,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
       {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
+      {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );

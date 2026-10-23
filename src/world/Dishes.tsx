@@ -1,3 +1,4 @@
+import { CantinaDish } from './CantinaDishes';
 import { useMemo, type ReactNode } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide, LatheGeometry, Vector2 } from 'three';
@@ -515,7 +516,8 @@ export function DishModel({ id }: { id: string }) {
         </group>
       );
     default:
-      return <Plate />;
+      // Cantina Ayé's menu (and an empty plate for anything unknown)
+      return <CantinaDish id={id} />;
   }
 }
 

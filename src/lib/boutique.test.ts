@@ -29,10 +29,17 @@ describe('The Fashion House', () => {
   it('says honestly what it cannot sell yet instead of selling it', () => {
     expect(rangeFor('lagos.marina', 'clothes', 'dresses')).toEqual([]);
     expect(rangeFor('lagos.marina', 'clothes', 'outerwear')).toEqual([]);
-    expect(rangeFor('lagos.marina', 'accessories')).toEqual([]);
     expect(NOT_YET.dresses).toMatch(/aren’t in the game yet/);
     expect(NOT_YET.outerwear).toMatch(/aren’t in the game yet/);
-    expect(NOT_YET.accessories).toMatch(/aren’t in the game yet/);
+  });
+
+  it('sells bags under accessories, in every city', () => {
+    for (const d of ['lagos.marina', 'accra.osu']) {
+      const bags = rangeFor(d, 'accessories');
+      expect(bags.length).toBe(5);
+      expect(bags.every((b) => b.slot === 'bag' && !!b.style.bag)).toBe(true);
+    }
+    expect(NOT_YET.accessories).toBeUndefined();
   });
 
   it('charges the cart once, for what you don’t already own', () => {

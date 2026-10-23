@@ -7,8 +7,9 @@
  *
  * What you can buy is the district's own range (lib/fashion.ts `stockedIn`).
  * With the current character models, clothes restyle the fabric of what your
- * character already wears; new cuts (dresses, jackets) and accessories need
- * new 3D garments, so those tabs say so instead of selling anything.
+ * character already wears; new cuts (dresses, jackets) need new 3D garments,
+ * so those tabs say so instead of selling anything. Accessories are bags,
+ * carried in the hand (world/HeldBag.tsx).
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import { stockedIn, type FashionItem } from './fashion';
@@ -29,7 +30,6 @@ export const CLOTHES_TABS: readonly { id: ClothesTab; label: string }[] = [
 export const NOT_YET: Partial<Record<ClothesTab | BoutiqueSection, string>> = {
   dresses: 'Dresses are a new cut, and new cuts need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. Tops restyle the fabric of what you wear, abayas and kaftans included.',
   outerwear: 'Jackets and coats need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. A top restyles a jacket you already have on.',
-  accessories: 'Bags, jewellery and sunglasses need new 3D accessories on your character. They aren’t in the game yet, so nothing here is for sale.',
 };
 
 /** A matching top and bottom in the same fabric, sold together. */
@@ -57,7 +57,7 @@ export function rangeFor(districtId: string, section: BoutiqueSection, tab: Clot
   const range = stockedIn(districtId).filter((i) => i.collection !== 'Rewards');
   if (section === 'shoes') return range.filter((i) => i.slot === 'shoes');
   if (section === 'hair') return range.filter((i) => i.slot === 'hair');
-  if (section === 'accessories') return [];
+  if (section === 'accessories') return range.filter((i) => i.slot === 'bag');
   if (tab === 'tops') return range.filter((i) => i.slot === 'top');
   if (tab === 'bottoms') return range.filter((i) => i.slot === 'bottom');
   if (tab === 'all') return range.filter((i) => i.slot === 'top' || i.slot === 'bottom');

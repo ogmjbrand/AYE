@@ -83,6 +83,8 @@ export interface DistrictSpec {
   restaurant?: RestaurantFront;
   /** A car dealership (lib/cars.ts), where the district has one. */
   dealership?: RestaurantFront;
+  /** A walk-in bar (lib/cantina.ts), where the district has one. */
+  bar?: RestaurantFront;
 }
 
 export interface RestaurantFront {
@@ -112,6 +114,12 @@ export function dealershipAt(d: Pick<District, 'dealership'>, x: number, z: numb
   return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
 }
 
+/** The bar whose door you're standing at, if any. */
+export function barAt(d: Pick<District, 'bar'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.bar;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+
 /** Within this distance of a restaurant's door you can go in (E). */
 export const DOOR_RADIUS = 2;
 
@@ -129,6 +137,7 @@ function buildDistrict(spec: DistrictSpec): District {
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
     ...(spec.restaurant ? [{ id: id(`restaurant.${spec.restaurant.id}`), kind: 'food' as const, name: spec.restaurant.name, position: spec.restaurant.door }] : []),
     ...(spec.dealership ? [{ id: id(`cars.${spec.dealership.id}`), kind: 'shop' as const, name: spec.dealership.name, position: spec.dealership.door }] : []),
+    ...(spec.bar ? [{ id: id(`bar.${spec.bar.id}`), kind: 'food' as const, name: spec.bar.name, position: spec.bar.door }] : []),
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,
@@ -161,6 +170,7 @@ function songhaiNames(d: District): District {
     nightlife: { ...named(d.nightlife), description: t(d.nightlife.description) },
     ...(d.restaurant ? { restaurant: named(d.restaurant) } : {}),
     ...(d.dealership ? { dealership: named(d.dealership) } : {}),
+    ...(d.bar ? { bar: named(d.bar) } : {}),
     homes: d.homes.map((h) => ({ ...named(h), building: t(h.building), description: t(h.description) })),
     workplaces: Object.fromEntries(Object.entries(d.workplaces).map(([k, w]) => [k, { ...named(w), description: t(w.description) }])) as District['workplaces'],
     layout: { ...d.layout, buildings: d.layout.buildings.map((b) => (b.name ? { ...b, name: t(b.name) } : b)) },

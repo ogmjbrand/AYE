@@ -25,6 +25,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-11, 38, 6, 10, 7, 'shop', '#c7d3c0', 'Gadget Hub'),
       // The Palms restaurant, fronting the cross street behind Mama Put
       b(-21, -10.25, 12, 5.5, 7, 'shop', '#1f2c27'),
+      // Cantina Ayé, the bar next door to the west: yellow stucco on the cross street
+      b(-33, -10.25, 8, 5.5, 6, 'shop', '#e9b949'),
       // West side, south of the cross street
       b(-13, -36, 10, 12, 18, 'office', '#d6cdbd', 'University'),
       // Eko Motors car showroom, its glass front on the cross street side
@@ -115,6 +117,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   },
   dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
+  bar: { id: 'cantina-aye', name: 'Cantina Ayé', kind: 'Bar & cantina', door: [-33, 0, -14.3], facing: Math.PI },
   homes: [
     {
       id: 'marina-court-room', district: 'lagos.marina', name: 'Marina Court, room 4B', kind: 'Room in a shared flat', building: 'Marina Court',
