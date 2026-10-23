@@ -42,6 +42,7 @@ import { interiorFor, type Interior } from './interiors';
 import { emptyLife, modifiers, type LifeState } from './lifeState';
 import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
+import { CLIENTS_PER_DAY, clientById, emptySpaJob, isOpen as spaOpen, onShiftHours, rollSpaDay, satisfaction, serviceById, sessionPay, stars, type SpaJob } from './spa';
 import { clockIn, clockOut, emptyShift, patientById, rollShift, saw, type ShiftState } from './hospital';
 import { STUDY, emptySchool, handIn, joinClub, leaveClass, minutesLeftInClass, participate, rollDay, schoolMinute, startClass, studied, visit, type CampusRoom, type CampusVisit, type SchoolState, type StudyKind } from './school';
 
@@ -92,6 +93,8 @@ export interface GameState {
   summary: DaySummary | null;
   /** The home you live in (lib/homes.ts): rented, or one you own. Null if none. */
   home: string | null;
+  /** Your job at Alafia Spa, if you took one (lib/spa.ts). */
+  spa: SpaJob;
   /** Homes you've bought through OGM Homes: yours for good, no rent. */
   owned: string[];
   /** Whether you've been given the starter flat (once, for every character). */
@@ -149,6 +152,13 @@ export type GameAction =
   | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
   | { type: 'buyHome'; homeId: string }
+  /** A treatment at the spa as a guest: paid, time passes, needs lift. A couples massage needs a friend (residentId). */
+  | { type: 'spaTreat'; serviceId: string; friendId?: string }
+  | { type: 'spaHire' }
+  | { type: 'spaClockIn' }
+  | { type: 'spaClockOut' }
+  /** Give one of today's clients their treatment: one choice per step of the routine (lib/spa.ts). */
+  | { type: 'spaSession'; clientId: string; choices: readonly number[] }
   | { type: 'moveOut' }
   | { type: 'buyEquipment'; id: string }
   | { type: 'buyCar'; id: string; color: string }
@@ -270,7 +280,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, owned: [], starterGiven: false, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, owned: [], starterGiven: false, spa: emptySpaJob(), workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
 }
 
 export function emptyLedger(): DayLedger {
@@ -469,6 +479,45 @@ function buyHome(state: GameState, homeId: string): GameState {
     balance: state.balance - price,
     today: { ...state.today, expenses: state.today.expenses + price },
     furniture: replaceAll(interiorFor(home), state.furniture),
+  };
+}
+
+/** A treatment as a guest at the spa. */
+function spaTreat(state: GameState, serviceId: string, friendId: string | undefined, career: Career, lifestyle: Lifestyle): GameState {
+  const service = serviceById(serviceId);
+  if (!service || state.summary || state.balance < service.price || !spaOpen(state.time.hour)) return state;
+  if (service.couples && (!friendId || friendshipLevel(state.relationships[friendId]?.points ?? 0) < 1)) return state;
+  let next: GameState = { ...state, balance: state.balance - service.price, today: { ...state.today, expenses: state.today.expenses + service.price } };
+  for (let i = 0; i < service.minutes; i++) next = tick(next, career, lifestyle, false);
+  return { ...next, needs: addNeeds(next.needs, service.lift) };
+}
+
+/** One client's treatment, given by you as a therapist: time passes, you're paid a share plus the tip. */
+function spaSession(state: GameState, clientId: string, choices: readonly number[], career: Career, lifestyle: Lifestyle): GameState {
+  const day = Math.floor(state.time.totalMinutes / 1440);
+  const spa = rollSpaDay(state.spa, state.time.totalMinutes);
+  const client = clientById(day, clientId);
+  if (!client || state.summary || !spa.clockedIn || spa.served.includes(clientId) || spa.served.length >= CLIENTS_PER_DAY || !onShiftHours(state.time.hour)) return state;
+  const sat = satisfaction(client, choices);
+  const service = serviceById(client.service)!;
+  if (sat === null) return state;
+  let next: GameState = { ...state, spa };
+  for (let i = 0; i < service.minutes; i++) next = tick(next, career, lifestyle, false);
+  const { fee, tip } = sessionPay(spa, service, sat);
+  const pay = fee + tip;
+  const good = stars(sat) >= 3;
+  return {
+    ...next,
+    balance: next.balance + pay,
+    today: { ...next.today, income: next.today.income + pay },
+    spa: {
+      ...next.spa,
+      day,
+      served: [...spa.served, clientId],
+      sessionsTotal: spa.sessionsTotal + 1,
+      goodSessions: spa.goodSessions + (good ? 1 : 0),
+      earnedTotal: spa.earnedTotal + pay,
+    },
   };
 }
 
@@ -806,6 +855,21 @@ function baseReducer(
       return travel(state, action.to, action.mode, career, lifestyle);
     case 'buyHome':
       return buyHome(state, action.homeId);
+    case 'spaTreat':
+      return spaTreat(state, action.serviceId, action.friendId, career, lifestyle);
+    case 'spaHire': {
+      if (state.summary || state.spa.employed) return state;
+      return { ...state, spa: { ...state.spa, employed: true } };
+    }
+    case 'spaClockIn': {
+      const spa = rollSpaDay(state.spa, state.time.totalMinutes);
+      if (!spa.employed || spa.clockedIn || !onShiftHours(state.time.hour) || state.summary) return state;
+      return { ...state, spa: { ...spa, clockedIn: true } };
+    }
+    case 'spaClockOut':
+      return state.spa.clockedIn ? { ...state, spa: { ...state.spa, clockedIn: false } } : state;
+    case 'spaSession':
+      return spaSession(state, action.clientId, action.choices, career, lifestyle);
     case 'moveOut':
       return state.summary ? state : { ...state, home: null, furniture: storeAll(state.furniture) };
     case 'dismissSummary':

@@ -44,6 +44,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       // East side, south of the cross street
       b(14, -36, 12, 12, 46, 'tower', '#3f5f73', 'Marina Heights'),
       b(28, -36, 8, 10, 12, 'residential', '#dcc2a2', 'Lagoon Villa'),
+      // Alafia Spa, behind the tower and north of the airport stop, its door facing south
+      b(25.5, 16, 9, 6, 7, 'shop', '#efe6d8', 'Alafia Spa'),
       // OGM Homes, the estate agency, on the cross street west of Eko Motors
       b(-38, -34, 10, 8, 8, 'office', '#e7e1d6', 'OGM Homes'),
     ],
@@ -124,6 +126,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   bar: { id: 'cantina-aye', name: 'Cantina Ayé', kind: 'Bar & cantina', door: [-33, 0, -14.3], facing: Math.PI },
+  spa: { id: 'alafia-spa', name: 'Alafia Spa', kind: 'Day spa · massage & wellness', door: [24.5, 0, 12.2], facing: Math.PI },
   agency: { id: 'ogm-homes', name: 'OGM Homes', kind: 'Estate agency · homes for sale', door: [-38, 0, -29.2], facing: 0 },
   hotel: { id: 'grand-lagoon', name: 'Grand Lagoon Hotel', kind: 'Hotel · rooms by the night', door: [-24, 0, 32.2], facing: Math.PI },
   homes: [

@@ -61,7 +61,7 @@ function OnWall({ player, x0, z0, x1, z1, children }: { player: PlayerHandle; x0
 const WALL_SLACK = 1.0;
 
 /** Every wall in cream plaster with a white skirting, each hidden while it stands between the camera and you. */
-function HotelWalls({ player, walls, plaster }: { player: PlayerHandle; walls: readonly WallSeg[]; plaster: Texture }) {
+export function HotelWalls({ player, walls, plaster }: { player: PlayerHandle; walls: readonly WallSeg[]; plaster: Texture }) {
   const boxes = useMemo(() => walls.map((w) => wallBox(w)), [walls]);
   const refs = useRef<(Group | null)[]>([]);
   const mat = useMemo(() => new MeshStandardMaterial({ map: plaster, roughness: 0.85 }), [plaster]);

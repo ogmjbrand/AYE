@@ -87,8 +87,10 @@ export interface DistrictSpec {
   bar?: RestaurantFront;
   /** A hotel with rooms to book (lib/hotel.ts), where the district has one. */
   hotel?: RestaurantFront;
-  /** OGM Homes, the estate agency selling homes (lib/agency.ts), where the district has one. */
+  /** OGM Homes, the estate agency selling homes (lib/homes.ts), where the district has one. */
   agency?: RestaurantFront;
+  /** A day spa with treatments and therapist jobs (lib/spa.ts), where the district has one. */
+  spa?: RestaurantFront;
 }
 
 export interface RestaurantFront {
@@ -136,6 +138,12 @@ export function agencyAt(d: Pick<District, 'agency'>, x: number, z: number): Res
   return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
 }
 
+/** The spa whose door you're standing at, if any. */
+export function spaAt(d: Pick<District, 'spa'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.spa;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+
 /** Within this distance of a restaurant's door you can go in (E). */
 export const DOOR_RADIUS = 2;
 
@@ -155,6 +163,7 @@ function buildDistrict(spec: DistrictSpec): District {
     ...(spec.dealership ? [{ id: id(`cars.${spec.dealership.id}`), kind: 'shop' as const, name: spec.dealership.name, position: spec.dealership.door }] : []),
     ...(spec.bar ? [{ id: id(`bar.${spec.bar.id}`), kind: 'food' as const, name: spec.bar.name, position: spec.bar.door }] : []),
     ...(spec.hotel ? [{ id: id(`hotel.${spec.hotel.id}`), kind: 'home' as const, name: spec.hotel.name, position: spec.hotel.door }] : []),
+    ...(spec.spa ? [{ id: id(`spa.${spec.spa.id}`), kind: 'shop' as const, name: spec.spa.name, position: spec.spa.door }] : []),
     ...(spec.agency ? [{ id: id(`agency.${spec.agency.id}`), kind: 'shop' as const, name: spec.agency.name, position: spec.agency.door }] : []),
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
@@ -191,6 +200,7 @@ function songhaiNames(d: District): District {
     ...(d.bar ? { bar: named(d.bar) } : {}),
     ...(d.hotel ? { hotel: named(d.hotel) } : {}),
     ...(d.agency ? { agency: named(d.agency) } : {}),
+    ...(d.spa ? { spa: named(d.spa) } : {}),
     homes: d.homes.map((h) => ({ ...named(h), building: t(h.building), description: t(h.description) })),
     workplaces: Object.fromEntries(Object.entries(d.workplaces).map(([k, w]) => [k, { ...named(w), description: t(w.description) }])) as District['workplaces'],
     layout: { ...d.layout, buildings: d.layout.buildings.map((b) => (b.name ? { ...b, name: t(b.name) } : b)) },

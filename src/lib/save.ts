@@ -17,6 +17,7 @@ import { sanitiseSchool } from './school';
 import { SONGHAI_CODE, songhaiRegion } from './songhai';
 import { sanitiseShift } from './hospital';
 import { sanitiseStay } from './hotel';
+import { sanitiseSpaJob } from './spa';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
 import { sanitiseNeeds } from './needs';
@@ -153,6 +154,8 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before OGM Homes own none
     owned: sanitiseOwned(p.owned),
     starterGiven: p.starterGiven === true,
+    // Saves from before the spa have no job there
+    spa: sanitiseSpaJob(p.spa),
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
@@ -193,6 +196,6 @@ function sanitiseOwned(data: unknown): string[] {
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift, hotel } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift, hotel }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift, hotel } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift, hotel }));
 }

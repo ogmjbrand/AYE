@@ -125,7 +125,15 @@ import { Hospital } from './world/Hospital';
 import type { ShiftHud } from './components/StudentPanels';
 import { DealershipPanel } from './components/DealershipPanel';
 import { carById, carToDrive, fuelCost, type OwnedCar } from './lib/cars';
-import { agencyAt, dealershipAt } from './lib/geography';
+import { agencyAt, dealershipAt, spaAt } from './lib/geography';
+import { friendshipLevel } from './lib/people';
+import { SpaInterior } from './world/SpaInterior';
+import { SpaFront } from './world/SpaFront';
+import { SpaJobPanel, SpaMenu, SpaSession } from './components/SpaPanel';
+import {
+  DESK_SPOT as SPA_DESK_SPOT, DOOR_SPOT as SPA_DOOR, MANAGER_SPOT as SPA_MANAGER_SPOT, ROOMS as SPA_ROOMS, WAITING_SEATS as SPA_WAITING,
+  clientsFor, isOpen as spaIsOpen, roomFor, rollSpaDay, serviceById as spaService, spaLayout, tableSpot, type Client as SpaClient, type ServiceId,
+} from './lib/spa';
 import { isDriving, setDriving } from './hooks/usePlayerController';
 import './App.css';
 
@@ -169,6 +177,7 @@ const CAMERA_TARGET_HEIGHT = 1.25;
 const PALMS_LAYOUT = restaurantLayout();
 const CANTINA_LAYOUT = cantinaLayout();
 const HOTEL_LAYOUT = hotelLayout(false);
+const SPA_LAYOUT = spaLayout();
 const HOTEL_LAYOUT_KEY = hotelLayout(true);
 const BOUTIQUE_LAYOUT = boutiqueLayout();
 const BOUTIQUE_ID = 'fashion-house';
@@ -261,6 +270,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <HotelFront night={night} />
       <DealershipFront night={night} />
       <AgencyFront night={night} />
+      <SpaFront night={night} />
       <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
@@ -371,7 +381,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, buyHome, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, buyHome, spaTreat, spaHire, spaClockIn, spaClockOut, spaSession, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -416,6 +426,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inPalms = !indoors && venue !== null && district.restaurant?.id === venue;
   const inCantina = !indoors && venue !== null && district.bar?.id === venue;
   const inHotel = !indoors && venue !== null && district.hotel?.id === venue;
+  const inSpa = !indoors && venue !== null && district.spa?.id === venue;
   /** Whether you hold the key to a hotel room (a night booked, before check-out). */
   const hotelKey = stayIsValid(state.hotel, state.time.totalMinutes);
   const trayHere = hotelKey && roomTray && roomTray.until === state.hotel!.until ? roomTray.ids : [];
@@ -423,9 +434,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inCampus = !indoors && venue === CAMPUS_ID;
   const inHospital = !indoors && venue === HOSPITAL_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
-  const offStreet = indoors || inPalms || inCantina || inHotel || inBoutique || inCampus || inHospital;
+  const offStreet = indoors || inPalms || inCantina || inHotel || inSpa || inBoutique || inCampus || inHospital;
   // Collision and ground height follow where you are (set before this frame's movement)
-  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inCantina ? CANTINA_LAYOUT : inHotel ? (hotelKey ? HOTEL_LAYOUT_KEY : HOTEL_LAYOUT) : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : inHospital ? HOSPITAL_LAYOUT : district.layout;
+  const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inCantina ? CANTINA_LAYOUT : inHotel ? (hotelKey ? HOTEL_LAYOUT_KEY : HOTEL_LAYOUT) : inSpa ? SPA_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : inHospital ? HOSPITAL_LAYOUT : district.layout;
   useEffect(() => { campusRef.current = inCampus; hospitalRef.current = inHospital; }, [inCampus, inHospital]);
   useEffect(() => { onShiftRef.current = rollShift(state.shift, state.time.totalMinutes).clockedIn; }, [state.shift, state.time.totalMinutes]);
   if (activeLayout() !== layoutNow) setActiveLayout(layoutNow);
@@ -607,6 +618,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // ---------------------------------------------------------------- cars
   const [dealerOpen, setDealerOpen] = useState(false);
   const [agencyOpen, setAgencyOpen] = useState(false);
+  // At the spa: which panel is open, the treatment you've booked (and its room), and the client you're treating
+  const [spaPanel, setSpaPanel] = useState<'menu' | 'job' | null>(null);
+  const [spaBooking, setSpaBooking] = useState<{ service: ServiceId; friendId?: string; room: string } | null>(null);
+  const [spaServing, setSpaServing] = useState<{ client: SpaClient; room: string; table: number } | null>(null);
   /** The car you're driving (one you own), or null when on foot. */
   const [driving, setDrivingCar] = useState<OwnedCar | null>(null);
   const myCar = state.cars.length ? state.cars[state.cars.length - 1] : null;
@@ -779,6 +794,66 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       setArrival(`You tap your phone and the machine drops a cold ${item.name}. You drink it in the lobby.`);
     }
     setHotelMenu(null);
+  };
+  /** In through Alafia Spa's front door (reception is open 09:00–21:00; staff can come in for a shift). */
+  const enterSpa = () => {
+    const r = district.spa;
+    if (!r) return;
+    if (!spaIsOpen(state.time.hour) && !state.spa.employed) { setArrival(`${r.name} is closed. It opens at 09:00.`); return; }
+    setHomePanel(null);
+    setVenue(r.id);
+    placePlayer([SPA_DOOR[0], 0, SPA_DOOR[1]], 0);
+    snapCamera();
+  };
+  const spaDay = Math.floor(state.time.totalMinutes / 1440);
+  const spaJobNow = rollSpaDay(state.spa, state.time.totalMinutes);
+  /** Today's clients still waiting for you (only while you're on shift). */
+  const spaWaiting: SpaClient[] = spaJobNow.clockedIn ? clientsFor(spaDay).filter((c) => !spaJobNow.served.includes(c.id) && c.id !== spaServing?.client.id) : [];
+  const spaFriends = Object.entries(state.relationships)
+    .filter(([, r]) => friendshipLevel(r.points) >= 1)
+    .map(([id]) => ({ id, name: residentById(id)?.name ?? 'A friend' }));
+  /** Walk to a table in a room: just beside it. */
+  const toTable = (roomId: string, table: number) => {
+    const t = SPA_ROOMS.find((r) => r.id === roomId)!.tables[table];
+    const [x, z] = tableSpot(t);
+    placePlayer([x, 0, z], Math.PI / 2);
+  };
+  /** What E does where you stand inside the spa. */
+  const spaPrompt = () => {
+    const { x, z } = controller.position;
+    const near = (p: readonly [number, number], r = USE_RADIUS) => Math.hypot(x - p[0], z - p[1]) <= r;
+    if (near(SPA_DOOR)) return { verb: 'Leave to', place: district.name, onOpen: () => { setSpaBooking(null); goOutside(); } };
+    if (spaBooking) {
+      const room = SPA_ROOMS.find((r) => r.id === spaBooking.room)!;
+      const svc = spaService(spaBooking.service)!;
+      if (near(tableSpot(room.tables[0]), 1.1)) return {
+        verb: `Lie down for your ${svc.name} in`, place: room.name,
+        onOpen: () => {
+          if (state.balance < svc.price) { setArrival(`The ${svc.name} is ${svc.price} GHAI. You don't have enough.`); return; }
+          spaTreat(svc.id, spaBooking.friendId);
+          setSpaBooking(null);
+          const friend = spaBooking.friendId ? residentById(spaBooking.friendId)?.name.split(' ')[0] : null;
+          setArrival(`${svc.name}${friend ? ` with ${friend}` : ''}: ${svc.minutes} minutes of warm oil, candlelight and quiet. You feel rested and lighter.`);
+        },
+      };
+    }
+    if (near(SPA_DESK_SPOT, 1.3)) return { verb: 'See the treatments with', place: 'Kemi at reception', onOpen: () => setSpaPanel('menu') };
+    if (near(SPA_MANAGER_SPOT, 1.3)) return { verb: state.spa.employed ? 'Talk shifts with' : 'Ask about a job with', place: 'Ifeoma, the manager', onOpen: () => setSpaPanel('job') };
+    if (spaJobNow.clockedIn && !spaServing) {
+      const i = SPA_WAITING.findIndex((seat, k) => k < spaWaiting.length && Math.hypot(x - seat.x, z - (seat.z + 0.7)) <= 1.0);
+      if (i >= 0) {
+        const c = spaWaiting[i];
+        return {
+          verb: `Take ${c.name} through for a ${spaService(c.service)!.name} in`, place: roomFor(c.service, spaJobNow.served.length + 1).name,
+          onOpen: () => {
+            const room = roomFor(c.service, spaJobNow.served.length + 1);
+            setSpaServing({ client: c, room: room.id, table: 0 });
+            toTable(room.id, 0);
+          },
+        };
+      }
+    }
+    return null;
   };
   /** In through the Fashion House's front door. */
   const enterBoutique = () => {
@@ -1084,6 +1159,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         hotelPrompt()?.onOpen();
         return;
       }
+      if (inSpa) {
+        spaPrompt()?.onOpen();
+        return;
+      }
       if (inBoutique) {
         boutiquePrompt()?.onOpen();
         return;
@@ -1115,6 +1194,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       else if (restaurantAt(district, x, z)) enterPalms();
       else if (barAt(district, x, z)) enterCantina();
       else if (hotelAt(district, x, z)) enterHotel();
+      else if (spaAt(district, x, z)) enterSpa();
       else if (counter === 'fashion') enterBoutique();
       else if (counter === 'gadgets') setGadgets(true);
       else if (counter === 'travel') setTravelOpen(true);
@@ -1129,9 +1209,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen || agencyOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen || agencyOpen || spaPanel !== null || spaServing !== null);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen, agencyOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen, agencyOpen, spaPanel, spaServing]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1297,7 +1377,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const openOs = (tab: OsTab) => { setOsTab(tab); setOsOpen(true); };
   // The area you're in (indoors: where the building's door is)
   // Inside a building, the area is where its front door is
-  const doorNow = inHospital ? district.workplaces.doctor.position : inCampus ? district.workplaces.student.position : inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : inCantina && district.bar ? district.bar.door : inHotel && district.hotel ? district.hotel.door : indoors && home ? home.door : null;
+  const doorNow = inHospital ? district.workplaces.doctor.position : inCampus ? district.workplaces.student.position : inBoutique ? district.fashionHouse.position : inPalms && district.restaurant ? district.restaurant.door : inCantina && district.bar ? district.bar.door : inHotel && district.hotel ? district.hotel.door : inSpa && district.spa ? district.spa.door : indoors && home ? home.door : null;
   const areaHere = doorNow
     ? district.neighborhoods.find((n) => doorNow[0] >= n.bounds.minX && doorNow[0] <= n.bounds.maxX && doorNow[2] >= n.bounds.minZ && doorNow[2] <= n.bounds.maxZ) ?? null
     : neighborhood;
@@ -1307,6 +1387,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     if (inPalms && district.restaurant) return { title: district.restaurant.name, subtitle: district.restaurant.kind, icon: 'restaurant' };
     if (inCantina && district.bar) return { title: district.bar.name, subtitle: district.bar.kind, icon: 'restaurant' };
     if (inHotel && district.hotel) return { title: district.hotel.name, subtitle: hotelKey ? `Room ${GUEST_ROOM} is yours until 12:00` : 'Reception', icon: 'home' };
+    if (inSpa && district.spa) return { title: district.spa.name, subtitle: spaJobNow.clockedIn ? 'On shift' : spaBooking ? `Booked: ${spaService(spaBooking.service)!.name}` : district.spa.kind, icon: 'home' };
     if (inBoutique) return { title: district.fashionHouse.name, subtitle: district.fashionHouse.kind, icon: 'hanger' };
     if (inCampus) return { title: UNIVERSITY_NAME, subtitle: ROOM_NAMES[campusHere.room], icon: 'career' };
     if (inHospital) return { title: HOSPITAL_NAME, subtitle: HOSPITAL_ROOM[hospitalHere.room], icon: 'career' };
@@ -1354,7 +1435,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   ];
   const whereabouts = {
     place: inHospital ? `${HOSPITAL_NAME}, ${district.city.name}` : inCampus ? `${UNIVERSITY_NAME}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : inCantina && district.bar ? `${district.bar.name}, ${district.city.name}` : inHotel && district.hotel ? `${district.hotel.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
-    activity: inHospital ? (shiftNow.clockedIn ? 'On shift' : 'At the hospital') : drivingNow ? `Driving the ${carById(drivingNow.id)?.name ?? 'car'}` : inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : inCantina ? (cantinaSeat ? 'Out at the bar' : `At ${CANTINA_NAME}`) : inHotel ? (hotelKey ? 'Staying at the hotel' : 'At the hotel') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
+    activity: inHospital ? (shiftNow.clockedIn ? 'On shift' : 'At the hospital') : drivingNow ? `Driving the ${carById(drivingNow.id)?.name ?? 'car'}` : inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : inCantina ? (cantinaSeat ? 'Out at the bar' : `At ${CANTINA_NAME}`) : inHotel ? (hotelKey ? 'Staying at the hotel' : 'At the hotel') : inSpa ? (spaJobNow.clockedIn ? 'On shift at the spa' : 'At the spa') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
       : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
         : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
   };
@@ -1593,6 +1674,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <InteriorLighting gameTime={state.time} player={controller} indoor={campusHere.indoors ? 'campus' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </University>
+            ) : inSpa ? (
+              <SpaInterior gameTime={state.time} player={controller} busy={spaIsOpen(state.time.hour)} waiting={spaWaiting} serving={spaServing}>
+                <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
+                <Player controller={controller} character={character} tryOn={tryOn} />
+              </SpaInterior>
             ) : inHotel ? (
               <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey} tray={trayHere}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
@@ -1692,6 +1778,41 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           kitchenOpen
           onOrder={orderInHotel}
           onClose={() => setHotelMenu(null)}
+        />
+      )}
+      {inSpa && spaPanel === 'menu' && (
+        <SpaMenu
+          balance={state.balance}
+          open={spaIsOpen(state.time.hour)}
+          friends={spaFriends}
+          onBook={(svc, friendId) => {
+            const room = roomFor(svc.id, 1);
+            setSpaBooking({ service: svc.id, friendId, room: room.id });
+            setSpaPanel(null);
+            toTable(room.id, 0);
+            setArrival(`Kemi shows you to the ${room.name}. Lie on the table when you're ready.`);
+          }}
+          onClose={() => setSpaPanel(null)}
+        />
+      )}
+      {inSpa && spaPanel === 'job' && (
+        <SpaJobPanel
+          job={spaJobNow}
+          balance={state.balance}
+          hour={state.time.hour}
+          onHire={() => { spaHire(); setArrival('Ifeoma: “Welcome to the team. Clock in with me between 10:00 and 20:00.”'); }}
+          onClockIn={() => { spaClockIn(); setSpaPanel(null); setArrival('You change into your white tunic. Clients are waiting in reception.'); }}
+          onClockOut={() => { spaClockOut(); setSpaPanel(null); }}
+          onClose={() => setSpaPanel(null)}
+        />
+      )}
+      {inSpa && spaServing && (
+        <SpaSession
+          client={spaServing.client}
+          job={spaJobNow}
+          balance={state.balance}
+          onFinish={(choices) => spaSession(spaServing.client.id, choices)}
+          onClose={() => setSpaServing(null)}
         />
       )}
       {agencyOpen && district.agency && (
@@ -1815,12 +1936,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onEnterRestaurant={enterPalms}
         onEnterBar={enterCantina}
         onEnterHotel={enterHotel}
+        onEnterSpa={enterSpa}
         dealerEntry={atDealer() && district.dealership ? { name: district.dealership.name, onOpen: () => setDealerOpen(true) } : atAgency() && district.agency ? { name: district.agency.name, verb: 'See homes for sale at', onOpen: () => setAgencyOpen(true) } : null}
         campusEntry={atCampusDoor() ? { name: `${UNIVERSITY_NAME} (${district.workplaces.student.name})`, onOpen: enterCampus } : atHospitalDoor() ? { name: HOSPITAL_NAME, onOpen: enterHospital } : null}
         statusOverride={student && (inCampus || state.school.inClass) ? { label: state.school.inClass ? 'In class' : 'On campus', tone: 'good' } : doctor ? (shiftNow.clockedIn ? { label: 'On shift', tone: 'good' } : shiftHours(state.time.totalMinutes) ? { label: 'Off shift', tone: 'warn' } : null) : null}
         student={studentHud}
         shift={shiftHud}
-        insideHome={inHospital ? { name: HOSPITAL_NAME, prompt: hospitalPrompt } : inCampus ? { name: UNIVERSITY_NAME, prompt: campusPrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : indoors && interior ? {
+        insideHome={inHospital ? { name: HOSPITAL_NAME, prompt: hospitalPrompt } : inCampus ? { name: UNIVERSITY_NAME, prompt: campusPrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
             const use = usableHere();

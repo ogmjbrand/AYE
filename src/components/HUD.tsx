@@ -9,7 +9,7 @@ import { nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { TouchStick } from './TouchStick';
 import { homeAtDoor, type Home } from '../lib/homes';
-import { barAt, counterAt, hotelAt, restaurantAt, type District, type PlaceKind } from '../lib/geography';
+import { barAt, counterAt, hotelAt, restaurantAt, spaAt, type District, type PlaceKind } from '../lib/geography';
 import { OPEN_HOUR as RESTAURANT_OPENS, isOpen as restaurantOpen } from '../lib/restaurant';
 import { OPEN_HOUR as BAR_OPENS, isOpen as barOpen } from '../lib/cantina';
 import { venueAt } from '../lib/nightlife';
@@ -79,6 +79,7 @@ interface HUDProps {
   onEnterBar?: () => void;
   /** Goes into the district's hotel when standing at its door. */
   onEnterHotel?: () => void;
+  onEnterSpa?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
@@ -288,6 +289,7 @@ export function HUD({
   onEnterRestaurant,
   onEnterBar,
   onEnterHotel,
+  onEnterSpa,
   homeId = null,
   onOpenHome,
   place,
@@ -320,6 +322,7 @@ export function HUD({
   const restaurant = restaurantAt(district, px, pz);
   const bar = barAt(district, px, pz);
   const hotel = hotelAt(district, px, pz);
+  const spa = spaAt(district, px, pz);
   const prompt = vendor && onOpenVendor
     ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
     : restaurant && onEnterRestaurant
@@ -328,6 +331,8 @@ export function HUD({
       ? { verb: barOpen(gameTime.hour) ? 'Go into' : `Closed until ${BAR_OPENS}:00:`, place: bar.name, onOpen: onEnterBar }
     : hotel && onEnterHotel
       ? { verb: 'Go into', place: hotel.name, onOpen: onEnterHotel }
+    : spa && onEnterSpa
+      ? { verb: 'Go into', place: spa.name, onOpen: onEnterSpa }
     : counter === 'fashion' && onOpenShop
       ? { verb: 'Go into', place: district.fashionHouse.name, onOpen: onOpenShop }
       : counter === 'gadgets' && onOpenGadgets

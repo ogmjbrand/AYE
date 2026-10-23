@@ -53,12 +53,14 @@ export interface NpcProps {
   chatty?: boolean;
   /** A uniform: fabrics for their top, bottom and shoes (lib/fashion.ts styles). */
   uniform?: Partial<Record<Slot, Style>>;
+  /** Lies face down on a table this high (a spa client), head towards `facing`; centred on x, z. */
+  lying?: number;
 }
 
 const WALK_SPEED = 1.0;
 const PAUSE_SECONDS = 2.2;
 
-function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform }: NpcProps) {
+function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform, lying }: NpcProps) {
   const look = lookById(lookId);
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
@@ -132,7 +134,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
       if (group.current) group.current.rotation.y = w.heading;
     }
     const sitting = !!seat && !!gestures.Sit;
-    const talking = chatty && !sitting && gestures.Talk && Math.floor((mixer.time + name.length * 1.7) / 9) % 3 === 0;
+    const talking = chatty && !sitting && lying === undefined && gestures.Talk && Math.floor((mixer.time + name.length * 1.7) / 9) % 3 === 0;
     const want = sitting ? 'Sit' : moving && walkName ? walkName : talking ? 'Talk' : idleName;
     if (want !== current.current) {
       const get = (n: string) => (n === 'Sit' || n === 'Talk' ? gestures[n as 'Sit' | 'Talk'] : actions[n]);
@@ -152,11 +154,16 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
   return (
     <group ref={root} position={[at[0], 0, at[1]]}>
       <group ref={group} rotation={[0, heading, 0]}>
-        <primitive object={figure} scale={scale} />
+        {lying === undefined ? <primitive object={figure} scale={scale} /> : (
+          // Feet at the foot of the table, face down into the head rest
+          <group position={[0, lying + 0.13, -look.height / 2]} rotation={[Math.PI / 2, 0, 0]}>
+            <primitive object={figure} scale={scale} />
+          </group>
+        )}
       </group>
       {uniform && <OutfitStyler scene={figure} lookId={look.id} styles={uniform} skinTone={0} />}
       <Gestures body={look.body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />
-      <sprite position={[0, (seat ? look.height * 0.78 : look.height) + 0.3, 0]} scale={[0.8, 0.25, 1]}>
+      <sprite position={[0, lying !== undefined ? lying + 0.75 : (seat ? look.height * 0.78 : look.height) + 0.3, 0]} scale={[0.8, 0.25, 1]}>
         <spriteMaterial map={tag} depthWrite={false} transparent />
       </sprite>
     </group>
