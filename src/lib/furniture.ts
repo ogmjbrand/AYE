@@ -123,6 +123,18 @@ export const CATALOGUE: readonly CatalogueItem[] = [
   item('luxe-nightstand', 'Nightstand', 'storage', 2200, 'dresser', [0.5, 0.55, 0.45], '#8d8f93', 1, 1, 'Two upholstered drawers with gold handles, to stand beside the bed.', { ...luxe, design: 'nightstand' }),
   item('luxe-dressing-table', 'Marble Dressing Table', 'storage', 6400, 'dresser', [1.2, 1.75, 0.45], '#f3f1ec', 2, 1, 'White marble laminate with a lit mirror, open shelves and gold handles.', { ...luxe, design: 'vanity' }),
   item('luxe-wardrobe', 'Marble Wardrobe', 'storage', 9800, 'wardrobe', [2.0, 2.2, 0.6], '#f3f1ec', 2, 1, 'Four doors in white marble laminate with long gold handles.', { ...luxe, design: 'marble' }),
+  // The Studio collection: warm loft pieces (world/StudioFurniture.tsx)
+  item('studio-sofa', 'Cloud Sofa', 'seating', 6200, 'sofa', [2.2, 0.8, 0.95], '#ece6da', 4, 1.4, 'A low, deep three-seater in oatmeal linen with plump cushions.', { design: 'studio-sofa' }),
+  item('studio-egg-chair', 'Egg Chair', 'seating', 3900, 'armchair', [0.85, 1.1, 0.85], '#e8e2d6', 3, 1.3, 'A cocooning swivel egg chair in cream bouclé on a steel base.', { design: 'studio-egg-chair' }),
+  item('studio-bench', 'Slatted Oak Bench', 'seating', 1200, 'armchair', [1.4, 0.45, 0.4], '#b58a5a', 1, 1, 'Solid oak slats on black steel legs; by the door or at the foot of the bed.', { design: 'studio-bench' }),
+  item('studio-tripod-lamp', 'Tripod Floor Lamp', 'lighting', 980, 'lamp', [0.45, 1.6, 0.45], '#efe6d4', 2, 1, 'Walnut tripod legs and a linen drum shade with a warm glow.', { design: 'studio-tripod-lamp' }),
+  item('studio-guitar', 'Acoustic Guitar & Stand', 'electronics', 1800, 'speaker', [0.5, 1.5, 0.4], '#c58a4a', 2, 1.3, 'A spruce-top acoustic on a floor stand. Play a few songs: good fun.', { design: 'studio-guitar' }),
+  item('studio-records', 'Framed Records', 'decor', 900, 'art', [1.3, 0.4, 0.06], '#1b1b1d', 2, 1, 'Three favourite album sleeves in black frames, for the wall.', { design: 'studio-records' }),
+  item('studio-prints', 'Landmark Prints', 'decor', 750, 'art', [1.45, 0.5, 0.06], '#b58a5a', 2, 1, 'A trio of city landmark prints in oak frames.', { design: 'studio-prints' }),
+  item('studio-coat-stand', 'Coat Stand', 'storage', 450, 'dresser', [0.45, 1.8, 0.45], '#5a3a24', 1, 1, 'A walnut coat stand with four hooks, for coats and bags by the door.', { design: 'studio-coat-stand', room: 'living' }),
+  item('studio-pampas', 'Pampas Grass Vase', 'decor', 380, 'plant', [0.45, 1.3, 0.45], '#e6d6b8', 1, 1, 'Feathery dried pampas grass in a tall stone vase.', { design: 'studio-pampas' }),
+  item('studio-low-shelf', 'Low Bookshelf', 'storage', 1500, 'bookshelf', [1.4, 0.8, 0.35], '#b58a5a', 2, 1.1, 'A long, low oak shelf full of books, with flowers on top.', { design: 'studio-low-shelf', room: 'living' }),
+  item('studio-boxes', 'Linen Storage Boxes', 'storage', 300, 'dresser', [0.8, 0.7, 0.4], '#d9cdb6', 1, 1, 'Three stacking linen boxes for the things that need a home.', { design: 'studio-boxes' }),
   item('luxe-bathtub', 'Stone Bathtub', 'bathroom', 9800, 'bathtub', [1.7, 0.6, 0.85], '#f4f2ee', 5, 1.4, 'A freestanding stone tub with brass taps.', luxe),
 ];
 

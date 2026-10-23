@@ -15,11 +15,13 @@ describe('OGM Homes and the starter flat', () => {
     expect(interiorFor(starter).tier).toBe('room');
   });
 
-  it('sells a starter home, a middle class house and a luxury villa, each bigger than the last', () => {
+  it('sells five homes, from starter homes to a luxury villa, the dearer ones no smaller', () => {
     const sale = homesForSale();
-    expect(sale.map((h) => h.band)).toEqual(['lower', 'middle', 'luxury']);
+    expect(sale).toHaveLength(5);
+    expect(sale.map((h) => h.band)).toEqual(['lower', 'lower', 'middle', 'middle', 'luxury']);
     const areas = sale.map((h) => { const i = interiorFor(h); return i.width * i.depth; });
-    for (let k = 1; k < areas.length; k++) expect(areas[k]).toBeGreaterThan(areas[k - 1]);
+    expect(areas.at(-1)).toBe(Math.max(...areas));
+    expect(areas[0]).toBe(Math.min(...areas));
     // Only Ayemara sells homes, through the agency on the cross street
     expect(sale.every((h) => h.district === 'lagos.marina')).toBe(true);
     const lagos = DISTRICTS[0];

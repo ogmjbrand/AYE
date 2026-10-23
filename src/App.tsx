@@ -187,7 +187,7 @@ const HOSPITAL_LAYOUT = hospitalLayout();
 const CAMPUS_DOOR_RADIUS = 3;
 
 /** The title plate at home, by the kind of place it is. */
-const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment', house: 'My House', family: 'My House', villa: 'My Villa' };
+const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment', house: 'My House', family: 'My House', villa: 'My Villa', loft: 'My Loft', warehouse: 'My Loft' };
 
 /** Standing this close to a place puts its name on the title plate. */
 const PLATE_RADIUS = 9;
@@ -1656,7 +1656,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.map((p) => p.f)}>
-                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' ? 'home' : undefined} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
             ) : inBoutique ? (

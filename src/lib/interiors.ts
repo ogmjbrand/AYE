@@ -27,7 +27,7 @@ export interface Furniture {
 
 export interface Interior {
   /** Rented: room to penthouse. Bought through OGM Homes: house (lower), family (middle class), villa (luxury). */
-  tier: 'room' | 'flat' | 'apartment' | 'penthouse' | 'house' | 'family' | 'villa';
+  tier: 'room' | 'flat' | 'apartment' | 'penthouse' | 'house' | 'family' | 'villa' | 'loft' | 'warehouse';
   width: number;
   depth: number;
   wallColor: string;
@@ -35,6 +35,8 @@ export interface Interior {
   /** Big window on the far wall (penthouse: floor to ceiling). */
   window: 'small' | 'wide' | 'full';
   furniture: readonly Furniture[];
+  /** Exposed brick walls (the lofts) instead of plaster. */
+  brick?: boolean;
   /** Solid decor that isn't usable furniture (dining chairs, the fireplace, the study chair): x, z, width, depth. */
   solids?: readonly (readonly [number, number, number, number])[];
 }
@@ -166,6 +168,55 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       ...[2.45, 3.1, 3.75].flatMap((x) => [[x, -3.55, 0.48, 0.48], [x, -1.95, 0.48, 0.48]] as const),
       // The desk's return, the study chair and the coat stand
       [-5.1, -2.95, 0.65, 1.05], [-4.0, -3.0, 0.6, 0.6], [-1.6, -4.1, 0.5, 0.5],
+    ],
+  },
+  // The attic loft studio: exposed brick, oak floor, the Studio collection
+  loft: {
+    tier: 'loft', width: 8, depth: 6.5, wallColor: '#d9cfc2', floorColor: '#b08d68', window: 'wide', brick: true,
+    furniture: [
+      f('bed', -2.95, 2.0, 1.6, 0.5, 2.1, '#e9e3d8', 'luxe'),
+      f('rug', 1.4, 0.4, 2.4, 0.01, 1.8, '#c8b89c', 'luxe'),
+      f('sofa', 1.4, 2.6, 2.2, 0.8, 0.95, '#ece6da', undefined, 'studio-sofa'),
+      f('table', 1.4, 1.35, 0.9, 0.42, 0.55, '#c9c3b8', 'luxe'),
+      f('tv', 1.4, -1.0, 1.6, 0.9, 0.42, '#2b2622', 'luxe'),
+      f('armchair', 3.4, 0.4, 0.85, 1.1, 0.85, '#e8e2d6', undefined, 'studio-egg-chair'),
+      f('lamp', 3.55, 2.75, 0.45, 1.6, 0.45, '#efe6d4', undefined, 'studio-tripod-lamp'),
+      f('speaker', -0.7, 2.95, 0.5, 1.5, 0.4, '#c58a4a', undefined, 'studio-guitar'),
+      f('art', 1.4, 3.2, 1.3, 0.4, 0.06, '#1b1b1d', undefined, 'studio-records'),
+      f('bookshelf', -3.25, -0.6, 0.35, 0.8, 1.4, '#b58a5a', undefined, 'studio-low-shelf'),
+      f('counter', -2.4, -2.88, 1.8, 0.92, 0.65, '#d9d2c6'),
+      f('fridge', -0.95, -2.9, 0.7, 1.8, 0.6, '#dadcdd'),
+      f('shower', 3.45, -2.6, 0.9, 2.1, 0.9, '#b9c9cf'),
+      f('dresser', 2.3, -2.95, 0.45, 1.8, 0.45, '#5a3a24', undefined, 'studio-coat-stand'),
+      f('plant', 3.55, -1.0, 0.45, 1.3, 0.45, '#e6d6b8', undefined, 'studio-pampas'),
+    ],
+  },
+  // The warehouse loft: a big brick-walled open plan, the Studio collection and Luxe pieces
+  warehouse: {
+    tier: 'warehouse', width: 12, depth: 8.5, wallColor: '#d9cfc2', floorColor: '#b08d68', window: 'wide', brick: true,
+    furniture: [
+      f('bed', -4.3, 3.0, 2.0, 0.6, 2.2, '#3b3c41', 'luxe', 'arch'),
+      f('dresser', -5.65, 3.95, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('dresser', -2.95, 3.95, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('dresser', -1.6, 3.95, 0.8, 0.7, 0.4, '#d9cdb6', undefined, 'studio-boxes'),
+      f('rug', 2.5, 0.8, 3.0, 0.01, 2.4, '#c8b89c', 'luxe'),
+      f('sofa', 2.5, 2.85, 2.6, 0.8, 1.05, '#ece6da', undefined, 'studio-sofa'),
+      f('table', 2.5, 1.4, 1.1, 0.4, 1.1, '#f1ede6', 'luxe'),
+      f('tv', 2.5, -1.05, 2.0, 1.45, 0.45, '#2b2622', 'luxe'),
+      f('armchair', 4.9, 0.9, 0.85, 1.1, 0.85, '#e8e2d6', undefined, 'studio-egg-chair'),
+      f('armchair', 0.1, 0.9, 0.85, 0.8, 0.85, '#1f5a47', 'luxe'),
+      f('lamp', 5.45, 3.75, 0.45, 1.6, 0.45, '#efe6d4', undefined, 'studio-tripod-lamp'),
+      f('speaker', -0.6, 3.85, 0.5, 1.5, 0.4, '#c58a4a', undefined, 'studio-guitar'),
+      f('art', 2.5, 4.2, 1.45, 0.5, 0.06, '#b58a5a', undefined, 'studio-prints'),
+      f('art', -5.97, 0.6, 0.06, 0.4, 1.3, '#1b1b1d', undefined, 'studio-records'),
+      f('counter', -3.6, -2.7, 2.0, 0.95, 0.9, '#efece6', 'luxe'),
+      f('fridge', -5.6, -3.85, 0.8, 1.9, 0.75, '#c4c6c8'),
+      f('table', -1.3, -1.9, 1.8, 0.76, 1.6, '#f1ede6', 'luxe'),
+      f('bookshelf', 5.8, -1.6, 0.35, 0.8, 1.4, '#b58a5a', undefined, 'studio-low-shelf'),
+      f('bathtub', 5.2, -3.6, 1.4, 0.6, 0.8, '#f2f1ee', 'luxe'),
+      f('dresser', 3.6, -3.95, 0.45, 1.8, 0.45, '#5a3a24', undefined, 'studio-coat-stand'),
+      f('plant', -2.3, 0.9, 0.45, 1.3, 0.45, '#e6d6b8', undefined, 'studio-pampas'),
+      f('plant', 5.6, 2.0, 0.6, 1.6, 0.6, '#3f6b3a', 'luxe'),
     ],
   },
   // Luxury: the villa. Marble floor, floor-to-ceiling glass, a fireplace in the

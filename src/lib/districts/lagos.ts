@@ -153,6 +153,16 @@ export const LAGOS_MARINA: DistrictSpec = {
       description: 'A bright one-bedroom house on the lane to the Grand Lagoon: a sofa and television, a table for two, a kitchen and a shower.',
     },
     {
+      id: 'marina-court-loft', district: 'lagos.marina', name: 'Marina Court, attic loft', kind: 'Attic loft studio', building: 'Marina Court',
+      door: [-5.5, 0, 13.6], rentPerNight: 0, price: 85_000, band: 'lower', tier: 'loft',
+      description: 'The top-floor studio: exposed brick, oak floorboards, a cloud sofa and egg chair, a guitar by the bed and records on the wall.',
+    },
+    {
+      id: 'palm-view-warehouse', district: 'lagos.marina', name: 'Palm View, warehouse loft', kind: 'Warehouse loft', building: 'Palm View',
+      door: [-5.5, 0, 19.4], rentPerNight: 0, price: 260_000, band: 'middle', tier: 'warehouse',
+      description: 'A converted warehouse floor: brick walls, an arched velvet bed, a marble kitchen island and dining for four, a free-standing bath.',
+    },
+    {
       id: 'eko-gardens-house', district: 'lagos.marina', name: 'Eko Gardens, garden house', kind: 'Family house', building: 'Eko Gardens',
       door: [24, 0, 32.8], rentPerNight: 0, price: 150_000, band: 'middle', tier: 'family',
       description: 'A living room round a brick fireplace with red curtains, dining for six under pendant lamps, a study with a bookcase, and a bedroom at the back.',

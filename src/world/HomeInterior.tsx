@@ -6,6 +6,7 @@ import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { LuxePiece } from './LuxeFurniture';
 import { HomeDecor } from './HomeDecor';
+import { StudioPiece } from './StudioFurniture';
 import { pbr } from './pbr';
 import type { GameTime } from '../lib/gameState';
 
@@ -44,12 +45,12 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
       </mesh>
 
       {/* Walls, facing inwards */}
-      <Wall color={interior.wallColor} position={[0, H / 2, d / 2]} rotationY={Math.PI} size={[w, H]} />
-      <Wall color={interior.wallColor} position={[-w / 2, H / 2, 0]} rotationY={Math.PI / 2} size={[d, H]} />
-      <Wall color={interior.wallColor} position={[w / 2, H / 2, 0]} rotationY={-Math.PI / 2} size={[d, H]} />
-      <Wall color={interior.wallColor} position={[-(doorW / 2 + side / 2), H / 2, -d / 2]} rotationY={0} size={[side, H]} />
-      <Wall color={interior.wallColor} position={[doorW / 2 + side / 2, H / 2, -d / 2]} rotationY={0} size={[side, H]} />
-      <Wall color={interior.wallColor} position={[0, (H + 2.1) / 2, -d / 2]} rotationY={0} size={[doorW, H - 2.1]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[0, H / 2, d / 2]} rotationY={Math.PI} size={[w, H]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[-w / 2, H / 2, 0]} rotationY={Math.PI / 2} size={[d, H]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[w / 2, H / 2, 0]} rotationY={-Math.PI / 2} size={[d, H]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[-(doorW / 2 + side / 2), H / 2, -d / 2]} rotationY={0} size={[side, H]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[doorW / 2 + side / 2, H / 2, -d / 2]} rotationY={0} size={[side, H]} />
+      <Wall brick={interior.brick} color={interior.wallColor} position={[0, (H + 2.1) / 2, -d / 2]} rotationY={0} size={[doorW, H - 2.1]} />
       {/* Front door, closed behind you (faces inwards like the walls, so the camera sees past it) */}
       <mesh position={[0, 1.05, -d / 2 + 0.01]}>
         <planeGeometry args={[doorW - 0.2, 2.1]} />
@@ -107,11 +108,13 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
   );
 }
 
-function Wall({ color, position, rotationY, size }: { color: string; position: [number, number, number]; rotationY: number; size: [number, number] }) {
+function Wall({ color, position, rotationY, size, brick = false }: { color: string; position: [number, number, number]; rotationY: number; size: [number, number]; brick?: boolean }) {
+  // Exposed brick (ambientCG Bricks104), tiled at its real size (about 1.2 m a repeat)
+  const bricks = useMemo(() => (brick ? pbr('bricks', [size[0] / 1.2, size[1] / 1.2]) : null), [brick, size]);
   return (
     <mesh position={position} rotation={[0, rotationY, 0]} receiveShadow>
       <planeGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={0.9} />
+      {bricks ? <meshStandardMaterial {...bricks} /> : <meshStandardMaterial color={color} roughness={0.9} />}
     </mesh>
   );
 }
@@ -127,6 +130,7 @@ const box = (w: number, h: number, d: number, y: number, color: string, x = 0, z
 export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
+  if (f.design?.startsWith('studio-')) return <group position={[x, 0, z]}><StudioPiece f={f} /></group>;
   if (f.style === 'luxe' || f.kind === 'art') return <group position={[x, 0, z]}><LuxePiece f={f} /></group>;
   let parts: ReactNode;
   switch (f.kind) {
