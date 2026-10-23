@@ -1,8 +1,8 @@
 {
   "surfaces": {
-    "road": null,
+    "road": { "color": "textures/road/color.webp", "normal": "textures/road/normal.webp", "roughness": "textures/road/roughness.webp", "tileMeters": 4 },
     "pavement": null,
-    "ground": null,
+    "ground": { "color": "textures/ground/color.webp", "normal": "textures/ground/normal.webp", "roughness": "textures/ground/roughness.webp", "ao": "textures/ground/ao.webp", "tileMeters": 2.5 },
     "roof": null,
     "concrete": null
   },

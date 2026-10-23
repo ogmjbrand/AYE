@@ -1,5 +1,8 @@
 import type { Interior } from '../lib/interiors';
 import { WALL_HEIGHT } from '../lib/interiors';
+import { pbr } from './pbr';
+import { RealModel } from './RealModel';
+import { useMemo } from 'react';
 
 /**
  * The built-in decor of the homes OGM Homes sells (lib/interiors.ts `solids`):
@@ -27,14 +30,16 @@ function DiningChair({ x, z, facing, color = '#5a3b28', seat = '#efe9df' }: { x:
 /** A fireplace against an east wall (+x), facing into the room: brick or marble. */
 function Fireplace({ x, z, width, kind, night }: { x: number; z: number; width: number; kind: 'brick' | 'marble'; night: number }) {
   const brick = kind === 'brick';
-  const face = brick ? '#9a4a34' : '#efece6';
+  const face = brick ? '#ffffff' : '#efece6';
+  // Real brick (ambientCG Bricks104) on the family house's chimney breast
+  const bricks = useMemo(() => (brick ? pbr('bricks', [width / 1.2, WALL_HEIGHT / 1.2]) : null), [brick, width]);
   return (
     <group position={[x, 0, z]} rotation={[0, -Math.PI / 2, 0]}>
       {/* Chimney breast to the ceiling */}
-      <mesh position={[0, WALL_HEIGHT / 2, -0.05]} castShadow><boxGeometry args={[width, WALL_HEIGHT, 0.5]} /><M color={face} rough={brick ? 0.95 : 0.2} /></mesh>
-      {brick && Array.from({ length: 22 }, (_, r) => (
-        <mesh key={r} position={[0, 0.06 + r * 0.13, 0.205]}><boxGeometry args={[width, 0.012, 0.01]} /><M color="#d9c8b8" rough={1} /></mesh>
-      ))}
+      <mesh position={[0, WALL_HEIGHT / 2, -0.05]} castShadow>
+        <boxGeometry args={[width, WALL_HEIGHT, 0.5]} />
+        {bricks ? <meshStandardMaterial {...bricks} /> : <M color={face} rough={0.2} />}
+      </mesh>
       {/* Mantel, opening and the fire */}
       <mesh position={[0, 1.15, 0.28]} castShadow><boxGeometry args={[width + 0.2, 0.08, 0.3]} /><M color={brick ? '#3e2a1e' : '#d8d2c6'} rough={0.4} /></mesh>
       <mesh position={[0, 0.5, 0.21]}><boxGeometry args={[width * 0.55, 0.8, 0.02]} /><M color="#141210" rough={1} /></mesh>
@@ -76,8 +81,33 @@ function Certificates({ x, z }: { x: number; z: number }) {
   );
 }
 
+/** On the kitchen counter: a bowl of real fruit and a loaf on a bread board (ambientCG scans, CC0). */
+function KitchenFood({ x, y, z, along }: { x: number; y: number; z: number; along: boolean }) {
+  return (
+    <group position={[x, y, z]} rotation={[0, along ? 0 : Math.PI / 2, 0]}>
+      <group position={[-0.35, 0, 0]}>
+        <mesh position={[0, 0.045, 0]} castShadow><sphereGeometry args={[0.13, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} /><meshStandardMaterial color="#efe9df" roughness={0.3} side={2} /></mesh>
+        <group position={[-0.04, 0.05, 0.02]}><RealModel name="apple-red" /></group>
+        <group position={[0.05, 0.05, -0.03]}><RealModel name="apple" /></group>
+        <group position={[0.0, 0.06, 0.06]}><RealModel name="pear" /></group>
+        <group position={[0.02, 0.1, -0.01]}><RealModel name="kiwi" /></group>
+      </group>
+      <group position={[0.3, 0, 0]}>
+        <mesh position={[0, 0.01, 0]} castShadow receiveShadow><boxGeometry args={[0.36, 0.02, 0.24]} /><meshStandardMaterial color="#9a6a3c" roughness={0.6} /></mesh>
+        <group position={[0, 0.02, 0]}><RealModel name="bread-loaf" /></group>
+      </group>
+    </group>
+  );
+}
+
 export function HomeDecor({ interior, night }: { interior: Interior; night: number }) {
   const w = interior.width, d = interior.depth;
+  const counter = interior.furniture.find((f) => f.kind === 'counter');
+  const food = counter ? <KitchenFood x={counter.at[0]} y={counter.size[1]} z={counter.at[1]} along={counter.size[0] >= counter.size[2]} /> : null;
+  return <>{food}<TierDecor interior={interior} night={night} w={w} d={d} /></>;
+}
+
+function TierDecor({ interior, night, w, d }: { interior: Interior; night: number; w: number; d: number }) {
   switch (interior.tier) {
     case 'house':
       return (

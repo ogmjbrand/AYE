@@ -3,15 +3,15 @@ import type { IndoorMood } from './indoorMoods';
 import { INDOOR } from './indoorMoods';
 
 /**
- * Studio-style reflections for interiors, built from glowing panels and rings
- * (no download): warm ceiling panels and the ring lights of a lounge show up
- * in marble, brass, glass and velvet the way a real room's lights would.
+ * Reflections for interiors: a real lounge photographed all round (ambientCG
+ * IndoorEnvironmentHDRI013, CC0) with glowing panels and rings laid over it,
+ * so the room's own ceiling lights and ring lamps show up in marble, brass,
+ * glass and velvet the way a real room's lights would.
  */
 export function IndoorEnvironment({ mood }: { mood: IndoorMood }) {
   const m = INDOOR[mood];
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={m.env}>
-      <color attach="background" args={[m.envBase]} />
+    <Environment resolution={256} frames={1} environmentIntensity={m.env} files={`${import.meta.env.BASE_URL}assets/hdri/lounge-indoor_1k.exr`}>
       {/* Ceiling panels */}
       <Lightformer form="rect" intensity={2.2} color={m.panel} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[10, 6, 1]} />
       <Lightformer form="ring" intensity={4} color={m.ring} position={[-3, 4.5, -2]} rotation-x={Math.PI / 2} scale={2} />

@@ -8,14 +8,18 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 type FurnitureName = 'sofa-velvet-champagne' | 'sofa-velvet-blush' | 'chair-velvet-peacock' | 'chair-velvet-mango' | 'vase-flowers' | 'plant-potted';
 /** Props built by scripts/sketchfab/build-props.mjs (CC-BY 4.0, see CREDITS.md). */
 export type PropName = 'sub-sandwich' | 'bento-box' | 'vending-machine' | 'motorhome';
-export type RealModelName = FurnitureName | PropName;
+/** Real-size food scanned by ambientCG (CC0), built by scripts/ambientcg/build-food.mjs. */
+export type FoodName = 'bread-loaf' | 'bread-rustic' | 'bread-roll' | 'bread-baguette' | 'cookie' | 'avocado' | 'kiwi' | 'pear' | 'pear-green'
+  | 'pastry' | 'cake' | 'apple' | 'apple-red' | 'melon';
+export type RealModelName = FurnitureName | PropName | FoodName;
 const PROPS: ReadonlySet<string> = new Set<PropName>(['sub-sandwich', 'bento-box', 'vending-machine', 'motorhome']);
-const modelPath = (name: RealModelName) => `models/${PROPS.has(name) ? 'props' : 'furniture'}/${name}.glb`;
+const FOOD: ReadonlySet<string> = new Set<FoodName>(['bread-loaf', 'bread-rustic', 'bread-roll', 'bread-baguette', 'cookie', 'avocado', 'kiwi', 'pear', 'pear-green', 'pastry', 'cake', 'apple', 'apple-red', 'melon']);
+const modelPath = (name: RealModelName) => `models/${PROPS.has(name) ? 'props' : FOOD.has(name) ? 'food' : 'furniture'}/${name}.glb`;
 
 interface Props {
   name: RealModelName;
-  /** Fit inside this box (width X, height, depth Z), keeping proportions, standing on y = 0. */
-  fit: readonly [number, number, number];
+  /** Fit inside this box (width X, height, depth Z), keeping proportions, standing on y = 0. Left out: real size (scanned food). */
+  fit?: readonly [number, number, number];
   /** Turn about the vertical axis (radians) after fitting; the models face +z. */
   rotationY?: number;
   /** Re-dye materials whose name matches (the fabric), keeping their weave, sheen and folds. */
@@ -25,7 +29,8 @@ interface Props {
 function Model({ name, fit, rotationY = 0, recolor }: Props) {
   const { scene } = useGLTF(assetUrl(modelPath(name)), false, true);
   // By value, so a new array with the same size doesn't re-clone the model
-  const [fx, fy, fz] = fit;
+  const [fx, fy, fz] = fit ?? [0, 0, 0];
+  const fitted = !!fit;
   const dyeMatch = recolor ? recolor.match.source : null;
   const dyeFlags = recolor ? recolor.match.flags : '';
   const dye = recolor?.color ?? null;
@@ -50,10 +55,10 @@ function Model({ name, fit, rotationY = 0, recolor }: Props) {
     // Turned a quarter, width and depth swap
     const quarter = Math.abs(Math.sin(rotationY)) > 0.7;
     const [fw, fh, fd] = quarter ? [fz, fy, fx] : [fx, fy, fz];
-    const s = Math.min(fw / size.x, fh / size.y, fd / size.z);
+    const s = fitted ? Math.min(fw / size.x, fh / size.y, fd / size.z) : 1;
     const c = box.getCenter(new Vector3());
     return { object: copy, scale: s, offset: [-c.x * s, -box.min.y * s, -c.z * s] as [number, number, number] };
-  }, [scene, fx, fy, fz, rotationY, dyeMatch, dyeFlags, dye]);
+  }, [scene, fitted, fx, fy, fz, rotationY, dyeMatch, dyeFlags, dye]);
   return (
     <group rotation={[0, rotationY, 0]}>
       <primitive object={object} scale={scale} position={offset} />

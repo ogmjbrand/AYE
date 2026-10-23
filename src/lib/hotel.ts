@@ -143,6 +143,8 @@ const m = (id: string, name: string, course: MenuItem['course'], price: number, 
 export const ROOM_SERVICE_MENU: readonly MenuItem[] = [
   m('room-sub', 'Club Sub Sandwich', 'main', 160, 50, 30, { fun: 4 }, ['meat', 'dairy'], 'A long toasted roll with sliced meats, cheese, lettuce and tomato, brought up on a tray.'),
   m('room-bento', 'Bento Box', 'main', 240, 60, 35, { fun: 6 }, ['fish', 'egg'], 'A lacquered box of rice, grilled fish, rolled omelette and pickled vegetables.'),
+  m('room-breakfast', 'Continental Breakfast', 'starter', 150, 40, 30, { energy: 6, fun: 4 }, ['dairy', 'egg'], 'A warm pastry, a crusty roll, a ripe pear and a kiwi, on a tray.'),
+  m('room-cake', 'Slice of Cake', 'dessert', 90, 18, 20, { fun: 6 }, ['dairy', 'egg'], 'A slice of the house sponge cake with cream.'),
   m('vend-water', 'Bottled Water', 'drink', 20, 3, 15, { energy: 2 }, [], 'Still water, chilled.'),
   m('vend-juice', 'Orange Juice', 'drink', 35, 8, 15, { energy: 3 }, [], 'Freshly pressed orange juice.'),
 ];

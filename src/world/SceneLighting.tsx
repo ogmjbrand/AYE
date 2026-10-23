@@ -12,10 +12,11 @@ import { useQuality } from './quality';
 import { SkyDome } from './SkyDome';
 import { lightingAt, type HdriKey } from './timeOfDay';
 
+/** Real city light for reflections and image-based lighting (ambientCG, CC0; the visible sky is SkyDome's). */
 const HDRI: Record<HdriKey, string> = {
-  day: `${import.meta.env.BASE_URL}assets/hdri/potsdamer_platz_1k.hdr`,
-  golden: `${import.meta.env.BASE_URL}assets/hdri/venice_sunset_1k.hdr`,
-  night: `${import.meta.env.BASE_URL}assets/hdri/dikhololo_night_1k.hdr`,
+  day: `${import.meta.env.BASE_URL}assets/hdri/city-day_1k.exr`,
+  golden: `${import.meta.env.BASE_URL}assets/hdri/town-dusk_1k.exr`,
+  night: `${import.meta.env.BASE_URL}assets/hdri/street-night_1k.exr`,
 };
 
 const SHADOW_EXTENT = 32;

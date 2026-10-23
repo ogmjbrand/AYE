@@ -43,3 +43,14 @@ From Sketchfab, rebuilt by `scripts/sketchfab/build-props.mjs` (WebP textures, m
 | `motorhome.glb` | "FREE GMC Motorhome reimagined low poly" (sketchfab.com/karolmiklas) | Karol Miklas | CC BY 4.0 |
 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ — changes made: animations removed, textures resized and converted to WebP, meshes compressed. On the vending machine, every texture that showed real drinks brands (the front, the drinks on the shelves, the instructions panel) was replaced with original artwork made for this game, so no brand names or logos remain. On the motorhome, the maker's badge, the tyre lettering, two round badges, the modeller's stickers and the fuel-company window stickers were painted out, and the wheels use the plain yellow paint sheet.
+
+## ambientCG (textures/, hdri/*.exr, models/food/)
+
+From ambientCG (ambientcg.com), **CC0 1.0** (public domain), with thanks. Built by `scripts/ambientcg/build.mjs` and `scripts/ambientcg/build-food.mjs` (WebP maps resized to 1K; scanned food simplified and meshopt-compressed).
+
+| Files | ambientCG assets |
+|---|---|
+| `textures/road/` (street asphalt), `textures/ground/` (grass) | Road007, Grass001 |
+| `textures/wood-floor/`, `textures/bricks/`, `textures/bamboo/`, `textures/onyx/`, `textures/fabric/`, `textures/metal/` | WoodFloor051, Bricks104, Bamboo001C, Onyx006, Fabric080, Metal049A |
+| `hdri/city-day_1k.exr`, `hdri/town-dusk_1k.exr`, `hdri/street-night_1k.exr`, `hdri/lounge-indoor_1k.exr` | DayEnvironmentHDRI052, EveningEnvironmentHDRI002, NightEnvironmentHDRI010, IndoorEnvironmentHDRI013 |
+| `models/food/*.glb` | 3DBread005/006/007/012, 3DCookie001, 3DAvocado001, 3DKiwi001, 3DPear001/002, 3DPastry003, 3DCake001, 3DApple002/003, 3DMelon001 |

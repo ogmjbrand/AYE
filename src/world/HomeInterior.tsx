@@ -6,6 +6,7 @@ import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { LuxePiece } from './LuxeFurniture';
 import { HomeDecor } from './HomeDecor';
+import { pbr } from './pbr';
 import type { GameTime } from '../lib/gameState';
 
 /**
@@ -25,6 +26,8 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
   const sky = skylineTexture(skyMoodAt(night, gameTime.hour), 23);
   const luxe = interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'villa';
   const floor = useMemo(() => (interior.tier === 'penthouse' || interior.tier === 'villa' ? marbleTexture('cream', [w / 2.4, d / 2.4]) : null), [interior.tier, w, d]);
+  // Every other home has real oak floorboards (ambientCG WoodFloor051), a little warmer or cooler by the home's colour
+  const boards = useMemo(() => (floor ? null : pbr('wood-floor', [w / 2.2, d / 2.2])), [floor, w, d]);
   // Pendant lights over the kitchen island and the dining table
   const pendants = luxe ? [...interior.furniture, ...extra].filter((f) => (f.kind === 'counter' || (f.kind === 'table' && f.size[0] * f.size[2] > 2)) && f.style === 'luxe') : [];
 
@@ -37,7 +40,7 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        {floor ? <meshStandardMaterial map={floor} roughness={0.14} /> : <meshStandardMaterial color={interior.floorColor} roughness={0.75} />}
+        {floor ? <meshStandardMaterial map={floor} roughness={0.14} /> : <meshStandardMaterial {...boards} />}
       </mesh>
 
       {/* Walls, facing inwards */}

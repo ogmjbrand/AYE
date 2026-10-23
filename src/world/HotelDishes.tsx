@@ -60,6 +60,23 @@ export function HotelDish({ id }: { id: string }) {
           <group position={[-0.03, 0.012, 0]}><RealModel suspend name="bento-box" fit={[0.24, 0.07, 0.18]} /></group>
         </group>
       );
+    case 'room-breakfast':
+      return (
+        <group>
+          <Tray />
+          <group position={[-0.08, 0.012, -0.04]}><RealModel suspend name="pastry" /></group>
+          <group position={[0.02, 0.012, 0.06]}><RealModel suspend name="bread-roll" /></group>
+          <group position={[0.08, 0.012, -0.06]}><RealModel suspend name="pear" /></group>
+          <group position={[0.12, 0.012, 0.05]}><RealModel suspend name="kiwi" /></group>
+        </group>
+      );
+    case 'room-cake':
+      return (
+        <group>
+          <mesh position={[0, 0.006, 0]} castShadow receiveShadow><cylinderGeometry args={[0.1, 0.085, 0.012, 32]} /><meshStandardMaterial color="#f6f4ee" roughness={0.25} /></mesh>
+          <group position={[0, 0.012, 0]}><RealModel suspend name="cake" /></group>
+        </group>
+      );
     case 'vend-water':
       return <Bottle liquid="#d8ecf6" label="#2b8ac8" cap="#2b6cc8" opacity={0.45} />;
     case 'vend-juice':

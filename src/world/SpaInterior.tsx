@@ -9,7 +9,7 @@ import {
   DESK, LOBBY_Z1, ROOM, ROOMS, SPA_NAME, SPA_STAFF, STOREY, TABLE, WAITING_SEATS, roomDoorX, spaWalls, type Client, type TreatmentRoom,
 } from '../lib/spa';
 import { WALL_T } from '../lib/university';
-import { hotelPlasterTexture, parquetTexture } from './hotelTextures';
+import { hotelPlasterTexture } from './hotelTextures';
 import { marbleTexture } from './venueTextures';
 import { HotelWalls } from './HotelInterior';
 import { VenueNpc } from './VenueNpc';
@@ -17,6 +17,7 @@ import { UNIFORMS } from '../lib/uniforms';
 import { Ceiling, Downlight } from './VenueShell';
 import { PottedPalm } from './PottedPalm';
 import { RealModel } from './RealModel';
+import { pbr } from './pbr';
 
 const H = STOREY;
 const FACE = WALL_T / 2 + 0.01;
@@ -198,7 +199,10 @@ export function SpaInterior({ gameTime, player, busy, waiting, serving, children
   const night = l.night;
   const w = ROOM.x1 - ROOM.x0;
   const stone = useMemo(() => marbleTexture('cream', [w / 2.5, (LOBBY_Z1 - ROOM.z0) / 2.5]), [w]);
-  const wood = useMemo(() => parquetTexture([w / 1.6, (ROOM.z1 - LOBBY_Z1) / 1.6]), [w]);
+  // Real oak boards in the treatment rooms, bamboo on the reception's feature wall, backlit onyx on the desk
+  const wood = useMemo(() => pbr('wood-floor', [w / 2.2, (ROOM.z1 - LOBBY_Z1) / 2.2]), [w]);
+  const bamboo = useMemo(() => pbr('bamboo', [3, 1.5]), []);
+  const onyx = useMemo(() => pbr('onyx', [1.5, 0.4]), []);
   const plaster = useMemo(() => hotelPlasterTexture([1, 1]), []);
   const walls = useMemo(() => spaWalls(), []);
   const sign = useMemo(() => nameCanvas(), []);
@@ -212,7 +216,7 @@ export function SpaInterior({ gameTime, player, busy, waiting, serving, children
       </mesh>
       <mesh position={[0, 0.001, (LOBBY_Z1 + ROOM.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w, ROOM.z1 - LOBBY_Z1]} />
-        <meshStandardMaterial map={wood} roughness={0.5} color="#c9a882" />
+        <meshStandardMaterial {...wood} />
       </mesh>
       <HotelWalls player={player} walls={walls} plaster={plaster} />
 
@@ -220,7 +224,7 @@ export function SpaInterior({ gameTime, player, busy, waiting, serving, children
       <group position={[DESK.x, 0, DESK.z]}>
         <mesh position={[0, DESK.h / 2, 0]} castShadow receiveShadow><boxGeometry args={[DESK.w, DESK.h, DESK.d]} /><meshStandardMaterial color={TEAK} roughness={0.45} /></mesh>
         {Array.from({ length: 9 }, (_, i) => <mesh key={i} position={[-DESK.w / 2 + 0.17 + i * 0.33, DESK.h / 2, -DESK.d / 2 - 0.006]}><boxGeometry args={[0.03, DESK.h - 0.1, 0.012]} /><meshStandardMaterial color="#4a3020" /></mesh>)}
-        <mesh position={[0, DESK.h + 0.03, 0]}><boxGeometry args={[DESK.w + 0.1, 0.06, DESK.d + 0.1]} /><meshStandardMaterial color="#e9e1d2" roughness={0.2} /></mesh>
+        <mesh position={[0, DESK.h + 0.03, 0]}><boxGeometry args={[DESK.w + 0.1, 0.06, DESK.d + 0.1]} /><meshStandardMaterial {...onyx} emissive="#ffd9a0" emissiveIntensity={0.12} /></mesh>
         <RealModel name="vase-flowers" fit={[0.25, 0.45, 0.25]} />
         <Candle p={[-1.0, DESK.h + 0.06, -0.1]} />
         <Candle p={[1.0, DESK.h + 0.06, -0.1]} />
@@ -233,6 +237,11 @@ export function SpaInterior({ gameTime, player, busy, waiting, serving, children
       <VenueNpc {...SPA_STAFF.receptionist} chatty uniform={UNIFORMS.spa} />
       <VenueNpc {...SPA_STAFF.manager} chatty uniform={UNIFORMS.black} />
 
+      {/* Bamboo feature wall behind the waiting area */}
+      <mesh position={[ROOM.x0 + FACE, H / 2, (ROOM.z0 + LOBBY_Z1) / 2]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[LOBBY_Z1 - ROOM.z0 - 0.2, H - 0.02]} />
+        <meshStandardMaterial {...bamboo} />
+      </mesh>
       {/* Waiting: a cream sofa, a low table with a candle, and a shelf of oils and towels */}
       <group position={[-6.2, 0, -5.9]}>
         <RealModel name="sofa-velvet-champagne" fit={[2.2, 0.85, 0.9]} rotationY={0} />
