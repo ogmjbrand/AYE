@@ -294,11 +294,13 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
   });
 
   const homeKinds = S.homes[T.homeSet];
-  const homeBuildings = homeNames(seed, area, T.spec.homes.length);
-  const homes: Home[] = T.spec.homes.map((h, i) => ({
+  // Homes to rent only: the homes for sale belong to Ayemara's OGM Homes
+  const toLet = T.spec.homes.filter((h) => h.price === undefined);
+  const homeBuildings = homeNames(seed, area, toLet.length);
+  const homes: Home[] = toLet.map((h, i) => ({
     id: `${seed.id}-${slug(homeKinds[i].kind)}`,
     district: id,
-    name: `${homeBuildings[i]}, ${homeUnit(i, T.spec.homes.length)}`,
+    name: `${homeBuildings[i]}, ${homeUnit(i, toLet.length)}`,
     kind: homeKinds[i].kind,
     building: homeBuildings[i],
     door: at(h.door),

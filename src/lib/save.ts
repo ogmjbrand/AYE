@@ -10,7 +10,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
 import { sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
-import { homeById } from './homes';
+import { STARTER_HOME_ID, forSale, homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
 import { sanitiseCars } from './cars';
 import { sanitiseSchool } from './school';
@@ -113,7 +113,8 @@ export function clearSave(storage: Storage = localStorage) {
 
 /** Restores clock, balance and today's ledger for this character, or starts fresh. */
 export function loadProgress(character: Character, storage: Storage = localStorage): GameState {
-  const fresh = createGameState(character.balance);
+  // A new character starts out renting the starter flat (rent from the first night)
+  const fresh: GameState = { ...createGameState(character.balance), home: STARTER_HOME_ID, starterGiven: true };
   const data = readJson(storage, PROGRESS_KEY);
   if (typeof data !== 'object' || data === null) return fresh;
   const p = data as Record<string, unknown>;
@@ -149,6 +150,9 @@ export function loadProgress(character: Character, storage: Storage = localStora
     summary: null,
     // Saves from before homes existed have none
     home: homeById(p.home as string | undefined)?.id ?? null,
+    // Saves from before OGM Homes own none
+    owned: sanitiseOwned(p.owned),
+    starterGiven: p.starterGiven === true,
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
@@ -167,11 +171,28 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before the hotel have no booking
     hotel: sanitiseStay(p.hotel),
   };
+  // Every character gets the starter flat once: a save from before it, with no home, is given it now
+  // (someone evicted later stays evicted). Nothing else changes
+  const housed = loaded.starterGiven ? loaded : { ...loaded, home: loaded.home ?? STARTER_HOME_ID, starterGiven: true };
+  // A home you live in that's for sale must be one you own
+  const home = homeById(housed.home);
+  const settled = home && forSale(home) && !housed.owned.includes(home.id) ? { ...housed, home: null } : housed;
   // A save from before Life OS: recognise what was already achieved, without paying for it again
-  return p.life === undefined ? recogniseExisting(loaded, character.career) : loaded;
+  return p.life === undefined ? recogniseExisting(settled, character.career) : settled;
+}
+
+/** Homes you own: known homes for sale, each once. */
+function sanitiseOwned(data: unknown): string[] {
+  if (!Array.isArray(data)) return [];
+  const out: string[] = [];
+  for (const id of data) {
+    const h = typeof id === 'string' ? homeById(id) : undefined;
+    if (h && forSale(h) && !out.includes(h.id)) out.push(h.id);
+  }
+  return out;
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift, hotel } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift, hotel }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift, hotel } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift, hotel }));
 }

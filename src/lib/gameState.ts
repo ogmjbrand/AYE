@@ -23,7 +23,7 @@
  *     work is paid at half rate, and mood scales a work task's bonus.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
-import { ROUGH_SLEEP_FULLNESS_LOSS, homeById, moveInFee } from './homes';
+import { ROUGH_SLEEP_FULLNESS_LOSS, forSale, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
 import { carById, carResale, fuelCost, type OwnedCar, type ParkedSpot } from './cars';
@@ -90,8 +90,12 @@ export interface GameState {
   fullness: number;
   /** Set after resting; the clock is paused until it is dismissed. */
   summary: DaySummary | null;
-  /** The rented home (lib/homes.ts), or null. */
+  /** The home you live in (lib/homes.ts): rented, or one you own. Null if none. */
   home: string | null;
+  /** Homes you've bought through OGM Homes: yours for good, no rent. */
+  owned: string[];
+  /** Whether you've been given the starter flat (once, for every character). */
+  starterGiven: boolean;
   /** All minutes ever worked in this career (experience for promotion). */
   workMinutes: number;
   /** Owned equipment ids (lib/equipment.ts). */
@@ -144,6 +148,7 @@ export type GameAction =
   | { type: 'seePatient'; patientId: string }
   | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
+  | { type: 'buyHome'; homeId: string }
   | { type: 'moveOut' }
   | { type: 'buyEquipment'; id: string }
   | { type: 'buyCar'; id: string; color: string }
@@ -265,7 +270,7 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
+  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, owned: [], starterGiven: false, workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
 }
 
 export function emptyLedger(): DayLedger {
@@ -429,11 +434,17 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   };
 }
 
-/** Rents a home: pays the move-in fee. Moving from another home gives up the old one. */
+/**
+ * Rents a home (pays the move-in fee), or moves back into one you own (free).
+ * Moving out of a rented home gives it up; a home you own stays yours.
+ * Homes for sale can't be rented: they're bought (buyHome).
+ */
 function moveIn(state: GameState, homeId: string): GameState {
   const home = homeById(homeId);
   if (!home || state.home === homeId || state.summary) return state;
-  const fee = moveInFee(home);
+  const owns = state.owned.includes(homeId);
+  if (forSale(home) && !owns) return state;
+  const fee = owns ? 0 : moveInFee(home);
   if (state.balance < fee) return state;
   // Your furniture moves with you: what fits the new place goes in, the rest into storage
   return {
@@ -441,6 +452,22 @@ function moveIn(state: GameState, homeId: string): GameState {
     home: homeId,
     balance: state.balance - fee,
     today: { ...state.today, expenses: state.today.expenses + fee },
+    furniture: replaceAll(interiorFor(home), state.furniture),
+  };
+}
+
+/** Buys a home for sale through OGM Homes outright, and moves you in. */
+function buyHome(state: GameState, homeId: string): GameState {
+  const home = homeById(homeId);
+  if (!home || !forSale(home) || state.owned.includes(homeId) || state.summary) return state;
+  const price = home.price!;
+  if (state.balance < price) return state;
+  return {
+    ...state,
+    home: homeId,
+    owned: [...state.owned, homeId],
+    balance: state.balance - price,
+    today: { ...state.today, expenses: state.today.expenses + price },
     furniture: replaceAll(interiorFor(home), state.furniture),
   };
 }
@@ -546,7 +573,8 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
   let rent = 0;
   let evicted = false;
   const home = homeById(state.home);
-  if (home) {
+  // A home you own has no rent
+  if (home && !state.owned.includes(home.id)) {
     if (state.balance >= home.rentPerNight) {
       rent = home.rentPerNight;
       start = { ...state, balance: state.balance - rent, today: { ...state.today, expenses: state.today.expenses + rent } };
@@ -776,6 +804,8 @@ function baseReducer(
     }
     case 'travel':
       return travel(state, action.to, action.mode, career, lifestyle);
+    case 'buyHome':
+      return buyHome(state, action.homeId);
     case 'moveOut':
       return state.summary ? state : { ...state, home: null, furniture: storeAll(state.furniture) };
     case 'dismissSummary':

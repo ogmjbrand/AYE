@@ -62,7 +62,7 @@ interface HUDProps {
   /** At a university's front marker on the street: in through the gate to the campus. */
   campusEntry?: { name: string; onOpen: () => void } | null;
   /** At a car dealer's showroom door. */
-  dealerEntry?: { name: string; onOpen: () => void } | null;
+  dealerEntry?: { name: string; onOpen: () => void; verb?: string } | null;
   /** Overrides the work status line (e.g. "In class", read from the save). */
   statusOverride?: { label: string; tone: 'good' | 'warn' } | null;
   /** The student's goals and status panels (lib/school.ts). */
@@ -341,10 +341,10 @@ export function HUD({
               : null;
   const resident = !prompt && !campusEntry && !dealerEntry && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const streetPrompt = prompt ?? (campusEntry ? { verb: 'Enter', place: campusEntry.name, onOpen: campusEntry.onOpen } : null) ?? (dealerEntry ? { verb: 'Browse cars at', place: dealerEntry.name, onOpen: dealerEntry.onOpen } : null) ?? (resident && onTalk
+  const streetPrompt = prompt ?? (campusEntry ? { verb: 'Enter', place: campusEntry.name, onOpen: campusEntry.onOpen } : null) ?? (dealerEntry ? { verb: dealerEntry.verb ?? 'Browse cars at', place: dealerEntry.name, onOpen: dealerEntry.onOpen } : null) ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
-    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
+    ? { verb: door.id === homeId ? 'Go into your home at' : door.price !== undefined ? `For sale (OGM Homes): ${door.kind} at` : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
     : null);
   const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
 

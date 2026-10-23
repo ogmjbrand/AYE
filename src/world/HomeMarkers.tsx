@@ -14,6 +14,7 @@ export function HomeMarkers({ homeId }: { homeId: string | null }) {
   const { homes, layout } = district;
   const boards = useMemo(() => {
     const toLet = signTexture('To let', '#2c3338', '#f1ede6', 256, 128);
+    const sale = signTexture('For sale', '#1f4a3a', '#f1ede6', 256, 128);
     const yours = signTexture('Home', '#4a3a26', '#f6e7c8', 256, 128);
     return homes.map((h) => {
       const building = layout.buildings.find((b) => b.name === h.building);
@@ -24,7 +25,7 @@ export function HomeMarkers({ homeId }: { homeId: string | null }) {
       const along: [number, number] = Math.abs(dx) > Math.abs(dz) ? [0, 1.3] : [1.3, 0];
       const x = h.door[0] + along[0];
       const z = h.door[2] + along[1];
-      return { id: h.id, x, z, y: groundHeightAt(x, z, layout), facing, toLet, yours, door: h.door };
+      return { id: h.id, x, z, y: groundHeightAt(x, z, layout), facing, toLet: h.price !== undefined ? sale : toLet, yours, door: h.door };
     });
   }, [homes, layout]);
   const travel = useMemo(() => {

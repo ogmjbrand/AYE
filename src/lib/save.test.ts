@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Character } from '../components/CharacterCreation';
 import { createGameState, createTime } from './gameState';
 import { loadCharacter, loadProgress, parseCharacter, saveCharacter, saveProgress } from './save';
+import { STARTER_HOME_ID } from './homes';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -110,7 +111,7 @@ describe('character save', () => {
 describe('progress save', () => {
   it('restores balance and clock for the same character', () => {
     const s = new MemoryStorage();
-    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini' };
+    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini', starterGiven: true };
     saveProgress('abc', state, s);
     expect(loadProgress(character, s)).toEqual(state);
   });
@@ -126,7 +127,9 @@ describe('progress save', () => {
     expect(p.today.minutesWorked).toBe(0);
     expect(p.minutesWorkedThisHour).toBe(0);
     expect(p.fullness).toBe(100);
-    expect(p.home).toBeNull();
+    // Every character is given the starter flat, once
+    expect(p.home).toBe(STARTER_HOME_ID);
+    expect(p.starterGiven).toBe(true);
   });
 
   it('remembers which city you are in, and falls back to the first for unknown places', () => {
@@ -148,8 +151,24 @@ describe('progress save', () => {
 
   it('drops a home that no longer exists', () => {
     const s = new MemoryStorage();
-    saveProgress('abc', { ...createGameState(100), home: 'demolished' }, s);
+    saveProgress('abc', { ...createGameState(100), home: 'demolished', starterGiven: true }, s);
     expect(loadProgress(character, s).home).toBeNull();
+  });
+
+  it('gives an old save without a home the starter flat once, and never again after eviction', () => {
+    const s = new MemoryStorage();
+    saveProgress('abc', { ...createGameState(100), home: null }, s);
+    const first = loadProgress(character, s);
+    expect(first.home).toBe(STARTER_HOME_ID);
+    saveProgress('abc', { ...first, home: null }, s);
+    expect(loadProgress(character, s).home).toBeNull();
+    // A home you live in that's for sale must be one you own
+    saveProgress('abc', { ...createGameState(100), home: 'lagoon-villa', starterGiven: true }, s);
+    expect(loadProgress(character, s).home).toBeNull();
+    saveProgress('abc', { ...createGameState(100), home: 'lagoon-villa', owned: ['lagoon-villa', 'nowhere'], starterGiven: true }, s);
+    const owner = loadProgress(character, s);
+    expect(owner.home).toBe('lagoon-villa');
+    expect(owner.owned).toEqual(['lagoon-villa']);
   });
 
   it('starts fresh for a different character or corrupted data', () => {

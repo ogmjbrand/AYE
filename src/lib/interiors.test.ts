@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INTERIORS, bedSpot, doorSpot, interiorFor, interiorLayout } from './interiors';
-import { allHomes } from './homes';
+import { allHomes, forSale } from './homes';
 import { PLAYER_RADIUS, resolveCollisions } from './world';
 
 describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s interior', (_, room) => {
@@ -56,7 +56,7 @@ describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s int
 
 describe('homes have interiors', () => {
   it('bigger rent, bigger home', () => {
-    const sizes = allHomes()
+    const sizes = allHomes().filter((h) => !forSale(h))
       .sort((a, b) => a.rentPerNight - b.rentPerNight)
       .map((h) => { const i = interiorFor(h); return i.width * i.depth; });
     for (let k = 1; k < sizes.length; k++) expect(sizes[k]).toBeGreaterThanOrEqual(sizes[k - 1]);

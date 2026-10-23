@@ -7,13 +7,13 @@ import { itemById } from './fashion';
 import { emptyLife, modifiers, sanitiseLife, skillLevel, xpForLevel } from './lifeState';
 import { cityDirectory } from './cityDirectory';
 import { districtById } from './geography';
-import { allHomes, homeById, moveInFee } from './homes';
+import { allHomes, forSale, homeById, moveInFee } from './homes';
 import { interiorFor } from './interiors';
 import { loadProgress, saveProgress } from './save';
 
 const act = (s: GameState, a: AnyAction, career: Career = 'engineer') => lifeReducer(s, a, career, 'ordinary');
 const tick = (s: GameState, n = 1, atWorkplace = false) => { for (let i = 0; i < n; i++) s = act(s, { type: 'tick', atWorkplace }); return s; };
-const lagos = allHomes().filter((h) => h.district === 'lagos.marina').sort((a, b) => a.rentPerNight - b.rentPerNight);
+const lagos = allHomes().filter((h) => h.district === 'lagos.marina' && !forSale(h)).sort((a, b) => a.rentPerNight - b.rentPerNight);
 const housed = (balance = 20_000) => act(act(createGameState(balance + moveInFee(lagos[1]), createTime(8, 0)), { type: 'tick', atWorkplace: false }), { type: 'moveIn', homeId: lagos[1].id });
 const withMission = (s: GameState, template: string): GameState => {
   const t = DAILY_MISSIONS.find((m) => m.id === template)!;

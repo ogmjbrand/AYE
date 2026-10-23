@@ -26,7 +26,8 @@ export interface Furniture {
 }
 
 export interface Interior {
-  tier: 'room' | 'flat' | 'apartment' | 'penthouse';
+  /** Rented: room to penthouse. Bought through OGM Homes: house (lower), family (middle class), villa (luxury). */
+  tier: 'room' | 'flat' | 'apartment' | 'penthouse' | 'house' | 'family' | 'villa';
   width: number;
   depth: number;
   wallColor: string;
@@ -34,13 +35,15 @@ export interface Interior {
   /** Big window on the far wall (penthouse: floor to ceiling). */
   window: 'small' | 'wide' | 'full';
   furniture: readonly Furniture[];
+  /** Solid decor that isn't usable furniture (dining chairs, the fireplace, the study chair): x, z, width, depth. */
+  solids?: readonly (readonly [number, number, number, number])[];
 }
 
 export const WALL_HEIGHT = 2.9;
 /** Use radius for the bed and the door. */
 export const USE_RADIUS = 1.4;
 
-const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string, style?: 'luxe', design?: string): Furniture =>
+const f = (kind: FurnitureKind, x: number, z: number, w: number, h: number, d: number, color: string, style?: Furniture['style'], design?: string): Furniture =>
   ({ kind, at: [x, z], size: [w, h, d], color, ...(style ? { style } : {}), ...(design ? { design } : {}) });
 
 export const INTERIORS: Record<Interior['tier'], Interior> = {
@@ -109,9 +112,92 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
       f('bathtub', -5.7, -2.2, 1.4, 0.6, 0.8, '#f2f1ee', 'luxe'),
     ],
   },
+  // ---- Homes bought through OGM Homes (lib/homes.ts)
+  // Starter home: a bright one-bedroom house, kitchen and table for two
+  house: {
+    tier: 'house', width: 7, depth: 6, wallColor: '#e8e0d0', floorColor: '#a07e5a', window: 'wide',
+    furniture: [
+      f('bed', -2.35, 1.85, 1.4, 0.55, 2.1, '#5b6f7f'),
+      f('wardrobe', -0.75, 2.65, 1.2, 2.0, 0.6, '#6b4a33'),
+      f('sofa', 2.75, 0.9, 0.95, 0.85, 1.9, '#8b7d70', 'luxe'),
+      f('tv', 0.95, 0.9, 0.4, 0.9, 1.1, '#1c1d20'),
+      f('rug', 1.85, 0.9, 1.5, 0.01, 1.8, '#a3483a'),
+      f('table', 2.3, -1.7, 1.1, 0.75, 0.75, '#7a5a3e'),
+      f('counter', -2.6, -2.62, 1.6, 0.92, 0.65, '#cfc6b6'),
+      f('fridge', -1.4, -2.65, 0.7, 1.8, 0.6, '#d8d9d6'),
+      f('shower', -3.0, -0.5, 0.9, 2.1, 0.9, '#b9c9cf'),
+      f('plant', 3.15, -2.6, 0.45, 1.1, 0.45, '#3f6b3a', 'luxe'),
+    ],
+    // The two chairs at the table
+    solids: [[1.55, -1.7, 0.45, 0.45], [3.05, -1.7, 0.45, 0.45]],
+  },
+  // Middle class: the family house. A living room round a brick fireplace with red
+  // curtains, white sofa and armchairs; dining for six under wire pendants; a study
+  // with an L-shaped desk, bookcase and framed certificates; the bed at the back
+  family: {
+    tier: 'family', width: 11, depth: 9, wallColor: '#dedad5', floorColor: '#c8ae8a', window: 'wide',
+    furniture: [
+      // Living room, facing the fireplace on the east wall
+      f('sofa', 1.9, 1.5, 1.0, 0.85, 2.5, '#eceae6', 'luxe'),
+      f('armchair', 4.0, 3.35, 0.95, 0.85, 0.95, '#eceae6', 'luxe'),
+      f('armchair', 4.0, -0.35, 0.95, 0.85, 0.95, '#eceae6', 'luxe'),
+      f('table', 3.15, 1.5, 0.75, 0.45, 1.35, '#5a3b28', 'luxe'),
+      f('rug', 3.1, 1.5, 2.2, 0.01, 3.0, '#8e8c8a', 'luxe'),
+      // Dining for six
+      f('table', 3.1, -2.75, 1.9, 0.76, 0.95, '#5a3b28'),
+      // Study by the front wall
+      f('desk', -4.15, -3.85, 2.2, 0.76, 0.75, '#5a3424'),
+      f('bookshelf', -5.25, -1.6, 0.45, 2.0, 1.6, '#5a3424', 'luxe'),
+      // Bedroom at the back
+      f('bed', -3.6, 3.3, 1.8, 0.55, 2.2, '#e8e2d8', 'luxe'),
+      f('wardrobe', -1.35, 4.15, 1.5, 2.1, 0.6, '#5c4130'),
+      f('dresser', -5.2, 4.2, 0.5, 0.6, 0.45, '#5c4130'),
+      // Kitchen along the back wall
+      f('counter', 1.05, 4.13, 2.0, 0.92, 0.65, '#d9d2c6'),
+      f('fridge', 2.5, 4.15, 0.75, 1.85, 0.65, '#dcdcda'),
+      f('shower', -5.0, 0.7, 0.9, 2.1, 0.9, '#b9c9cf'),
+      f('plant', 5.1, -4.05, 0.5, 1.4, 0.5, '#3f6b3a', 'luxe'),
+      f('plant', -0.35, 0.4, 0.45, 1.1, 0.45, '#3f6b3a', 'luxe'),
+    ],
+    solids: [
+      // The fireplace's chimney breast and hearth
+      [5.2, 1.5, 0.6, 2.0],
+      // Six dining chairs
+      ...[2.45, 3.1, 3.75].flatMap((x) => [[x, -3.55, 0.48, 0.48], [x, -1.95, 0.48, 0.48]] as const),
+      // The desk's return, the study chair and the coat stand
+      [-5.1, -2.95, 0.65, 1.05], [-4.0, -3.0, 0.6, 0.6], [-1.6, -4.1, 0.5, 0.5],
+    ],
+  },
+  // Luxury: the villa. Marble floor, floor-to-ceiling glass, a fireplace in the
+  // living room, dining for six, a study, and a bathtub
+  villa: {
+    tier: 'villa', width: 14, depth: 10, wallColor: '#ece6dc', floorColor: '#e8e2d8', window: 'full',
+    furniture: [
+      f('bed', -5.3, 3.6, 2.2, 0.6, 2.3, '#e9e3d8', 'luxe', 'chevron'),
+      f('dresser', -6.7, 4.6, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('dresser', -3.9, 4.6, 0.5, 0.55, 0.45, '#8d8f93', 'luxe', 'nightstand'),
+      f('wardrobe', -2.2, 4.65, 2.2, 2.2, 0.6, '#f3f1ec', 'luxe', 'marble'),
+      f('desk', -6.1, -0.9, 0.8, 0.75, 1.8, '#2b2b2d'),
+      f('bookshelf', -6.75, 1.05, 0.4, 2.0, 1.4, '#3a2c22', 'luxe'),
+      f('lamp', -6.7, 2.05, 0.4, 1.8, 0.4, '#efe2c0', 'luxe'),
+      f('sofa', 3.9, 1.9, 3.2, 0.85, 1.1, '#e9e3d8', 'luxe'),
+      f('sofa', 6.2, -0.4, 1.0, 0.85, 2.4, '#e9e3d8', 'luxe'),
+      f('table', 3.9, 0.15, 1.6, 0.42, 0.9, '#c9c3b8', 'luxe'),
+      f('rug', 3.9, 0.7, 4.2, 0.01, 3.4, '#8a7b66', 'luxe'),
+      f('counter', -3.4, -4.0, 3.0, 0.95, 0.8, '#efece6', 'luxe'),
+      f('fridge', -1.4, -4.45, 0.8, 1.9, 0.75, '#c4c6c8'),
+      f('table', 2.0, -2.2, 2.4, 0.76, 1.8, '#f1ede6', 'luxe'),
+      f('bathtub', -6.1, -3.6, 1.4, 0.6, 0.8, '#f2f1ee', 'luxe'),
+      f('plant', 6.5, 4.4, 0.6, 1.6, 0.6, '#3f6b3a', 'luxe'),
+      f('plant', 0.6, 4.4, 0.6, 1.6, 0.6, '#3f6b3a', 'luxe'),
+    ],
+    // The fireplace on the east wall
+    solids: [[6.7, -3.6, 0.6, 2.0]],
+  },
 };
 
 export function interiorFor(home: Home): Interior {
+  if (home.tier) return INTERIORS[home.tier];
   if (home.rentPerNight < 120) return INTERIORS.room;
   if (home.rentPerNight < 300) return INTERIORS.flat;
   if (home.rentPerNight < 800) return INTERIORS.apartment;
@@ -145,6 +231,7 @@ export function interiorLayout(i: Interior, extra: readonly Furniture[] = []): D
     ...[...i.furniture, ...extra]
       .filter((x) => x.kind !== 'rug' && x.kind !== 'art')
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
+    ...(i.solids ?? []).map(([x, z, sx, sz]): Building => ({ position: [x, 0, z], size: [sx, 1, sz], color: i.wallColor, style: 'residential' })),
   ];
   return buildLayout({
     id: `interior.${i.tier}`,

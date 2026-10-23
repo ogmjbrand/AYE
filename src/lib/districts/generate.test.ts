@@ -23,7 +23,7 @@ describe('generated districts', () => {
 
   it('use all three street plans, laid every way', () => {
     const generated = DISTRICTS.slice(2);
-    const plan = (d: (typeof generated)[number]) => d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' : d.layout.buildings.length === 20 ? 'marina' : 'osu';
+    const plan = (d: (typeof generated)[number]) => d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' : d.layout.buildings.length === 21 ? 'marina' : 'osu';
     const seen = new Set(generated.map((d) => `${plan(d)}:${Math.sign(d.layout.crossStreet.minZ)}:${Math.sign(d.travelDesk.position[0])}`));
     expect(seen.size).toBe(12);
     expect(generated.filter((d) => plan(d) === 'avenue').length).toBeGreaterThan(40);

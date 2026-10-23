@@ -115,6 +115,8 @@ import { University } from './world/University';
 import { CafeteriaPanel, ClassPanel, ClubsPanel, DirectoryPanel, RecordsPanel, type CampusPanelMode } from './components/CampusPanel';
 import type { StudentHud } from './components/StudentPanels';
 import { DealershipFront } from './world/DealershipFront';
+import { AgencyFront } from './world/AgencyFront';
+import { OgmHomesPanel } from './components/OgmHomesPanel';
 import {
   DAILY_TARGET, H_ARRIVE, HOSPITAL_ID, HOSPITAL_NAME, PATIENTS, ROOM_LABEL as HOSPITAL_ROOM, hospitalLayout, hospitalRoomAt, hospitalSpotAt, insideHospital,
   patientById, rollShift, shiftHours, type HospitalRoom,
@@ -123,7 +125,7 @@ import { Hospital } from './world/Hospital';
 import type { ShiftHud } from './components/StudentPanels';
 import { DealershipPanel } from './components/DealershipPanel';
 import { carById, carToDrive, fuelCost, type OwnedCar } from './lib/cars';
-import { dealershipAt } from './lib/geography';
+import { agencyAt, dealershipAt } from './lib/geography';
 import { isDriving, setDriving } from './hooks/usePlayerController';
 import './App.css';
 
@@ -176,7 +178,7 @@ const HOSPITAL_LAYOUT = hospitalLayout();
 const CAMPUS_DOOR_RADIUS = 3;
 
 /** The title plate at home, by the kind of place it is. */
-const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment' };
+const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment', house: 'My House', family: 'My House', villa: 'My Villa' };
 
 /** Standing this close to a place puts its name on the title plate. */
 const PLATE_RADIUS = 9;
@@ -258,6 +260,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, talkin
       <CantinaFront hour={gameTime.hour} night={night} />
       <HotelFront night={night} />
       <DealershipFront night={night} />
+      <AgencyFront night={night} />
       <Park />
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       <HomeMarkers homeId={homeId} />
@@ -368,7 +371,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, buyHome, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -603,6 +606,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const sit = useSitSession(controller, wait);
   // ---------------------------------------------------------------- cars
   const [dealerOpen, setDealerOpen] = useState(false);
+  const [agencyOpen, setAgencyOpen] = useState(false);
   /** The car you're driving (one you own), or null when on foot. */
   const [driving, setDrivingCar] = useState<OwnedCar | null>(null);
   const myCar = state.cars.length ? state.cars[state.cars.length - 1] : null;
@@ -696,6 +700,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const parkedHere = state.cars.filter((c) => c.parked?.districtId === district.id && c.id !== drivingNow?.id);
   const mapCar = parkedHere.length ? parkedHere[parkedHere.length - 1] : null;
   const atDealer = () => !offStreet && !drivingNow && !!dealershipAt(district, controller.position.x, controller.position.z);
+  const atAgency = () => !offStreet && !drivingNow && !!agencyAt(district, controller.position.x, controller.position.z);
 
   /** In through The Palms' front door (while it's open). */
   const enterPalms = () => {
@@ -1106,6 +1111,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       else if (atCampusDoor()) enterCampus();
       else if (atHospitalDoor()) enterHospital();
       else if (atDealer()) setDealerOpen(true);
+      else if (atAgency()) setAgencyOpen(true);
       else if (restaurantAt(district, x, z)) enterPalms();
       else if (barAt(district, x, z)) enterCantina();
       else if (hotelAt(district, x, z)) enterHotel();
@@ -1123,9 +1129,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen || agencyOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen, agencyOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1520,6 +1526,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         <HomePanel
           home={homePanel}
           currentHomeId={state.home}
+          owned={state.owned}
           balance={state.balance}
           onMoveIn={() => moveIn(homePanel.id)}
           onMoveOut={moveOut}
@@ -1568,7 +1575,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.map((p) => p.f)}>
-                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' ? 'home' : undefined} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
             ) : inBoutique ? (
@@ -1687,6 +1694,16 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClose={() => setHotelMenu(null)}
         />
       )}
+      {agencyOpen && district.agency && (
+        <OgmHomesPanel
+          balance={state.balance}
+          homeId={state.home}
+          owned={state.owned}
+          onBuy={buyHome}
+          onMoveIn={moveIn}
+          onClose={() => setAgencyOpen(false)}
+        />
+      )}
       {dealerOpen && district.dealership && (
         <DealershipPanel
           name={district.dealership.name}
@@ -1798,7 +1815,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onEnterRestaurant={enterPalms}
         onEnterBar={enterCantina}
         onEnterHotel={enterHotel}
-        dealerEntry={atDealer() && district.dealership ? { name: district.dealership.name, onOpen: () => setDealerOpen(true) } : null}
+        dealerEntry={atDealer() && district.dealership ? { name: district.dealership.name, onOpen: () => setDealerOpen(true) } : atAgency() && district.agency ? { name: district.agency.name, verb: 'See homes for sale at', onOpen: () => setAgencyOpen(true) } : null}
         campusEntry={atCampusDoor() ? { name: `${UNIVERSITY_NAME} (${district.workplaces.student.name})`, onOpen: enterCampus } : atHospitalDoor() ? { name: HOSPITAL_NAME, onOpen: enterHospital } : null}
         statusOverride={student && (inCampus || state.school.inClass) ? { label: state.school.inClass ? 'In class' : 'On campus', tone: 'good' } : doctor ? (shiftNow.clockedIn ? { label: 'On shift', tone: 'good' } : shiftHours(state.time.totalMinutes) ? { label: 'Off shift', tone: 'warn' } : null) : null}
         student={studentHud}

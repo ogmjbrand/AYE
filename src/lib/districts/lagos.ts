@@ -43,7 +43,9 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(11, 39, 6, 8, 6, 'shop', '#d7c4e0', 'Fashion House'),
       // East side, south of the cross street
       b(14, -36, 12, 12, 46, 'tower', '#3f5f73', 'Marina Heights'),
-      b(28, -36, 8, 10, 12, 'residential', '#dcc2a2'),
+      b(28, -36, 8, 10, 12, 'residential', '#dcc2a2', 'Lagoon Villa'),
+      // OGM Homes, the estate agency, on the cross street west of Eko Motors
+      b(-38, -34, 10, 8, 8, 'office', '#e7e1d6', 'OGM Homes'),
     ],
     palms: { x: 6.3, spacing: 12, offset: 2 },
     lamps: { x: 4.5, spacing: 12, offset: 8 },
@@ -122,6 +124,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   bar: { id: 'cantina-aye', name: 'Cantina Ayé', kind: 'Bar & cantina', door: [-33, 0, -14.3], facing: Math.PI },
+  agency: { id: 'ogm-homes', name: 'OGM Homes', kind: 'Estate agency · homes for sale', door: [-38, 0, -29.2], facing: 0 },
   hotel: { id: 'grand-lagoon', name: 'Grand Lagoon Hotel', kind: 'Hotel · rooms by the night', door: [-24, 0, 32.2], facing: Math.PI },
   homes: [
     {
@@ -139,6 +142,22 @@ export const LAGOS_MARINA: DistrictSpec = {
     {
       id: 'marina-heights-penthouse', district: 'lagos.marina', name: 'Marina Heights penthouse', kind: 'Penthouse', building: 'Marina Heights',
       door: [5.5, 0, -36], rentPerNight: 1200, description: 'Top floor of the tower with views over the lagoon, a concierge and a pool.',
+    },
+    // For sale through OGM Homes: bought outright, then yours with no rent
+    {
+      id: 'palm-view-house', district: 'lagos.marina', name: 'Palm View Lane, house 3', kind: 'One-bedroom house', building: 'Palm View',
+      door: [-11, 0, 30.8], rentPerNight: 0, price: 40_000, band: 'lower', tier: 'house',
+      description: 'A bright one-bedroom house on the lane to the Grand Lagoon: a sofa and television, a table for two, a kitchen and a shower.',
+    },
+    {
+      id: 'eko-gardens-house', district: 'lagos.marina', name: 'Eko Gardens, garden house', kind: 'Family house', building: 'Eko Gardens',
+      door: [24, 0, 32.8], rentPerNight: 0, price: 150_000, band: 'middle', tier: 'family',
+      description: 'A living room round a brick fireplace with red curtains, dining for six under pendant lamps, a study with a bookcase, and a bedroom at the back.',
+    },
+    {
+      id: 'lagoon-villa', district: 'lagos.marina', name: 'Lagoon Villa', kind: 'Villa by the lagoon', building: 'Lagoon Villa',
+      door: [28, 0, -30.2], rentPerNight: 0, price: 600_000, band: 'luxury', tier: 'villa',
+      description: 'Marble floors and floor-to-ceiling glass over the lagoon, a fireplace, dining for six, a study and a freestanding bath.',
     },
   ],
   // Marker positions sit on the pavement or plaza in front of the matching building

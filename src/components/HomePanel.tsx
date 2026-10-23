@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { MOVE_IN_NIGHTS, homeById, moveInFee, type Home } from '../lib/homes';
+import { MOVE_IN_NIGHTS, forSale, homeById, moveInFee, type Home } from '../lib/homes';
 
 interface HomePanelProps {
   home: Home;
-  /** The home the player rents now, if any. */
+  /** The home the player lives in now, if any. */
   currentHomeId: string | null;
+  /** Homes the player has bought (OGM Homes). */
+  owned?: readonly string[];
   balance: number;
   onMoveIn: () => void;
   onMoveOut: () => void;
@@ -19,12 +21,14 @@ const PRIMARY = `${BUTTON} bg-ui-accent text-black hover:bg-ui-accent-strong`;
 const SECONDARY = `${BUTTON} border border-ui-line text-ui-ink hover:border-ui-accent`;
 
 /** The front door of a home: a listing to rent, or your own place to sleep in or leave. */
-export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, onSleep, onGoInside, onClose }: HomePanelProps) {
+export function HomePanel({ home, currentHomeId, owned = [], balance, onMoveIn, onMoveOut, onSleep, onGoInside, onClose }: HomePanelProps) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const mine = currentHomeId === home.id;
   const current = homeById(currentHomeId);
   const fee = moveInFee(home);
   const affordable = balance >= fee;
+  const sale = forSale(home);
+  const ownIt = owned.includes(home.id);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -43,7 +47,7 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
       >
         <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
           <div>
-            <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{mine ? 'Your home' : `To let · ${home.kind}`}</p>
+            <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{mine ? (ownIt ? 'Your home · you own it' : 'Your home') : ownIt ? `Yours · ${home.kind}` : sale ? `For sale · ${home.kind}` : `To let · ${home.kind}`}</p>
             <h2 id="home-title" className="m-0 mt-1 font-display text-2xl font-bold">{home.name}</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
@@ -52,9 +56,9 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
         <div className="space-y-4 p-5">
           <p className="m-0 text-sm text-ui-muted">{home.description}</p>
           <dl className="m-0 grid grid-cols-2 gap-y-1.5 rounded-lg bg-black/20 p-3 text-sm">
-            <dt className="text-ui-muted">Rent</dt>
-            <dd className="m-0 text-right tabular-nums">{home.rentPerNight.toLocaleString()} GHAI a night</dd>
-            {!mine && (
+            <dt className="text-ui-muted">{sale ? 'Price' : 'Rent'}</dt>
+            <dd className="m-0 text-right tabular-nums">{sale ? (ownIt ? 'Paid · no rent' : `${home.price!.toLocaleString()} GHAI`) : `${home.rentPerNight.toLocaleString()} GHAI a night`}</dd>
+            {!mine && !sale && (
               <>
                 <dt className="text-ui-muted">Move-in fee</dt>
                 <dd className="m-0 text-right tabular-nums">{fee.toLocaleString()} GHAI</dd>
@@ -67,7 +71,7 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
           {mine ? (
             confirmLeave ? (
               <div className="space-y-3">
-                <p className="m-0 text-sm">Give up {home.name}? The move-in fee isn't refunded, and you'll sleep rough until you rent again.</p>
+                <p className="m-0 text-sm">{ownIt ? `Move out of ${home.name}? It stays yours: you can move back in for free.` : `Give up ${home.name}? The move-in fee isn't refunded, and you'll sleep rough until you rent again.`}</p>
                 <button type="button" className={SECONDARY} onClick={() => { onMoveOut(); onClose(); }}>Yes, move out</button>
                 <button type="button" className={PRIMARY} onClick={() => setConfirmLeave(false)}>Stay</button>
               </div>
@@ -76,9 +80,17 @@ export function HomePanel({ home, currentHomeId, balance, onMoveIn, onMoveOut, o
                 {onGoInside && <button type="button" autoFocus className={PRIMARY} onClick={onGoInside}>Go inside</button>}
                 <button type="button" className={onGoInside ? SECONDARY : PRIMARY} onClick={onSleep}>Sleep here until 07:00</button>
                 <button type="button" className={SECONDARY} onClick={() => setConfirmLeave(true)}>Move out</button>
-                <p className="m-0 text-xs text-ui-muted">Rent is paid each night you sleep, wherever you sleep. If you can't pay, you lose the home.</p>
+                <p className="m-0 text-xs text-ui-muted">{ownIt ? 'You own this home: there is no rent to pay.' : "Rent is paid each night you sleep, wherever you sleep. If you can't pay, you lose the home."}</p>
               </div>
             )
+          ) : sale ? (
+            <div className="space-y-3">
+              {ownIt ? (
+                <button type="button" autoFocus className={PRIMARY} onClick={onMoveIn}>Move back in (it’s yours)</button>
+              ) : (
+                <p className="m-0 text-sm">This home is sold through OGM Homes, the estate agency on the cross street by Eko Motors.</p>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               <button type="button" autoFocus className={PRIMARY} disabled={!affordable} onClick={onMoveIn}>

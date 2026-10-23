@@ -5,6 +5,7 @@ import { WALL_HEIGHT } from '../lib/interiors';
 import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { LuxePiece } from './LuxeFurniture';
+import { HomeDecor } from './HomeDecor';
 import type { GameTime } from '../lib/gameState';
 
 /**
@@ -22,8 +23,8 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
   const windowY = interior.window === 'full' ? H / 2 : 1.6;
   // The city outside the window, by time of day
   const sky = skylineTexture(skyMoodAt(night, gameTime.hour), 23);
-  const luxe = interior.tier === 'penthouse' || interior.tier === 'apartment';
-  const floor = useMemo(() => (interior.tier === 'penthouse' ? marbleTexture('cream', [w / 2.4, d / 2.4]) : null), [interior.tier, w, d]);
+  const luxe = interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'villa';
+  const floor = useMemo(() => (interior.tier === 'penthouse' || interior.tier === 'villa' ? marbleTexture('cream', [w / 2.4, d / 2.4]) : null), [interior.tier, w, d]);
   // Pendant lights over the kitchen island and the dining table
   const pendants = luxe ? [...interior.furniture, ...extra].filter((f) => (f.kind === 'counter' || (f.kind === 'table' && f.size[0] * f.size[2] > 2)) && f.style === 'luxe') : [];
 
@@ -92,6 +93,7 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
       ))}
 
       {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
+      <HomeDecor interior={interior} night={night} />
       {/* Furniture you bought */}
       {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
 

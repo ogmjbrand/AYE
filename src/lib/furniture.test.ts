@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGUE, DECOR_ROOMS, FURNITURE_CATEGORIES, USES, asFurniture, catalogueItem, findSpot, fits, footprint, homeComfort, layerOf, replaceAll, resaleValue, sanitiseFurniture, furnitureUse, walkable, type OwnedFurniture } from './furniture';
 import { INTERIORS, bedSpot, doorSpot, interiorFor, interiorLayout } from './interiors';
 import { createGameState, gameReducer, type GameState } from './gameState';
-import { allHomes, homeById, moveInFee } from './homes';
+import { allHomes, forSale, homeById, moveInFee } from './homes';
 import { PLAYER_RADIUS, resolveCollisions } from './world';
 
 const act = (s: GameState, a: Parameters<typeof gameReducer>[1]) => gameReducer(s, a, 'engineer', 'ordinary');
-const cheapest = allHomes().sort((a, b) => a.rentPerNight - b.rentPerNight)[0];
-const priciest = allHomes().sort((a, b) => b.rentPerNight - a.rentPerNight)[0];
+// Homes to rent (homes for sale are bought, not rented)
+const rentable = () => allHomes().filter((h) => !forSale(h));
+const cheapest = rentable().sort((a, b) => a.rentPerNight - b.rentPerNight)[0];
+const priciest = rentable().sort((a, b) => b.rentPerNight - a.rentPerNight)[0];
 const housed = (homeId = cheapest.id, balance = 100_000) => act(createGameState(balance + moveInFee(homeById(homeId)!)), { type: 'moveIn', homeId });
 
 describe('catalogue', () => {
