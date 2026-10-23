@@ -27,6 +27,8 @@ export const CARS: readonly CarModel[] = [
   { id: 'saloon', name: 'Family Saloon', kind: 'Four-door saloon', price: 32000, speed: 10.5, fuelPerKm: 6, length: 4.4, colors: ['#e9e7e2', '#2b2d31', '#5a6e7f', '#7a1f2b'], description: 'Room for four, a big boot and a smooth ride.' },
   { id: 'suv', name: 'City SUV', kind: 'Sport utility', price: 55000, speed: 11, fuelPerKm: 9, length: 4.6, colors: ['#111214', '#f2f0ea', '#3d4a3a', '#8a6a48'], description: 'High seats, tough suspension and presence on any road.' },
   { id: 'executive', name: 'Executive', kind: 'Executive saloon', price: 90000, speed: 12.5, fuelPerKm: 11, length: 4.9, colors: ['#0d0e10', '#3a3d42', '#e8e4dc', '#1d2a44'], description: 'Leather, quiet and quick. Arrive like you mean it.' },
+  { id: 'ev-suv', name: 'Volta EV', kind: 'Electric SUV', price: 72000, speed: 11.5, fuelPerKm: 2, length: 4.7, colors: ['#0f4a3c', '#f2f0ea', '#2b2d31', '#5a6e7f'], description: 'Quiet, quick and charged at home: a sleek electric SUV with a light-bar nose, a black roof and two-tone wheels. Pennies a kilometre.' },
+  { id: 'limousine', name: 'Sovereign', kind: 'Flagship saloon', price: 210000, speed: 13, fuelPerKm: 14, length: 5.3, colors: ['#11141c', '#0d0e10', '#e8e4dc', '#3a3d42'], description: 'The long-wheelbase flagship: a tall chrome-slatted grille, chrome window line, rear seats like an armchair. Arrive.' },
   { id: 'coupe', name: 'Grand Coupé', kind: 'Luxury coupé', price: 150000, speed: 14, fuelPerKm: 15, length: 4.7, colors: ['#c9a052', '#b0283a', '#0d0e10', '#1f5a47'], description: 'Two doors, a long bonnet and a lot of power.' },
 ];
 

@@ -48,6 +48,15 @@ export const LOOKS: readonly Look[] = [
   look('male-adult-15', 'masculine', 'Kufi cap', 'Kaftan', { covered: true, facialHair: 'Full beard' }),
   look('male-adult-10', 'masculine', 'Short, straight', 'Track jacket'),
   look('male-adult-01', 'masculine', 'Short, swept back', 'Striped polo'),
+  // Professionals from the Rocketbox library: in their work clothes
+  look('business-female-02', 'feminine', 'Shoulder-length, with glasses', 'Burgundy blazer and trousers'),
+  look('medical-female-02', 'feminine', 'Tied back', "Doctor's white coat"),
+  look('pilot-female-01', 'feminine', "Under a captain's cap", 'Pilot shirt and trousers', { covered: true }),
+  look('business-male-05', 'masculine', 'Close crop', 'Dark suit and tie'),
+  look('construction-male-03', 'masculine', 'Under a hard hat', 'Work overalls', { covered: true }),
+  look('medical-male-02', 'masculine', 'Short, swept back', 'Paramedic uniform'),
+  look('pilot-male-01', 'masculine', "Under a captain's cap", 'Captain’s uniform', { covered: true }),
+  look('police-male-01', 'masculine', 'Under a police cap', 'Police uniform', { covered: true, facialHair: 'Beard' }),
 ];
 
 export const DEFAULT_LOOK_ID = 'male-adult-12';

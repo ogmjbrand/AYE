@@ -129,9 +129,10 @@ export const DAILY_TARGET = 4;
 export interface HospitalPerson { lookId: string; name: string; role: string; x: number; z: number; facing: number; route?: readonly (readonly [number, number])[]; seat?: Seat; chatty?: boolean }
 export const HOSPITAL_STAFF: readonly HospitalPerson[] = [
   { lookId: 'female-adult-11', name: 'Adaeze', role: 'Receptionist', x: RECEPTION.x, z: RECEPTION.z + 0.8, facing: Math.PI, chatty: true },
-  { lookId: 'male-adult-12', name: 'Dr. Bello', role: 'Supervisor', x: SUPERVISOR_DESK.x, z: SUPERVISOR_DESK.z + 0.85, facing: Math.PI },
+  { lookId: 'medical-female-02', name: 'Dr. Bello', role: 'Supervisor', x: SUPERVISOR_DESK.x, z: SUPERVISOR_DESK.z + 0.85, facing: Math.PI },
   { lookId: 'female-adult-08', name: 'Nurse Efe', role: 'Nurse', x: 0, z: 10.5, facing: 0, route: [[-12, 10.5], [12, 10.5]] },
   { lookId: 'female-adult-10', name: 'Nurse Halima', role: 'Nurse', x: -3, z: 16, facing: 0, route: [[-5, 16.5], [5, 16.5]] },
+  { lookId: 'medical-male-02', name: 'Kunle', role: 'Paramedic', x: -10.5, z: 5, facing: Math.PI / 2, route: [[-10.5, 2.5], [-10.5, 7.5]] },
 ];
 /** People waiting in reception (visitors, computer-controlled). */
 export const WAITING_PEOPLE: readonly HospitalPerson[] = [

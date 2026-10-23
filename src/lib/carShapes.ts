@@ -1,11 +1,13 @@
 import { carById } from './cars';
 
 /** Shape of each model: body length, width, height of the shoulder and roof, cabin position and wheel size. */
-export const CAR_SHAPE: Record<string, { l: number; w: number; body: number; roof: number; cabin: number; cabinLen: number; wheel: number; ground: number }> = {
+export const CAR_SHAPE: Record<string, { l: number; w: number; body: number; roof: number; cabin: number; cabinLen: number; wheel: number; ground: number; trim?: 'ev' | 'flagship' }> = {
   hatch: { l: 3.8, w: 1.7, body: 0.62, roof: 1.48, cabin: -0.15, cabinLen: 0.6, wheel: 0.3, ground: 0.16 },
   saloon: { l: 4.4, w: 1.78, body: 0.62, roof: 1.44, cabin: -0.05, cabinLen: 0.48, wheel: 0.32, ground: 0.15 },
   suv: { l: 4.6, w: 1.86, body: 0.82, roof: 1.72, cabin: -0.2, cabinLen: 0.58, wheel: 0.38, ground: 0.22 },
   executive: { l: 4.9, w: 1.86, body: 0.64, roof: 1.46, cabin: -0.12, cabinLen: 0.47, wheel: 0.34, ground: 0.15 },
+  'ev-suv': { l: 4.7, w: 1.9, body: 0.8, roof: 1.68, cabin: -0.12, cabinLen: 0.6, wheel: 0.38, ground: 0.2, trim: 'ev' },
+  limousine: { l: 5.3, w: 1.92, body: 0.68, roof: 1.5, cabin: -0.06, cabinLen: 0.5, wheel: 0.36, ground: 0.15, trim: 'flagship' },
   coupe: { l: 4.7, w: 1.88, body: 0.56, roof: 1.28, cabin: -0.35, cabinLen: 0.4, wheel: 0.34, ground: 0.12 },
 };
 

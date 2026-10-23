@@ -53,7 +53,62 @@ export const TALK_RADIUS = 2.2;
 
 /** The residents of the hand-built districts. */
 const HAND_BUILT: readonly Resident[] = [
-  // Lagos, Marina Boulevard
+  // Lagos, Marina Boulevard: people at work in their uniforms
+  {
+    id: 'captain-ade', district: 'lagos.marina', name: 'Captain Ade Martins', role: 'Airline captain', lookId: 'pilot-male-01',
+    position: [27.5, 0, 8.6], facing: Math.PI, route: [[27.5, 8.6], [31.5, 8.6]],
+    lines: [
+      'Just landed from Accra. Smooth flight, for once.',
+      'You should book a trip at the travel desk. The lagoon looks beautiful from the air.',
+      'Twenty years flying and I still get a thrill at take-off.',
+      'If you ever want to train as a pilot, I will put a word in at the airport.',
+      'My friend! Come, let me tell you about the storm over Abidjan.',
+    ],
+  },
+  {
+    id: 'officer-musa', district: 'lagos.marina', name: 'Officer Musa Danjuma', role: 'Police officer', lookId: 'police-male-01',
+    position: [-5.2, 0, -14.2], facing: Math.PI / 2, route: [[-5.2, -14.2], [-5.2, -12.6]],
+    lines: [
+      'Good day. Keep to the pavement, the danfos do not slow down.',
+      'Quiet morning on the boulevard. I like it that way.',
+      'If anyone gives you trouble, you come and find me.',
+      'Between us: the best suya on this street is from the market stall by Mama Put.',
+      'You are always welcome here. Stay safe out there, my friend.',
+    ],
+  },
+  {
+    id: 'kelechi', district: 'lagos.marina', name: 'Kelechi Obi', role: 'Site foreman', lookId: 'construction-male-03',
+    position: [-6.0, 0, 44.0], facing: Math.PI / 2,
+    lines: [
+      'Hard hats on past this point, please.',
+      'We are fixing the drainage before the rains come.',
+      'Long days, but I like building something people will use.',
+      'If you ever buy a house, call me before you renovate.',
+      'My friend! Come, I will show you the plans for the new tower.',
+    ],
+  },
+  {
+    id: 'ngozi-exec', district: 'lagos.marina', name: 'Ngozi Adeyemi', role: 'Investment banker', lookId: 'business-female-02',
+    position: [6.2, 0, 8.0], facing: -Math.PI / 2, route: [[6.2, 8.0], [6.2, 14.0]],
+    lines: [
+      'Sorry, I have a call in five minutes.',
+      'Markets were wild this morning. Coffee helps.',
+      'Save a little every month; it adds up faster than you think.',
+      'If you start a business, I would love to hear the pitch.',
+      'You! Lunch is on me today, no arguments.',
+    ],
+  },
+  {
+    id: 'emeka-exec', district: 'lagos.marina', name: 'Emeka Nwosu', role: 'Company director', lookId: 'business-male-05',
+    position: [-6.2, 0, 22.0], facing: Math.PI / 2,
+    lines: [
+      'Good afternoon.',
+      'The new office on the boulevard opens next month.',
+      'Hard work and good people: that is the whole secret.',
+      'We are hiring soon. Keep an eye out.',
+      'My friend, you must come to the company dinner.',
+    ],
+  },
   {
     id: 'tunde', district: 'lagos.marina', name: 'Tunde Bakare', role: 'Danfo conductor', lookId: 'male-adult-04',
     position: [5.2, 0, 29.5], facing: -Math.PI / 2, route: [[5.2, 29.5], [5.2, 34.5]],

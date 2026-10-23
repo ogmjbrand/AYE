@@ -259,7 +259,7 @@ function People() {
   );
   // Every patient you can be asked to see is always there; visitors are the first thing cut on the low tier
   const visitors = quality.quality === 'high' ? WAITING_PEOPLE : WAITING_PEOPLE.slice(0, 1);
-  const dress = (role: string) => (role === 'Nurse' ? UNIFORMS.scrubs : role === 'Supervisor' ? UNIFORMS.chef : role === 'Receptionist' ? UNIFORMS.black : undefined);
+  const dress = (role: string) => (role === 'Nurse' ? UNIFORMS.scrubs : role === 'Receptionist' ? UNIFORMS.black : undefined);
   return (
     <>
       {HOSPITAL_STAFF.map((p, i) => one(p, `s${i}`, dress(p.role)))}
