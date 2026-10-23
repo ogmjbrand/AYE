@@ -36,7 +36,7 @@ describe('The Fashion House', () => {
   it('sells bags under accessories, in every city', () => {
     for (const d of ['lagos.marina', 'accra.osu']) {
       const bags = rangeFor(d, 'accessories');
-      expect(bags.length).toBe(5);
+      expect(bags.length).toBe(18);
       expect(bags.every((b) => b.slot === 'bag' && !!b.style.bag)).toBe(true);
     }
     expect(NOT_YET.accessories).toBeUndefined();

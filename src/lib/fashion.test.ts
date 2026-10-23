@@ -111,7 +111,7 @@ describe('choosing colours', () => {
 
   it('every bag has a shape and is sold in every country', () => {
     const bags = FASHION_ITEMS.filter((i) => i.slot === 'bag');
-    expect(bags.length).toBe(5);
+    expect(bags.length).toBe(18);
     for (const b of bags) {
       expect(b.style.bag).toBeTruthy();
       expect(b.stockedIn).toBeUndefined();

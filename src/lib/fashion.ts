@@ -11,7 +11,7 @@ export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag'];
 export const SLOT_LABEL: Record<Slot, string> = { top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour', bag: 'Bags' };
 
 /** A handbag's shape (world/HeldBag.tsx draws each): carried in the left hand. */
-export type BagShape = 'tote' | 'top-handle' | 'clutch' | 'bucket' | 'mini';
+export type BagShape = 'tote' | 'top-handle' | 'clutch' | 'bucket' | 'mini' | 'flap' | 'barrel' | 'dome' | 'heart' | 'saddle';
 
 /** Shader pattern ids (must match the GLSL in components/outfitShader.ts). */
 export const PATTERNS = { solid: 0, stripes: 1, pinstripe: 2, check: 3, ankara: 4, kente: 5, adire: 6, bogolan: 7, houndstooth: 8, batik: 9 } as const;
@@ -19,7 +19,7 @@ export type Pattern = keyof typeof PATTERNS;
 
 /** How a fabric catches the light: roughness (0 glossy … 1 matte), weave texture and metallic sheen. */
 export interface Fabric {
-  name: 'cotton' | 'linen' | 'silk' | 'denim' | 'wool' | 'wax print' | 'handwoven' | 'leather' | 'suede' | 'metallic';
+  name: 'cotton' | 'linen' | 'silk' | 'denim' | 'wool' | 'wax print' | 'handwoven' | 'leather' | 'suede' | 'metallic' | 'patent' | 'croc' | 'satin' | 'jersey' | 'velvet';
   roughness: number;
   /** 0 none, 1 plain weave, 2 twill (diagonal), 3 handwoven rib. */
   weave: 0 | 1 | 2 | 3;
@@ -37,11 +37,21 @@ export const FABRICS: Record<Fabric['name'], Fabric> = {
   leather: { name: 'leather', roughness: 0.5, weave: 0, metalness: 0 },
   suede: { name: 'suede', roughness: 0.97, weave: 0, metalness: 0 },
   metallic: { name: 'metallic', roughness: 0.28, weave: 0, metalness: 0.75 },
+  patent: { name: 'patent', roughness: 0.12, weave: 0, metalness: 0.05 },
+  croc: { name: 'croc', roughness: 0.3, weave: 0, metalness: 0 },
+  satin: { name: 'satin', roughness: 0.35, weave: 0, metalness: 0.08 },
+  jersey: { name: 'jersey', roughness: 0.7, weave: 1, metalness: 0 },
+  velvet: { name: 'velvet', roughness: 0.98, weave: 0, metalness: 0 },
 };
 
 /** The fabric an item is made of, from what it is. Hair dye keeps the hair's own finish. */
 export function fabricFor(id: string, pattern: Pattern): Fabric | undefined {
   if (id.startsWith('hair-')) return undefined;
+  if (id.includes('patent')) return FABRICS.patent;
+  if (id.includes('croc')) return FABRICS.croc;
+  if (id.includes('satin')) return FABRICS.satin;
+  if (id.includes('sport') || id.includes('legging') || id.includes('jogger')) return FABRICS.jersey;
+  if (id.includes('velvet')) return FABRICS.velvet;
   if (id.includes('silk')) return FABRICS.silk;
   if (id.includes('denim')) return FABRICS.denim;
   if (id.includes('linen')) return FABRICS.linen;
@@ -70,7 +80,7 @@ export interface FashionItem {
   name: string;
   slot: Slot;
   price: number;
-  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Accessories' | 'Rewards';
+  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Accessories' | 'Rewards' | 'Workout' | 'Joggers' | 'Office' | 'Evening' | 'Gala';
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
@@ -146,6 +156,92 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   bagItem('bag-clutch-metallic', 'Evening clutch · Metallic', 1200, 'clutch', '#c7a24f'),
   bagItem('bag-bucket-suede', 'Suede bucket bag', 750, 'bucket', '#5c1f2b'),
   bagItem('bag-mini-leather', 'Mini bag', 650, 'mini', '#e9dccb'),
+  // OGM Atelier: the game's own house brand (gold OGM plate on every bag, no real brands)
+  bagItem('bag-flap-croc', 'OGM Atelier croc flap bag · Emerald', 3200, 'flap', '#1f4a32'),
+  bagItem('bag-flap-tweed', 'OGM Atelier tweed flap bag · Noir', 1500, 'flap', '#1b1b1d'),
+  bagItem('bag-flap-embossed', 'OGM Atelier embossed messenger · Burgundy', 2400, 'flap', '#5a1a24'),
+  bagItem('bag-flap-patent-blush', 'OGM Atelier patent chain bag · Blush', 1100, 'flap', '#e7a9b6'),
+  bagItem('bag-flap-metallic-gold', 'OGM Atelier chain shoulder bag · Gold', 1300, 'flap', '#c9a24f'),
+  bagItem('bag-barrel-leather', 'OGM Atelier barrel bag · Tangerine', 1600, 'barrel', '#d4521e'),
+  bagItem('bag-dome-leather', 'OGM Atelier dome bag · Slate', 2100, 'dome', '#6b6d72'),
+  bagItem('bag-tote-shopper-leather', 'OGM Atelier shopper tote · Black', 1900, 'tote', '#141416'),
+  bagItem('bag-heart-patent', 'OGM Atelier heart bag · Red', 1400, 'heart', '#b3141c'),
+  bagItem('bag-tophandle-croc', 'OGM Atelier croc top-handle · Navy', 4800, 'top-handle', '#16213e'),
+  bagItem('bag-tophandle-patent-wine', 'OGM Atelier patent top-handle · Wine', 2300, 'top-handle', '#5a1420'),
+  bagItem('bag-saddle-leather', 'OGM Atelier saddle bag · Black', 2200, 'saddle', '#18181a'),
+  bagItem('bag-mini-leather-ivory', 'OGM Atelier mini top-handle · Ivory', 1200, 'mini', '#f0ebe0'),
+  // Workout sets (wear the top and bottom together)
+  item('top-sport-plum', 'top', 'Seamless sports bra · Plum', 280, 'Workout', 'solid', ['#4a1830']),
+  item('bottom-legging-plum', 'bottom', 'Seamless leggings · Plum', 320, 'Workout', 'solid', ['#4a1830']),
+  item('top-sport-magenta', 'top', 'Panel crop top · Magenta', 300, 'Workout', 'solid', ['#a8169a']),
+  item('bottom-legging-magenta', 'bottom', 'Panel leggings · Magenta & black', 360, 'Workout', 'stripes', ['#a8169a', '#141416'], 6),
+  item('top-sport-black-lilac', 'top', 'Run bra · Black & lilac', 300, 'Workout', 'stripes', ['#141416', '#c49be6'], 8),
+  item('bottom-legging-black-lilac', 'bottom', 'Run tights · Black & lilac', 380, 'Workout', 'stripes', ['#141416', '#c49be6'], 5),
+  item('top-sport-black', 'top', 'Halter sports top · Black', 260, 'Workout', 'solid', ['#141416']),
+  item('bottom-legging-black', 'bottom', 'Drawcord leggings · Black', 300, 'Workout', 'solid', ['#141416']),
+  item('top-sport-navy', 'top', 'Strappy sports bra · Navy & lilac', 280, 'Workout', 'stripes', ['#1a1c3a', '#c9b3ec'], 4),
+  item('bottom-legging-navy', 'bottom', 'Shine leggings · Navy', 320, 'Workout', 'solid', ['#1a1c3a']),
+  // Joggers outfits: rope-tie joggers with a fitted top
+  item('top-rib-emerald', 'top', 'Ribbed long sleeve · Emerald', 240, 'Joggers', 'solid', ['#1d4d33']),
+  item('bottom-jogger-emerald', 'bottom', 'Rope-tie joggers · Emerald', 320, 'Joggers', 'solid', ['#1d4d33']),
+  item('top-tank-white', 'top', 'Embellished tank · White', 260, 'Joggers', 'solid', ['#f3f1ec']),
+  item('bottom-jogger-tangerine', 'bottom', 'Rope-tie joggers · Tangerine', 320, 'Joggers', 'solid', ['#d4341e']),
+  item('top-tank-black', 'top', 'Ruched tank · Black', 220, 'Joggers', 'solid', ['#141416']),
+  item('bottom-jogger-charcoal', 'bottom', 'Rope-tie joggers · Charcoal', 320, 'Joggers', 'solid', ['#55575c']),
+  item('top-bodysuit-white', 'top', 'Racer bodysuit · White', 280, 'Joggers', 'solid', ['#f3f1ec']),
+  item('bottom-jogger-black', 'bottom', 'Rope-tie joggers · Black', 320, 'Joggers', 'solid', ['#141416']),
+  item('top-rib-burgundy', 'top', 'Ribbed long sleeve · Burgundy', 240, 'Joggers', 'solid', ['#4c1420']),
+  item('bottom-jogger-burgundy', 'bottom', 'Rope-tie joggers · Burgundy', 320, 'Joggers', 'solid', ['#4c1420']),
+  // Office: tailored separates
+  item('top-jacket-burgundy-print', 'top', 'Peplum jacket · Burgundy print', 1600, 'Office', 'stripes', ['#6e1426', '#f1ece4', '#1b1b1d'], 14),
+  item('bottom-flare-burgundy', 'bottom', 'Wide trousers · Burgundy', 700, 'Office', 'solid', ['#5a1624']),
+  item('top-vest-burgundy', 'top', 'Button vest · Burgundy', 650, 'Office', 'solid', ['#5a1624']),
+  item('bottom-flare-cream', 'bottom', 'Draped wide trousers · Cream', 750, 'Office', 'solid', ['#e8e0d0']),
+  item('top-shirt-white', 'top', 'Pearl-collar shirt · White', 520, 'Office', 'solid', ['#f5f3ee']),
+  item('bottom-maxi-charcoal', 'bottom', 'Pencil maxi · Charcoal', 680, 'Office', 'solid', ['#2b2c30']),
+  item('top-shirt-navy-pinstripe', 'top', 'Pinstripe shirt & tie · Navy', 560, 'Office', 'pinstripe', ['#1b2346', '#c9cbd8'], 70),
+  item('bottom-skirt-red-leather', 'bottom', 'Leather pencil skirt · Red', 1400, 'Office', 'solid', ['#b5121b']),
+  item('top-shirtdress-plaid', 'top', 'Belted shirt dress · Lilac plaid', 680, 'Office', 'check', ['#e9e6ee', '#9b8cc4', '#d6a8c6'], 30),
+  item('bottom-shirtdress-plaid', 'bottom', 'Belted shirt dress skirt · Lilac plaid', 520, 'Office', 'check', ['#e9e6ee', '#9b8cc4', '#d6a8c6'], 30),
+  // Evening: night-out looks
+  item('top-ruched-black', 'top', 'Ruched mini dress top · Black lace', 900, 'Evening', 'check', ['#141416', '#2a2a2e'], 60),
+  item('bottom-ruched-black', 'bottom', 'Ruched mini · Black lace', 700, 'Evening', 'check', ['#141416', '#2a2a2e'], 60),
+  item('top-satin-red', 'top', 'Satin slip dress · Red', 1300, 'Evening', 'solid', ['#a8111c']),
+  item('bottom-satin-red', 'bottom', 'Satin slip skirt · Red', 900, 'Evening', 'solid', ['#a8111c']),
+  item('top-halter-black', 'top', 'Plunge halter · Black', 520, 'Evening', 'solid', ['#141416']),
+  item('bottom-denim-mini-acid', 'bottom', 'Acid-wash denim mini', 480, 'Evening', 'solid', ['#5e5a48']),
+  item('top-satin-halter-navy', 'top', 'Satin cross halter · Navy', 780, 'Evening', 'solid', ['#16204a']),
+  item('bottom-ruched-white', 'bottom', 'Ruched mini · White', 520, 'Evening', 'solid', ['#f3f1ec']),
+  item('top-cowl-floral', 'top', 'Cowl halter · White & pink bloom', 680, 'Evening', 'batik', ['#f6f2ee', '#e06aa0', '#f2c3d8'], 6),
+  item('top-halter-skater-black', 'top', 'Halter skater dress · Black', 740, 'Evening', 'solid', ['#121214']),
+  item('top-chiffon-navy', 'top', 'Chiffon cape top · Navy', 720, 'Evening', 'solid', ['#1b1f4a']),
+  item('bottom-draped-navy', 'bottom', 'Draped mini · Navy', 520, 'Evening', 'solid', ['#1b1f4a']),
+  item('top-metallic-gold-halter', 'top', 'Liquid metallic halter · Gold', 980, 'Evening', 'solid', ['#c9a24f']),
+  item('bottom-cargo-mini-white', 'bottom', 'Cargo mini · White denim', 460, 'Evening', 'solid', ['#f1eee8']),
+  item('top-corset-bow-pink', 'top', 'Bow corset top · Pink', 640, 'Evening', 'solid', ['#e8a4b4']),
+  // Gala gowns: our own couture colourways
+  item('top-gala-emerald', 'top', 'Gala bodice · Emerald crystal', 4200, 'Gala', 'check', ['#0f6b5a', '#c9d3d0', '#0a4a3e'], 50),
+  item('bottom-gala-emerald', 'bottom', 'Mermaid skirt · Emerald crystal', 4800, 'Gala', 'check', ['#0f6b5a', '#c9d3d0', '#0a4a3e'], 50),
+  item('top-gala-fuchsia', 'top', 'Pleated bodice · Fuchsia & pearl', 4400, 'Gala', 'pinstripe', ['#b0186f', '#f3eef0'], 90),
+  item('bottom-gala-fuchsia', 'bottom', 'Pleated mermaid skirt · Fuchsia', 4600, 'Gala', 'pinstripe', ['#b0186f', '#f3eef0'], 90),
+  item('top-gala-green-satin', 'top', 'Spiral satin bodice · Green', 4000, 'Gala', 'stripes', ['#0f6a2a', '#28b04a'], 60),
+  item('bottom-gala-green-satin', 'bottom', 'Spiral satin gown skirt · Green', 4500, 'Gala', 'stripes', ['#0f6a2a', '#28b04a'], 60),
+  item('top-gala-cream', 'top', 'Sculpted top · Cream & caramel', 3200, 'Gala', 'solid', ['#efe5cc']),
+  item('bottom-gala-teal', 'bottom', 'Buttoned pencil skirt · Deep teal', 2600, 'Gala', 'solid', ['#0f3f3a']),
+  // Shoes
+  item('shoes-pump-patent-black', 'shoes', 'Patent pumps · Black', 900, 'Evening', 'solid', ['#0e0e10']),
+  item('shoes-heel-patent-red', 'shoes', 'Patent heels · Red', 950, 'Evening', 'solid', ['#a8111c']),
+  item('shoes-heel-blush', 'shoes', 'Strappy heels · Blush', 820, 'Evening', 'solid', ['#ecc3c8']),
+  item('shoes-sandal-metallic-gold', 'shoes', 'Strappy sandals · Gold', 880, 'Evening', 'solid', ['#c9a24f']),
+  item('shoes-pump-patent-navy', 'shoes', 'Patent pumps · Navy', 900, 'Evening', 'solid', ['#16204a']),
+  item('shoes-slide-velvet-emerald', 'shoes', 'Velvet buckle slides · Emerald', 600, 'Joggers', 'solid', ['#1d4d33']),
+  item('shoes-boot-suede-black', 'shoes', 'Slouch knee boots · Black suede', 1300, 'Evening', 'solid', ['#141416']),
+  item('shoes-trainer-lilac', 'shoes', 'Court trainers · Lilac', 520, 'Workout', 'solid', ['#c9b3ec']),
+  item('shoes-pump-burgundy-patent', 'shoes', 'Pointed pumps · Burgundy patent', 900, 'Office', 'solid', ['#5a1624']),
+  // Hair colour
+  item('hair-ash-blonde', 'hair', 'Ash blonde', 450, 'Salon', 'solid', ['#cfc6b4']),
+  item('hair-auburn', 'hair', 'Auburn', 300, 'Salon', 'solid', ['#6a2a1a']),
+  item('hair-ginger', 'hair', 'Ginger', 320, 'Salon', 'solid', ['#a8461c']),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
   item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),
