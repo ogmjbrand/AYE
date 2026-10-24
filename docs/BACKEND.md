@@ -28,13 +28,15 @@ What it **can't** check: the server doesn't see where the player stands, so it l
 1. Create a free project at supabase.com under your own account (free tier; limits apply, and inactive projects pause).
 2. In the project's **SQL editor**, paste and run the migration file. Or, with the Supabase CLI: `supabase link` then `supabase db push`.
 3. Turn on **Email** sign-in under Authentication → Providers.
-4. Put the project URL and the **publishable (anon) key** in `aye-web/.env.local`:
+4. Put the project URL and the **publishable key** in `.env.local` at the project root:
    ```
    VITE_SUPABASE_URL=https://<project>.supabase.co
-   VITE_SUPABASE_ANON_KEY=<publishable key>
+   VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key>
    ```
-   `.env.local` is git-ignored. Never put the service-role key in the game: it bypasses every rule above.
-5. Then the remaining client work (next step once approved): a sign-in screen on the entry page, `@supabase/supabase-js`, and the game calling these functions instead of saving money to the browser, with a guest mode that stays offline.
+   `.env.local` is git-ignored. Never put the service-role (secret) key in the game: it bypasses every rule above. `src/backend/supabase.ts` refuses a secret key if one is put there by mistake.
+5. Then the remaining client work: a sign-in screen on the entry page, and the game calling these functions instead of saving money to the browser, with a guest mode that stays offline.
+
+**Status:** `@supabase/supabase-js` is installed and `src/backend/supabase.ts` creates the client from `.env.local` (a project URL and publishable key are set locally, not committed). The migrations haven't been confirmed as applied to that project, and the game doesn't use the client yet: it still saves in the browser.
 
 ## Running the tests
 
