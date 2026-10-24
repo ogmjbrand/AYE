@@ -53,9 +53,9 @@ describe('places to eat', () => {
     }
   });
 
-  it('includes vegan dishes from across Africa, not just Nigeria', () => {
+  it('includes vegan dishes from across Africa, not just Songhai', () => {
     const origins = new Set(DISHES.filter((d) => suitsDiet(d, 'vegan')).map((d) => d.origin));
-    for (const c of ['Nigeria', 'Ethiopia', 'Ghana', 'Kenya', 'Senegal', 'Egypt', 'Morocco', 'South Africa']) {
+    for (const c of ['Songhai', 'Ethiopia', 'Ghana', 'Kenya', 'Senegal', 'Egypt', 'Morocco', 'South Africa']) {
       expect(origins.has(c), c).toBe(true);
     }
   });

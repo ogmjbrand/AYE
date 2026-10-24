@@ -5,9 +5,13 @@ import { PATTERNS, SLOTS, type Slot, type Style } from '../lib/fashion';
  * Restyles a Rocketbox avatar's clothes and hair in the fragment shader.
  * A garment map (see scripts/rocketbox/garment-masks.mjs) says which texels
  * belong to the top, bottom, shoes (body texture: R, G, B) or hair (head
- * texture: R; cut-out cards such as hijab drapes count as headwear). Garments
- * keep their original folds and shading; optional skin tinting uses only the
- * unmasked body/head texels.
+ * texture: R; cut-out cards such as hijab drapes count as headwear). Those
+ * texels take the chosen fabric's colours and pattern,
+ * keeping the original fabric's folds and shading. Fabric never touches skin.
+ *
+ * Skin (every texel the garment map leaves uncovered) can be made deeper or
+ * lighter within a natural range, keeping the person's own pores, shading
+ * and undertone. Cut-out cards (hijab drapes, eyelashes) are never skin.
  */
 
 interface SlotUniforms {
@@ -162,9 +166,12 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   }
   const isHead = slots === HEAD_SLOTS;
   m.userData.ayeStyle = uniforms;
+  const skin = { value: 0 };
+  (m.userData as { ayeSkin?: { value: number } }).ayeSkin = skin;
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uAyeMask = { value: mask };
-    let decl = 'uniform sampler2D uAyeMask;\n';
+    shader.uniforms.uAyeSkin = skin;
+    let decl = 'uniform sampler2D uAyeMask; uniform float uAyeSkin;\n';
     for (const [slot] of slots) {
       const u = uniforms[slot]!;
       for (const [key, val] of Object.entries(u)) shader.uniforms[`uAye_${slot}_${key}`] = val;
@@ -196,6 +203,17 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
           float ayeLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
+          // Skin tone, before any fabric: deeper darkens and enriches, lighter lifts, both keeping the texture
+          float ayeSkinW = ${cutout ? '0.0' : isHead ? '1.0 - ayeMask.r' : '1.0 - max(max(ayeMask.r, ayeMask.g), ayeMask.b)'};
+          if (ayeSkinW > 0.001 && abs(uAyeSkin) > 0.001) {
+            // Deeper: towards a warm deep brown (sRGB about #4a2b19), keeping the texel's own light and shade
+            // (lum / typical skin lum). Colours here are linear, as diffuseColor is.
+            vec3 ayeDeep = vec3(0.068, 0.026, 0.011) * clamp(ayeLum / 0.3, 0.45, 1.6);
+            vec3 ayeSkinCol = uAyeSkin > 0.0
+              ? mix(diffuseColor.rgb, ayeDeep, uAyeSkin * 0.92)
+              : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));
+            diffuseColor.rgb = mix(diffuseColor.rgb, ayeSkinCol, ayeSkinW);
+          }
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
       )
@@ -229,7 +247,8 @@ export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot
   }
 }
 
-export function applySkinTone(uniforms: StyleUniforms, color: string, enabled: boolean) {
-  uniforms.skinTone.value.set(color);
-  uniforms.skinToneEnabled.value = enabled ? 1 : 0;
+/** Deeper (up to 1) or lighter (down to -1) skin for a material set up by installStyleShader. */
+export function applySkinTone(material: Material, tone: number) {
+  const u = (material.userData as { ayeSkin?: { value: number } }).ayeSkin;
+  if (u) u.value = Math.max(-1, Math.min(1, tone));
 }

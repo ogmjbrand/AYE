@@ -105,7 +105,7 @@ export function WorkTaskPanel({ task, workplace, hourlyPay, workPerformance, onA
             <p role="status" className="m-0 rounded-lg bg-black/20 px-3 py-2 text-sm">
               <span className="font-semibold">{reward.label}.</span>{' '}
               {reward.payShare > 0
-                ? `Bonus +${Math.round(hourlyPay * reward.payShare)} ⓒ and ${reward.xpMinutes} min towards your next promotion.`
+                ? `Bonus +${Math.round(hourlyPay * reward.payShare)} GHAI and ${reward.xpMinutes} min towards your next promotion.`
                 : 'No bonus this time. There will be another task next hour.'}
             </p>
           )}

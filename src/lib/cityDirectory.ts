@@ -65,6 +65,14 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
   for (const v of district.vendors) {
     out.push({ id: id(v.id), name: v.name, kind: v.kind, categories: ['restaurants'], status: 'open', note: 'Order food here', position: at(v.position) });
   }
+  if (district.dealership) {
+    const r = district.dealership;
+    out.push({ id: id(`cars.${r.id}`), name: r.name, kind: r.kind, categories: ['shopping'], status: 'open', note: 'Buy a car, then drive it anywhere', position: at(r.door) });
+  }
+  if (district.restaurant) {
+    const r = district.restaurant;
+    out.push({ id: id(`restaurant.${r.id}`), name: r.name, kind: r.kind, categories: ['restaurants'], status: 'open', note: 'Sit down to a three-course meal, 11:00–23:00', position: at(r.door) });
+  }
   out.push(
     { id: id('fashion'), name: district.fashionHouse.name, kind: district.fashionHouse.kind, categories: ['shopping'], status: 'open', note: 'Buy clothes, change your hair colour', position: at(district.fashionHouse.position) },
     { id: id('gadgets'), name: district.gadgetHub.name, kind: district.gadgetHub.kind, categories: ['shopping'], status: 'open', note: 'Buy a phone or work kit', position: at(district.gadgetHub.position) },
@@ -78,19 +86,19 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
     },
     { id: id('travel'), name: district.travelDesk.name, kind: district.travelDesk.kind, categories: ['transport'], status: 'open', note: 'Book a flight or coach to another city', position: at(district.travelDesk.position) },
   );
-  if (district.carDealership) {
+  if (district.dealership) {
     out.push({
-      id: id('car-dealership'), name: district.carDealership.name, kind: 'Car dealership',
+      id: id('car-dealership'), name: district.dealership.name, kind: 'Car dealership',
       categories: ['vehicles', 'shopping'], status: 'open',
-      note: 'Browse cars, buy and customise a vehicle, or take an owned car out',
-      position: at(district.carDealership.position),
+      note: 'Browse cars, buy one, or sell a car you own',
+      position: at(district.dealership.door),
     });
   }
   for (const h of district.homes) {
     const yours = h.id === homeId;
     out.push({
       id: id(`home.${h.id}`), name: h.name, kind: h.kind, categories: ['residential'], status: 'open',
-      note: yours ? 'Your home: go in, sleep' : `To let, ${h.rentPerNight} ⓒ a night`, position: at(h.door),
+      note: yours ? 'Your home: go in, sleep' : `To let, ${h.rentPerNight} GHAI a night`, position: at(h.door),
     });
   }
   for (const [career, w] of Object.entries(district.workplaces) as [Exclude<Career, 'none'>, District['workplaces'][Exclude<Career, 'none'>]][]) {

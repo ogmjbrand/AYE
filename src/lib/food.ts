@@ -1,3 +1,4 @@
+import { songhaiText } from './songhai';
 /**
  * Food, diets and places to eat. A player's diet is part of who they are:
  * menus show the dishes that suit it, and dishes that don't can't be bought.
@@ -21,7 +22,7 @@ export interface Dish {
   name: string;
   origin: string;
   description: string;
-  /** Price in ⓒ. */
+  /** Price in GHAI. */
   price: number;
   /** How much the fullness meter rises (0–100 scale). */
   fullness: number;
@@ -32,7 +33,7 @@ export interface Dish {
 const d = (
   id: string, name: string, origin: string, price: number, fullness: number,
   contains: AnimalProduct[], description: string, note?: string,
-): Dish => ({ id, name, origin, price, fullness, contains, description, note });
+): Dish => ({ id, name, origin: songhaiText(origin), price, fullness, contains, description: songhaiText(description), note });
 
 export const DISHES: readonly Dish[] = [
   // Mama Put: Nigerian buka food
@@ -432,7 +433,7 @@ const FORBIDDEN: Record<Diet, readonly AnimalProduct[]> = {
   vegan: ['meat', 'fish', 'dairy', 'egg'],
 };
 
-export function suitsDiet(dish: Dish, diet: Diet): boolean {
+export function suitsDiet(dish: Pick<Dish, 'contains'>, diet: Diet): boolean {
   return !dish.contains.some((p) => FORBIDDEN[diet].includes(p));
 }
 

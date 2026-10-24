@@ -1,6 +1,6 @@
 /**
  * Player preferences that belong to this device rather than to a character
- * (graphics quality now; sound and controls later). Validated on load so a bad
+ * (graphics quality, the route line and sound). Validated on load so a bad
  * value falls back to the defaults.
  */
 export type QualityMode = 'auto' | 'high' | 'low';
@@ -10,10 +10,12 @@ export interface Settings {
   quality: QualityMode;
   /** Dotted line on the ground along a click-to-move route. */
   showRoute: boolean;
+  /** Game sounds (the engine while you drive). */
+  sound: boolean;
 }
 
 const SETTINGS_KEY = 'aye_settings';
-export const DEFAULT_SETTINGS: Settings = { quality: 'auto', showRoute: true };
+export const DEFAULT_SETTINGS: Settings = { quality: 'auto', showRoute: true, sound: true };
 export const QUALITY_MODES: readonly QualityMode[] = ['auto', 'high', 'low'];
 
 export function parseSettings(data: unknown): Settings {
@@ -21,6 +23,7 @@ export function parseSettings(data: unknown): Settings {
   return {
     quality: QUALITY_MODES.includes(s.quality as QualityMode) ? (s.quality as QualityMode) : DEFAULT_SETTINGS.quality,
     showRoute: typeof s.showRoute === 'boolean' ? s.showRoute : DEFAULT_SETTINGS.showRoute,
+    sound: typeof s.sound === 'boolean' ? s.sound : DEFAULT_SETTINGS.sound,
   };
 }
 

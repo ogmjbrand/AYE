@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC } from './WorldNPC';
 import { signTexture } from './textures';
-import { UNIVERSITY } from '../lib/university';
+import { UNIVERSITY } from '../lib/universityInterior';
 
 const [DOOR_X, , DOOR_Z] = UNIVERSITY.position;
 // The building face the entrance sits on

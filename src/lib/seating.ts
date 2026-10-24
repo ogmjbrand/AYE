@@ -16,6 +16,8 @@ export interface Seat {
   facing: number;
   /** Top of the seat above the ground, in metres. */
   height: number;
+  /** Where to stand to sit down and where you get up, when not straight in front (a chair pulled up to a table). */
+  approach?: { x: number; z: number };
 }
 
 /** Seat-contact height of the seated pose as a share of standing height (measured: 0.25 on male and female looks). */
@@ -32,7 +34,7 @@ const ahead = (s: { x: number; z: number; facing: number }, d: number) => ({ x: 
 /** Where the character's origin goes when seated: just behind the cushion centre. */
 export const seatedSpot = (s: Seat) => ahead(s, -SEAT_BACK);
 /** Where to walk to before sitting, and where you end up when you get up. */
-export const standSpot = (s: Seat) => ahead(s, STAND_OFF);
+export const standSpot = (s: Seat) => s.approach ?? ahead(s, STAND_OFF);
 /** How far to lower the character (its origin) so a body of this height rests on the seat. */
 export const seatDrop = (s: Seat, standingHeight: number) => s.height - SEAT_CONTACT_RATIO * standingHeight;
 

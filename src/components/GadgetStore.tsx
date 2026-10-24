@@ -36,7 +36,7 @@ export function GadgetStore({ shop, owned, balance, career, onBuy, onClose }: Ga
           <div>
             <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{shop.kind}</p>
             <h2 id="gadget-title" className="m-0 mt-1 font-display text-2xl font-bold">{shop.name}</h2>
-            <p className="m-0 mt-1 text-sm text-ui-muted">Balance <span className="tabular-nums text-ui-ink">{balance.toLocaleString()} ⓒ</span></p>
+            <p className="m-0 mt-1 text-sm text-ui-muted">Balance <span className="tabular-nums text-ui-ink">{balance.toLocaleString()} GHAI</span></p>
           </div>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
         </header>
@@ -60,7 +60,7 @@ export function GadgetStore({ shop, owned, balance, career, onBuy, onClose }: Ga
                     onClick={() => onBuy(item)}
                     className="shrink-0 rounded-md border border-ui-accent bg-ui-accent/20 px-3 py-1.5 text-xs font-semibold tabular-nums hover:bg-ui-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Buy · {item.price.toLocaleString()} ⓒ
+                    Buy · {item.price.toLocaleString()} GHAI
                   </button>
                 )}
               </li>

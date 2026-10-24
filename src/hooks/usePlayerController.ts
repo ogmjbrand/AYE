@@ -1,25 +1,18 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
-import { activeLayout, movingObstacles, resolveCollisions } from '../lib/world';
+import { activeLayout, obstaclesWithVehicles, resolveCollisions, type Obstacle } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
 import { seatedSpot, standSpot, type Seat } from '../lib/seating';
 import { DEFAULT_DISTRICT_ID, districtById } from '../lib/geography';
-import { pedestrianInTrafficPath, trafficSnapshot } from '../lib/traffic';
-import { advanceVehicleMotion } from '../lib/vehicleDriving';
+import { carTurnRate } from '../lib/cars';
 
 export interface PlayerHandle {
   position: Vector3;
   direction: number;
   velocity: Vector3;
-  trafficWarning: boolean;
-  /** Catalogue id while the player is driving an owned car. */
-  drivingVehicleId: string | null;
-  vehicleSpeed: number;
   applyMovement: (delta: number) => void;
-  faceTowards: (x: number, z: number, delta: number) => void;
-  moveToPose: (x: number, z: number, facing: number, blend: number) => void;
 }
 
 const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
@@ -28,9 +21,19 @@ const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
  * strides play at about 1.4x their recorded rate rather than sliding. */
 export const RUN_SPEED = 4.2;
 export const WALK_SPEED = 1.4;
+
+/** Mood shows in how you move: a little brisker when happy, slower when low (see App). */
+let pace = 1;
+export function setPace(factor: number) { pace = Math.max(0.8, Math.min(1.1, factor)); }
+
+/** Driving your own car (lib/cars.ts): top speed in m/s, or null on foot. */
+let driving: { speed: number } | null = null;
+export function setDriving(car: { speed: number } | null) { driving = car; }
+export const isDriving = () => driving !== null;
+/** A car is about this wide: it keeps this far from walls and parked buses. */
+const CAR_RADIUS = 0.95;
 const keysPressed: Record<string, boolean> = {};
 const stick: StickInput = { forward: 0, turn: 0 };
-let vehicleSpeed = 0;
 // Where a click or tap sent the player, until they arrive, steer themselves or get stuck
 let moveTarget: MoveTarget | null = null;
 // The legs of the route there, around buildings and parked vehicles
@@ -68,27 +71,7 @@ const playerHandle: PlayerHandle = {
   position: new Vector3(...districtById(DEFAULT_DISTRICT_ID).spawn),
   direction: 0,
   velocity: new Vector3(),
-  trafficWarning: false,
-  drivingVehicleId: null,
-  vehicleSpeed: 0,
-  faceTowards: (x: number, z: number, delta: number) => {
-    const facing = Math.atan2(x - playerHandle.position.x, z - playerHandle.position.z);
-    const turn = Math.atan2(Math.sin(facing - playerHandle.direction), Math.cos(facing - playerHandle.direction));
-    playerHandle.direction += turn * Math.min(1, delta * 5);
-  },
-  moveToPose: (x: number, z: number, facing: number, blend: number) => {
-    const amount = Math.max(0, Math.min(1, blend));
-    playerHandle.velocity.set(0, 0, 0);
-    playerHandle.position.x += (x - playerHandle.position.x) * amount;
-    playerHandle.position.z += (z - playerHandle.position.z) * amount;
-    const turn = Math.atan2(Math.sin(facing - playerHandle.direction), Math.cos(facing - playerHandle.direction));
-    playerHandle.direction += turn * amount;
-  },
   applyMovement: (delta: number) => {
-    if (playerHandle.drivingVehicleId) {
-      applyVehicleMovement(delta);
-      return;
-    }
     let intent = movementIntent(keysPressed, stick);
     if (seated) {
       // Pressing a direction gets you up; otherwise you stay exactly on the seat (no collision push off the bench)
@@ -106,9 +89,12 @@ const playerHandle: PlayerHandle = {
         if (route.length === 0) endTrip('arrived');
       } else intent = s;
     }
-    const moveSpeed = intent.walk ? WALK_SPEED : RUN_SPEED;
-    const rotationSpeed = 3; // radians per second
-    const acceleration = 6;
+    // In a car: much faster, slower to pick up speed, reverse at a crawl, and steering that tightens with speed
+    const reversing = !!driving && intent.forward < 0;
+    const moveSpeed = driving ? driving.speed * (intent.walk ? 0.45 : 1) * (reversing ? 0.35 : 1) : (intent.walk ? WALK_SPEED : RUN_SPEED) * pace;
+    const currentSpeed = Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z);
+    const rotationSpeed = driving ? carTurnRate(currentSpeed) * (reversing ? -1 : 1) : 3; // radians per second
+    const acceleration = driving ? 1.8 : 6;
     const damping = 0.92;
 
     // Forward matches the model's facing: rotation.y = θ points local +Z at (sin θ, cos θ).
@@ -119,21 +105,9 @@ const playerHandle: PlayerHandle = {
     const targetVelX = forwardX * moveSpeed * intent.forward;
     const targetVelZ = forwardZ * moveSpeed * intent.forward;
 
-    const traffic = trafficSnapshot();
-    const trafficRisk = pedestrianInTrafficPath({
-      x: playerHandle.position.x,
-      z: playerHandle.position.z,
-      vx: targetVelX,
-      vz: targetVelZ,
-    }, traffic.cars, traffic.lanes);
-    playerHandle.trafficWarning = trafficRisk;
-    if (trafficRisk) {
-      playerHandle.velocity.set(0, 0, 0);
-    } else {
-      // Smooth acceleration toward target
-      playerHandle.velocity.x += (targetVelX - playerHandle.velocity.x) * acceleration * delta;
-      playerHandle.velocity.z += (targetVelZ - playerHandle.velocity.z) * acceleration * delta;
-    }
+    // Smooth acceleration toward target
+    playerHandle.velocity.x += (targetVelX - playerHandle.velocity.x) * acceleration * delta;
+    playerHandle.velocity.z += (targetVelZ - playerHandle.velocity.z) * acceleration * delta;
 
     // Damping when no input
     if (intent.forward === 0) {
@@ -150,6 +124,7 @@ const playerHandle: PlayerHandle = {
     const resolved = resolveCollisions(
       prevX + playerHandle.velocity.x * delta,
       prevZ + playerHandle.velocity.z * delta,
+      driving ? CAR_RADIUS : undefined,
     );
     playerHandle.position.x = resolved.x;
     playerHandle.position.z = resolved.z;
@@ -161,11 +136,11 @@ const playerHandle: PlayerHandle = {
     }
 
     // A clicked trip that's blocked (a wall, a parked bus) gives up rather than pushing forever
-    if (!trafficRisk && moveTarget && intent.forward > 0.3 && Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z) < 0.25) {
+    if (moveTarget && intent.forward > 0.3 && Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z) < 0.25) {
       stuckFor += delta;
       if (stuckFor > STUCK_SECONDS) {
         // Probably traffic in the way: plan once more around where vehicles are now, else give up
-        const again = replanned ? null : planRoute(moveTarget, [...activeLayout().obstacles, ...movingObstacles]);
+        const again = replanned ? null : planRoute(moveTarget, obstaclesWithVehicles());
         replanned = true;
         stuckFor = 0;
         if (again) route = again;
@@ -174,26 +149,6 @@ const playerHandle: PlayerHandle = {
     } else stuckFor = 0;
   },
 };
-
-function applyVehicleMovement(delta: number) {
-  const intent = movementIntent(keysPressed, stick);
-  const previousX = playerHandle.position.x;
-  const previousZ = playerHandle.position.z;
-  const next = advanceVehicleMotion(
-    { x: previousX, z: previousZ, direction: playerHandle.direction, speed: vehicleSpeed },
-    { forward: intent.forward, turn: intent.turn, delta },
-  );
-  vehicleSpeed = next.speed;
-  playerHandle.position.set(next.x, playerHandle.position.y, next.z);
-  playerHandle.direction = next.direction;
-  playerHandle.velocity.set(
-    (next.x - previousX) / Math.max(delta, 0.001),
-    0,
-    (next.z - previousZ) / Math.max(delta, 0.001),
-  );
-  playerHandle.vehicleSpeed = vehicleSpeed;
-  playerHandle.trafficWarning = false;
-}
 
 function releaseAllKeys() {
   for (const key of MOVE_KEYS) keysPressed[key] = false;
@@ -209,48 +164,7 @@ export function setMovementBlocked(blocked: boolean) {
   if (blocked) releaseAllKeys();
 }
 
-export function enterVehicle(vehicleId: string, spot?: readonly [number, number, number], direction?: number) {
-  if (inputBlocked || playerHandle.drivingVehicleId) return false;
-  if (spot) playerHandle.position.set(spot[0], spot[1], spot[2]);
-  if (direction !== undefined) playerHandle.direction = direction;
-  playerHandle.velocity.set(0, 0, 0);
-  vehicleSpeed = 0;
-  playerHandle.vehicleSpeed = 0;
-  playerHandle.drivingVehicleId = vehicleId;
-  if (moveTarget) endTrip('cancelled');
-  return true;
-}
-
-/** Stops the car beside a clear spot so the player does not exit into a wall. */
-export function exitVehicle() {
-  if (!playerHandle.drivingVehicleId) return false;
-  const { x, z } = playerHandle.position;
-  const direction = playerHandle.direction;
-  const rightX = Math.cos(direction);
-  const rightZ = -Math.sin(direction);
-  const forwardX = Math.sin(direction);
-  const forwardZ = Math.cos(direction);
-  const candidates = [
-    [x + rightX * 1.55, z + rightZ * 1.55],
-    [x - rightX * 1.55, z - rightZ * 1.55],
-    [x - forwardX * 2.3, z - forwardZ * 2.3],
-    [x + forwardX * 2.3, z + forwardZ * 2.3],
-  ];
-  const clear = candidates.map(([cx, cz]) => {
-    const resolved = resolveCollisions(cx, cz, 0.32);
-    return Math.hypot(resolved.x - cx, resolved.z - cz) < 0.2 ? resolved : null;
-  }).find((spot) => spot !== null);
-  if (!clear) return false;
-  playerHandle.position.set(clear.x, playerHandle.position.y, clear.z);
-  playerHandle.velocity.set(0, 0, 0);
-  vehicleSpeed = 0;
-  playerHandle.vehicleSpeed = 0;
-  playerHandle.drivingVehicleId = null;
-  playerHandle.direction = direction;
-  return true;
-}
-
-function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Point[] | null {
+function planRoute(target: MoveTarget, obstacles: readonly Obstacle[] = activeLayout().obstacles): Point[] | null {
   const grid = obstacles === activeLayout().obstacles ? walkGridFor(obstacles) : buildWalkGrid(obstacles);
   return findPath(grid, { x: playerHandle.position.x, z: playerHandle.position.z }, target);
 }
@@ -260,7 +174,6 @@ function planRoute(target: MoveTarget, obstacles = activeLayout().obstacles): Po
  * round anything in the way; null cancels. Returns false if there's no way there.
  */
 export function setMoveTarget(target: MoveTarget | null, about?: { destinationId?: string; label?: string }): boolean {
-  if (playerHandle.drivingVehicleId) return target === null;
   if (target && seated) standUp(); // clicking somewhere else gets you up first
   stuckFor = 0;
   replanned = false;

@@ -58,8 +58,10 @@ describe('catalogue matches the game', () => {
   it('has every fashion item and piece of equipment at the same price', async () => {
     const rows = await admin<{ id: string; price: number; career: string | null; pay_bonus: string }>('select id, price, career, pay_bonus from public.shop_items');
     const byId = new Map(rows.map((r) => [r.id, r]));
-    expect(rows.length).toBe(FASHION_ITEMS.length + EQUIPMENT.length);
-    for (const i of FASHION_ITEMS) expect(byId.get(i.id)?.price, i.id).toBe(i.price);
+    // Collectibles (earned through achievements) are never for sale, so the server doesn't list them
+    const forSale = FASHION_ITEMS.filter((i) => i.collection !== 'Rewards');
+    expect(rows.length).toBe(forSale.length + EQUIPMENT.length);
+    for (const i of forSale) expect(byId.get(i.id)?.price, i.id).toBe(i.price);
     for (const e of EQUIPMENT) {
       expect(byId.get(e.id)?.price, e.id).toBe(e.price);
       expect(byId.get(e.id)?.career ?? undefined, e.id).toBe(e.career);

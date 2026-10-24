@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLASS_SLOTS,
   academicStanding,
   assignmentForDay,
   attendClass,
@@ -9,8 +8,7 @@ import {
   sanitiseCampus,
   submitAssignment,
 } from './campus';
-import { createGameState, createTime, gameReducer } from './gameState';
-import { UNIVERSITY_INTERIOR, universityInteractionAt } from './university';
+import { UNIVERSITY_INTERIOR, universityInteractionAt } from './universityInterior';
 import { doorSpot, interiorLayout } from './interiors';
 
 describe('campus rules', () => {
@@ -57,26 +55,6 @@ describe('campus rules', () => {
     expect(cleaned.attended).toEqual(['morning']);
     expect(cleaned.assignmentsCorrect).toBe(2);
     expect(cleaned.credits).toBe(0);
-  });
-});
-
-describe('campus in the game reducer', () => {
-  const student = (state: ReturnType<typeof createGameState>, action: Parameters<typeof gameReducer>[1]) =>
-    gameReducer(state, action, 'student', 'student');
-
-  it('pays through the normal student hourly wage while attending class', () => {
-    const start = createGameState(2500, createTime(9, 0));
-    const after = student(start, { type: 'campusClass', slot: CLASS_SLOTS[0].id, inHall: true });
-    expect(after.campus.totalClasses).toBe(1);
-    expect(after.time.hour).toBe(10);
-    expect(after.today.minutesWorked).toBe(60);
-    expect(after.today.income).toBeGreaterThan(0);
-  });
-
-  it('ignores campus actions for non-students and outside the hall', () => {
-    const start = createGameState(2500, createTime(9, 0));
-    expect(gameReducer(start, { type: 'campusClass', slot: 'morning', inHall: true }, 'doctor', 'student')).toBe(start);
-    expect(student(start, { type: 'campusClass', slot: 'morning', inHall: false })).toBe(start);
   });
 });
 

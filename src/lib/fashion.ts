@@ -91,7 +91,7 @@ export interface FashionItem {
   name: string;
   slot: Slot;
   price: number;
-  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon';
+  collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Rewards';
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
@@ -198,6 +198,13 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   hairstyle('hairstyle-braids', 'Long braids', 850),
   hairstyle('hairstyle-ponytail', 'Ponytail', 600),
   hairstyle('hairstyle-long', 'Long waves', 700),
+  // Collectibles: earned through achievements (lib/life.ts), never sold in shops
+  item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
+  item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),
+  item('top-festival-adire', 'top', 'Festival adire · Gold resist', 0, 'Rewards', 'adire', ['#2b1d4f', '#e3c27a', '#3a2a6e'], 22, []),
+  item('top-friendship-ankara', 'top', 'Friendship ankara', 0, 'Rewards', 'ankara', ['#b8463a', '#1f6b4f', '#f0d6a0'], 16, []),
+  item('shoes-trail-emerald', 'shoes', 'Trail runners · Emerald', 0, 'Rewards', 'solid', ['#2f8f6b'], 18, []),
+  item('hair-rose-gold', 'hair', 'Rose gold', 0, 'Rewards', 'solid', ['#b9776a'], 18, []),
 ];
 
 export const itemById = (id: string | null | undefined) => FASHION_ITEMS.find((i) => i.id === id);
@@ -219,6 +226,8 @@ export interface Wardrobe {
   equipped: Partial<Record<Slot, string>>;
   /** Saved looks (absent until the player saves one). */
   outfits?: Outfit[];
+  /** Pieces and sets hearted in the boutique, by id (absent until the player hearts one). */
+  favourites?: string[];
 }
 
 /** Items a district's boutique sells: the basics, plus what's made in its country. */
@@ -247,7 +256,11 @@ export function sanitiseWardrobe(data: unknown): Wardrobe {
     .filter((o): o is { name: string; equipped: unknown } => typeof o === 'object' && o !== null && typeof (o as { name?: unknown }).name === 'string' && (o as { name: string }).name.trim() !== '')
     .slice(0, MAX_OUTFITS)
     .map((o) => ({ name: o.name.trim().slice(0, 24), equipped: cleanEquipped(o.equipped) }));
-  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}) };
+  // Hearted items and sets (a set's id is "set-" and its top's id without "top-")
+  const favourites = (Array.isArray((w as { favourites?: unknown }).favourites) ? (w as { favourites: unknown[] }).favourites : [])
+    .filter((id): id is string => typeof id === 'string' && (!!itemById(id) || (id.startsWith('set-') && !!itemById(`top-${id.slice(4)}`))))
+    .slice(0, 200);
+  return { owned, equipped: cleanEquipped(w.equipped), ...(outfits.length ? { outfits } : {}), ...(favourites.length ? { favourites: [...new Set(favourites)] } : {}) };
 }
 
 /** The styles to draw for each slot (equipped items, overridden by anything being tried on). */

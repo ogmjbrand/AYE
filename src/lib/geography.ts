@@ -18,9 +18,10 @@ import { ACCRA_OSU } from './districts/accra';
 import { generateDistrict } from './districts/generate';
 import { NIGERIA } from './districts/nigeria';
 import { AFRICA } from './districts/africa';
+import { AREA_NAMES, CITY_NAMES, SONGHAI_CODE, songhaiText, stateOfCity } from './songhai';
 import { WORLD } from './districts/world';
 
-export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park' | 'dealership';
+export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
 type Spot = readonly [number, number, number];
 
 export interface Place {
@@ -41,7 +42,7 @@ export interface City {
   country: string;
   /** IANA time zone, for when cities run on their own clocks. */
   timeZone: string;
-  /** Local currency code; the game itself uses one virtual currency (ⓒ). */
+  /** Local currency code; the game itself uses one virtual currency (GHAI). */
   currency: string;
   /** State, region or province. */
   region: string;
@@ -71,7 +72,6 @@ export interface DistrictSpec {
   vendors: readonly FoodVendor[];
   fashionHouse: Counter;
   gadgetHub: Counter;
-  carDealership?: Counter;
   travelDesk: Counter;
   homes: readonly Home[];
   workplaces: Record<Exclude<Career, 'none'>, CareerLocation>;
@@ -79,6 +79,20 @@ export interface DistrictSpec {
   nightlife: Venue;
   /** The district's public park: benches where you can sit and let time pass (lib/parks.ts). */
   park: Park;
+  /** A sit-down restaurant you walk into (lib/restaurant.ts), where the district has one. */
+  restaurant?: RestaurantFront;
+  /** A car dealership (lib/cars.ts), where the district has one. */
+  dealership?: RestaurantFront;
+}
+
+export interface RestaurantFront {
+  id: string;
+  name: string;
+  kind: string;
+  /** Where you stand outside the door (E goes in). */
+  door: Spot;
+  /** Which way the shop front faces (0 = +z, π = −z). */
+  facing: number;
 }
 
 export interface District extends Omit<DistrictSpec, 'layout'> {
@@ -86,6 +100,20 @@ export interface District extends Omit<DistrictSpec, 'layout'> {
   /** Every interactive place, indexed for maps, saves and a future server. */
   places: readonly Place[];
 }
+
+/** The restaurant whose door you're standing at, if any. */
+export function restaurantAt(d: Pick<District, 'restaurant'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.restaurant;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+/** The car dealership whose door you're standing at, if any. */
+export function dealershipAt(d: Pick<District, 'dealership'>, x: number, z: number): RestaurantFront | undefined {
+  const r = d.dealership;
+  return r && Math.hypot(x - r.door[0], z - r.door[2]) <= DOOR_RADIUS ? r : undefined;
+}
+
+/** Within this distance of a restaurant's door you can go in (E). */
+export const DOOR_RADIUS = 2;
 
 /** Within this distance of a counter you can use it (E). */
 export const COUNTER_RADIUS = 3;
@@ -96,16 +124,48 @@ function buildDistrict(spec: DistrictSpec): District {
     ...spec.vendors.map((v): Place => ({ id: id(v.id), kind: 'food', name: v.name, position: v.position })),
     { id: id('fashion'), kind: 'shop', name: spec.fashionHouse.name, position: spec.fashionHouse.position },
     { id: id('gadgets'), kind: 'shop', name: spec.gadgetHub.name, position: spec.gadgetHub.position },
-    ...(spec.carDealership ? [{ id: id('car-dealership'), kind: 'dealership' as const, name: spec.carDealership.name, position: spec.carDealership.position }] : []),
     { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
     { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },
+    ...(spec.restaurant ? [{ id: id(`restaurant.${spec.restaurant.id}`), kind: 'food' as const, name: spec.restaurant.name, position: spec.restaurant.door }] : []),
+    ...(spec.dealership ? [{ id: id(`cars.${spec.dealership.id}`), kind: 'shop' as const, name: spec.dealership.name, position: spec.dealership.door }] : []),
     ...spec.homes.map((h): Place => ({ id: id(`home.${h.id}`), kind: 'home', name: h.name, position: h.door })),
     ...(Object.entries(spec.workplaces) as [Exclude<Career, 'none'>, CareerLocation][]).map(([career, w]): Place => ({
       id: id(`work.${career}`), kind: 'workplace', name: w.name, position: w.position, career,
     })),
   ];
-  return { ...spec, layout: buildLayout(spec.layout), places };
+  const district = { ...spec, layout: buildLayout(spec.layout), places };
+  return spec.city.country === SONGHAI_CODE ? songhaiNames(district) : district;
+}
+
+/**
+ * The names a Songhai district shows: its city's and state's Songhai names, an
+ * original area name, and shop, home and landmark text without real place
+ * names. Only names and descriptions change; every ID stays as it was, so
+ * saves keep pointing at the same district, home, places and people.
+ */
+function songhaiNames(d: District): District {
+  const t = songhaiText;
+  const named = <T extends { name: string }>(x: T): T => ({ ...x, name: t(x.name) });
+  const state = stateOfCity(d.city.id);
+  return {
+    ...d,
+    city: { ...d.city, name: CITY_NAMES[d.city.id] ?? t(d.city.name), region: state?.name ?? t(d.city.region) },
+    name: AREA_NAMES[d.id] ?? t(d.name),
+    neighborhoods: d.neighborhoods.map((n) => ({ ...n, name: t(n.name), description: t(n.description) })),
+    vendors: d.vendors.map((v) => ({ ...named(v), kind: t(v.kind) })),
+    fashionHouse: named(d.fashionHouse),
+    gadgetHub: named(d.gadgetHub),
+    travelDesk: named(d.travelDesk),
+    park: { ...named(d.park), description: t(d.park.description) },
+    nightlife: { ...named(d.nightlife), description: t(d.nightlife.description) },
+    ...(d.restaurant ? { restaurant: named(d.restaurant) } : {}),
+    ...(d.dealership ? { dealership: named(d.dealership) } : {}),
+    homes: d.homes.map((h) => ({ ...named(h), building: t(h.building), description: t(h.description) })),
+    workplaces: Object.fromEntries(Object.entries(d.workplaces).map(([k, w]) => [k, { ...named(w), description: t(w.description) }])) as District['workplaces'],
+    layout: { ...d.layout, buildings: d.layout.buildings.map((b) => (b.name ? { ...b, name: t(b.name) } : b)) },
+    places: d.places.map(named),
+  };
 }
 
 /** Hand-built districts first (Lagos is where a new life starts), then the generated ones. */

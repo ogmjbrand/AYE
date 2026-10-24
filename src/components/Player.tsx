@@ -7,9 +7,11 @@ import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
-import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
+import { resolveStyles, type Slot } from '../lib/fashion';
+import type { OwnedCar } from '../lib/cars';
 import { residentById, residentPosition } from '../lib/people';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
+import { CarBody } from '../world/CarBody';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -18,10 +20,19 @@ interface PlayerProps {
   tryOn?: Partial<Record<Slot, string | null>>;
   /** Talking with a resident (gestures in turns). */
   conversing?: boolean;
+  /** Driving your car: the car is shown instead of you on foot. */
+  car?: OwnedCar | null;
+  /** The resident you're talking with: you turn to face them. */
   conversationTarget?: string | null;
+  /** Sharing a hug: you walk to the meeting point, embrace and step back (lib/hug.ts). */
   hugSession?: HugSession | null;
   onHugComplete?: (residentId: string) => void;
-  eating?: boolean;
+}
+
+/** Turns the player towards a heading (radians), by `amount` of the way (0..1). */
+function turnTowards(controller: PlayerHandle, facing: number, amount: number) {
+  const turn = Math.atan2(Math.sin(facing - controller.direction), Math.cos(facing - controller.direction));
+  controller.direction += turn * amount;
 }
 
 /** Simple capsule figure: shown while the avatar loads, or if it fails to load. */
@@ -40,16 +51,7 @@ function CapsuleFigure({ color }: { color: string }) {
   );
 }
 
-export function Player({
-  controller,
-  character,
-  tryOn,
-  conversing = false,
-  conversationTarget = null,
-  hugSession = null,
-  onHugComplete,
-  eating = false,
-}: PlayerProps) {
+export function Player({ controller, character, tryOn, conversing = false, car = null, conversationTarget = null, hugSession = null, onHugComplete }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
@@ -61,30 +63,19 @@ export function Player({
 
   const equipped = character?.wardrobe.equipped;
   const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
-  const visibleShoeId = resolveFashionItemId(equipped ?? {}, tryOn, 'shoes');
-  const visibleHairstyleId = resolveFashionItemId(equipped ?? {}, tryOn, 'hairstyle');
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
     if (hugSession) {
+      // The hug moves you: to the meeting point, holding the embrace, then a step back
       const elapsed = Date.now() - hugSession.startedAt;
       const blend = hugPositionBlend(elapsed, hugSession.approachMs);
       const reverse = elapsed >= hugSession.approachMs + HUG_DURATION_MS;
       const pose = hugPathPose(hugSession.playerFrom, hugSession.playerTarget, hugSession.playerPath, blend, reverse);
-      const previousX = controller.position.x;
-      const previousZ = controller.position.z;
-      controller.moveToPose(
-        pose.x,
-        pose.z,
-        pose.facing,
-        1,
-      );
       const seconds = Math.max(0.001, Math.min(delta, 0.1));
-      controller.velocity.set(
-        (controller.position.x - previousX) / seconds,
-        0,
-        (controller.position.z - previousZ) / seconds,
-      );
+      controller.velocity.set((pose.x - controller.position.x) / seconds, 0, (pose.z - controller.position.z) / seconds);
+      controller.position.set(pose.x, controller.position.y, pose.z);
+      turnTowards(controller, pose.facing, 1);
       if (elapsed >= hugSessionDurationMs(hugSession.approachMs) && completedHug.current !== hugSession.residentId) {
         completedHug.current = hugSession.residentId;
         controller.velocity.set(0, 0, 0);
@@ -94,10 +85,11 @@ export function Player({
       completedHug.current = null;
       controller.applyMovement(Math.min(delta, 0.1));
     }
-    const resident = conversationTarget ? residentById(conversationTarget) : undefined;
-    if (conversing && resident) {
-      const target = residentPosition(resident);
-      controller.faceTowards(target.x, target.z, delta);
+    // In a conversation you turn to face the person you're talking with
+    const resident = conversing && conversationTarget ? residentById(conversationTarget) : undefined;
+    if (resident) {
+      const at = residentPosition(resident);
+      turnTowards(controller, Math.atan2(at.x - controller.position.x, at.z - controller.position.z), Math.min(1, delta * 5));
     }
 
     // Apply position and rotation to the visual group, standing on the pavement or road
@@ -127,24 +119,13 @@ export function Player({
   const fallback = <CapsuleFigure color={bodyColor} />;
   return (
     <group ref={groupRef}>
+      {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar
-            controller={controller}
-            lookId={character?.lookId}
-            heightCm={character?.heightCm}
-            styles={styles}
-            shape={character?.shape}
-            skinTone={character?.skinTone}
-            skinColor={character?.skinColor}
-            conversing={conversing}
-            hugSession={hugSession}
-            eating={eating}
-            shoeItemId={visibleShoeId}
-            hairstyleItemId={visibleHairstyleId}
-          />
+          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
         </Suspense>
       </ErrorBoundary>
+      )}
     </group>
   );
 }

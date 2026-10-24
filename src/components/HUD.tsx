@@ -1,63 +1,39 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
+import { ShiftStatus, StudentStatus, TodaysGoals, type ShiftHud, type StudentHud } from './StudentPanels';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { formatGameTime, hungerLabel, HUNGRY_THRESHOLD, isWorkingHours, type DayLedger, type GameTime } from '../lib/gameState';
-import { DIETS, nearestVendor, type FoodVendor } from '../lib/food';
+import { useEffect, useRef, useState } from 'react';
+import { assetUrl } from '../lib/assetManifest';
+import { HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
+import { nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
-import { perfStats } from '../world/quality';
 import { TouchStick } from './TouchStick';
-import { genderLabel, heritageLabel } from '../lib/identity';
-import { formatHome } from '../lib/places';
-import { homeAtDoor, homeById, type Home } from '../lib/homes';
-import { equipmentPay } from '../lib/equipment';
-import { counterAt, type District } from '../lib/geography';
+import { homeAtDoor, type Home } from '../lib/homes';
+import { counterAt, restaurantAt, type District, type PlaceKind } from '../lib/geography';
+import { OPEN_HOUR as RESTAURANT_OPENS, isOpen as restaurantOpen } from '../lib/restaurant';
 import { venueAt } from '../lib/nightlife';
 import { parkAt } from '../lib/parks';
 import { residentNear, type Resident } from '../lib/people';
-import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../lib/progression';
-import { HOURLY_WAGE, WORK_END_HOUR, WORK_START_HOUR } from '../lib/gameState';
-import { ARRIVE_RADIUS, compass } from '../lib/locations';
-import { CAREER_LABEL } from '../lib/labels';
-import { dailyGoals, formatGameDate, goalDay, parseFlags, updateFlags, type GoalFlags } from '../lib/dailyGoals';
-import { assetUrl } from '../lib/assetManifest';
-import { PhonePanel, type PhoneApp } from './PhonePanel';
-import { Minimap } from './Minimap';
-import {
-  Apple,
-  Armchair,
-  BedDouble,
-  BriefcaseBusiness,
-  CalendarDays,
-  Camera,
-  CarFront,
-  GraduationCap,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  House as HouseIcon,
-  Contact,
-  Landmark,
-  Map,
-  MapPin,
-  Menu,
-  MessageCircle,
-  Moon,
-  Music2,
-  Package,
-  Settings2,
-  Shirt,
-  ShoppingBag,
-  Smartphone,
-  Sun,
-  TreePine,
-  Utensils,
-  UserRound,
-  Wallet,
-  TriangleAlert,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+import { TIRED_THRESHOLD, type Needs } from '../lib/needs';
+import { Icon, type IconName } from './os/icons';
+import { ICON_PATHS } from './os/iconPaths';
+
+/** One button on the bottom bar. The bar changes with where you are (street, home, restaurant, boutique). */
+export interface NavItem {
+  id: string;
+  label: string;
+  icon: IconName;
+  onClick: () => void;
+  active?: boolean;
+  title?: string;
+}
+
+/** The title plate at the top of the screen: the venue or area you're in. */
+export interface PlacePlate {
+  title: string;
+  subtitle: string;
+  icon: IconName;
+}
 
 interface HUDProps {
   controller: PlayerHandle;
@@ -65,16 +41,9 @@ interface HUDProps {
   balance: number;
   gameTime: GameTime;
   neighborhood?: Neighborhood | null;
-  /** Today's money and purchases, which drive the daily goals. */
-  today?: DayLedger;
-  /** The end-of-day summary is showing: the player has rested. */
-  summaryShown?: boolean;
-  /** Back to the entry screen (nothing is lost; the game saves as you play). */
-  onExitToMenu?: () => void;
-  onRest?: () => void;
-  qualityLabel?: string;
-  onCycleQuality?: () => void;
   fullness: number;
+  /** Energy, hygiene, fun and social (lib/needs.ts). */
+  needs?: Needs;
   onOpenVendor?: (vendor: FoodVendor) => void;
   onOpenShop?: () => void;
   /** The district the player is in: its counters, homes and workplaces. */
@@ -89,112 +58,201 @@ interface HUDProps {
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
-  /** Set while inside your home: replaces the street prompts. */
-  insideHome?: {
-    name: string;
-    interactionAt: (x: number, z: number) => Prompt | null;
-  };
-  insidePlaceLabel?: string;
-  outsideOffice?: { name: string; onOpen: () => void };
-  outsideUniversity?: { name: string; onOpen: () => void };
-  outsideHospital?: { name: string; onOpen: () => void };
-  hospitalStatus?: { onShift: boolean; patientsToday: number; patientsTarget: number; shiftsCompleted: number };
-  onCampus?: boolean;
-  campusStatus?: { classesToday: number; classesTotal: number; assignmentDone: boolean; credits: number; standing: string };
-  outsideDealership?: { name: string; onOpen: () => void };
-  onExitVehicle?: () => void;
-  onOpenWardrobe?: () => void;
-  onOpenDecor?: () => void;
-  onOpenRestaurantPanel?: () => void;
+  /** At a university's front marker on the street: in through the gate to the campus. */
+  campusEntry?: { name: string; onOpen: () => void } | null;
+  /** At a car dealer's showroom door. */
+  dealerEntry?: { name: string; onOpen: () => void } | null;
+  /** Overrides the work status line (e.g. "In class", read from the save). */
+  statusOverride?: { label: string; tone: 'good' | 'warn' } | null;
+  /** The student's goals and status panels (lib/school.ts). */
+  student?: StudentHud | null;
+  /** A doctor's shift panels (lib/hospital.ts). */
+  shift?: ShiftHud | null;
+  /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
+  insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
-  /** Opens the smartphone map (only passed once you own a phone). */
-  onOpenMap?: () => void;
-  /** Routes to the assigned home and enters after reaching its front door. */
-  onGoHome?: () => void;
-  /** The city locations directory. */
-  onOpenLocations?: () => void;
+  /** Goes into the district's restaurant when standing at its door. */
+  onEnterRestaurant?: () => void;
   /** The rented home, if any (lib/homes.ts). */
   homeId?: string | null;
   onOpenHome?: (home: Home) => void;
-  /** Experience in the current career, in worked minutes (lib/progression.ts). */
-  workMinutes?: number;
-  /** Owned equipment (work kits raise pay). */
-  equipment?: readonly string[];
-  /** The destination being tracked, in district metres. */
-  tracked?: { name: string; position: readonly [number, number, number] } | null;
-  onStopTracking?: () => void;
+  /** The title plate (venue or area). */
+  place?: PlacePlate | null;
+  /** The bottom bar's buttons. */
+  nav: readonly NavItem[];
+  /** Where to put you on the minimap while you're indoors (the building's door). */
+  mapPosition?: { x: number; z: number } | null;
+  onOpenMoney?: () => void;
+  onOpenInventory?: () => void;
+  onOpenProfile?: () => void;
+  onOpenSettings?: () => void;
+  /** Opens the Life OS on today's needs (the warning chips). */
+  onOpenNeeds?: () => void;
 }
 
-type Prompt = { verb: string; place: string; onOpen: () => void; icon?: LucideIcon };
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const EMPTY_LEDGER: DayLedger = { income: 0, expenses: 0, minutesWorked: 0 };
+/** Dark glass with a thin gold edge, opaque enough to read over a bright sky without a costly backdrop blur. */
+const GLASS = 'border border-ui-gold/35 bg-[#0d1412]/85 shadow-[0_8px_24px_rgba(0,0,0,0.4)]';
+const ROUND =
+  `pointer-events-auto grid h-10 w-10 place-items-center rounded-full ${GLASS} text-ui-gold-strong transition hover:border-ui-gold hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold sm:h-11 sm:w-11`;
 
-const PANEL = 'rounded-2xl border border-white/10 bg-[#0c0e11]/80 shadow-[0_8px_28px_rgba(0,0,0,0.45)]';
-const GOLD = 'text-[#e3bd70]';
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e3bd70]';
-const ICON_BUTTON = `pointer-events-auto grid size-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-[#0c0e11]/80 text-white/85 shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition hover:border-[#e3bd70]/70 hover:text-[#f0d797] disabled:cursor-not-allowed disabled:opacity-45 sm:size-12 ${FOCUS}`;
+const twoDigits = (n: number) => String(n).padStart(2, '0');
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-ui-muted">{label}</dt>
-      <dd className="m-0 text-right text-ui-ink">{children}</dd>
-    </div>
-  );
-}
-
-/** "E — do something here" prompt for food vendors, shops and home fixtures. */
-function PlacePrompt({ verb, place, onOpen, icon: Icon }: Prompt) {
+/** "E: do something here", for counters, doors, people and furniture. */
+function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-left text-sm sm:whitespace-nowrap hover:border-[#e3bd70]/70 ${FOCUS}`}
+      className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-sm hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:whitespace-nowrap`}
     >
-      {Icon && <Icon size={17} aria-hidden="true" className={`shrink-0 ${GOLD}`} strokeWidth={1.8} />}
-      <kbd className={`hidden rounded border border-white/20 bg-black/40 px-1.5 font-mono text-xs sm:inline ${GOLD}`}>E</kbd>
-      <span>
-        {verb} <span className="font-semibold">{place}</span>
+      <kbd className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ui-gold/60 bg-ui-gold/15 font-mono text-xs font-bold text-ui-gold-strong">E</kbd>
+      <span className="leading-tight">
+        {verb} <span className="font-semibold text-ui-gold-strong">{place}</span>
       </span>
     </button>
   );
 }
 
-function GoalsPanel({ goals }: { goals: ReturnType<typeof dailyGoals> }) {
-  const [open, setOpen] = useState(true);
-  const firstOpen = goals.find((goal) => !goal.done)?.id;
+/** Head-and-shoulders picture of your character (the same portrait as the Life OS). */
+function Portrait({ character }: { character?: Character }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const src = character ? assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`) : null;
   return (
-    <section className={`${PANEL} pointer-events-auto w-60 p-3`} aria-label="Today's goals">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={`flex w-full items-center justify-between text-left text-sm font-semibold text-white ${FOCUS}`}
-      >
-        Today&apos;s Goals
-        <ChevronDown size={16} aria-hidden="true" className={`text-white/60 transition-transform ${open ? '' : '-rotate-90'}`} />
-      </button>
-      {open && (
-        <ul className="m-0 mt-2 list-none space-y-1 p-0">
-          {goals.map((goal) => (
-            <li
-              key={goal.id}
-              className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] ${goal.id === firstOpen ? 'bg-white/10 text-white' : goal.done ? 'text-white/55' : 'text-white/75'}`}
-            >
-              <span
-                className={`grid size-4 shrink-0 place-items-center rounded-full border ${goal.done ? 'border-[#e3bd70] bg-[#e3bd70]/20 text-[#f0d797]' : 'border-white/30'}`}
-                aria-hidden="true"
-              >
-                {goal.done && <Check size={11} strokeWidth={3} />}
-              </span>
-              <span className={goal.done ? 'line-through decoration-white/30' : ''}>{goal.label}</span>
-              <span className="sr-only">{goal.done ? 'completed' : 'not completed'}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a3a33] to-[#121a17] sm:h-12 sm:w-12">
+      {src && broken !== src
+        ? <img src={src} alt="" onError={() => setBroken(src)} className="h-full w-full object-cover" draggable={false} />
+        : <span className="font-display text-lg font-bold text-ui-gold-strong">{character?.name.slice(0, 1).toUpperCase() ?? '?'}</span>}
+    </span>
+  );
+}
+
+const POI_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm' };
+const POI_COLOR: Record<PlaceKind, string> = { food: '#e0913f', shop: '#b07fd6', workplace: '#5b9bd5', home: '#3fbf8e', public: '#8a8f96', nightlife: '#d46a92', park: '#7aa54a' };
+const ICON_2D = new Map<IconName, Path2D>();
+const path2d = (name: IconName) => {
+  let p = ICON_2D.get(name);
+  if (!p) { p = new Path2D(ICON_PATHS[name]); ICON_2D.set(name, p); }
+  return p;
+};
+
+/** Metres from the centre to the edge of the minimap. */
+const MAP_RANGE = 42;
+
+/** Round minimap, north up: streets, buildings, places (pinned to the rim when out of range) and you. */
+function Minimap({ district, at, direction, homePlaceId, workPlaceId, size }: { district: District; at: { x: number; z: number }; direction: number; homePlaceId: string | null; workPlaceId: string | null; size: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = canvas.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (c.width !== size * dpr) { c.width = size * dpr; c.height = size * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r = size / 2;
+    const k = r / MAP_RANGE;
+    // The world's east is -x: mirror x so east is on the right, as on the phone map
+    const mx = (wx: number) => r - (wx - at.x) * k;
+    const my = (wz: number) => r - (wz - at.z) * k;
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(r, r, r - 1, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = '#1a2420';
+    ctx.fillRect(0, 0, size, size);
+    const { roadHalfWidth, crossStreet, buildings } = district.layout;
+    ctx.fillStyle = '#3b4441';
+    ctx.fillRect(mx(roadHalfWidth), 0, roadHalfWidth * 2 * k, size);
+    ctx.fillRect(0, my(crossStreet.maxZ), size, (crossStreet.maxZ - crossStreet.minZ) * k);
+    ctx.fillStyle = '#56615c';
+    for (const b of buildings) {
+      const w = b.size[0] * k;
+      const d = b.size[2] * k;
+      const x = mx(b.position[0]) - w / 2;
+      const y = my(b.position[2]) - d / 2;
+      if (x > size || y > size || x + w < 0 || y + d < 0) continue;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, d, 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // Places: icon discs, pinned to the rim when out of range
+    for (const p of district.places) {
+      let x = mx(p.position[0]) - r;
+      let y = my(p.position[2]) - r;
+      const dist = Math.hypot(x, y);
+      const rim = r - 9;
+      const out = dist > rim;
+      // Out of range, only your home and your workplace stay on the rim
+      if (out) {
+        if (p.id !== homePlaceId && p.id !== workPlaceId) continue;
+        x = (x / dist) * rim;
+        y = (y / dist) * rim;
+      }
+      const mine = p.id === homePlaceId;
+      const rad = mine ? 8 : 6.5;
+      ctx.save();
+      ctx.translate(r + x, r + y);
+      ctx.globalAlpha = out ? 0.75 : 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.fillStyle = POI_COLOR[p.kind];
+      ctx.fill();
+      ctx.lineWidth = mine ? 1.6 : 1;
+      ctx.strokeStyle = mine ? '#ecc98a' : 'rgba(0,0,0,0.5)';
+      ctx.stroke();
+      const s = (rad * 1.25) / 24;
+      ctx.translate(-12 * s, -12 * s);
+      ctx.scale(s, s);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke(path2d(POI_ICON[p.kind]));
+      ctx.restore();
+    }
+    // You: a gold arrow in the middle
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.rotate(-direction);
+    ctx.beginPath();
+    ctx.moveTo(0, -8);
+    ctx.lineTo(6, 6);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(-6, 6);
+    ctx.closePath();
+    ctx.fillStyle = '#ecc98a';
+    ctx.strokeStyle = '#1a1206';
+    ctx.lineWidth = 1.4;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    // North marker on the rim
+    ctx.fillStyle = '#ecc98a';
+    ctx.font = '600 10px "DM Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', r, 11);
+  });
+  return (
+    <canvas
+      ref={canvas}
+      style={{ width: size, height: size }}
+      className="block rounded-full border-2 border-ui-gold/50 shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+      role="img"
+      aria-label={`Map of ${district.name}. You are the gold arrow; north is up.`}
+    />
+  );
+}
+
+/** A warning chip for a need that is costing you (pay, mood). */
+function NeedChip({ icon, text, onClick }: { icon: IconName; text: string; onClick?: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title={text} aria-label={text} className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-ui-danger/60 bg-[#2a1210]/90 px-2.5 py-1 text-[11px] font-semibold text-ui-danger shadow-lg hover:border-ui-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-danger">
+      <Icon name={icon} className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{text}</span>
+    </button>
   );
 }
 
@@ -204,13 +262,8 @@ export function HUD({
   balance,
   gameTime,
   neighborhood,
-  today = EMPTY_LEDGER,
-  summaryShown = false,
-  onExitToMenu,
-  onRest,
-  qualityLabel,
-  onCycleQuality,
   fullness,
+  needs,
   onOpenVendor,
   onOpenShop,
   district,
@@ -220,29 +273,24 @@ export function HUD({
   busy = false,
   onTalk,
   workTask,
+  campusEntry,
+  dealerEntry,
+  statusOverride,
+  student,
+  shift,
   insideHome,
-  insidePlaceLabel,
-  outsideOffice,
-  outsideUniversity,
-  outsideHospital,
-  hospitalStatus,
-  onCampus,
-  campusStatus,
-  outsideDealership,
-  onExitVehicle,
-  onOpenWardrobe,
-  onOpenDecor,
-  onOpenRestaurantPanel,
   onOpenGadgets,
-  onOpenMap,
-  onGoHome,
-  onOpenLocations,
+  onEnterRestaurant,
   homeId = null,
   onOpenHome,
-  workMinutes = 0,
-  equipment = [],
-  tracked = null,
-  onStopTracking,
+  place,
+  nav,
+  mapPosition,
+  onOpenMoney,
+  onOpenInventory,
+  onOpenProfile,
+  onOpenSettings,
+  onOpenNeeds,
 }: HUDProps) {
   // The controller is mutated every frame; refresh the readout ~10 times a second
   const [, setFrame] = useState(0);
@@ -250,469 +298,178 @@ export function HUD({
     const id = setInterval(() => setFrame((n) => n + 1), 100);
     return () => clearInterval(id);
   }, []);
-  const [panel, setPanel] = useState<'profile' | 'settings' | null>(null);
-  const [phoneOpen, setPhoneOpen] = useState(false);
-  const closePhone = useCallback(() => setPhoneOpen(false), []);
-  const togglePanel = (next: 'profile' | 'settings') => setPanel((current) => (current === next ? null : next));
+  const [small, setSmall] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const onResize = () => setSmall(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
   const { x: px, z: pz } = controller.position;
   const vendor = nearestVendor(district.vendors, px, pz);
   const counter = counterAt(district, px, pz);
   // One prompt at a time: a food vendor, then a shop or desk, then a front door
-  const prompt = outsideDealership
-    ? { verb: 'Enter dealership', place: outsideDealership.name, onOpen: outsideDealership.onOpen, icon: CarFront }
-    : vendor && onOpenVendor
-    ? { verb: 'Enter', place: vendor.name, onOpen: () => onOpenVendor(vendor), icon: Utensils }
+  const restaurant = restaurantAt(district, px, pz);
+  const prompt = vendor && onOpenVendor
+    ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
+    : restaurant && onEnterRestaurant
+      ? { verb: restaurantOpen(gameTime.hour) ? 'Go into' : `Closed until ${RESTAURANT_OPENS}:00:`, place: restaurant.name, onOpen: onEnterRestaurant }
     : counter === 'fashion' && onOpenShop
-      ? { verb: 'Shop at', place: district.fashionHouse.name, onOpen: onOpenShop, icon: ShoppingBag }
+      ? { verb: 'Go into', place: district.fashionHouse.name, onOpen: onOpenShop }
       : counter === 'gadgets' && onOpenGadgets
-        ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets, icon: Smartphone }
+        ? { verb: 'Shop at', place: district.gadgetHub.name, onOpen: onOpenGadgets }
         : counter === 'travel' && onOpenTravel
-          ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel, icon: MapPin }
+          ? { verb: 'Book travel at', place: district.travelDesk.name, onOpen: onOpenTravel }
           : venueAt(district.nightlife, px, pz) && onOpenNightlife
-            ? { verb: 'Go out at', place: district.nightlife.name, onOpen: onOpenNightlife, icon: Music2 }
+            ? { verb: 'Go out at', place: district.nightlife.name, onOpen: onOpenNightlife }
             : parkAt(district.park, px, pz) && onOpenPark
-              ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark, icon: TreePine }
+              ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark }
               : null;
-  const resident = !prompt && !insideHome && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const resident = !prompt && !campusEntry && !dealerEntry && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const streetPrompt = prompt ?? (resident && onTalk
-    ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident), icon: UserRound }
-    : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen, icon: BriefcaseBusiness } : null) ?? (door && onOpenHome
-    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door), icon: HouseIcon }
-    : null) ?? (outsideUniversity
-      ? { verb: 'Enter campus at', place: outsideUniversity.name, onOpen: outsideUniversity.onOpen, icon: GraduationCap }
-      : null) ?? (outsideHospital
-      ? { verb: 'Enter hospital at', place: outsideHospital.name, onOpen: outsideHospital.onOpen, icon: BriefcaseBusiness }
-      : null) ?? (outsideOffice
-      ? { verb: 'Enter workplace', place: outsideOffice.name, onOpen: outsideOffice.onOpen, icon: BriefcaseBusiness }
-      : null);
-  const placePrompt = controller.drivingVehicleId ? null : busy ? null : insideHome ? insideHome.interactionAt(px, pz) : streetPrompt;
-  const hasCareer = !!character && character.career !== 'none';
-  const shiftHours = isWorkingHours(gameTime) && hasCareer;
-  const status = !shiftHours
-    ? { label: 'Off duty', dot: 'bg-ui-faint', text: 'text-ui-muted' }
-    : workplaceStatus.isAtWorkplace || onCampus
-      ? { label: 'Working', dot: 'bg-[#e3bd70]', text: GOLD }
-      : { label: 'Not at work', dot: 'bg-ui-warn', text: 'text-ui-warn' };
+  const streetPrompt = prompt ?? (campusEntry ? { verb: 'Enter', place: campusEntry.name, onOpen: campusEntry.onOpen } : null) ?? (dealerEntry ? { verb: 'Browse cars at', place: dealerEntry.name, onOpen: dealerEntry.onOpen } : null) ?? (resident && onTalk
+    ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
+    : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
+    ? { verb: door.id === homeId ? 'Go into your home at' : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
+    : null);
+  const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
 
-  const hungry = fullness < HUNGRY_THRESHOLD;
-  const hungerBar = hungry ? 'bg-ui-danger' : fullness < 50 ? 'bg-ui-warn' : 'bg-[#e3bd70]';
+  const shiftHours = isWorkingHours(gameTime) && !!character && character.career !== 'none';
+  const status = statusOverride
+    ? { label: statusOverride.label, dot: statusOverride.tone === 'good' ? 'bg-ui-accent' : 'bg-ui-warn', text: statusOverride.tone === 'good' ? 'text-ui-accent-strong' : 'text-ui-warn' }
+    : !shiftHours ? null
+    : workplaceStatus.isAtWorkplace
+      ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
+      : { label: insideHome ? 'Not at work' : `Not at work · ${workplaceStatus.distanceToWorkplace} m`, dot: 'bg-ui-warn', text: 'text-ui-warn' };
 
-  const x = controller.position.x.toFixed(1);
-  const z = controller.position.z.toFixed(1);
-  const direction = (controller.direction * (180 / Math.PI)).toFixed(0);
-  const speed = Math.sqrt(controller.velocity.x ** 2 + controller.velocity.z ** 2).toFixed(1);
-  const homeScene = !!insideHome && !insidePlaceLabel;
-  const careerAction = workTask?.onOpen ?? outsideUniversity?.onOpen ?? outsideHospital?.onOpen ?? outsideOffice?.onOpen
-    ?? (hasCareer ? onOpenLocations : undefined);
-  const level = hasCareer && character ? levelIndex(character.career, workMinutes) + 1 : 1;
+  const warnings: { icon: IconName; text: string }[] = [];
+  if (fullness < HUNGRY_THRESHOLD) warnings.push({ icon: 'hunger', text: 'Hungry: pay halved' });
+  if (needs && needs.energy < TIRED_THRESHOLD) warnings.push({ icon: 'energy', text: 'Exhausted: pay halved' });
+  if (needs && needs.hygiene < 20) warnings.push({ icon: 'hygiene', text: 'Needs a shower' });
+  if (needs && needs.fun < 20) warnings.push({ icon: 'fun', text: 'Bored' });
+  if (needs && needs.social < 20) warnings.push({ icon: 'social', text: 'Lonely' });
 
-  // Daily goals: derived from the ledger plus the few actions the ledger does not record
-  const outfitSignature = JSON.stringify(character?.wardrobe?.equipped ?? {});
-  const goalKey = `aye.dailyGoals.v1.${character?.name ?? 'guest'}`;
-  const [goalFlags, setGoalFlags] = useState<GoalFlags | null>(() => {
-    try { return parseFlags(window.localStorage.getItem(goalKey)); } catch { return null; }
-  });
-  const inDowntown = !insideHome && neighborhood?.id === 'downtown';
-  const nextFlags = updateFlags(goalFlags, goalDay(gameTime), outfitSignature, inDowntown);
-  if (nextFlags !== goalFlags) setGoalFlags(nextFlags);
-  useEffect(() => {
-    try { if (goalFlags) window.localStorage.setItem(goalKey, JSON.stringify(goalFlags)); } catch { /* storage unavailable */ }
-  }, [goalFlags, goalKey]);
-  const goals = dailyGoals(nextFlags, today, today.minutesWorked > 0, summaryShown);
-
-  const phoneEnabled = !!onOpenMap;
-  const phoneTitle = phoneEnabled ? 'Phone' : 'Buy a phone at the gadget hub to unlock it';
-  const dockItems: { label: string; icon: LucideIcon; onClick?: () => void; active?: boolean; title?: string }[] = [
-    { label: 'Home', icon: HouseIcon, onClick: homeScene ? undefined : onGoHome, active: homeScene, title: homeScene ? 'You are home' : homeId ? 'Walk home' : 'Rent a home to enable this' },
-    { label: 'Phone', icon: Smartphone, onClick: phoneEnabled ? () => setPhoneOpen(true) : undefined, title: phoneTitle },
-    { label: 'Map', icon: Map, onClick: onOpenLocations, title: onOpenLocations ? 'City locations' : 'Go outside to use the city map' },
-    { label: 'Inventory', icon: Package, title: 'Inventory is not implemented yet' },
-    { label: 'Fashion', icon: Shirt, onClick: onOpenWardrobe, title: 'Wardrobe and clothing' },
-    { label: 'Social', icon: Users, onClick: resident && onTalk ? () => onTalk(resident) : undefined, title: resident ? `Talk to ${resident.name}` : 'Stand near someone to talk' },
-  ];
-  if (homeScene && onOpenDecor) dockItems.splice(5, 0, { label: 'Decor', icon: Armchair, onClick: onOpenDecor, title: 'Decorate this home' });
-  if (insidePlaceLabel?.startsWith('Dining') && onOpenRestaurantPanel) {
-    dockItems.splice(5, 0, { label: 'Restaurant', icon: Utensils, onClick: onOpenRestaurantPanel, active: true });
-  }
-  const phoneApps: PhoneApp[] = [
-    { label: 'Messages', detail: 'Messaging is not implemented yet', icon: MessageCircle },
-    { label: 'Map', detail: 'Open the district map', icon: Map, onOpen: onOpenMap },
-    { label: 'Jobs', detail: 'Open your current work task or workplace directory', icon: BriefcaseBusiness, onOpen: careerAction },
-    { label: 'Fashion', detail: 'Open wardrobe and clothing', icon: Shirt, onOpen: onOpenWardrobe },
-    { label: 'Shop', detail: 'Browse shops and restaurants in the city directory', icon: ShoppingBag, onOpen: onOpenLocations },
-    { label: 'Bank', detail: 'Banking is not implemented yet', icon: Landmark },
-    { label: 'Social', detail: resident ? `Talk to ${resident.name}` : 'Find someone nearby to talk to', icon: Users, onOpen: resident && onTalk ? () => onTalk(resident) : undefined },
-    { label: 'Camera', detail: 'The camera is not implemented yet', icon: Camera },
-    { label: 'Settings', detail: 'Cycle graphics quality', icon: Settings2, onOpen: onCycleQuality },
-    { label: 'Calendar', detail: 'Calendar is not implemented yet', icon: CalendarDays },
-    { label: 'Contacts', detail: 'Contacts are not implemented yet', icon: Contact },
-    { label: 'Real Estate', detail: 'Homes to let are listed in the city directory', icon: HouseIcon, onOpen: onOpenLocations },
-  ];
-
-  const isNight = gameTime.period === 'night' || gameTime.period === 'evening';
-  const PeriodIcon = isNight ? Moon : Sun;
-  const locationName = insideHome ? insideHome.name : neighborhood?.name;
-  const locationSub = insidePlaceLabel ?? (insideHome ? district.name : district.city.name);
+  const mapAt = mapPosition ?? { x: px, z: pz };
+  const homePlaceId = homeId ? `${district.id}.home.${homeId}` : null;
+  const location = neighborhood?.name ?? district.name;
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
-      {phoneOpen && (
-        <PhonePanel
-          characterName={character?.name ?? 'AYE'}
-          balance={balance}
-          gameTime={gameTime}
-          apps={phoneApps}
-          onClose={closePhone}
-        />
-      )}
-
-      {/* Top row: identity on the left, clock in the centre, account and menus on the right */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:p-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <img src={assetUrl('brand/aye-mark.webp')} alt="AYE" className="hidden h-12 w-auto shrink-0 object-contain drop-shadow-lg sm:block" />
-          <button
-            type="button"
-            onClick={() => togglePanel('profile')}
-            aria-expanded={panel === 'profile'}
-            aria-label="Player profile"
-            className={`${PANEL} pointer-events-auto flex min-w-0 items-center gap-2.5 py-1.5 pl-1.5 pr-4 text-left ${FOCUS}`}
-          >
-            {character ? (
-              <img
-                src={assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`)}
-                alt=""
-                className="size-10 shrink-0 rounded-full border border-[#e3bd70]/50 object-cover object-top sm:size-11"
-              />
-            ) : (
-              <UserRound size={22} aria-hidden="true" className="m-2 shrink-0 text-white/70" />
+      {/* Top-left: who and when */}
+      <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5 sm:left-5 sm:top-5">
+        <div className={`${GLASS} flex items-center gap-2.5 rounded-full py-1 pl-1 pr-4`}>
+          <Portrait character={character} />
+          <div className="min-w-0">
+            <p className="m-0 max-w-[9rem] truncate text-sm font-semibold leading-tight sm:max-w-[12rem]">{character?.name ?? 'You'}</p>
+            <p className="m-0 font-display text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
+              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}
+            </p>
+            {status && (
+              <p className={`m-0 flex items-center gap-1 text-[10px] font-medium leading-tight ${status.text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} aria-hidden /> {status.label}
+              </p>
             )}
-            <span className="min-w-0">
-              <span className="block truncate font-display text-sm font-semibold leading-tight sm:text-base">{character?.name ?? 'AYE'}</span>
-              <span className="mt-0.5 flex items-center gap-2 text-[11px] text-white/65">
-                <span className="whitespace-nowrap">Level {level}</span>
-                <span className="whitespace-nowrap md:hidden">{formatGameTime(gameTime)}</span>
-                <span
-                  className="block h-1 w-10 overflow-hidden rounded-full bg-white/15"
-                  role="meter"
-                  aria-label="Fullness"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(fullness)}
-                >
-                  <span className={`block h-full rounded-full ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                </span>
-              </span>
-            </span>
-          </button>
-        </div>
-
-        <div className={`${PANEL} absolute left-1/2 top-3 hidden -translate-x-1/2 items-center gap-4 px-5 py-2 md:flex sm:top-4`} aria-label="Date and time">
-          <CalendarDays size={22} aria-hidden="true" className="text-white/70" />
-          <div className="leading-tight">
-            <p className="m-0 text-[11px] text-white/65">{formatGameDate(gameTime)}</p>
-            <p className="m-0 font-display text-xl font-semibold tabular-nums">{formatGameTime(gameTime)}</p>
-          </div>
-          <span aria-hidden="true" className="h-8 w-px bg-white/15" />
-          <div className="flex items-center gap-2">
-            <PeriodIcon size={20} aria-hidden="true" className={GOLD} />
-            <span className="text-sm capitalize text-white/85">{gameTime.period}</span>
           </div>
         </div>
-
-        <div className="flex items-start gap-1.5 sm:gap-2">
-          <p className={`${PANEL} m-0 hidden h-11 items-center gap-2 px-4 text-sm font-semibold tabular-nums sm:flex sm:h-12`} aria-label="Balance">
-            <span className="grid size-5 place-items-center rounded-full bg-[#e3bd70] text-[10px] font-black text-black" aria-hidden="true">G</span>
-            <span className="text-white/70">GHAI</span>
-            <span className="text-white">{balance.toLocaleString()}</span>
-          </p>
-          <button type="button" className={ICON_BUTTON} disabled={!phoneEnabled} onClick={() => setPhoneOpen(true)} aria-label="Phone" title={phoneTitle}>
-            <Smartphone size={20} aria-hidden="true" strokeWidth={1.8} />
-          </button>
-          <button type="button" className={ICON_BUTTON} disabled aria-label="Bag (coming soon)" title="Inventory is not implemented yet">
-            <ShoppingBag size={20} aria-hidden="true" strokeWidth={1.8} />
-          </button>
-          <button type="button" className={ICON_BUTTON} onClick={() => togglePanel('profile')} aria-expanded={panel === 'profile'} aria-label="Profile" title="Profile and details">
-            <UserRound size={20} aria-hidden="true" strokeWidth={1.8} />
-          </button>
-          <button type="button" className={ICON_BUTTON} onClick={() => togglePanel('settings')} aria-expanded={panel === 'settings'} aria-label="Settings" title="Settings">
-            <Settings2 size={20} aria-hidden="true" strokeWidth={1.8} />
-          </button>
-        </div>
+        {warnings.length > 0 && (
+          <div className="flex max-w-[16rem] flex-wrap gap-1">
+            {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}
+          </div>
+        )}
+        {student && !small && <TodaysGoals goals={student.goals} />}
+        {shift && !small && <TodaysGoals goals={shift.goals} />}
       </div>
-
-      {controller.trafficWarning && (
-        <p role="status" className="absolute left-1/2 top-24 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg sm:top-24 sm:text-sm">
-          <TriangleAlert size={16} aria-hidden="true" />
-          Vehicle approaching — waiting for a safe gap.
-        </p>
+      {(student || shift) && !small && (
+        <div className="absolute right-5 top-[4.6rem]">
+          {student ? <StudentStatus s={student} /> : shift && <ShiftStatus s={shift} />}
+        </div>
       )}
 
-      {/* Left column: daily goals and the destination being tracked */}
-      <div className="absolute left-3 top-[4.75rem] flex max-w-60 flex-col items-start gap-2 sm:left-4 sm:top-24">
-        <div className="hidden sm:block">
-          <GoalsPanel goals={goals} />
-        </div>
-        {tracked && (
-          <div role="status" className={`${PANEL} pointer-events-auto flex items-center gap-2.5 px-3 py-2 text-xs`}>
-            <MapPin size={15} aria-hidden="true" className={`shrink-0 ${GOLD}`} />
-            <div className="min-w-0">
-              <p className="m-0 truncate font-semibold">{tracked.name}</p>
-              <p className="m-0 tabular-nums text-ui-muted">
-                {(() => {
-                  const d = Math.hypot(tracked.position[0] - px, tracked.position[2] - pz);
-                  return d < ARRIVE_RADIUS ? "You're here" : `${Math.round(d)} m ${compass(tracked.position[0] - px, tracked.position[2] - pz)}`;
-                })()}
+      {/* Top-centre: the venue or area */}
+      {place && (
+        <div className="absolute left-1/2 top-[4.6rem] -translate-x-1/2 sm:top-5">
+          <div className={`${GLASS} flex items-center gap-3 rounded-2xl px-4 py-2 sm:px-5`}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-ui-gold/60 bg-ui-gold/10 text-ui-gold-strong sm:h-9 sm:w-9">
+              <Icon name={place.icon} className="h-4 w-4 sm:h-5 sm:w-5" />
+            </span>
+            <div className="text-center">
+              <p className="m-0 whitespace-nowrap font-display text-sm font-bold uppercase tracking-[0.14em] sm:text-base">{place.title}</p>
+              <p className="m-0 flex items-center justify-center gap-2 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.22em] text-ui-gold-strong">
+                <span className="h-px w-4 bg-ui-gold/60" aria-hidden /> {place.subtitle} <span className="h-px w-4 bg-ui-gold/60" aria-hidden />
               </p>
             </div>
-            {onStopTracking && (
-              <button
-                type="button"
-                onClick={onStopTracking}
-                aria-label="Stop tracking"
-                className={`shrink-0 rounded px-1.5 py-0.5 text-ui-muted hover:text-ui-ink ${FOCUS}`}
-              >
-                ✕
-              </button>
-            )}
           </div>
-        )}
-      </div>
-
-      {/* Right column: active career */}
-      <section className={`${PANEL} absolute right-4 top-[6.25rem] hidden w-64 lg:block`} aria-label="Active career">
-        <p className="m-0 px-4 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
-          {character?.career === 'student' ? 'Active Status' : 'Active Career'}
-        </p>
-        {(() => {
-          const body = (
-            <>
-              <span className={`grid size-11 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 ${GOLD}`}>
-                <BriefcaseBusiness size={22} aria-hidden="true" strokeWidth={1.7} />
-              </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-sm font-semibold text-white">
-                  {hasCareer && character ? CAREER_LABEL[character.career] : 'No career yet'}
-                </span>
-                <span className={`flex items-center gap-1.5 text-xs ${hasCareer ? status.text : 'text-white/60'}`}>
-                  {hasCareer && <span className={`size-1.5 rounded-full ${status.dot}`} aria-hidden="true" />}
-                  {hasCareer && character ? `${status.label} · ${careerLevel(character.career, workMinutes).title}` : 'Choose one in your profile'}
-                </span>
-              </span>
-              <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-white/60" />
-            </>
-          );
-          return careerAction ? (
-            <button type="button" onClick={careerAction} title="Career details" className={`pointer-events-auto flex w-full items-center gap-3 px-4 pb-3 pt-2 ${FOCUS}`}>
-              {body}
-            </button>
-          ) : (
-            <div className="flex w-full items-center gap-3 px-4 pb-3 pt-2">{body}</div>
-          );
-        })()}
-        {hasCareer && character && (
-          <dl className="m-0 space-y-2 border-t border-white/10 px-4 pb-3 pt-2.5 text-xs">
-            <div className="flex justify-between gap-2"><dt className="text-white/55">Shift</dt><dd className="m-0 tabular-nums text-white">{String(WORK_START_HOUR).padStart(2, '0')}:00 – {String(WORK_END_HOUR).padStart(2, '0')}:00</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-white/55">{character.career === 'student' ? 'Allowance' : 'Income rate'}</dt><dd className={`m-0 tabular-nums ${GOLD}`}>GHAI {HOURLY_WAGE[character.career]} / game hour</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-white/55">Today's earnings</dt><dd className={`m-0 tabular-nums ${GOLD}`}>GHAI {today.income.toLocaleString()}</dd></div>
-            <div>
-              <div className="flex justify-between gap-2"><dt className="text-white/55">{character.career === 'student' ? 'Time in class' : 'Time on shift'}</dt><dd className="m-0 tabular-nums text-white">{Math.floor(today.minutesWorked / 60)}h {today.minutesWorked % 60}m / {WORK_END_HOUR - WORK_START_HOUR}h</dd></div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={(WORK_END_HOUR - WORK_START_HOUR) * 60} aria-valuenow={Math.min(today.minutesWorked, (WORK_END_HOUR - WORK_START_HOUR) * 60)} aria-label="Shift progress">
-                <div className="h-full rounded-full bg-[#e3bd70]" style={{ width: `${Math.min(100, (today.minutesWorked / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100)}%` }} />
-              </div>
-            </div>
-            {campusStatus && character.career === 'student' && (
-              <>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Classes today</dt><dd className="m-0 tabular-nums text-white">{campusStatus.classesToday} / {campusStatus.classesTotal}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Assignment</dt><dd className="m-0 text-white">{campusStatus.assignmentDone ? 'Submitted' : 'Due today'}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Credits · standing</dt><dd className="m-0 text-white">{campusStatus.credits} · {campusStatus.standing}</dd></div>
-              </>
-            )}
-            {hospitalStatus && character.career === 'doctor' && (
-              <>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Shift</dt><dd className="m-0 text-white">{hospitalStatus.onShift ? 'Clocked in' : 'Clocked out'}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Patients today</dt><dd className="m-0 tabular-nums text-white">{hospitalStatus.patientsToday} / {hospitalStatus.patientsTarget}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-white/55">Shifts completed</dt><dd className="m-0 tabular-nums text-white">{hospitalStatus.shiftsCompleted}</dd></div>
-              </>
-            )}
-          </dl>
-        )}
-      </section>
-
-      {/* Profile and settings drop-downs */}
-      {panel === 'profile' && (
-        <section className={`${PANEL} pointer-events-auto absolute right-3 top-[4.75rem] z-20 max-h-[calc(100dvh-10rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto px-4 py-3.5 sm:right-4 sm:top-[5.5rem]`} aria-label="Player status">
-          {character && (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="m-0 flex items-center gap-1.5 truncate text-sm font-semibold"><UserRound size={14} aria-hidden="true" className={`shrink-0 ${GOLD}`} />{character.name}</p>
-                  <p className="m-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-ui-muted">
-                    <BriefcaseBusiness size={13} aria-hidden="true" className="shrink-0" />
-                    {careerLevel(character.career, workMinutes).title} · <span className="capitalize">{character.lifestyle.replace('-', ' ')}</span>
-                  </p>
-                </div>
-                <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.text}`}>
-                  <span className={`h-2 w-2 rounded-full ${status.dot}`} aria-hidden />
-                  {status.label}
-                </span>
-              </div>
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <div>
-                  <p className="m-0 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-ui-faint"><Wallet size={13} aria-hidden="true" />Balance</p>
-                  <p className="m-0 font-display text-2xl font-semibold leading-tight tabular-nums">
-                    {balance.toLocaleString()} <span className="text-base text-ui-muted">GHAI</span>
-                  </p>
-                </div>
-                {hasCareer && !insideHome && (
-                  <p className="m-0 text-right text-xs text-ui-muted">
-                    <span className="flex items-center justify-end gap-1"><BriefcaseBusiness size={13} aria-hidden="true" />Workplace</span>
-                    <span className={`block text-sm ${workplaceStatus.isAtWorkplace || onCampus ? GOLD : 'text-ui-ink'}`}>
-                      {workplaceStatus.isAtWorkplace || onCampus ? 'You are here' : `${workplaceStatus.distanceToWorkplace} m away`}
-                    </span>
-                  </p>
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="flex items-baseline justify-between text-xs">
-                  <span className="flex items-center gap-1.5 text-ui-muted"><Apple size={13} aria-hidden="true" />Hunger</span>
-                  <span className={hungry ? 'font-semibold text-ui-danger' : 'text-ui-ink'}>{hungerLabel(fullness)}</span>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ui-line">
-                  <div className={`h-full rounded-full transition-[width] duration-500 ${hungerBar}`} style={{ width: `${Math.round(fullness)}%` }} />
-                </div>
-                {hungry && <p className="m-0 mt-1.5 text-xs text-ui-danger">Hungry: pay is halved until you eat.</p>}
-              </div>
-            </>
-          )}
-          <dl className="m-0 mt-3 space-y-1 border-t border-white/10 pt-3 text-xs">
-            {character && (
-              <>
-                {character.career !== 'none' && (() => {
-                  const left = hoursToNextLevel(character.career, workMinutes);
-                  const next = careerLadder(character.career)[levelIndex(character.career, workMinutes) + 1];
-                  return (
-                    <>
-                      <Row label="Pay">{Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, workMinutes).pay * equipmentPay(equipment, character.career))} GHAI an hour</Row>
-                      <Row label="Next promotion">{left === null || !next ? 'Top of the ladder' : `${next.title} in ${left}h of work`}</Row>
-                    </>
-                  );
-                })()}
-                <Row label="Lives in">{homeById(homeId)?.name ?? 'No home (sleeping rough)'}</Row>
-                <Row label="From">{formatHome(character.country, character.region)}</Row>
-                <Row label="Gender">{genderLabel(character.gender)}</Row>
-                <Row label="Heritage">{[heritageLabel(character.heritage), character.ethnicGroup].filter(Boolean).join(' · ')}</Row>
-                <Row label="Diet">{DIETS.find((d) => d.id === character.diet)?.label}</Row>
-              </>
-            )}
-            <Row label="Period"><span className="capitalize">{gameTime.period}</span></Row>
-            <Row label="Position"><span className="font-mono text-ui-muted">{x}, {z}</span></Row>
-            <Row label="Direction"><span className="font-mono text-ui-muted">{direction}°</span></Row>
-            <Row label="Speed"><span className="font-mono text-ui-muted">{speed} m/s</span></Row>
-          </dl>
-        </section>
-      )}
-      {panel === 'settings' && (
-        <section className={`${PANEL} pointer-events-auto absolute right-3 top-[4.75rem] z-20 w-[min(17rem,calc(100vw-1.5rem))] space-y-2 p-3 sm:right-4 sm:top-[5.5rem]`} aria-label="Settings">
-          {onCycleQuality && (
-            <button type="button" onClick={onCycleQuality} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} aria-label={`Graphics quality ${qualityLabel}`} title="Auto lowers detail if the frame rate drops">
-              <Settings2 size={17} aria-hidden="true" className={GOLD} />
-              <span className="flex-1">Graphics quality</span>
-              <span className="capitalize text-white/70">{qualityLabel}</span>
-            </button>
-          )}
-          {onRest && (!insideHome || homeScene) && (
-            <button type="button" onClick={() => { onRest(); setPanel(null); }} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} title="Sleep until 07:00">
-              <BedDouble size={17} aria-hidden="true" className={GOLD} />
-              <span className="flex-1">Rest until morning</span>
-            </button>
-          )}
-          {onExitToMenu && (
-            <button type="button" onClick={onExitToMenu} className={`flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left text-sm hover:border-[#e3bd70]/60 ${FOCUS}`} title="Back to the main menu (your life is saved)">
-              <Menu size={17} aria-hidden="true" className={GOLD} />
-              <span className="flex-1">Main menu</span>
-            </button>
-          )}
-          <p className="m-0 px-1 font-mono text-[11px] text-ui-muted" aria-label="Frames per second">{perfStats.fps} FPS</p>
-        </section>
-      )}
-
-      {/* Prompt when standing at a vendor, shop or home fixture (desktop: above the navigation bar) */}
-      {placePrompt && (
-        <div className="absolute bottom-24 left-1/2 hidden -translate-x-1/2 sm:block">
-          <PlacePrompt {...placePrompt} />
         </div>
       )}
-      {controller.drivingVehicleId && (
-        <div className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-[#e3bd70]/50 bg-ui-panel/90 px-3 py-2 text-xs text-ui-ink shadow-lg">
-          <span className="flex items-center gap-2 font-semibold"><CarFront size={16} className={GOLD} />Driving · {Math.round(Math.abs(controller.vehicleSpeed) * 3.6)} km/h</span>
-          <span className="hidden text-ui-muted sm:inline">W/S drive · A/D steer · E exit</span>
-        </div>
-      )}
-      {controller.drivingVehicleId && onExitVehicle && (
-        <button type="button" onClick={onExitVehicle} className={`fixed bottom-28 right-4 z-40 rounded-lg border border-[#e3bd70]/70 bg-ui-panel/90 px-4 py-3 text-xs font-bold uppercase tracking-wider ${GOLD} shadow-lg transition hover:bg-[#e3bd70]/10 sm:bottom-28 sm:right-6 ${FOCUS}`}>
-          Exit car
+
+      {/* Top-right: money and the system buttons */}
+      <div className="absolute right-3 top-3 flex items-center gap-1.5 sm:right-5 sm:top-5 sm:gap-2">
+        <button
+          type="button"
+          onClick={onOpenMoney}
+          title="Your money: income, spending and savings"
+          className={`${GLASS} pointer-events-auto flex h-10 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:h-11 sm:gap-2 sm:pr-3`}
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#3a2606] sm:h-8 sm:w-8">
+            <Icon name="coin" className="h-4 w-4 sm:h-5 sm:w-5" />
+          </span>
+          <span className="font-display text-sm font-bold tabular-nums sm:text-base">{Math.round(balance).toLocaleString()}</span>
+          <span className="hidden text-[10px] font-semibold text-ui-gold-strong sm:inline">GHAI</span>
+          <Icon name="arrowRight" className="h-3.5 w-3.5 text-ui-gold-strong" />
         </button>
-      )}
-
-      {/* Bottom left: thumb-stick on touch screens, minimap and neighbourhood */}
-      <div className="absolute bottom-[4.9rem] left-0 flex flex-col items-start gap-2 p-3 sm:p-4 lg:bottom-0">
-        <div className="flex items-end justify-between gap-2">
-          <TouchStick />
-        </div>
-        {placePrompt && (
-          <div className="sm:hidden">
-            <PlacePrompt {...placePrompt} />
-          </div>
+        {onOpenInventory && (
+          <button type="button" onClick={onOpenInventory} className={ROUND} title="Inventory: the clothes you own" aria-label="Inventory">
+            <Icon name="bag" className="h-5 w-5" />
+          </button>
         )}
-        {!insideHome && (
-          <div className="hidden size-36 overflow-hidden rounded-full border-2 border-white/25 bg-[#1b2128] shadow-[0_8px_28px_rgba(0,0,0,0.55)] md:block lg:size-44">
-            <Minimap district={district} controller={controller} tracked={tracked} />
-          </div>
+        {onOpenProfile && (
+          <button type="button" onClick={onOpenProfile} className={`${ROUND} hidden sm:grid`} title="Your profile" aria-label="Profile">
+            <Icon name="profile" className="h-5 w-5" />
+          </button>
         )}
-        {locationName && (
-          <div className={`${PANEL} flex max-w-[16rem] items-center gap-2.5 px-3.5 py-2`}>
-            {insidePlaceLabel?.startsWith('Dining')
-              ? <Utensils size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />
-              : insidePlaceLabel?.startsWith('At work')
-                ? <BriefcaseBusiness size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />
-                : insideHome ? <HouseIcon size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" /> : <MapPin size={18} className={`shrink-0 ${GOLD}`} aria-hidden="true" />}
-            <div className="min-w-0">
-              <p className="m-0 truncate text-sm font-semibold text-white">{locationName}</p>
-              <p className="m-0 truncate text-[10px] uppercase tracking-[0.12em] text-white/55">{locationSub}</p>
-            </div>
-          </div>
+        {onOpenSettings && (
+          <button type="button" onClick={onOpenSettings} className={ROUND} title="Settings and main menu" aria-label="Settings">
+            <Icon name="settings" className="h-5 w-5" />
+          </button>
         )}
       </div>
 
-      {/* Bottom navigation: the same destinations in every scene, state is never reset */}
-      <nav
-        aria-label="Quick navigation"
-        className={`${PANEL} pointer-events-auto fixed bottom-3 left-1/2 z-30 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 overflow-x-auto p-1.5 sm:bottom-4`}
-      >
-        {dockItems.map(({ label, icon: Icon, onClick, active, title }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={onClick}
-            disabled={!onClick}
-            aria-current={active ? 'page' : undefined}
-            aria-label={label}
-            title={title ?? label}
-            className={`flex min-w-[3.9rem] shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-[11px] transition sm:min-w-[4.6rem] ${FOCUS} ${active ? 'border-[#e3bd70]/80 bg-[#e3bd70]/15 text-[#f0d797]' : 'border-transparent text-white/75 hover:bg-white/5 hover:text-white'} disabled:cursor-default ${active ? '' : 'disabled:opacity-45'}`}
-          >
-            <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-            <span className="whitespace-nowrap">{label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* Bottom-left: minimap and where you are */}
+      <div className="absolute bottom-[5.25rem] left-3 flex flex-col items-center gap-1.5 sm:bottom-5 sm:left-5 pointer-coarse:bottom-auto pointer-coarse:left-auto pointer-coarse:right-3 pointer-coarse:top-[4.6rem] sm:pointer-coarse:top-[4.75rem]">
+        <Minimap district={district} at={mapAt} direction={mapPosition ? Math.PI : controller.direction} homePlaceId={homePlaceId} workPlaceId={character && character.career !== 'none' ? `${district.id}.work.${character.career}` : null} size={small ? 92 : 148} />
+        <p className={`${GLASS} m-0 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold`}>
+          <Icon name="pin" className="h-3.5 w-3.5 text-ui-gold-strong" /> {location}
+        </p>
+      </div>
 
-      {/* Keyboard hint: desktop only, hidden on touch screens */}
-      <div className="absolute bottom-0 right-0 hidden p-5 text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/85 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] xl:block pointer-coarse:hidden">
+      {/* Bottom: the prompt, then the bar */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-3 pb-3 sm:pb-5">
+        <div className="flex w-full items-end justify-between gap-2 sm:justify-center">
+          <TouchStick />
+          {placePrompt && <PlacePrompt {...placePrompt} />}
+        </div>
+        <nav aria-label="Main" className={`${GLASS} pointer-events-auto flex max-w-full items-stretch gap-0.5 overflow-x-auto rounded-2xl p-1 sm:gap-1 sm:p-1.5`}>
+          {nav.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={n.onClick}
+              title={n.title ?? n.label}
+              aria-pressed={n.active || undefined}
+              className={`flex min-w-[3.4rem] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:min-w-[4.5rem] sm:px-2.5 sm:text-[11px] ${n.active ? 'bg-ui-gold/20 text-ui-gold-strong' : 'text-ui-ink/85 hover:bg-white/5 hover:text-ui-gold-strong'}`}
+            >
+              <Icon name={n.icon} className="h-5 w-5" />
+              <span className="whitespace-nowrap">{n.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Keyboard hint: desktop only */}
+      <div className="absolute bottom-5 right-5 hidden text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] lg:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
-        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom</p>
+        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom · <span className="font-semibold">L</span> phone</p>
       </div>
     </div>
   );

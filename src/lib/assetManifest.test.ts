@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseManifest } from './assetManifest';
+import { parseManifest, wantsCc5Avatar } from './assetManifest';
 
 describe('asset manifest', () => {
   it('accepts a valid manifest', () => {
@@ -64,5 +64,22 @@ describe('asset manifest', () => {
     expect(manifest.avatar).toEqual({ url: 'a.glb', height: 1.8, walkSpeed: 1.03, runSpeed: 2.8 });
     const bad = parseManifest({ avatar: { url: 'a.glb', height: 1.8, walkSpeed: -1 } });
     expect(bad.manifest.avatar?.walkSpeed).toBe(1.4);
+  });
+
+  it('reads an optional ambient-occlusion map, and ignores a bad one', () => {
+    const { manifest } = parseManifest({ surfaces: { pavement: { color: 'textures/pavement/color.jpg', ao: 'textures/pavement/ao.jpg', tileMeters: 2 } } });
+    expect(manifest.surfaces.pavement?.ao).toBe('textures/pavement/ao.jpg');
+    const bad = parseManifest({ surfaces: { road: { color: 'textures/road/color.jpg', ao: '../secret.jpg', tileMeters: 4 } } });
+    expect(bad.manifest.surfaces.road?.ao).toBeUndefined();
+    expect(bad.problems.some((p) => p.includes('road.ao'))).toBe(true);
+  });
+
+  it('the CC5 character is the player body; the old looks only by request in development', () => {
+    expect(wantsCc5Avatar('', false)).toBe(true);
+    expect(wantsCc5Avatar('', true)).toBe(true);
+    expect(wantsCc5Avatar('?avatar=default', true)).toBe(false);
+    // Players can't switch back to the old looks from the address bar
+    expect(wantsCc5Avatar('?avatar=default', false)).toBe(true);
+    expect(wantsCc5Avatar('?avatar=other', true)).toBe(true);
   });
 });

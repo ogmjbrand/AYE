@@ -37,6 +37,11 @@ function useFrondGeometry() {
 
 function Palms() {
   const { palmSpots } = useLayout();
+  return <PalmGrove spots={palmSpots} />;
+}
+
+/** Palms at these spots (street verges, a campus courtyard). */
+export function PalmGrove({ spots: palmSpots, seed = 29 }: { spots: readonly (readonly [number, number, number])[]; seed?: number }) {
   const frondGeo = useFrondGeometry();
   const frondMat = useMemo(
     () => new MeshStandardMaterial({ map: frondTexture(), alphaTest: 0.5, side: DoubleSide, roughness: 0.8 }),
@@ -44,7 +49,7 @@ function Palms() {
   );
   const trunkMat = useMemo(() => new MeshStandardMaterial({ color: '#7b6b55', roughness: 0.95 }), []);
   const { trunks, fronds } = useMemo(() => {
-    const rand = seeded(29);
+    const rand = seeded(seed);
     const trunks: Placement[] = [];
     const fronds: Placement[] = [];
     for (const [x, , z] of palmSpots) {
@@ -61,7 +66,7 @@ function Palms() {
       }
     }
     return { trunks, fronds };
-  }, [palmSpots]);
+  }, [palmSpots, seed]);
   return (
     <>
       <Instances items={trunks} material={trunkMat} geometry={<cylinderGeometry args={[0.16, 0.24, 1, 8]} />} />

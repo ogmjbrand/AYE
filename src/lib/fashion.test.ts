@@ -6,7 +6,9 @@ describe('fashion catalogue', () => {
   it('has unique ids, valid colours and prices, and items for every slot', () => {
     expect(new Set(FASHION_ITEMS.map((i) => i.id)).size).toBe(FASHION_ITEMS.length);
     for (const i of FASHION_ITEMS) {
-      expect(i.price).toBeGreaterThan(0);
+      // Collectibles are earned, never sold; everything else has a price
+      if (i.collection === 'Rewards') expect(i.stockedIn).toEqual([]);
+      else expect(i.price).toBeGreaterThan(0);
       expect(PATTERNS[i.style.pattern]).toBeTypeOf('number');
       for (const c of i.style.colors) expect(c).toMatch(/^#[0-9a-f]{6}$/);
       expect(i.id.startsWith(i.slot)).toBe(true);

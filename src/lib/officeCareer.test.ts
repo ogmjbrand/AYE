@@ -25,7 +25,7 @@ const character: Character = {
   colorR: 1, colorG: 2, colorB: 3, balance: 1_000, createdAt: 1, lastBalanceUpdate: 1,
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Yoruba', country: 'NG', region: 'Lagos',
   body: 'feminine', lookId: 'female-adult-08', heightCm: 165,
-  shape: { weight: 0, muscle: 0, curves: 0, belly: 0 },
+  shape: { weight: 0, muscle: 0, curves: 0, belly: 0, bust: 0, waist: 0, shoulders: 0, legs: 0 },
   wardrobe: { owned: [], equipped: {} },
 };
 
@@ -42,7 +42,7 @@ class MemoryStorage implements Storage {
 describe('Office Worker shift rules', () => {
   it('uses a complete office interior and keeps the entrance and aligned workstation seats usable', () => {
     expect(OFFICE_INTERIOR.architecture).toBe('office');
-    expect(OFFICE_INTERIOR.partitions.some((partition) => partition.material === 'glass')).toBe(true);
+    expect((OFFICE_INTERIOR.partitions ?? []).some((partition) => partition.material === 'glass')).toBe(true);
     expect(OFFICE_WORKPLACE.exteriorDoor[0]).toBe(OFFICE_WORKPLACE.position[0] + 1.3);
     const exteriorBuilding = DISTRICTS.find((district) => district.id === OFFICE_WORKPLACE.districtId)
       ?.layout.buildings.find((building) => building.name === 'Marina Heights');

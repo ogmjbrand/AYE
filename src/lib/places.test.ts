@@ -17,14 +17,16 @@ describe('countries', () => {
   it('lists countries by name', () => {
     const names = countryOptions().map((c) => c.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
-    expect(countryName('NG')).toBe('Nigeria');
+    // AYE's own country keeps the code NG
+    expect(countryName('NG')).toBe('Songhai');
+    expect(countryName('GH')).toBe('Ghana');
   });
 });
 
 describe('states and regions', () => {
-  it('has the official number of subdivisions', () => {
+  it('has the official number of subdivisions (Songhai: its 12 states)', () => {
     const counts = Object.fromEntries(Object.entries(SUBDIVISIONS).map(([k, v]) => [k, v.names.length]));
-    expect(counts).toEqual({ NG: 37, GH: 16, KE: 47, ZA: 9, US: 51, GB: 4, CA: 13, IN: 36 });
+    expect(counts).toEqual({ NG: 12, GH: 16, KE: 47, ZA: 9, US: 51, GB: 4, CA: 13, IN: 36 });
   });
 
   it('has no duplicate names and only lists known countries', () => {
@@ -37,7 +39,10 @@ describe('states and regions', () => {
   it('labels and formats a home', () => {
     expect(regionTerm('KE')).toBe('County');
     expect(regionTerm('FR')).toBe('State / region');
-    expect(formatHome('NG', 'Lagos')).toBe('Lagos, Nigeria');
+    expect(formatHome('NG', 'Aderan')).toBe('Aderan, Songhai');
+    // A home saved as a former real state shows its Songhai state
+    expect(formatHome('NG', 'Lagos')).toBe('Aderan, Songhai');
+    expect(formatHome('NG', 'Enugu')).toBe('Darsuna, Songhai');
     expect(formatHome('FR', '  ')).toBe('France');
   });
 });

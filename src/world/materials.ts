@@ -52,6 +52,9 @@ function surfaceFromFiles(f: SurfaceFiles) {
     map: fileTexture(f.color, true),
     normalMap: f.normal ? fileTexture(f.normal, false) : null,
     roughnessMap: f.roughness ? fileTexture(f.roughness, false) : null,
+    // Ambient occlusion darkens the gaps between pavers and the pits in asphalt (uses the same UVs as the colour)
+    aoMap: f.ao ? fileTexture(f.ao, false) : null,
+    aoMapIntensity: 0.8,
     roughness: f.roughness ? 1 : 0.9,
     metalness: 0,
   });
@@ -63,6 +66,22 @@ function surfaceFromFiles(f: SurfaceFiles) {
 function groundSurface(key: SurfaceKey, fallback: () => SurfaceSet, opts?: Parameters<typeof surface>[1]) {
   const files = assetManifest().surfaces[key];
   return files ? surfaceFromFiles(files) : surface(fallback(), opts);
+}
+
+/** Concrete for plain kerbs, tiled to the kerb stone length (2 m) so it isn't stretched. */
+function kerbConcrete() {
+  const files = assetManifest().surfaces.concrete;
+  if (!files) return new MeshStandardMaterial({ color: '#b5b1a9', roughness: 0.9 });
+  const m = surfaceFromFiles(files);
+  const along = 2 / files.tileMeters;
+  for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) t?.repeat.set(along, Math.max(0.1, 0.2 / files.tileMeters));
+  return m;
+}
+
+/** A real pavement texture for park footpaths, or null to keep their plain packed-earth colour. */
+export function parkPathSurface() {
+  const files = assetManifest().surfaces.pavement;
+  return files ? surfaceFromFiles(files) : null;
 }
 
 let cache: ReturnType<typeof build> | null = null;
@@ -81,7 +100,8 @@ function build() {
     pavement: groundSurface('pavement', pavers),
     ground: groundSurface('ground', ground),
     kerb: surface(kerb()),
-    plainKerb: new MeshStandardMaterial({ color: '#b5b1a9', roughness: 0.9 }),
+    // Plain grey kerbs are cast concrete: the listed concrete texture if there is one
+    plainKerb: kerbConcrete(),
     marking: new MeshStandardMaterial({ color: '#e9e4d3', roughness: 0.75 }),
     yellowMarking: new MeshStandardMaterial({ color: '#e0b425', roughness: 0.75 }),
     // Balcony slabs and ledges: a listed concrete texture if there is one, else plain concrete

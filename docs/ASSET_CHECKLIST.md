@@ -108,13 +108,18 @@ Walk, above that uses Run.
 Poly Haven (polyhaven.com/textures).
 
 Download the **1K JPG** package. 2K is the maximum; larger costs memory and
-frame rate on integrated graphics. You need three images per surface:
+frame rate on integrated graphics. You need three images per surface, and a
+fourth (ambient occlusion) is used if the package has one:
 
 | Map | ambientCG file contains | Poly Haven map name | Save as |
 |---|---|---|---|
 | Colour | `_Color` | `diff` | `color.jpg` |
 | Normal | `_NormalGL` (**not** NormalDX) | `nor_gl` | `normal.jpg` |
 | Roughness | `_Roughness` | `rough` | `roughness.jpg` |
+| Ambient occlusion (optional) | `_AmbientOcclusion` | `ao` | `ao.jpg` |
+
+Leave out `_Displacement`, `_NormalDX` and `.usdc`/`.mtlx` files: the game
+doesn't use height maps (too costly on integrated graphics).
 
 | Slot | Search for | Folder | Used on |
 |---|---|---|---|
@@ -132,11 +137,24 @@ image covers; the asset page lists it:
   "color": "textures/road/color.jpg",
   "normal": "textures/road/normal.jpg",
   "roughness": "textures/road/roughness.jpg",
+  "ao": "textures/road/ao.jpg",
   "tileMeters": 3
 }
 ```
 
-`assets:check` warns above 3 MB per colour or normal image and above 2 MB per roughness image.
+Worked example for an ambientCG download such as `PavingStones092_1K-JPG.zip`:
+unzip it, then copy `PavingStones092_1K-JPG_Color.jpg` to
+`public/assets/textures/pavement/color.jpg`, `..._NormalGL.jpg` to `normal.jpg`,
+`..._Roughness.jpg` to `roughness.jpg` and `..._AmbientOcclusion.jpg` (if
+present) to `ao.jpg`. Typical sizes: asphalt 3–4 m, paving stones 1.5–2 m,
+concrete 2–3 m per image.
+
+If a listed file is missing the game says so in the browser console and uses
+the built-in texture (or goes without that one map); it never renders black.
+Painted black-and-yellow kerbs keep their built-in paint; only plain grey kerbs
+take the concrete texture.
+
+`assets:check` warns above 3 MB per colour or normal image and above 2 MB per roughness or AO image, and flags a DirectX normal map by its name.
 
 ### Integrated interior and environment maps
 

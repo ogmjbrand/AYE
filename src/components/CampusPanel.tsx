@@ -1,204 +1,174 @@
-import { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
 import {
-  CLASS_MINUTES,
-  CLASS_SLOTS,
-  CREDITS_TO_GRADUATE,
-  STUDY_MINUTES,
-  academicStanding,
-  assignmentAverage,
-  assignmentForDay,
-  classWindowState,
-  type CampusState,
-  type ClassSlot,
-} from '../lib/campus';
-import { formatGameTime, type GameTime } from '../lib/gameState';
+  ASSIGNMENT_CREDITS, ATTEND_SHARE, CAFETERIA_MENU, CLASS_CREDITS, CLUBS, ROOM_NAMES, TIMETABLE, assignmentTitle, classById, isSchoolDay, type SchoolState,
+} from '../lib/school';
+import { DESTINATIONS, UNIVERSITY_NAME, type Destination } from '../lib/university';
+import { Icon } from './os/icons';
 
-export type CampusPanelMode = 'info' | 'lecture' | 'study' | 'assignment' | 'services' | 'centre';
+export type CampusPanelMode = 'directory' | 'records' | 'cafe' | 'clubs';
 
-interface CampusPanelProps {
-  mode: CampusPanelMode;
-  campus: CampusState;
-  time: GameTime;
-  day: number;
-  inLectureHall: boolean;
-  onAttend: (slot: ClassSlot['id']) => void;
-  onStudy: () => void;
-  onNotes: () => void;
-  onRelax: () => void;
-  onAnswer: (choice: number) => void;
-  onClose: () => void;
-}
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const ROOM_CODE: Record<string, string> = { 'hall-a': 'G01', lab: 'G05' };
 
-const buttonClass =
-  'inline-flex min-h-11 items-center justify-center rounded-lg border border-ui-accent bg-ui-accent px-4 py-2 text-sm font-semibold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent';
-const secondaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-lg border border-ui-line px-4 py-2 text-sm font-semibold text-ui-ink transition active:scale-[0.98] hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent';
-
-const TITLES: Record<CampusPanelMode, string> = {
-  info: 'University directory',
-  lecture: 'Lecture hall',
-  study: 'Library · study & research',
-  assignment: 'Computer lab',
-  services: 'Student services',
-  centre: 'Student centre',
-};
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-ui-line p-3">
-      <p className="m-0 text-xs uppercase tracking-[0.12em] text-ui-muted">{label}</p>
-      <p className="m-0 mt-1 text-lg font-bold">{value}</p>
-    </div>
-  );
-}
-
-export function CampusPanel({ mode, campus, time, day, inLectureHall, onAttend, onStudy, onNotes, onRelax, onAnswer, onClose }: CampusPanelProps) {
+function Shell({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  const minuteOfDay = time.hour * 60 + time.minute;
-  const average = assignmentAverage(campus);
-  const question = assignmentForDay(day);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 sm:items-center" onClick={onClose}>
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="campus-panel-title"
-        className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-xl border border-ui-line bg-ui-panel p-5 text-ui-ink shadow-2xl sm:p-6"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">
-              AYE Global University · {formatGameTime(time)}
-            </p>
-            <h2 id="campus-panel-title" className="m-0 mt-1 font-display text-2xl font-bold">{TITLES[mode]}</h2>
-          </div>
-          <button type="button" className={secondaryClass} aria-label="Close" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </header>
+    <aside role="dialog" aria-label={title}
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[27rem] sm:rounded-3xl">
+      <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
+        <button type="button" onClick={onClose} aria-label={`Close ${title}`}
+          className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+          <Icon name="back" className="h-4 w-4" />
+        </button>
+        <div>
+          <h2 className="m-0 font-display text-lg font-bold">{title}</h2>
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.2em] text-ui-gold-strong">{UNIVERSITY_NAME}</p>
+        </div>
+      </header>
+      <div className="min-h-0 overflow-y-auto p-4">{children}</div>
+      {footer && <footer className="shrink-0 border-t border-ui-gold/20 px-4 py-3 text-[11px] text-ui-muted" aria-live="polite">{footer}</footer>}
+    </aside>
+  );
+}
 
-        {mode === 'info' && (
-          <div className="grid gap-2">
+const btn = 'rounded-xl border border-ui-gold/30 px-3 py-2 text-sm font-semibold hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold disabled:cursor-not-allowed disabled:opacity-50';
+
+/** The directory: every place in the building; picking one lays a glowing route to it. */
+export function DirectoryPanel({ onGuide, onClose }: { onGuide: (d: Destination) => void; onClose: () => void }) {
+  return (
+    <Shell title="Campus directory" onClose={onClose} footer="Pick a place and follow the gold arrows on the floor.">
+      <ul className="m-0 grid list-none gap-2 p-0">
+        {DESTINATIONS.map((d) => (
+          <li key={d.id}>
+            <button type="button" className={`${btn} flex w-full items-center justify-between text-left`} onClick={() => onGuide(d)}>
+              <span>{d.name}</span>
+              <Icon name="arrowRight" className="h-4 w-4 text-ui-gold-strong" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Shell>
+  );
+}
+
+/** Today's timetable and your own academic record (only yours: it's read from your save). */
+export function RecordsPanel({ school, student, minute, dayOfWeek, levelTitle, hourlyPay, onClose }: {
+  school: SchoolState; student: boolean; minute: number; dayOfWeek: number; levelTitle: string; hourlyPay: number; onClose: () => void;
+}) {
+  const weekday = isSchoolDay(dayOfWeek);
+  return (
+    <Shell title="Timetable & records" onClose={onClose}
+      footer={`Classes count when you sit through at least ${Math.round(ATTEND_SHARE * 100)}% of them. Allowance is the student rate (${hourlyPay} GHAI an hour) for time on campus between 09:00 and 17:00.`}>
+      <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.16em] text-ui-muted">{weekday ? 'Today' : 'Weekend: no classes'}</h3>
+      <ul className="m-0 mt-2 grid list-none gap-2 p-0">
+        {TIMETABLE.map((c) => {
+          const done = school.attended.includes(c.id);
+          const now = weekday && minute >= c.start && minute < c.end;
+          return (
+            <li key={c.id} className={`rounded-xl border p-3 ${now ? 'border-ui-gold' : 'border-ui-line/70'}`}>
+              <p className="m-0 flex items-center justify-between text-sm font-semibold">
+                <span>{c.course}</span>
+                <span className={done ? 'text-ui-accent-strong' : 'text-ui-muted'}>{done ? 'Attended' : now ? 'On now' : weekday && minute >= c.end ? 'Missed' : ''}</span>
+              </p>
+              <p className="m-0 mt-0.5 text-xs text-ui-muted">{hhmm(c.start)}–{hhmm(c.end)} · {ROOM_NAMES[c.room]} · {c.lecturer}</p>
+            </li>
+          );
+        })}
+      </ul>
+      {student ? (
+        <>
+          <h3 className="m-0 mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-ui-muted">Your record</h3>
+          <dl className="m-0 mt-2 grid grid-cols-2 gap-2 text-xs">
             {[
-              ['Lecture Halls', 'Back left · attend classes'],
-              ['Library', 'Back right · study and research'],
-              ['Computer Lab', 'Library front row · assignments'],
-              ['Cafeteria', 'Back centre · buy lunch'],
-              ['Student Centre', 'Front right · events and lounge'],
-              ['Administration', 'Front left · timetable, records, support'],
-            ].map(([name, where]) => (
-              <div key={name} className="flex items-center justify-between gap-3 rounded-lg border border-ui-line p-3">
-                <p className="m-0 font-semibold">{name}</p>
-                <p className="m-0 text-xs text-ui-muted">{where}</p>
-              </div>
+              ['Year', levelTitle],
+              ['Credits', String(school.credits)],
+              ['Classes attended', String(school.classesTotal)],
+              ['Assignments handed in', String(school.assignmentsDone)],
+              ['Current assignment', `${school.assignment}%`],
+              ['Clubs', school.clubs.length ? school.clubs.map((id) => CLUBS.find((c) => c.id === id)?.name).join(', ') : 'None yet'],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl border border-ui-line/70 p-2.5"><dt className="text-ui-muted">{k}</dt><dd className="m-0 mt-0.5 font-semibold">{v}</dd></div>
             ))}
-          </div>
-        )}
+          </dl>
+          <p className="m-0 mt-3 text-xs text-ui-ink/80">Working on: <span className="font-semibold">{assignmentTitle(school.assignmentsDone)}</span>. Each class is worth {CLASS_CREDITS} credits (+1 for notes, +1 for a question); a handed-in assignment {ASSIGNMENT_CREDITS}.</p>
+        </>
+      ) : (
+        <p className="m-0 mt-4 text-sm text-ui-ink/85">You’re visiting. Classes, coursework and records are for students; choose the Student career to enrol.</p>
+      )}
+    </Shell>
+  );
+}
 
-        {mode === 'services' && (
-          <div className="grid gap-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Stat label="Standing" value={academicStanding(campus)} />
-              <Stat label="Credits" value={`${campus.credits} / ${CREDITS_TO_GRADUATE}`} />
-              <Stat label="Classes today" value={`${campus.attended.length} / ${CLASS_SLOTS.length}`} />
-              <Stat label="Assignment avg" value={average === null ? 'None yet' : `${average}%`} />
-              <Stat label="Classes attended" value={String(campus.totalClasses)} />
-              <Stat label="Study hours" value={(campus.totalStudyMinutes / 60).toFixed(1)} />
+/** The cafeteria counter: prices first, paid only when you buy. */
+export function CafeteriaPanel({ balance, onBuy, onClose }: { balance: number; onBuy: (id: string) => void; onClose: () => void }) {
+  return (
+    <Shell title="AYE Cafeteria" onClose={onClose} footer="Meals are paid from your GHAI and eaten here.">
+      <ul className="m-0 grid list-none gap-2 p-0">
+        {CAFETERIA_MENU.map((i) => (
+          <li key={i.id} className="flex items-center justify-between gap-3 rounded-xl border border-ui-line/70 p-3">
+            <div>
+              <p className="m-0 text-sm font-semibold">{i.name}</p>
+              <p className="m-0 text-xs text-ui-muted">+{i.fullness} fullness{i.lift?.energy ? ` · +${i.lift.energy} energy` : ''}</p>
             </div>
-            <div className="grid gap-2">
-              <p className="m-0 text-xs uppercase tracking-[0.12em] text-ui-muted">Timetable</p>
-              {CLASS_SLOTS.map((slot) => (
-                <p key={slot.id} className="m-0 text-sm">
-                  {String(slot.startHour).padStart(2, '0')}:00–{String(slot.endHour).padStart(2, '0')}:00 · {slot.title} · {slot.room}
-                  {campus.attended.includes(slot.id) ? ' ✓' : ''}
-                </p>
-              ))}
+            <button type="button" className={btn} disabled={balance < i.price} onClick={() => onBuy(i.id)}>
+              {balance < i.price ? 'Not enough GHAI' : `Buy · ${i.price} GHAI`}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Shell>
+  );
+}
+
+/** Clubs on the student centre board: joining is saved on your record. */
+export function ClubsPanel({ joined, student, onJoin, onClose }: { joined: readonly string[]; student: boolean; onJoin: (id: string) => void; onClose: () => void }) {
+  return (
+    <Shell title="Campus clubs" onClose={onClose} footer="Club meetings and events aren’t in the game yet; membership is saved on your record.">
+      <ul className="m-0 grid list-none gap-2 p-0">
+        {CLUBS.map((c) => (
+          <li key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-ui-line/70 p-3">
+            <div>
+              <p className="m-0 text-sm font-semibold">{c.name}</p>
+              <p className="m-0 text-xs text-ui-muted">{c.about}</p>
             </div>
-            <p className="m-0 text-sm text-ui-muted">
-              Support: join a class while it is open, submit one assignment a day at the computer lab, and study in the library.
-              Students are paid the normal hourly wage while on campus between 09:00 and 17:00.
-            </p>
-          </div>
-        )}
+            {joined.includes(c.id)
+              ? <span className="text-xs font-semibold text-ui-accent-strong">Member</span>
+              : <button type="button" className={btn} disabled={!student} onClick={() => onJoin(c.id)}>{student ? 'Join' : 'Students only'}</button>}
+          </li>
+        ))}
+      </ul>
+    </Shell>
+  );
+}
 
-        {mode === 'centre' && (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <p className="m-0 text-xs uppercase tracking-[0.12em] text-ui-muted">Campus events</p>
-              {['Fashion Club · Mon 17:00', 'Tech Society · Wed 16:00', 'Music Club · Thu 18:00', 'Volunteer Group · Sat 10:00'].map((event) => (
-                <p key={event} className="m-0 rounded-lg border border-ui-line p-3 text-sm">{event}</p>
-              ))}
-            </div>
-            <button type="button" className={buttonClass} onClick={onRelax}>Sit with classmates (15 min)</button>
-          </div>
-        )}
-
-        {mode === 'lecture' && (
-          <div className="grid gap-3">
-            {inLectureHall && campus.attended.length > 0 && (
-              <button type="button" className={secondaryClass} onClick={onNotes}>Take notes ({STUDY_MINUTES} min, counts as study)</button>
-            )}
-            {CLASS_SLOTS.map((slot) => {
-              const done = campus.attended.includes(slot.id);
-              const window = classWindowState(slot, minuteOfDay);
-              const label = done ? 'Attended' : window === 'upcoming' ? 'Not yet open' : window === 'ended' ? 'Missed' : `Attend (${CLASS_MINUTES} min)`;
-              return (
-                <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-ui-line p-3">
-                  <div>
-                    <p className="m-0 font-semibold">{slot.title}</p>
-                    <p className="m-0 text-xs text-ui-muted">
-                      {slot.room} · {String(slot.startHour).padStart(2, '0')}:00–{String(slot.endHour).padStart(2, '0')}:00
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    disabled={done || window !== 'open' || !inLectureHall}
-                    onClick={() => onAttend(slot.id)}
-                  >
-                    {label}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {mode === 'study' && (
-          <div className="grid gap-4">
-            <p className="m-0 text-sm text-ui-muted">
-              Studied today: {campus.studyMinutesToday} min. Each session takes {STUDY_MINUTES} minutes of game time.
-            </p>
-            <button type="button" className={buttonClass} onClick={onStudy}>Study for {STUDY_MINUTES} minutes</button>
-            <button type="button" className={secondaryClass} onClick={onStudy}>Research for {STUDY_MINUTES} minutes</button>
-          </div>
-        )}
-
-        {mode === 'assignment' && (
-          campus.assignmentDone ? (
-            <p className="m-0 text-sm text-ui-muted">Today&apos;s assignment is already submitted. A new one arrives tomorrow.</p>
-          ) : (
-            <div className="grid gap-3">
-              <p className="m-0 font-semibold">{question.prompt}</p>
-              {question.options.map((option, index) => (
-                <button key={option} type="button" className={secondaryClass} onClick={() => onAnswer(index)}>
-                  {option}
-                </button>
-              ))}
-            </div>
-          )
-        )}
-      </section>
-    </div>
+/** While you're seated in class: progress, taking part, and getting up. */
+export function ClassPanel({ school, minutesLeft, onNotes, onAsk, onFinish, onLeave }: {
+  school: SchoolState; minutesLeft: number; onNotes: () => void; onAsk: () => void; onFinish: () => void; onLeave: () => void;
+}) {
+  const c = school.inClass;
+  const slot = classById(c?.classId);
+  if (!c || !slot) return null;
+  const need = Math.ceil((slot.end - slot.start) * ATTEND_SHARE);
+  const pct = Math.min(100, Math.round((c.minutes / need) * 100));
+  return (
+    <aside aria-label="In class" className="fixed bottom-[9.5rem] left-1/2 z-30 w-[min(26rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border border-ui-gold/40 bg-[#0d1412]/95 p-4 text-ui-ink shadow-2xl sm:top-[6.5rem]">
+      <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.2em] text-ui-gold-strong">In class · {ROOM_CODE[slot.room] ?? ''} {ROOM_NAMES[slot.room]}</p>
+      <p className="m-0 mt-1 font-display text-base font-bold">{slot.course}</p>
+      <p className="m-0 text-xs text-ui-muted">{slot.lecturer} · until {hhmm(slot.end)} ({minutesLeft} min left)</p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Attendance so far">
+        <div className="h-full bg-ui-gold" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="m-0 mt-1 text-[11px] text-ui-muted">{c.minutes} of {need} minutes needed to count</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" className={btn} disabled={c.notes} onClick={onNotes}>{c.notes ? 'Notes taken ✓' : 'Take notes'}</button>
+        <button type="button" className={btn} disabled={c.asked} onClick={onAsk}>{c.asked ? 'Question asked ✓' : 'Ask a question'}</button>
+        <button type="button" className={btn} disabled={minutesLeft <= 0} onClick={onFinish}>Sit through to the end</button>
+        <button type="button" className={btn} onClick={onLeave}>Leave class</button>
+      </div>
+    </aside>
   );
 }

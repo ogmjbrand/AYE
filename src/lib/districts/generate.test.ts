@@ -23,10 +23,9 @@ describe('generated districts', () => {
 
   it('use all three street plans, laid every way', () => {
     const generated = DISTRICTS.slice(2);
+    // Each plan has its own road and pavement widths (building counts change as places are added)
     const plan = (d: (typeof generated)[number]) =>
-      d.layout.buildings.length === 18 && d.layout.roadHalfWidth === 4 && d.layout.pavementWidth === 3 ? 'marina' :
-      d.layout.buildings.length === 15 && d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' :
-      'osu';
+      d.layout.roadHalfWidth === 4 ? 'marina' : d.layout.pavementWidth === 3 ? 'avenue' : 'osu';
     const seen = new Set(generated.map((d) => `${plan(d)}:${Math.sign(d.layout.crossStreet.minZ)}:${Math.sign(d.travelDesk.position[0])}`));
     expect(seen.size).toBe(12);
     expect(generated.filter((d) => plan(d) === 'avenue').length).toBeGreaterThan(40);
@@ -58,7 +57,8 @@ describe('generated districts', () => {
   it('name the shops and homes after the city, and price them for it', () => {
     const abuja = DISTRICTS.find((d) => d.city.id === 'abuja')!;
     const yenagoa = DISTRICTS.find((d) => d.city.id === 'yenagoa')!;
-    expect(abuja.travelDesk.name).toBe('Abuja Travel');
+    // Built from the city's ID-stable plan, shown with its Songhai name
+    expect(abuja.travelDesk.name).toBe('Wusara Travel');
     expect(abuja.layout.buildings.some((b) => b.name === abuja.nightlife.name)).toBe(true);
     expect(Math.max(...abuja.homes.map((h) => h.rentPerNight))).toBeGreaterThan(Math.max(...yenagoa.homes.map((h) => h.rentPerNight)));
   });
@@ -115,5 +115,25 @@ describe('generated districts', () => {
     expect(find('kano').streetStyle).toBe('painted');
     expect(kinds('mexico-city')).toEqual(new Set(['minibus', 'car']));
     expect(districtById('lagos.marina').layout.streetStyle ?? 'painted').toBe('painted');
+  });
+});
+
+import { DISTRICTS as ALL } from '../geography';
+import { resolveCollisions as resolve } from '../world';
+describe('car dealers in generated cities', () => {
+  it('each dealer is named for its city, with a clear door in front of its own showroom', () => {
+    let n = 0;
+    for (const d of ALL) {
+      const id = d.id;
+      if (!d.dealership) continue;
+      n++;
+      const b = d.layout.buildings.find((x) => x.name === d.dealership!.name);
+      expect(b, `${id} showroom`).toBeTruthy();
+      const [x, , z] = d.dealership.door;
+      const r = resolve(x, z, undefined, d.layout.obstacles);
+      expect(Math.hypot(r.x - x, r.z - z), `${id} door clear`).toBeLessThan(0.3);
+      expect(Math.abs(z - b!.position[2])).toBeGreaterThan(b!.size[2] / 2);
+    }
+    expect(n).toBeGreaterThan(10);
   });
 });

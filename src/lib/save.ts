@@ -12,14 +12,19 @@ import { itemById, sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
+import { sanitiseCars } from './cars';
+import { sanitiseSchool } from './school';
+import { SONGHAI_CODE, songhaiRegion } from './songhai';
+import { sanitiseShift } from './hospital';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
 import { sanitiseRelationships } from './people';
+import { sanitiseNeeds } from './needs';
+import { sanitiseFurniture } from './furniture';
+import { sanitiseLife } from './lifeState';
+import { recogniseExisting } from './life';
 import { sanitiseOfficeCareer } from './officeCareer';
-import { sanitiseCampus } from './campus';
-import { sanitiseHospital } from './hospital';
-import { sanitiseHomeDecor } from './homeDecor';
-import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId } from './skinTone';
-import { sanitiseOwnedVehicles } from './vehicleCatalog';
+import { migrateOwnedVehicles } from './saveMigration';
+import { isSkinToneId, skinToneDepth } from './skinTone';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -62,25 +67,30 @@ export function parseCharacter(data: unknown): Character | null {
   const gender = GENDERS.some((g) => g.id === c.gender) ? (c.gender as Gender) : 'unspecified';
   const look = LOOKS.find((l) => l.id === c.lookId) ?? lookById(undefined);
   const body: BodyType = c.body === 'feminine' || c.body === 'masculine' ? c.body : look.body;
+  // Opening choices are applied once in memory and never kept
+  const { start: _start, ...rest } = c;
+  void _start;
   return {
-    ...(c as unknown as Character),
+    ...(rest as unknown as Character),
     diet: (c.diet as Diet | undefined) ?? 'everything',
     gender,
     heritage: HERITAGES.some((h) => h.id === c.heritage) ? (c.heritage as string) : 'unspecified',
     ethnicGroup: str(c.ethnicGroup, 40),
     country: COUNTRY_CODES.includes(c.country as string) ? (c.country as string) : DEFAULT_COUNTRY,
-    region: str(c.region, 60),
+    // A home region saved as a former real state shows as its Songhai state
+    region: c.country === SONGHAI_CODE ? songhaiRegion(str(c.region, 60)) : str(c.region, 60),
     // A look must match the body; otherwise fall back to the first look for that body
     lookId: look.body === body ? look.id : LOOKS.find((l) => l.body === body)!.id,
     body,
     heightCm: isNum(c.heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max) ? Math.round(c.heightCm) : defaultHeightCm(body),
     // Unknown items (e.g. removed from the catalogue) are dropped; nothing is lost otherwise
     wardrobe: sanitiseWardrobe(c.wardrobe),
-    homeDecor: sanitiseHomeDecor(c.homeDecor),
     // Saves from before body shape start average
     shape: sanitiseShape(c.shape),
-    skinTone: isSkinToneId(c.skinTone) ? c.skinTone : DEFAULT_SKIN_TONE,
-    skinColor: isSkinColor(c.skinColor) ? c.skinColor : undefined,
+    // Saves from before skin tone keep the person's own skin; a named swatch from
+    // an earlier version becomes its depth, and the name is kept alongside
+    skinTone: isNum(c.skinTone, -1, 1) ? Math.round(c.skinTone * 100) / 100 : isSkinToneId(c.skinTone) ? skinToneDepth(c.skinTone) : 0,
+    ...(typeof c.skinTone === 'string' ? { legacySkinTone: c.skinTone } : {}),
   };
 }
 
@@ -89,7 +99,15 @@ export function loadCharacter(storage: Storage = localStorage): Character | null
 }
 
 export function saveCharacter(character: Character, storage: Storage = localStorage) {
-  storage.setItem(CHARACTER_KEY, JSON.stringify(character));
+  const { start: _start, ...rest } = character;
+  void _start;
+  storage.setItem(CHARACTER_KEY, JSON.stringify(rest));
+}
+
+/** Whether this character already has saved progress (opening choices only apply to a brand-new life). */
+export function hasProgress(character: Pick<Character, 'id'>, storage: Storage = localStorage): boolean {
+  const data = readJson(storage, PROGRESS_KEY);
+  return typeof data === 'object' && data !== null && (data as Record<string, unknown>).characterId === character.id;
 }
 
 export function clearSave(storage: Storage = localStorage) {
@@ -118,7 +136,8 @@ export function loadProgress(character: Character, storage: Storage = localStora
   ) {
     return fresh;
   }
-  return {
+  const legacy = legacyOf(p);
+  const loaded: GameState = {
     time: {
       hour: time.hour,
       minute: time.minute,
@@ -143,7 +162,8 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
-    ownedVehicles: sanitiseOwnedVehicles(p.ownedVehicles),
+    // Saves from the earlier vehicle catalogue bring their cars into today's garage
+    cars: p.cars === undefined && Array.isArray(p.ownedVehicles) ? migrateOwnedVehicles(p.ownedVehicles) : sanitiseCars(p.cars, isDistrictId),
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
@@ -161,12 +181,44 @@ export function loadProgress(character: Character, storage: Storage = localStora
       poor: performanceCount(performanceData.poor),
     },
     officeCareer: sanitiseOfficeCareer(p.officeCareer),
-    campus: sanitiseCampus(p.campus),
-    hospital: sanitiseHospital(p.hospital),
+    // Data from systems this version doesn't run is carried along untouched
+    ...(legacy ? { legacy } : {}),
+    // Saves from before needs start with every need met, and own no furniture
+    needs: sanitiseNeeds(p.needs),
+    furniture: sanitiseFurniture(p.furniture),
+    // Saves from before Life OS start with a fresh profile, skills and goals
+    life: sanitiseLife(p.life),
+    school: sanitiseSchool(p.school),
+    shift: sanitiseShift(p.shift),
   };
+  // A save from before Life OS: recognise what was already achieved, without paying for it again
+  return p.life === undefined ? recogniseExisting(loaded, character.career) : loaded;
+}
+
+/**
+ * Progress kept by the earlier local-only university, hospital and vehicle
+ * systems (lib/campus.ts, lib/hospitalCareer.ts, lib/vehicleCatalog.ts). The
+ * game now runs AYE Global University, AYE General Hospital and the car
+ * dealers instead; this data is stored back unchanged so nothing is lost.
+ */
+const LEGACY_KEYS = ['campus', 'hospital', 'ownedVehicles'] as const;
+
+function legacyOf(p: Record<string, unknown>): Record<string, unknown> | null {
+  const kept = typeof p.legacy === 'object' && p.legacy !== null ? { ...(p.legacy as Record<string, unknown>) } : {};
+  for (const key of LEGACY_KEYS) if (p[key] !== undefined) kept[key] = p[key];
+  return Object.keys(kept).length > 0 ? kept : null;
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital }));
+  const {
+    time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour,
+    lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer,
+    needs, furniture, life, school, shift, legacy,
+  } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({
+    characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour,
+    lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer,
+    needs, furniture, life: { ...life, celebrations: [] }, school, shift,
+    ...(legacy ? { legacy } : {}),
+  }));
 }

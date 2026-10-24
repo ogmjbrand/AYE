@@ -8,7 +8,7 @@ import {
   diagnosisAccuracy,
   nextPatientIndex,
   type HospitalState,
-} from '../lib/hospital';
+} from '../lib/hospitalCareer';
 import { formatGameTime, type GameTime } from '../lib/gameState';
 
 export type HospitalPanelMode = 'reception' | 'patient' | 'supervisor' | 'pharmacy';

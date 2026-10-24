@@ -2,17 +2,22 @@
 @import 'tailwindcss';
 
 /*
- * Game UI palette. The brand colours (green, red, white, black, yellow) belong
- * to the AYE logo only and are deliberately not used for interface chrome.
+ * AYE design system. Charcoal surfaces, a restrained emerald accent for
+ * actions and progress, warm gold for rewards and celebrations. These are
+ * softer, deeper tones than the logo's flat brand colours, which stay on the
+ * logo only.
  */
 @theme {
-  --color-ui-ink: #f1ede6;
-  --color-ui-muted: #a4a7ad;
-  --color-ui-faint: #6f737a;
-  --color-ui-panel: #15181c;
-  --color-ui-line: #353a42;
-  --color-ui-accent: #8ab4d8;
-  --color-ui-accent-strong: #b5d2ea;
+  --color-ui-ink: #f2efe8;
+  --color-ui-muted: #a7aaa9;
+  --color-ui-faint: #707572;
+  --color-ui-panel: #131615;
+  --color-ui-raised: #1b1f1d;
+  --color-ui-line: #2f3532;
+  --color-ui-accent: #3fbf8e;
+  --color-ui-accent-strong: #7fdcb6;
+  --color-ui-gold: #d4a85a;
+  --color-ui-gold-strong: #ecc98a;
   --color-ui-warn: #f0a35e;
   --color-ui-danger: #ec8b7f;
 
@@ -44,8 +49,33 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Life OS: soft glass panels over the living world */
+.os-glass {
+  background: linear-gradient(160deg, rgb(27 31 29 / 0.92), rgb(16 19 18 / 0.9));
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+@keyframes os-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.os-rise { animation: os-rise 240ms ease-out both; }
+
+@keyframes os-shine {
+  from { background-position: -120% 0; }
+  to { background-position: 220% 0; }
+}
+.os-shine {
+  background-image: linear-gradient(100deg, transparent 30%, rgb(236 201 138 / 0.35) 50%, transparent 70%);
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: os-shine 1.6s ease-out 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }

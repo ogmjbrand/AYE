@@ -17,6 +17,7 @@ import { Gestures, type GestureActions } from '../components/Gestures';
 import { conversationGesture, shouldWave, type Gesture } from '../lib/bodyLanguage';
 import type { HugSession } from '../lib/hug';
 import { generateNpcAppearance } from '../lib/npcFashion';
+import { skinToneDepth } from '../lib/skinTone';
 import { applyBodyShape } from '../components/bodyShapeSkin';
 import { OutfitStyler } from '../components/Avatar';
 import { GarmentLayer } from '../components/GarmentLoader';
@@ -186,7 +187,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
     <group ref={root} position={[x, groundHeightAt(x, z), z]}>
       <group ref={group} rotation={[0, resident.facing, 0]}>
         <primitive object={figure} scale={scale} />
-        <OutfitStyler scene={figure} lookId={look.id} styles={appearance.styles} skinTone={appearance.skinTone} />
+        <OutfitStyler scene={figure} lookId={look.id} styles={appearance.styles} skinTone={skinToneDepth(appearance.skinTone)} />
         {appearance.hairstyleItemId && getGarmentModel(appearance.hairstyleItemId) && (
           <GarmentLayer
             groupRef={group}

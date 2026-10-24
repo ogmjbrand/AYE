@@ -38,6 +38,8 @@ for (const [key, s] of Object.entries(manifest.surfaces ?? {})) {
   checkFile(s.color, `${key} colour`, 3);
   if (s.normal) checkFile(s.normal, `${key} normal`, 3);
   if (s.roughness) checkFile(s.roughness, `${key} roughness`, 2);
+  if (s.ao) checkFile(s.ao, `${key} ambient occlusion`, 2);
+  if (s.normal && /normaldx/i.test(s.normal)) warn(`${key}: ${s.normal} looks like a DirectX normal map; use the NormalGL file from ambientCG`);
   if (!(s.tileMeters > 0)) warn(`${key}: set tileMeters (how many metres one image covers)`);
 }
 

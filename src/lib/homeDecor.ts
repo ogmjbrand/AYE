@@ -107,7 +107,7 @@ export function canPlaceDecor(
     );
     if (distanceToWall > 1.2) return false;
   }
-  if (interior.partitions.some((wall) =>
+  if ((interior.partitions ?? []).some((wall) =>
     Math.abs(x - wall.position[0]) < (itemWidth + wall.size[0]) / 2
     && Math.abs(z - wall.position[2]) < (itemDepth + wall.size[2]) / 2,
   )) return false;

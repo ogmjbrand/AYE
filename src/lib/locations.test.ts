@@ -52,7 +52,8 @@ describe('locationsFor', () => {
   });
 
   it('places the park at the centre of its neighbourhood bounds', () => {
-    expect(entries.find((e) => e.id === `${marina.id}.park`)?.position).toEqual([10, 0, 27.5]);
+    const b = marina.neighborhoods.find((n) => n.id === 'parks')!.bounds;
+    expect(entries.find((e) => e.id === `${marina.id}.park`)?.position).toEqual([(b.minX + b.maxX) / 2, 0, (b.minZ + b.maxZ) / 2]);
   });
 
   it('builds for every district', () => {
@@ -62,7 +63,8 @@ describe('locationsFor', () => {
 
 describe('areaAt', () => {
   it('names the neighbourhood a point is in', () => {
-    expect(areaAt(marina, -5.2, -4.5)).toBe('Downtown');
+    // Names follow the district's own (Songhai) naming of its areas
+    expect(areaAt(marina, -5.2, -4.5)).toBe(marina.neighborhoods.find((n) => n.id === 'downtown')!.name);
     expect(areaAt(marina, 999, 999)).toBeNull();
   });
 });

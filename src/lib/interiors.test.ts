@@ -38,14 +38,10 @@ describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s int
     }
   });
 
-  it('you can walk from the front door to the bed and sofa', () => {
+  it('you can walk from the front door to the bed', () => {
     const start = doorSpot(room);
-    const sofa = room.furniture.find((f) => f.kind === 'sofa')!;
-    const sofaStand = standSpot({ id: 'home-sofa', x: sofa.at[0], z: sofa.at[1], facing: Math.PI, height: 0.45 });
-    const goals = [
-      bedSpot(room),
-      [sofaStand.x, sofaStand.z] as const,
-    ];
+    // Reaching every other piece is covered by furniture.test.ts (walkable)
+    const goals = [bedSpot(room)];
     expect(free(...start)).toBe(true);
     goals.forEach((goal) => expect(free(...goal)).toBe(true));
     // Breadth-first search over a 0.25 m grid of free floor
@@ -66,7 +62,7 @@ describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s int
         queue.push([nx, nz]);
       }
     }
-    expect(reached.size, `reached ${[...reached].map((index) => index === 0 ? 'bed' : 'sofa').join(', ')}`).toBe(goals.length);
+    expect(reached.size, 'reached the bed').toBe(goals.length);
   });
 
   it('walls keep you in', () => {
@@ -86,7 +82,9 @@ describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s int
       ['counter', 'kitchen'],
       ['shower', 'bathroom'],
     ] as const) {
-      const item = room.furniture.find((f) => f.kind === kind)!;
+      // Each home offers what it's furnished with
+      const item = room.furniture.find((f) => f.kind === kind);
+      if (!item) continue;
       expect(homeInteractionAt(room, ...item.at), kind).toBe(action);
     }
   });

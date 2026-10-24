@@ -122,12 +122,12 @@ export function locationsFor(district: District, career: Career, homeId: string 
     position: gadgets.position, built: true, activities: ['Buy equipment that raises your pay'], use: 'gadgets',
   });
 
-  if (district.carDealership) {
+  if (district.dealership) {
     entries.push({
-      id: `${district.id}.car-dealership`, name: district.carDealership.name, category: 'vehicles',
-      description: 'Browse and buy vehicles, customise paint, and take owned cars onto the road',
-      area: at(district.carDealership.position), position: district.carDealership.position, built: true,
-      activities: ['View vehicle specifications', 'Purchase cars with GHAI', 'Select an owned car for driving'],
+      id: `${district.id}.car-dealership`, name: district.dealership.name, category: 'vehicles',
+      description: 'Browse cars, buy one in your colour, or sell a car you own',
+      area: at(district.dealership.door), position: district.dealership.door, built: true,
+      activities: ['Compare speed, fuel use and price', 'Buy a car with GHAI', 'Sell a car you own'],
       use: 'dealership',
     });
   }

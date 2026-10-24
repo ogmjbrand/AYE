@@ -42,22 +42,22 @@ export function DailyLogModal({ income, expenses, netChange, minutesWorked, wake
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Income</span>
-              <span className="text-ui-accent">+{income.toLocaleString()} ⓒ</span>
+              <span className="text-ui-accent">+{income.toLocaleString()} GHAI</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Expenses</span>
-              <span className="text-ui-danger">-{expenses.toLocaleString()} ⓒ</span>
+              <span className="text-ui-danger">-{expenses.toLocaleString()} GHAI</span>
             </div>
             {rent > 0 && (
               <div className="flex justify-between pl-3 text-xs">
                 <span className="text-gray-500">of which rent</span>
-                <span className="text-gray-400">{rent.toLocaleString()} ⓒ</span>
+                <span className="text-gray-400">{rent.toLocaleString()} GHAI</span>
               </div>
             )}
             <div className="border-t border-gray-700 pt-2 flex justify-between font-bold">
               <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>Net Change</span>
               <span className={netChange >= 0 ? 'text-ui-accent' : 'text-ui-danger'}>
-                {netChange >= 0 ? '+' : ''}{netChange.toLocaleString()} ⓒ
+                {netChange >= 0 ? '+' : ''}{netChange.toLocaleString()} GHAI
               </span>
             </div>
           </div>

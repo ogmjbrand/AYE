@@ -29,3 +29,15 @@ public/assets/private/*
 !public/assets/private/README.md
 assets-src/private-avatars/
 assets-src/makehuman/base/
+assets-src/makehuman/cache/
+assets-src/khronos/cache/
+
+# Character Creator 5 conversion: raw Blender exports (100+ MB), logs and debug files.
+# The pipeline scripts in scripts/cc5/ are committed; rebuild with node scripts/cc5/build.mjs
+assets-src/cc5/*.glb
+assets-src/cc5/*.log
+assets-src/cc5/*.blend
+assets-src/cc5/*-report.json
+
+# accidental output folder from an unexpanded $dest script variable
+/$dest/

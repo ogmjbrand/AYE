@@ -14,6 +14,7 @@ import { OutfitStyler } from '../components/Avatar';
 import { withRelaxedHands } from '../components/handPose';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { generateNpcAppearance } from '../lib/npcFashion';
+import { skinToneDepth } from '../lib/skinTone';
 import { applyBodyShape } from '../components/bodyShapeSkin';
 import { GarmentLayer } from '../components/GarmentLoader';
 import { getGarmentModel } from '../lib/fashion';
@@ -252,7 +253,7 @@ function NPCModel({
     <group ref={root} position={position} dispose={null}>
       <group ref={rig} rotation={[0, facing, 0]}>
         <primitive object={figure} scale={scale} />
-        <OutfitStyler scene={figure} lookId={look.id} styles={styles ?? appearance.styles} skinTone={appearance.skinTone} />
+        <OutfitStyler scene={figure} lookId={look.id} styles={styles ?? appearance.styles} skinTone={skinToneDepth(appearance.skinTone)} />
         {!styles && appearance.hairstyleItemId && getGarmentModel(appearance.hairstyleItemId) && (
           <GarmentLayer
             groupRef={rig}

@@ -1,7 +1,9 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Environment, Stars } from '@react-three/drei';
-import { Vector3, type DirectionalLight, Object3D, type PointLight } from 'three';
+import { IndoorEnvironment } from './IndoorEnvironment';
+import { INDOOR, type IndoorMood } from './indoorMoods';
+import { Color, Vector3, type DirectionalLight, Object3D, type PointLight, type Scene } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { GameTime } from '../lib/gameState';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -35,7 +37,16 @@ const characterLightFor = (sunIntensity: number) => CHARACTER_LIGHT_MAX * Math.m
  * The sun's shadow camera follows the player so a small, sharp shadow map
  * covers the area the camera can actually see.
  */
-export function SceneLighting({ gameTime, player, indoor = false }: { gameTime: GameTime; player: PlayerHandle; indoor?: boolean }) {
+function setBackground(scene: Scene, color: string) {
+  scene.background = new Color(color);
+}
+
+export function SceneLighting({ gameTime, player, indoor }: {
+  gameTime: GameTime;
+  player: PlayerHandle;
+  /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. */
+  indoor?: IndoorMood;
+}) {
   const quality = useQuality();
   const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
   const sun = useRef<DirectionalLight>(null);
@@ -43,6 +54,10 @@ export function SceneLighting({ gameTime, player, indoor = false }: { gameTime: 
   const fill = useRef<PointLight>(null);
 
   useEffect(() => setNightGlow(l.night), [l.night]);
+  // Set directly rather than by attaching a <color>, so moving between indoors and out never leaves the wrong one behind
+  const { scene } = useThree();
+  const background = indoor ? INDOOR[indoor].background : l.horizonColor;
+  useEffect(() => setBackground(scene, background), [scene, background]);
 
   useFrame(({ camera }) => {
     if (fill.current) {
@@ -54,15 +69,45 @@ export function SceneLighting({ gameTime, player, indoor = false }: { gameTime: 
     if (!light) return;
     // Follow the player in whole metres to stop shadow edges shimmering
     const px = Math.round(player.position.x), pz = Math.round(player.position.z);
-    sunOffset.set(...l.sunDirection).normalize().multiplyScalar(60);
+    // Indoors the key light comes from the ceiling, nearly straight down
+    if (indoor) sunOffset.set(0.25, 1, 0.35).normalize().multiplyScalar(60);
+    else sunOffset.set(...l.sunDirection).normalize().multiplyScalar(60);
     light.position.set(px + sunOffset.x, Math.max(sunOffset.y, 8), pz + sunOffset.z);
     target.position.set(px, 0, pz);
     target.updateMatrixWorld();
   });
 
+  if (indoor) {
+    const mood = INDOOR[indoor];
+    return (
+      <>
+        <hemisphereLight args={[mood.sky, mood.ground, mood.hemi]} />
+        <pointLight ref={fill} color="#ffd9b0" intensity={0.8} distance={6} decay={2} />
+        <primitive object={target} />
+        <directionalLight
+          ref={sun}
+          target={target}
+          color={mood.key}
+          intensity={mood.keyIntensity}
+          castShadow
+          shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
+          shadow-camera-left={-12}
+          shadow-camera-right={12}
+          shadow-camera-top={12}
+          shadow-camera-bottom={-12}
+          shadow-camera-near={1}
+          shadow-camera-far={120}
+          shadow-bias={-0.0004}
+          shadow-normalBias={0.04}
+          shadow-radius={4}
+        />
+        <IndoorEnvironment mood={indoor} />
+      </>
+    );
+  }
+
   return (
     <>
-      <color attach="background" args={[l.horizonColor]} />
       <fog attach="fog" args={[l.fogColor, 45, 190]} />
       <SkyDome lighting={l} />
       {l.night > 0.3 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}

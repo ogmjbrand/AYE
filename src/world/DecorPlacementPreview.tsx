@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { DecorItem } from '../lib/homeDecor';
-import { InteriorFurniturePiece } from './HomeInterior';
+import { InteriorFurniturePiece } from './VenueInterior';
 
 export function DecorPlacementPreview({
   controller,
