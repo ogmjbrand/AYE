@@ -6,14 +6,14 @@
  */
 import { districtById } from './geography';
 
-export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'bag' | 'neck' | 'ears' | 'wrist' | 'eyes' | 'nails';
-export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag', 'neck', 'ears', 'wrist', 'eyes', 'nails'];
+export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'bag' | 'neck' | 'ears' | 'wrist' | 'eyes' | 'nails' | 'rings';
+export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag', 'neck', 'ears', 'wrist', 'eyes', 'nails', 'rings'];
 export const SLOT_LABEL: Record<Slot, string> = {
   top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour', bag: 'Bags',
-  neck: 'Necklaces', ears: 'Earrings', wrist: 'Watches & bangles', eyes: 'Sunglasses', nails: 'Nails',
+  neck: 'Necklaces', ears: 'Earrings', wrist: 'Watches & bangles', eyes: 'Sunglasses', nails: 'Nails', rings: 'Rings',
 };
 /** Worn pieces drawn on the body (world/Adornments.tsx), not restyled fabric. */
-export const ADORNMENT_SLOTS: readonly Slot[] = ['neck', 'ears', 'wrist', 'eyes', 'nails'];
+export const ADORNMENT_SLOTS: readonly Slot[] = ['neck', 'ears', 'wrist', 'eyes', 'nails', 'rings'];
 
 /** The cut of a worn piece: a necklace, earrings, what's on the wrist, a frame or a nail shape. */
 export type NeckKind = 'choker' | 'chain' | 'pearls' | 'collar' | 'layered' | 'snake' | 'roses' | 'charms';
@@ -22,8 +22,9 @@ export type EarKind = 'stud' | 'hoop' | 'chunky-hoop' | 'drop' | 'tassel' | 'bow
 export type WristKind = 'watch' | 'iced-watch' | 'bangle' | 'cuff' | 'stack' | 'coil' | 'knot';
 export type EyeKind = 'oval' | 'cat-eye' | 'rect' | 'round' | 'rimless' | 'shield';
 export type NailKind = 'almond' | 'stiletto' | 'coffin' | 'square';
+export type RingKind = 'band' | 'sphere' | 'cocktail' | 'stack' | 'sculpt' | 'coil' | 'solitaire';
 export interface Piece {
-  kind: NeckKind | EarKind | WristKind | EyeKind | NailKind;
+  kind: NeckKind | EarKind | WristKind | EyeKind | NailKind | RingKind;
   /** What hangs from a necklace. */
   pendant?: Pendant;
 }
@@ -118,6 +119,8 @@ export interface Style {
   bag?: BagShape;
   /** Worn pieces only (necklace, earrings, wrist, glasses, nails): their cut. */
   piece?: Piece;
+  /** Bags only: a woven surface (real wicker relief) under the colour. */
+  woven?: true;
 }
 
 export interface FashionItem {
@@ -145,7 +148,7 @@ const item = (
 
 const bagItem = (id: string, name: string, price: number, bag: BagShape, color: string, trim?: string): FashionItem => {
   const base = item(id, 'bag', name, price, price >= 1500 ? 'Luxury' : 'Accessories', 'solid', [color, trim ?? color]);
-  return { ...base, style: { ...base.style, bag } };
+  return { ...base, style: { ...base.style, bag, ...(/woven|wicker|raffia/.test(id) ? { woven: true as const } : {}) } };
 };
 
 /** A dress look: the dress's top and its matching bottom (ids "top-x" and "bottom-x"), in one fabric. */
@@ -541,6 +544,18 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   worn('wrist-gold-cuff', 'wrist', 'Sculpted cuff · Gold', 900, 'cuff', ['#d8b048', '#d8b048', '#d8b048']),
   worn('wrist-open-bangle-gold', 'wrist', 'Open teardrop bangle · Gold', 600, 'bangle', ['#d8b048', '#d8b048', '#d8b048']),
   worn('wrist-clover-watch-rose', 'wrist', 'Starry watch & clover set · Rose gold', 900, 'watch', ['#d8a088', '#141416', '#121214']),
+  // Rings (the right hand; a stack goes across two fingers)
+  worn('rings-sphere-gold', 'rings', 'Triple sphere ring · Gold', 650, 'sphere', ['#d8b048', '#d8b048', '#d8b048']),
+  worn('rings-chunky-dome-gold', 'rings', 'Chunky dome ring · Gold', 550, 'sculpt', ['#d8b048', '#d8b048', '#d8b048']),
+  worn('rings-molten-gold', 'rings', 'Molten wave ring · Gold', 600, 'sculpt', ['#d8b048', '#d8b048', '#d8b048']),
+  worn('rings-coil-gold', 'rings', 'Spring coil ring · Gold', 500, 'coil', ['#d8b048', '#d8b048', '#d8b048']),
+  worn('rings-pave-stack-gold', 'rings', 'Pavé stacking rings · Gold', 900, 'stack', ['#d8b048', '#f2f4f8', '#d8b048']),
+  worn('rings-pave-stack-rose', 'rings', 'Pavé stacking rings · Rose gold', 900, 'stack', ['#d8a088', '#f2f4f8', '#d8a088']),
+  worn('rings-eternity-band-gold', 'rings', 'Eternity band · Gold', 1200, 'band', ['#d8b048', '#f2f4f8', '#d8b048']),
+  worn('rings-solitaire-gold', 'rings', 'Solitaire ring · Gold', 1800, 'solitaire', ['#d8b048', '#f2f4f8', '#d8b048']),
+  worn('rings-cocktail-ruby-silver', 'rings', 'Ruby cocktail ring · Silver', 1100, 'cocktail', ['#d6d8dc', '#b8121c', '#f2f4f8']),
+  worn('rings-cocktail-emerald-gold', 'rings', 'Emerald cocktail ring · Gold', 1100, 'cocktail', ['#d8b048', '#1d6e52', '#f2f4f8']),
+  worn('rings-band-silver', 'rings', 'Plain band · Silver', 300, 'band', ['#d6d8dc', '#d6d8dc', '#d6d8dc']),
   // Sunglasses
   worn('eyes-oval-cream', 'eyes', 'Oval sunglasses · Cream & brown', 480, 'oval', ['#e2cfa6', '#5a3c22']),
   worn('eyes-rect-black-pink', 'eyes', 'Rectangle sunglasses · Black & pink', 450, 'rect', ['#121214', '#f0a0b8']),
@@ -607,7 +622,7 @@ export const COLOUR_CHOICES: readonly { name: string; hex: string }[] = [
 /** Whether you can choose this piece's colour: single-colour pieces, but not hair dye (each dye is its own shade). */
 export const recolourable = (i: FashionItem) => i.style.pattern === 'solid' && i.slot !== 'hair' && i.collection !== 'Rewards'
   // Jewellery and frames are metal and stones; two-tone bags and nail art keep their own colours
-  && !['neck', 'ears', 'wrist', 'eyes'].includes(i.slot) && ((i.slot !== 'bag' && i.slot !== 'nails') || i.style.colors[1] === i.style.colors[0]);
+  && !['neck', 'ears', 'wrist', 'eyes', 'rings'].includes(i.slot) && ((i.slot !== 'bag' && i.slot !== 'nails') || i.style.colors[1] === i.style.colors[0]);
 
 /** An item's style in the colour you chose for it (its own colour if none, or if the choice isn't one on offer). */
 export function styleIn(i: FashionItem, colour?: string): Style {

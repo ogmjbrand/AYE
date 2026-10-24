@@ -1,7 +1,7 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DoubleSide, ExtrudeGeometry, Matrix4, MeshPhysicalMaterial, MeshStandardMaterial, Quaternion, Shape, Vector3, type Bone, type Group, type Material, type Object3D } from 'three';
-import type { EarKind, EyeKind, NailKind, NeckKind, Pendant, Slot, Style, WristKind } from '../lib/fashion';
+import type { EarKind, EyeKind, NailKind, NeckKind, Pendant, RingKind, Slot, Style, WristKind } from '../lib/fashion';
 
 /**
  * Jewellery, sunglasses and nails on a character: necklaces round the neck,
@@ -273,6 +273,25 @@ function Nail({ kind, mats }: { kind: NailKind; mats: ReturnType<typeof useMater
   );
 }
 
+/** Which fingers of the right hand a ring goes on (0 thumb … 4 little finger). */
+const RING_FINGERS: Record<RingKind, readonly number[]> = { band: [3], sphere: [2], cocktail: [3], stack: [2, 3], sculpt: [1], coil: [2], solitaire: [3] };
+
+/** A ring round a finger (frame: y along the finger, z out of the back of the hand). */
+function Ring({ kind, mats }: { kind: RingKind; mats: ReturnType<typeof useMaterials> }) {
+  const { metal, stone } = mats;
+  const band = (tube: number, y = 0) => <mesh position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.85, 1]} material={metal}><torusGeometry args={[0.0095, tube, 8, 24]} /></mesh>;
+  switch (kind) {
+    case 'band': return <>{band(0.0014)}{Array.from({ length: 8 }, (_, i) => <mesh key={i} position={[Math.cos((i / 8) * Math.PI) * 0.0095, 0, Math.sin((i / 8) * Math.PI) * 0.0085]} material={stone}><sphereGeometry args={[0.0013, 6, 4]} /></mesh>)}</>;
+    case 'solitaire': return <>{band(0.0012)}<mesh position={[0, 0, 0.0115]} material={stone}><octahedronGeometry args={[0.0035]} /></mesh></>;
+    case 'cocktail': return <>{band(0.0016)}<mesh position={[0, 0, 0.011]} scale={[1, 1.3, 0.7]} material={stone}><sphereGeometry args={[0.005, 12, 10]} /></mesh></>;
+    case 'sphere': return <>{band(0.0016)}{[[-0.004, 0.012, 0.0045], [0.004, 0.0125, 0.004], [0, 0.0105, 0.0035]].map(([x, z, r], i) => <mesh key={i} position={[x, (i - 1) * 0.004, z]} material={metal}><sphereGeometry args={[r, 14, 10]} /></mesh>)}</>;
+    case 'sculpt': return <mesh rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.85, 1.6]} material={metal}><torusGeometry args={[0.0105, 0.0035, 10, 24]} /></mesh>;
+    case 'coil': return <>{[0, 1, 2, 3].map((i) => <group key={i}>{band(0.0012, -0.004 + i * 0.0028)}</group>)}</>;
+    case 'stack': return <>{band(0.0012, -0.002)}{band(0.0012, 0.002)}{Array.from({ length: 6 }, (_, i) => <mesh key={i} position={[Math.cos((i / 6) * Math.PI) * 0.0095, 0, Math.sin((i / 6) * Math.PI) * 0.0085]} material={stone}><sphereGeometry args={[0.0012, 6, 4]} /></mesh>)}</>;
+    default: return null;
+  }
+}
+
 /** Every worn piece the character has on, following its bones. */
 export function Adornments({ scene, styles }: { scene: Object3D; styles: Partial<Record<Slot, Style>> }) {
   const bones = useMemo(() => {
@@ -285,11 +304,14 @@ export function Adornments({ scene, styles }: { scene: Object3D; styles: Partial
   const neck = useRef<Group>(null);
   const wrists = { L: useRef<Group>(null), R: useRef<Group>(null) };
   const nails = useRef<(Group | null)[]>([]);
+  const rings = useRef<(Group | null)[]>([]);
   const neckMats = useMaterials(styles.neck ?? EMPTY);
   const earMats = useMaterials(styles.ears ?? EMPTY);
   const wristMats = useMaterials(styles.wrist ?? EMPTY);
   const eyeMats = useMaterials(styles.eyes ?? EMPTY);
   const nailMats = useMaterials(styles.nails ?? EMPTY);
+  const ringMats = useMaterials(styles.rings ?? EMPTY);
+  const ringFingers = styles.rings?.piece ? RING_FINGERS[styles.rings.piece.kind as RingKind] ?? [] : [];
 
   useFrame(() => {
     const parent = root.current;
@@ -319,12 +341,23 @@ export function Adornments({ scene, styles }: { scene: Object3D; styles: Partial
       const sign = side === 'L' ? -1 : 1;
       const wantWrist = !!styles.wrist;
       const wantNails = !!styles.nails;
-      if (!wantWrist && !wantNails) continue;
+      const wantRings = side === 'R' && ringFingers.length > 0;
+      if (!wantWrist && !wantNails && !wantRings) continue;
       if (!at(`${side} Hand`, a) || !at(`${side} Forearm`, b) || !at(`${side} Finger1`, c) || !at(`${side} Finger4`, d)) continue;
       const along = b.subVectors(a, b).normalize();
       const across = ACROSS.subVectors(d, c).multiplyScalar(sign);
       // y along the arm, x across the knuckles: the frame's z is out of the back of the hand
       if (wantWrist) place(wrists[side].current, a, across, along);
+      if (wantRings) {
+        ringFingers.forEach((f, i) => {
+          const g = rings.current[i];
+          if (!g || !at(`R Finger${f}`, F1) || !at(`R Finger${f}1`, F2)) return;
+          const dir = F2.sub(F1);
+          // Round the first bone of the finger, a little past its middle
+          TIP.copy(F1).addScaledVector(dir, 0.55);
+          place(g, TIP, across, dir);
+        });
+      }
       if (wantNails) {
         for (let f = 0; f < 5; f++) {
           const g = nails.current[(side === 'L' ? 0 : 5) + f];
@@ -357,6 +390,9 @@ export function Adornments({ scene, styles }: { scene: Object3D; styles: Partial
       </group>
       {(['L', 'R'] as const).map((side) => (
         <group key={side} ref={wrists[side]}>{wristPiece && <Wrist kind={wristPiece.kind as WristKind} side={side} mats={wristMats} />}</group>
+      ))}
+      {styles.rings?.piece && ringFingers.map((f, i) => (
+        <group key={`ring${f}`} ref={(g) => { rings.current[i] = g; }}><Ring kind={styles.rings!.piece!.kind as RingKind} mats={ringMats} /></group>
       ))}
       {nailPiece && Array.from({ length: 10 }, (_, i) => (
         <group key={i} ref={(g) => { nails.current[i] = g; }}><Nail kind={nailPiece.kind as NailKind} mats={nailMats} /></group>

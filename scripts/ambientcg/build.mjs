@@ -23,6 +23,10 @@ const SURFACES = {
   bamboo: 'Bamboo001C_1K-JPG',
   fabric: 'Fabric080_1K-JPG',
   metal: 'Metal049A_1K-JPG',
+  leather: 'Leather009_1K-JPG',
+  wicker: 'Wicker005_1K-JPG',
+  plaster: 'PaintedPlaster003_1K-JPG',
+  tiles: 'Tiles035_1K-JPG',
 };
 const MAPS = { color: 'Color', normal: 'NormalGL', roughness: 'Roughness', ao: 'AmbientOcclusion' };
 

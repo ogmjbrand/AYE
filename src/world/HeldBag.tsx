@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { CanvasTexture, MeshPhysicalMaterial, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, Shape, Vector3, type Bone, type Group, type Object3D } from 'three';
 import type { BagShape, Style } from '../lib/fashion';
+import { pbr } from './pbr';
 
 /** Grip, body size (width front-to-back, height, depth side-to-side) and where the body's top sits below the hand, in metres. */
 const BAG: Record<BagShape, { w: number; h: number; d: number; top: number; handle: 'straps' | 'arch' | 'none' | 'cord' | 'chain' | 'twin' | 'ring' | 'hook' }> = {
@@ -154,10 +155,13 @@ export function HeldBag({ scene, style }: { scene: Object3D; style: Style }) {
       clearcoatRoughness: f === 'patent' || f === 'acrylic' ? 0.05 : 0.4,
       ...(f === 'croc' ? { bumpMap: crocTexture(), bumpScale: 2 } : {}),
       ...(relief ? { bumpMap: bumpTexture(relief), bumpScale: relief === 'quilted' ? 3 : 1.5 } : {}),
+      // Real grain from ambientCG scans: leather (Leather009) and woven straw (Wicker005), in the bag's own colour
+      ...(f === 'leather' ? { normalMap: pbr('leather', [2, 2]).normalMap, roughnessMap: pbr('leather', [2, 2]).roughnessMap } : {}),
+      ...(style.woven ? { normalMap: pbr('wicker', [3, 3]).normalMap, aoMap: pbr('wicker', [3, 3]).aoMap } : {}),
       // Fur and marabou: soft light across the fibres
       ...(f === 'fur' || f === 'velvet' ? { sheen: 1, sheenRoughness: 0.6, sheenColor: style.colors[0] } : {}),
     });
-  }, [style.colors, fabric]);
+  }, [style.colors, style.woven, fabric]);
   // A second colour on two-tone bags: the flap, trim and handles
   const trim = useMemo(() => (style.colors[1] !== style.colors[0] ? new MeshPhysicalMaterial({ color: style.colors[1], roughness: 0.45, clearcoat: 0.3 }) : body), [style.colors, body]);
   const gold = useMemo(() => new MeshStandardMaterial({ color: '#d4b26a', roughness: 0.25, metalness: 1 }), []);

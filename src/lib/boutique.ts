@@ -28,12 +28,13 @@ export const CLOTHES_TABS: readonly { id: ClothesTab; label: string }[] = [
   { id: 'sets', label: 'Sets' },
 ];
 
-export type AccessoryTab = 'bags' | 'necklaces' | 'earrings' | 'wrist' | 'sunglasses';
+export type AccessoryTab = 'bags' | 'necklaces' | 'earrings' | 'wrist' | 'rings' | 'sunglasses';
 export const ACCESSORY_TABS: readonly { id: AccessoryTab; label: string; slot: FashionItem['slot'] }[] = [
   { id: 'bags', label: 'Bags', slot: 'bag' },
   { id: 'necklaces', label: 'Necklaces', slot: 'neck' },
   { id: 'earrings', label: 'Earrings', slot: 'ears' },
   { id: 'wrist', label: 'Watches & bangles', slot: 'wrist' },
+  { id: 'rings', label: 'Rings', slot: 'rings' },
   { id: 'sunglasses', label: 'Sunglasses', slot: 'eyes' },
 ];
 export type HairTab = 'colour' | 'nails';
@@ -84,7 +85,7 @@ export function rangeFor(districtId: string, section: BoutiqueSection, tab: Shop
   }
   if (section === 'accessories') {
     const slot = ACCESSORY_TABS.find((t) => t.id === tab)?.slot;
-    return range.filter((i) => (slot ? i.slot === slot : ['bag', 'neck', 'ears', 'wrist', 'eyes'].includes(i.slot)));
+    return range.filter((i) => (slot ? i.slot === slot : ['bag', 'neck', 'ears', 'wrist', 'rings', 'eyes'].includes(i.slot)));
   }
   // A dress's two halves are sold together on the Dresses tab, not as separate tops and skirts
   const dressPart = (i: FashionItem) => !!i.dress || (i.slot === 'bottom' && !!range.find((t) => t.id === i.id.replace(/^bottom-/, 'top-'))?.dress);

@@ -288,4 +288,15 @@ insert into public.shop_items (id, kind, price, career, pay_bonus) values
   ('nails-burgundy-heart-french', 'fashion', 380, null, 0),
   ('nails-burgundy-flower-stiletto', 'fashion', 450, null, 0),
   ('nails-black-swirl-coffin', 'fashion', 420, null, 0),
-  ('nails-gold-chrome-almond', 'fashion', 420, null, 0);
+  ('nails-gold-chrome-almond', 'fashion', 420, null, 0),
+  ('rings-sphere-gold', 'fashion', 650, null, 0),
+  ('rings-chunky-dome-gold', 'fashion', 550, null, 0),
+  ('rings-molten-gold', 'fashion', 600, null, 0),
+  ('rings-coil-gold', 'fashion', 500, null, 0),
+  ('rings-pave-stack-gold', 'fashion', 900, null, 0),
+  ('rings-pave-stack-rose', 'fashion', 900, null, 0),
+  ('rings-eternity-band-gold', 'fashion', 1200, null, 0),
+  ('rings-solitaire-gold', 'fashion', 1800, null, 0),
+  ('rings-cocktail-ruby-silver', 'fashion', 1100, null, 0),
+  ('rings-cocktail-emerald-gold', 'fashion', 1100, null, 0),
+  ('rings-band-silver', 'fashion', 300, null, 0);

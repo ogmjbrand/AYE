@@ -18,6 +18,7 @@ const SHAPE: Record<Slot, string> = {
   wrist: svg('M38 8 L62 8 L60 28 A24 24 0 0 1 60 72 L62 92 L38 92 L40 72 A24 24 0 0 1 40 28 Z'),
   eyes: svg('M4 40 Q4 30 14 30 L40 30 Q46 30 46 40 Q46 62 26 62 Q4 62 4 40 Z M54 40 Q54 30 60 30 L86 30 Q96 30 96 40 Q96 62 74 62 Q54 62 54 40 Z M44 36 L56 36 L56 42 L44 42 Z'),
   nails: svg('M14 30 Q14 10 24 10 Q34 10 34 30 L34 90 L14 90 Z M40 22 Q40 2 50 2 Q60 2 60 22 L60 90 L40 90 Z M66 30 Q66 10 76 10 Q86 10 86 30 L86 90 L66 90 Z'),
+  rings: svg('M50 30 A26 26 0 1 1 49.9 30 Z M50 40 A16 16 0 1 0 50.1 40 Z M42 8 L58 8 L64 22 L36 22 Z'),
   hair: svg('M50 6 C20 6 13 34 18 60 C20 78 14 90 9 95 L34 95 C30 80 34 64 34 50 C34 30 42 22 50 22 C58 22 66 30 66 50 C66 64 70 80 66 95 L91 95 C86 90 80 78 82 60 C87 34 80 6 50 6 Z'),
 };
 
@@ -58,6 +59,7 @@ function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, st
     eyes: { position: [0.18, 0.94 * h, 0.5], target: [0, 0.935 * h, 0], fov: 26 },
     wrist: { position: [0.75, 0.5 * h, 0.55], target: [0.2, 0.47 * h, 0], fov: 30 },
     nails: { position: [0.6, 0.42 * h, 0.45], target: [0.21, 0.4 * h, 0.02], fov: 24 },
+    rings: { position: [-0.6, 0.42 * h, 0.45], target: [-0.21, 0.4 * h, 0.02], fov: 24 },
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {

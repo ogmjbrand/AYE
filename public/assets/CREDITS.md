@@ -53,5 +53,6 @@ From ambientCG (ambientcg.com), **CC0 1.0** (public domain), with thanks. Built 
 |---|---|
 | `textures/road/` (street asphalt), `textures/ground/` (grass) | Road007, Grass001 |
 | `textures/wood-floor/`, `textures/bricks/`, `textures/bamboo/`, `textures/onyx/`, `textures/fabric/`, `textures/metal/` | WoodFloor051, Bricks104, Bamboo001C, Onyx006, Fabric080, Metal049A |
+| `textures/leather/`, `textures/wicker/`, `textures/plaster/`, `textures/tiles/` | Leather009, Wicker005, PaintedPlaster003, Tiles035 |
 | `hdri/city-day_1k.exr`, `hdri/town-dusk_1k.exr`, `hdri/street-night_1k.exr`, `hdri/lounge-indoor_1k.exr` | DayEnvironmentHDRI052, EveningEnvironmentHDRI002, NightEnvironmentHDRI010, IndoorEnvironmentHDRI013 |
 | `models/food/*.glb` | 3DBread005/006/007/012, 3DCookie001, 3DAvocado001, 3DKiwi001, 3DPear001/002, 3DPastry003, 3DCake001, 3DApple002/003, 3DMelon001 |

@@ -222,7 +222,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       <primitive object={scene} scale={scale} />
       {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
       {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}
-      {styles && (styles.neck || styles.ears || styles.wrist || styles.eyes || styles.nails) && <Adornments scene={scene} styles={styles} />}
+      {styles && (styles.neck || styles.ears || styles.wrist || styles.eyes || styles.nails || styles.rings) && <Adornments scene={scene} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );

@@ -7,9 +7,9 @@ import { assetUrl } from '../lib/assetManifest';
  * background (nothing suspends), so a material made with them shows its plain
  * colour for a moment and then the real surface.
  */
-export type PbrName = 'wood-floor' | 'bricks' | 'bamboo' | 'onyx' | 'fabric' | 'metal' | 'road' | 'ground';
+export type PbrName = 'wood-floor' | 'bricks' | 'bamboo' | 'onyx' | 'fabric' | 'metal' | 'road' | 'ground' | 'leather' | 'wicker' | 'plaster' | 'tiles';
 
-const HAS_AO: ReadonlySet<PbrName> = new Set(['wood-floor', 'bricks', 'bamboo', 'ground']);
+const HAS_AO: ReadonlySet<PbrName> = new Set(['wood-floor', 'bricks', 'bamboo', 'ground', 'wicker']);
 const loader = new TextureLoader();
 const cache = new Map<string, Texture>();
 

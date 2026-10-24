@@ -44,6 +44,11 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
         {floor ? <meshStandardMaterial map={floor} roughness={0.14} /> : <meshStandardMaterial {...boards} />}
       </mesh>
 
+      {/* Ceramic tiles under the shower, bath and kitchen counters (ambientCG Tiles035) */}
+      {[...interior.furniture, ...extra].filter((f) => f.kind === 'shower' || f.kind === 'bathtub' || f.kind === 'counter').map((f, i) => (
+        <TiledPatch key={i} x={f.at[0]} z={f.at[1]} w={f.size[0] + 0.5} d={f.size[2] + 0.5} />
+      ))}
+
       {/* Walls, facing inwards */}
       <Wall brick={interior.brick} color={interior.wallColor} position={[0, H / 2, d / 2]} rotationY={Math.PI} size={[w, H]} />
       <Wall brick={interior.brick} color={interior.wallColor} position={[-w / 2, H / 2, 0]} rotationY={Math.PI / 2} size={[d, H]} />
@@ -108,13 +113,29 @@ export function HomeInterior({ interior, gameTime, extra = [], children }: { int
   );
 }
 
+function TiledPatch({ x, z, w, d }: { x: number; z: number; w: number; d: number }) {
+  const tiles = useMemo(() => pbr('tiles', [w / 0.9, d / 0.9]), [w, d]);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.004, z]} receiveShadow>
+      <planeGeometry args={[w, d]} />
+      <meshStandardMaterial {...tiles} />
+    </mesh>
+  );
+}
+
 function Wall({ color, position, rotationY, size, brick = false }: { color: string; position: [number, number, number]; rotationY: number; size: [number, number]; brick?: boolean }) {
   // Exposed brick (ambientCG Bricks104), tiled at its real size (about 1.2 m a repeat)
   const bricks = useMemo(() => (brick ? pbr('bricks', [size[0] / 1.2, size[1] / 1.2]) : null), [brick, size]);
+  // Painted walls: the home's colour over real plaster relief (ambientCG PaintedPlaster003), about 2 m a repeat
+  const plaster = useMemo(() => {
+    if (brick) return null;
+    const { normalMap, roughnessMap } = pbr('plaster', [size[0] / 2, size[1] / 2]);
+    return { normalMap, roughnessMap };
+  }, [brick, size]);
   return (
     <mesh position={position} rotation={[0, rotationY, 0]} receiveShadow>
       <planeGeometry args={size} />
-      {bricks ? <meshStandardMaterial {...bricks} /> : <meshStandardMaterial color={color} roughness={0.9} />}
+      {bricks ? <meshStandardMaterial {...bricks} /> : <meshStandardMaterial color={color} roughness={0.95} {...plaster} normalScale={[0.6, 0.6]} />}
     </mesh>
   );
 }
