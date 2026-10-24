@@ -38,6 +38,8 @@ const FULL_MASK = (() => {
   t.needsUpdate = true;
   return t;
 })();
+/** How shiny skin is (0 mirror, 1 matt): healthy skin has a soft sheen, not a matt finish. */
+export const SKIN_ROUGHNESS = 0.48;
 const HEAD_SLOTS: readonly (readonly [Slot, string])[] = [['hair', 'r']];
 
 const PATTERN_GLSL = /* glsl */ `
@@ -111,6 +113,7 @@ vec3 ayePattern(float p, vec2 uv, float s, vec3 a, vec3 b, vec3 c) {
     float v = cx == cy ? cx : step(0.5, fract((h.x + h.y) * 2.0));
     return mix(a, b, v);
   }
+  if (p < 9.5) {
   // Batik: wax-resist flowers with the fine crackle where the wax broke
   float r = length(f);
   float petals = 0.5 + 0.5 * cos(atan(f.y, f.x) * 6.0);
@@ -118,6 +121,56 @@ vec3 ayePattern(float p, vec2 uv, float s, vec3 a, vec3 b, vec3 c) {
   float crack = 1.0 - smoothstep(0.0, 0.035, abs(fract(q.x * 1.7 + 0.35 * sin(q.y * 3.1)) - 0.5));
   vec3 col = mix(a, b, flower);
   return mix(col, c, crack * 0.55 * (1.0 - flower));
+  }
+  vec2 cell = floor(q);
+  if (p < 10.5) {
+    // Leopard: broken rosettes (a ring of dark spots round a warmer centre), jittered per cell
+    vec2 j = vec2(ayeHash(cell), ayeHash(cell + 5.1)) * 0.4 - 0.2;
+    vec2 d = f - j;
+    float ang = atan(d.y, d.x);
+    float r = length(d * vec2(1.0, 1.25));
+    float ring = smoothstep(0.24, 0.2, abs(r - 0.27)) * step(0.35, fract(ang * 0.477 + ayeHash(cell + 2.0)));
+    float centre = smoothstep(0.2, 0.12, r);
+    vec3 col = mix(a, c, centre * 0.8);
+    return mix(col, b, ring);
+  }
+  if (p < 11.5) {
+    // Polka dots on a half-drop grid
+    vec2 g = fract(q + vec2(step(0.5, fract(cell.y * 0.5)) * 0.5, 0.0)) - 0.5;
+    return mix(a, b, smoothstep(0.24, 0.2, length(g)));
+  }
+  if (p < 12.5) {
+    // Cherries: pairs of red fruit on green stalks, scattered
+    vec2 j = vec2(ayeHash(cell), ayeHash(cell + 3.7)) * 0.3 - 0.15;
+    vec2 d = f - j;
+    float fruit = max(smoothstep(0.13, 0.1, length(d - vec2(-0.1, -0.08))), smoothstep(0.13, 0.1, length(d - vec2(0.1, -0.1))));
+    float stalk = smoothstep(0.025, 0.0, abs(d.x * 0.9 - (d.y - 0.12) * 0.5 * sign(d.x))) * step(-0.05, d.y) * step(d.y, 0.22);
+    return mix(mix(a, c, stalk), b, fruit);
+  }
+  if (p < 13.5) {
+    // Painted florals: soft five-petal blooms in two colours over the ground, with leaves
+    vec2 j = vec2(ayeHash(cell), ayeHash(cell + 9.2)) * 0.36 - 0.18;
+    vec2 d = f - j;
+    float petals = 0.5 + 0.5 * cos(atan(d.y, d.x) * 5.0 + ayeHash(cell) * 6.0);
+    float bloom = smoothstep(0.05, 0.0, length(d) - (0.17 + 0.11 * petals));
+    float leaf = smoothstep(0.03, 0.0, abs(length(d - vec2(0.3, 0.25)) - 0.12)) * 0.6;
+    vec3 flowerCol = ayeHash(cell + 1.3) > 0.5 ? b : c;
+    vec3 col = mix(a, mix(c, a, 0.5), leaf);
+    return mix(col, mix(flowerCol, a, smoothstep(0.0, 0.2, length(d)) * 0.3), bloom);
+  }
+  if (p < 14.5) {
+    // Lace: fine net with scalloped flowers, the second colour showing through the gaps
+    vec2 net = abs(fract(q * 6.0) - 0.5);
+    float mesh = step(0.42, max(net.x, net.y));
+    float r = length(f);
+    float motif = smoothstep(0.03, 0.0, abs(r - 0.25 - 0.05 * cos(atan(f.y, f.x) * 8.0))) + smoothstep(0.1, 0.06, r);
+    return mix(b, a, clamp(mesh * 0.8 + motif, 0.0, 1.0));
+  }
+  // Swirl: tie-dye and marbling, flowing bands of the three colours
+  float w = sin(q.x * 1.3 + 2.0 * sin(q.y * 0.9) + 1.5 * cos(q.x * 0.5 + q.y * 0.7));
+  float v = sin(q.y * 1.1 + 2.5 * cos(q.x * 0.6));
+  vec3 col = mix(a, b, smoothstep(-0.2, 0.2, w));
+  return mix(col, c, smoothstep(0.55, 0.8, v) * 0.85);
 }
 `;
 
@@ -182,6 +235,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
         float ayeRough = 0.0;
         float ayeMetal = 0.0;
         float ayeFinish = 0.0;
+        float ayeSkinGlow = 0.0;
         {
           vec4 ayeMask = texture2D(uAyeMask, vMapUv);
           // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
@@ -189,6 +243,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
           // Skin tone, before any fabric: deeper darkens and enriches, lighter lifts, both keeping the texture
           float ayeSkinW = ${cutout ? '0.0' : isHead ? '1.0 - ayeMask.r' : '1.0 - max(max(ayeMask.r, ayeMask.g), ayeMask.b)'};
+          ayeSkinGlow = ayeSkinW;
           if (ayeSkinW > 0.001 && abs(uAyeSkin) > 0.001) {
             // Deeper: towards a warm deep brown (sRGB about #4a2b19), keeping the texel's own light and shade
             // (lum / typical skin lum). Colours here are linear, as diffuseColor is.
@@ -201,10 +256,11 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);')
+      // Skin has a soft natural sheen: light catches the forehead, cheekbones and shoulders as on real skin
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);\nroughnessFactor = mix(roughnessFactor, min(roughnessFactor, ${SKIN_ROUGHNESS.toFixed(2)}), ayeSkinGlow * (1.0 - ayeFinish));`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v5-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v6-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }

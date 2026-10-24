@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { COLOUR_CHOICES, FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, colourName, itemById, recolourable, resolveStyles, stockedIn, styleIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
+import { ADORNMENT_SLOTS, COLOUR_CHOICES, FASHION_ITEMS, MAX_OUTFITS, SLOTS, SLOT_LABEL, colourName, itemById, recolourable, resolveStyles, stockedIn, styleIn, swatchCss, type FashionItem, type Slot, type Wardrobe } from '../lib/fashion';
 
 interface FashionStoreProps {
   /** 'shop' sells everything; 'wardrobe' shows only what the player owns. */
@@ -101,8 +101,8 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
           </section>
         )}
         <ItemRow
-          title={slot === 'hair' ? 'Natural colour' : slot === 'bag' ? 'No bag' : 'Original'}
-          subtitle={slot === 'hair' ? 'Your own hair colour' : slot === 'bag' ? 'Hands free' : 'What you were wearing'}
+          title={slot === 'hair' ? 'Natural colour' : slot === 'bag' ? 'No bag' : slot === 'nails' ? 'Natural nails' : ADORNMENT_SLOTS.includes(slot) ? 'None' : 'Original'}
+          subtitle={slot === 'hair' ? 'Your own hair colour' : slot === 'bag' ? 'Hands free' : slot === 'nails' ? 'Short and bare' : ADORNMENT_SLOTS.includes(slot) ? 'Nothing on' : 'What you were wearing'}
           swatch="repeating-linear-gradient(45deg, #2a2d33 0 6px, #353a42 6px 12px)"
           active={shownId === null}
           actions={

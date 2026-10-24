@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLOUR_CHOICES, FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, recolourable, resolveStyles, sanitiseWardrobe, stockedIn, styleIn } from './fashion';
+import { ADORNMENT_SLOTS, COLOUR_CHOICES, FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, recolourable, resolveStyles, sanitiseWardrobe, stockedIn, styleIn, swatchCss } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -111,10 +111,38 @@ describe('choosing colours', () => {
 
   it('every bag has a shape and is sold in every country', () => {
     const bags = FASHION_ITEMS.filter((i) => i.slot === 'bag');
-    expect(bags.length).toBe(18);
+    expect(bags.length).toBe(67);
     for (const b of bags) {
       expect(b.style.bag).toBeTruthy();
       expect(b.stockedIn).toBeUndefined();
     }
+  });
+});
+
+describe('jewellery, sunglasses and nails', () => {
+  const worn = FASHION_ITEMS.filter((i) => ADORNMENT_SLOTS.includes(i.slot));
+  it('every worn piece has its cut, and necklaces say what hangs from them', () => {
+    expect(worn.length).toBeGreaterThanOrEqual(70);
+    for (const i of worn) expect(i.style.piece?.kind, i.id).toBeTruthy();
+    expect(itemById('neck-layered-pearl-cross-gold')!.style.piece).toEqual({ kind: 'layered', pendant: 'cross' });
+    expect(itemById('eyes-cateye-red')!.style.piece!.kind).toBe('cat-eye');
+  });
+  it('jewellery keeps its metal and stones; a plain set of nails can be any polish', () => {
+    for (const i of worn.filter((w) => w.slot !== 'nails')) expect(recolourable(i), i.id).toBe(false);
+    expect(recolourable(itemById('nails-red-stiletto')!)).toBe(true);
+    expect(recolourable(itemById('nails-lilac-french')!)).toBe(false);
+    expect(itemById('neck-iced-cross-ruby')!.style.fabric!.name).toBe('silver');
+    expect(itemById('ears-chunky-hoop-gold')!.style.fabric!.name).toBe('gold');
+  });
+  it('the new prints have a swatch of their own', () => {
+    for (const p of ['leopard', 'polka', 'cherry', 'floral', 'lace', 'swirl'] as const) {
+      const it = FASHION_ITEMS.find((i) => i.style.pattern === p)!;
+      expect(it, p).toBeTruthy();
+      expect(swatchCss(it.style), p).not.toBe(it.style.colors[0]);
+    }
+  });
+  it('a saved wardrobe keeps worn pieces in their own slots', () => {
+    const w = sanitiseWardrobe({ owned: ['neck-solitaire-gold', 'nails-red-stiletto'], equipped: { neck: 'neck-solitaire-gold', ears: 'nails-red-stiletto', nails: 'nails-red-stiletto' } });
+    expect(w.equipped).toEqual({ neck: 'neck-solitaire-gold', nails: 'nails-red-stiletto' });
   });
 });

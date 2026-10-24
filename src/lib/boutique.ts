@@ -8,8 +8,10 @@
  * What you can buy is the district's own range (lib/fashion.ts `stockedIn`).
  * With the current character models, clothes restyle the fabric of what your
  * character already wears; new cuts (dresses, jackets) need new 3D garments,
- * so those tabs say so instead of selling anything. Accessories are bags,
- * carried in the hand (world/HeldBag.tsx).
+ * so outerwear says so instead of selling anything; a dress is sold as a look
+ * that restyles your top and bottom in its fabric. Accessories are bags
+ * carried in the hand (world/HeldBag.tsx), and jewellery, sunglasses and
+ * nails drawn on the body (world/Adornments.tsx).
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import { stockedIn, type FashionItem } from './fashion';
@@ -26,9 +28,26 @@ export const CLOTHES_TABS: readonly { id: ClothesTab; label: string }[] = [
   { id: 'sets', label: 'Sets' },
 ];
 
+export type AccessoryTab = 'bags' | 'necklaces' | 'earrings' | 'wrist' | 'sunglasses';
+export const ACCESSORY_TABS: readonly { id: AccessoryTab; label: string; slot: FashionItem['slot'] }[] = [
+  { id: 'bags', label: 'Bags', slot: 'bag' },
+  { id: 'necklaces', label: 'Necklaces', slot: 'neck' },
+  { id: 'earrings', label: 'Earrings', slot: 'ears' },
+  { id: 'wrist', label: 'Watches & bangles', slot: 'wrist' },
+  { id: 'sunglasses', label: 'Sunglasses', slot: 'eyes' },
+];
+export type HairTab = 'colour' | 'nails';
+export const HAIR_TABS: readonly { id: HairTab; label: string; slot: FashionItem['slot'] }[] = [
+  { id: 'colour', label: 'Hair colour', slot: 'hair' },
+  { id: 'nails', label: 'Nails', slot: 'nails' },
+];
+export type ShopTab = ClothesTab | AccessoryTab | HairTab;
+
+/** What a dress look does on today's characters, shown on the Dresses tab. */
+export const DRESS_NOTE = 'A dress restyles your top and bottom together in the dress’s fabric and print. The cut stays your character’s own until new 3D dresses arrive.';
+
 /** Cuts the current characters can't wear yet: these tabs explain instead of selling. */
-export const NOT_YET: Partial<Record<ClothesTab | BoutiqueSection, string>> = {
-  dresses: 'Dresses are a new cut, and new cuts need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. Tops restyle the fabric of what you wear, abayas and kaftans included.',
+export const NOT_YET: Partial<Record<ShopTab | BoutiqueSection, string>> = {
   outerwear: 'Jackets and coats need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. A top restyles a jacket you already have on.',
 };
 
@@ -41,23 +60,35 @@ export interface FashionSet {
   price: number;
 }
 
-/** Every matching top-and-bottom pair this district's boutique stocks. */
-export function setsIn(districtId: string): FashionSet[] {
+/** Every matching top-and-bottom pair this district's boutique stocks (dresses: only the dress looks). */
+export function setsIn(districtId: string, dresses?: boolean): FashionSet[] {
   const range = stockedIn(districtId).filter((i) => i.collection !== 'Rewards');
   const out: FashionSet[] = [];
   for (const top of range.filter((i) => i.slot === 'top')) {
     const bottom = range.find((i) => i.slot === 'bottom' && i.id === top.id.replace(/^top-/, 'bottom-'));
-    if (bottom) out.push({ id: `set-${top.id.slice(4)}`, name: `${top.name.split(' · ')[0]} set${top.name.includes(' · ') ? ` · ${top.name.split(' · ')[1]}` : ''}`, top, bottom, price: top.price + bottom.price });
+    if (!bottom || (dresses !== undefined && !!top.dress !== dresses)) continue;
+    // A dress is named as the dress ("Satin cowl halter dress · Gold"), a set by its top
+    const name = top.dress ? top.name.replace(/ · bodice$/, '') : `${top.name.split(' · ')[0]} set${top.name.includes(' · ') ? ` · ${top.name.split(' · ')[1]}` : ''}`;
+    out.push({ id: `set-${top.id.slice(4)}`, name, top, bottom, price: top.price + bottom.price });
   }
   return out;
 }
 
 /** What the boutique sells in a section (never the earned-only rewards). */
-export function rangeFor(districtId: string, section: BoutiqueSection, tab: ClothesTab = 'all'): FashionItem[] {
-  const range = stockedIn(districtId).filter((i) => i.collection !== 'Rewards');
+export function rangeFor(districtId: string, section: BoutiqueSection, tab: ShopTab = 'all'): FashionItem[] {
+  let range = stockedIn(districtId).filter((i) => i.collection !== 'Rewards');
   if (section === 'shoes') return range.filter((i) => i.slot === 'shoes');
-  if (section === 'hair') return range.filter((i) => i.slot === 'hair');
-  if (section === 'accessories') return range.filter((i) => i.slot === 'bag');
+  if (section === 'hair') {
+    const slot = HAIR_TABS.find((t) => t.id === tab)?.slot;
+    return range.filter((i) => (slot ? i.slot === slot : i.slot === 'hair' || i.slot === 'nails'));
+  }
+  if (section === 'accessories') {
+    const slot = ACCESSORY_TABS.find((t) => t.id === tab)?.slot;
+    return range.filter((i) => (slot ? i.slot === slot : ['bag', 'neck', 'ears', 'wrist', 'eyes'].includes(i.slot)));
+  }
+  // A dress's two halves are sold together on the Dresses tab, not as separate tops and skirts
+  const dressPart = (i: FashionItem) => !!i.dress || (i.slot === 'bottom' && !!range.find((t) => t.id === i.id.replace(/^bottom-/, 'top-'))?.dress);
+  range = range.filter((i) => !dressPart(i));
   if (tab === 'tops') return range.filter((i) => i.slot === 'top');
   if (tab === 'bottoms') return range.filter((i) => i.slot === 'bottom');
   if (tab === 'all') return range.filter((i) => i.slot === 'top' || i.slot === 'bottom');

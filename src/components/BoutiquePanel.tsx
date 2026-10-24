@@ -4,7 +4,7 @@ import { COLOUR_CHOICES, recolourable, styleIn, swatchCss, type FashionItem, typ
 import type { BodyShape } from '../lib/bodyShape';
 import { Avatar } from './Avatar';
 import { useSnapshot, type SnapshotJob } from './snapshot/store';
-import { CLOTHES_TABS, NOT_YET, cartTotal, rangeFor, setsIn, type BoutiqueSection, type ClothesTab, type FashionSet } from '../lib/boutique';
+import { ACCESSORY_TABS, CLOTHES_TABS, DRESS_NOTE, HAIR_TABS, NOT_YET, cartTotal, rangeFor, setsIn, type BoutiqueSection, type FashionSet, type ShopTab } from '../lib/boutique';
 import { Icon } from './os/icons';
 
 const svg = (path: string) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='${path}'/></svg>`)}")`;
@@ -13,6 +13,11 @@ const SHAPE: Record<Slot, string> = {
   bottom: svg('M29 7 L71 7 L76 93 L57 93 L50 38 L43 93 L24 93 Z'),
   shoes: svg('M8 64 Q10 40 30 42 L44 46 Q55 28 67 40 L88 58 Q95 67 90 74 L10 74 Z'),
   bag: svg('M34 34 C34 14 66 14 66 34 L60 34 C60 22 40 22 40 34 Z M18 34 L82 34 L88 90 L12 90 Z'),
+  neck: svg('M20 10 Q50 75 80 10 L84 13 Q50 86 16 13 Z M44 70 L56 70 L56 82 L50 92 L44 82 Z'),
+  ears: svg('M30 8 A9 9 0 1 1 30 26 A9 9 0 1 1 30 8 Z M30 30 L36 52 Q30 64 24 52 Z M70 8 A9 9 0 1 1 70 26 A9 9 0 1 1 70 8 Z M70 30 L76 52 Q70 64 64 52 Z'),
+  wrist: svg('M38 8 L62 8 L60 28 A24 24 0 0 1 60 72 L62 92 L38 92 L40 72 A24 24 0 0 1 40 28 Z'),
+  eyes: svg('M4 40 Q4 30 14 30 L40 30 Q46 30 46 40 Q46 62 26 62 Q4 62 4 40 Z M54 40 Q54 30 60 30 L86 30 Q96 30 96 40 Q96 62 74 62 Q54 62 54 40 Z M44 36 L56 36 L56 42 L44 42 Z'),
+  nails: svg('M14 30 Q14 10 24 10 Q34 10 34 30 L34 90 L14 90 Z M40 22 Q40 2 50 2 Q60 2 60 22 L60 90 L40 90 Z M66 30 Q66 10 76 10 Q86 10 86 30 L86 90 L66 90 Z'),
   hair: svg('M50 6 C20 6 13 34 18 60 C20 78 14 90 9 95 L34 95 C30 80 34 64 34 50 C34 30 42 22 50 22 C58 22 66 30 66 50 C66 64 70 80 66 95 L91 95 C86 90 80 78 82 60 C87 34 80 6 50 6 Z'),
 };
 
@@ -48,6 +53,11 @@ function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, st
     shoes: { position: [0.45, 0.22, 0.75], target: [0, 0.06, 0.05], fov: 30 },
     hair: { position: [0.3, 0.94 * h, 0.75], target: [0, 0.92 * h, 0], fov: 30 },
     bag: { position: [1.0, 0.42 * h, 0.75], target: [0.2, 0.36 * h, 0], fov: 32 },
+    neck: { position: [0.12, 0.84 * h, 0.55], target: [0, 0.8 * h, 0], fov: 30 },
+    ears: { position: [0.42, 0.93 * h, 0.32], target: [0.04, 0.92 * h, 0], fov: 28 },
+    eyes: { position: [0.18, 0.94 * h, 0.5], target: [0, 0.935 * h, 0], fov: 26 },
+    wrist: { position: [0.75, 0.5 * h, 0.55], target: [0.2, 0.47 * h, 0], fov: 30 },
+    nails: { position: [0.6, 0.42 * h, 0.45], target: [0.21, 0.4 * h, 0.02], fov: 24 },
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {
@@ -76,7 +86,9 @@ function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
   );
 }
 
-const TITLE: Record<BoutiqueSection, string> = { clothes: 'Clothes', shoes: 'Shoes', hair: 'Hair', accessories: 'Accessories' };
+const TITLE: Record<BoutiqueSection, string> = { clothes: 'Clothes', shoes: 'Shoes', hair: 'Hair & nails', accessories: 'Accessories' };
+const TABS: Partial<Record<BoutiqueSection, readonly { id: ShopTab; label: string }[]>> = { clothes: CLOTHES_TABS, accessories: ACCESSORY_TABS, hair: HAIR_TABS };
+const FIRST_TAB: Record<BoutiqueSection, ShopTab> = { clothes: 'all', shoes: 'all', hair: 'colour', accessories: 'bags' };
 
 interface Card {
   id: string;
@@ -106,7 +118,10 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
   onPickColour: (item: FashionItem, hex: string) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<ClothesTab>('all');
+  const [tab, setTab] = useState<ShopTab>(FIRST_TAB[section]);
+  // Opening another section starts on its first tab
+  const [shownSection, setShownSection] = useState(section);
+  if (shownSection !== section) { setShownSection(section); setTab(FIRST_TAB[section]); }
   const [cart, setCart] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   useEffect(() => {
@@ -115,11 +130,12 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const sets = useMemo(() => setsIn(districtId), [districtId]);
+  const sets = useMemo(() => setsIn(districtId, false), [districtId]);
+  const dresses = useMemo(() => setsIn(districtId, true), [districtId]);
   const cards: Card[] = useMemo(() => {
-    if (section === 'clothes' && tab === 'sets') return sets.map((s: FashionSet) => ({ id: s.id, name: s.name, price: s.price, items: [s.top, s.bottom] }));
+    if (section === 'clothes' && (tab === 'sets' || tab === 'dresses')) return (tab === 'sets' ? sets : dresses).map((s: FashionSet) => ({ id: s.id, name: s.name, price: s.price, items: [s.top, s.bottom] }));
     return rangeFor(districtId, section, tab).map((i) => ({ id: i.id, name: i.name, price: i.price, items: [i] }));
-  }, [section, tab, districtId, sets]);
+  }, [section, tab, districtId, sets, dresses]);
   const notYet = section === 'clothes' ? NOT_YET[tab] : NOT_YET[section];
   const favourites = wardrobe.favourites ?? [];
   const owned = wardrobe.owned;
@@ -155,9 +171,9 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
         <h2 className="m-0 font-display text-xl font-bold">{TITLE[section]}</h2>
         <span className="ml-auto"><Coin amount={balance} /></span>
       </header>
-      {section === 'clothes' && (
-        <div role="tablist" aria-label="Clothes" className="flex shrink-0 gap-1 overflow-x-auto px-3 pt-3">
-          {CLOTHES_TABS.map((t) => (
+      {TABS[section] && (
+        <div role="tablist" aria-label={TITLE[section]} className="flex shrink-0 gap-1 overflow-x-auto px-3 pt-3">
+          {TABS[section]!.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${tab === t.id ? 'bg-ui-gold text-[#2a1c06]' : 'border border-ui-gold/25 text-ui-ink/80 hover:border-ui-gold/60'}`}>
               {t.label}
@@ -166,6 +182,7 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
         </div>
       )}
 
+      {section === 'clothes' && tab === 'dresses' && <p className="m-0 px-4 pt-2 text-[11px] text-ui-muted">{DRESS_NOTE}</p>}
       {notYet ? (
         <div className="m-4 rounded-2xl border border-ui-gold/25 bg-ui-gold/5 p-4">
           <p className="m-0 text-sm font-semibold text-ui-gold-strong">Not in the game yet</p>
@@ -238,7 +255,8 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
           </div>
         ) : (
           <p className="m-0 text-[11px] text-ui-muted" aria-live="polite">{note ?? (section === 'accessories'
-            ? 'Tap a bag to carry it, and pick its colour from the dots. Jewellery and sunglasses aren’t in the game yet.'
+            ? 'Tap a piece to try it on. Bags are carried in your left hand, the watch goes on your left wrist and bangles on your right.'
+            : section === 'hair' ? 'Tap a colour or a set of nails to try it on. The salon colours your own hair; nails are long sets on your own hands.'
             : 'Tap a piece to try it on; plain pieces come in the colour you pick. Clothes restyle the fabric of what your character wears; new cuts are coming with new 3D clothes.')}</p>
         )}
       </footer>

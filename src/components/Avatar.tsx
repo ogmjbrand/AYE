@@ -16,6 +16,7 @@ import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HeldBag } from '../world/HeldBag';
+import { Adornments } from '../world/Adornments';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
@@ -221,6 +222,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       <primitive object={scene} scale={scale} />
       {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
       {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}
+      {styles && (styles.neck || styles.ears || styles.wrist || styles.eyes || styles.nails) && <Adornments scene={scene} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );
