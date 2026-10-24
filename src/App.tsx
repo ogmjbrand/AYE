@@ -90,6 +90,11 @@ import type { FurnitureKind, Interior } from './lib/interiors';
 import { currentMood, type FurnitureTarget } from './lib/gameState';
 import { FurnitureCatalogue } from './components/FurnitureCatalogue';
 import { LifeOS, type OsTab } from './components/os/LifeOS';
+import { Phone, PhoneBanner } from './components/phone/Phone';
+import { PhotoCapture } from './components/phone/photoCapture';
+import { usePhone } from './hooks/usePhone';
+import { unreadCount, type AppId } from './lib/phone';
+import { rideFare } from './lib/gameState';
 import { Celebrations } from './components/os/Celebrations';
 import type { LifeLink } from './lib/life';
 import { spotToUse } from './lib/furniture';
@@ -381,7 +386,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, buyHome, spaTreat, spaHire, spaClockIn, spaClockOut, spaSession, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, buyHome, spaTreat, spaHire, spaClockIn, spaClockOut, spaSession, moveOut, buyEquipment, travel, socialise, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, phoneFriend, ride, bookHotel, hotelWash, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -421,6 +426,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // Life OS: the character's dashboard; the world keeps running (and you can keep walking) while it's open
   const [osOpen, setOsOpen] = useState(false);
   const [osTab, setOsTab] = useState<OsTab>('today');
+  // The phone: open or in your pocket (it keeps its battery and notifications either way)
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneStart, setPhoneStart] = useState<AppId | null>(null);
 
   const indoors = inside && !!home && home.district === district.id && !!roomLayout;
   const inPalms = !indoors && venue !== null && district.restaurant?.id === venue;
@@ -435,6 +443,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inHospital = !indoors && venue === HOSPITAL_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
   const offStreet = indoors || inPalms || inCantina || inHotel || inSpa || inBoutique || inCampus || inHospital;
+  // The phone in your pocket: it charges while you're at home
+  const phoneCharging = indoors && !!home && home.id === state.home;
+  const myPhone = usePhone(character.id, state, phoneCharging);
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inCantina ? CANTINA_LAYOUT : inHotel ? (hotelKey ? HOTEL_LAYOUT_KEY : HOTEL_LAYOUT) : inSpa ? SPA_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : inHospital ? HOSPITAL_LAYOUT : district.layout;
   useEffect(() => { campusRef.current = inCampus; hospitalRef.current = inHospital; }, [inCampus, inHospital]);
@@ -1209,9 +1220,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen || agencyOpen || spaPanel !== null || spaServing !== null);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || dealerOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen, agencyOpen, spaPanel, spaServing]);
+  }, [vendor, store, homePanel, gadgets, travelOpen, talking, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, dealerOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1259,6 +1270,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const unlocked = ACHIEVEMENTS.filter((a) => a.unlock && !owned.includes(a.unlock) && state.life.achievements.some((x) => x.id === a.id)).map((a) => a.unlock!);
     if (unlocked.length) onCharacterUpdate({ ...character, wardrobe: { ...character.wardrobe, owned: [...owned, ...unlocked] } });
   }, [state.life.achievements, character, onCharacterUpdate]);
+
+  // P takes the phone out and puts it away
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) { setPhoneStart(null); setPhoneOpen((o) => !o); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // L opens and closes the Life OS
   useEffect(() => {
@@ -1412,7 +1432,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     indoors
       ? { id: 'home', label: 'Decor', icon: 'decor', onClick: () => setCatalogueOpen(true), active: catalogueOpen, title: 'Buy, place and arrange furniture' }
       : { id: 'home', label: 'Home', icon: 'home', onClick: () => onGo(state.home ? { to: 'home' } : { to: 'homes' }), title: state.home ? 'Walk home' : 'Find a home to rent' },
-    { id: 'phone', label: 'Phone', icon: 'phone', onClick: () => toggleOs('today'), active: osOpen && osTab === 'today', title: 'Your Life OS: needs, goals and today (L)' },
+    { id: 'phone', label: 'Phone', icon: 'phone', onClick: () => { setPhoneStart(null); setPhoneOpen((o) => !o); }, active: phoneOpen, badge: myPhone.phone.notifications ? unreadCount(myPhone.phone) : 0, title: 'Your phone: bank, messages, jobs, homes, rides and more (P)' },
     {
       id: 'map', label: inCampus ? 'Directory' : 'Map', icon: 'map', active: mapOpen || locationsOpen || campusPanel === 'directory',
       title: inCampus ? 'The campus directory: every room, with a route' : phone ? 'The map on your phone (M)' : 'Every place in the city',
@@ -1438,6 +1458,39 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     activity: inHospital ? (shiftNow.clockedIn ? 'On shift' : 'At the hospital') : drivingNow ? `Driving the ${carById(drivingNow.id)?.name ?? 'car'}` : inCampus ? (state.school.inClass ? 'In class' : 'At university') : inBoutique ? 'Shopping' : inPalms ? (tableSeat ? 'Dining out' : 'At the restaurant') : inCantina ? (cantinaSeat ? 'Out at the bar' : `At ${CANTINA_NAME}`) : inHotel ? (hotelKey ? 'Staying at the hotel' : 'At the hotel') : inSpa ? (spaJobNow.clockedIn ? 'On shift at the spa' : 'At the spa') : sit.session ? `Sitting at ${sit.session.place}` : indoors ? 'At home'
       : character.career !== 'none' && isWorkingHours(state.time) && isAtWorkplace(district, character.career, controller.position.x, controller.position.z) ? 'Working'
         : getTrip()?.status === 'moving' ? `On the way${getTrip()?.label ? ` to ${getTrip()!.label}` : ''}` : 'Out and about',
+  };
+
+  const closePhone = () => setPhoneOpen(false);
+  const phoneActions = {
+    phoneFriend, buyHome, moveIn, sellCar, spaHire, setSavingsGoal,
+    onGo: (link: LifeLink) => { closePhone(); onGo(link); },
+    openMap: phone ? () => { closePhone(); setMapOpen(true); } : null,
+    openTravel: () => { closePhone(); setTravelOpen(true); },
+    openLifeOS: () => { closePhone(); openOs('today'); },
+    walkTo: (d: Destination): string | null => {
+      if (!d.position) return 'This place isn’t in the city yet.';
+      if (drivingNow) return 'You’re driving: park first.';
+      closePhone();
+      if (offStreet) { goOutside(); setTimeout(() => { const e = goTo(d); if (e) setArrival(e); }, 150); return null; }
+      const e = goTo(d);
+      if (e) setPhoneOpen(true);
+      return e;
+    },
+    ride: (d: Destination): string | null => {
+      if (!d.position) return 'A taxi can’t take you there.';
+      if (drivingNow) return 'You’re driving your own car.';
+      if (sit.session) return 'Get up first.';
+      const metres = Math.hypot(d.position.x - controller.position.x, d.position.z - controller.position.z);
+      if (metres < 15) return 'You’re already there.';
+      if (state.summary) return 'Start your day first.';
+      if (state.balance < rideFare(metres)) return 'Not enough GHAI for the fare.';
+      const { x, z } = d.position;
+      ride(metres);
+      closePhone();
+      const drop = () => { placePlayer([x, groundHeightAt(x, z), z]); setArrival(`Your taxi dropped you at ${d.name}. Fare ${rideFare(metres).toLocaleString()} GHAI.`); };
+      if (offStreet) { goOutside(); setTimeout(drop, 150); } else drop();
+      return null;
+    },
   };
 
   // M opens the phone map once you own a phone
@@ -1712,6 +1765,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             minDistance={2.5}
             maxDistance={40}
           />
+          <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
 
@@ -1888,6 +1942,28 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       <Celebrations items={state.life.celebrations} />
+      {phoneOpen && (
+        <Phone
+          state={state}
+          character={character}
+          district={district}
+          phone={myPhone.phone}
+          setPhone={myPhone.setPhone}
+          battery={myPhone.battery}
+          charging={phoneCharging}
+          whereabouts={whereabouts}
+          destinations={destinations}
+          here={{ x: controller.position.x, z: controller.position.z }}
+          canRide={!drivingNow && !sit.session && !state.summary}
+          sound={sound}
+          startApp={phoneStart}
+          act={phoneActions}
+          onClose={() => setPhoneOpen(false)}
+        />
+      )}
+      {!phoneOpen && myPhone.banner && (
+        <PhoneBanner n={myPhone.banner} onOpen={() => { setPhoneStart(myPhone.banner!.app); setPhoneOpen(true); myPhone.dismissBanner(); }} onDismiss={myPhone.dismissBanner} />
+      )}
       <SnapshotHost />
       {osOpen && (
         <LifeOS

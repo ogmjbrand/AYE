@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
-import type { FurnitureTarget, GameState } from '../lib/gameState';
+import type { FurnitureTarget, GameState, PhoneContact } from '../lib/gameState';
 import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
 import { hasProgress, loadProgress, saveProgress } from '../lib/save';
@@ -68,6 +68,8 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
     socialise: (residentId: string, activity: Activity) => dispatch({ type: 'socialise', residentId, activity }),
     nightOut: (residentId: string) => dispatch({ type: 'nightOut', residentId }),
+    phoneFriend: (residentId: string, kind: PhoneContact) => dispatch({ type: 'phoneFriend', residentId, kind }),
+    ride: (metres: number) => dispatch({ type: 'ride', metres }),
     wait: (minutes: number) => dispatch({ type: 'wait', minutes }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),

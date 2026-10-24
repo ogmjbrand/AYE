@@ -15,7 +15,7 @@
  *   5. rolls over missions at the start of each game day and week.
  */
 import type { Career, Lifestyle } from '../components/CharacterCreation';
-import { gameReducer, currentMood, type GameAction, type GameState } from './gameState';
+import { gameReducer, currentMood, rideFare, type GameAction, type GameState } from './gameState';
 import {
   HISTORY_SIZE, LEDGER_SIZE, MAX_TRAITS, PERKS, SKILLS, TRAITS, modifiers, perksOf, skillLevel,
   type Celebration, type DreamId, type LifeState, type Mission, type SkillId, type StatKey, type TraitId, type Wish,
@@ -31,6 +31,8 @@ import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
+import { carById } from './cars';
+import { clientById, serviceById as spaServiceById } from './spa';
 
 // ---------------------------------------------------------------- actions and links
 
@@ -526,6 +528,18 @@ function recordMoney(prev: GameState, action: GameAction, next: GameState): Game
     if (next.summary.rent) entries.push({ label: `Rent: ${homeById(prev.home)?.name ?? 'home'}`, amount: -next.summary.rent });
     const rest = next.balance - prev.balance + next.summary.rent;
     if (rest) entries.push({ label: 'Living costs overnight', amount: rest });
+  } else if (action.type === 'ride') {
+    const delta = next.balance - prev.balance;
+    const fare = rideFare(action.metres);
+    entries.push({ label: 'Taxi ride', amount: -fare });
+    if (delta + fare) entries.push({ label: 'Living costs', amount: delta + fare, merge: true });
+  } else if (action.type === 'spaTreat' || action.type === 'spaSession') {
+    // A treatment takes time: the treatment's own line, and the living costs of those minutes on their own
+    const delta = next.balance - prev.balance;
+    const svc = action.type === 'spaTreat' ? spaServiceById(action.serviceId) : spaServiceById(clientById(gameDay(prev.time.totalMinutes), action.clientId)?.service ?? '');
+    const main = action.type === 'spaTreat' ? -(svc?.price ?? 0) : next.spa.earnedTotal - prev.spa.earnedTotal;
+    if (main) entries.push({ label: action.type === 'spaTreat' ? `Alafia Spa: ${svc?.name ?? 'treatment'}` : `Spa pay & tip: ${svc?.name ?? 'session'}`, amount: main });
+    if (delta - main) entries.push({ label: 'Living costs', amount: delta - main, merge: true });
   } else {
     const delta = next.balance - prev.balance;
     if (delta) entries.push({ label: labelFor(prev, action), amount: delta });
@@ -553,6 +567,11 @@ function labelFor(prev: GameState, action: GameAction): string {
     case 'moveIn': return `Move-in fee: ${homeById(action.homeId)?.name ?? ''}`;
     case 'useFurniture': return 'Groceries';
     case 'workTask': return 'Work bonus';
+    case 'buyHome': return `Bought: ${homeById(action.homeId)?.name ?? 'a home'}`;
+    case 'buyCar': return `Car: ${carById(action.id)?.name ?? ''}`;
+    case 'sellCar': return `Sold car: ${carById(action.id)?.name ?? ''}`;
+    case 'fuel': return 'Fuel';
+    case 'bookHotel': return 'Grand Lagoon Hotel: one night';
     default: return 'Living costs';
   }
 }

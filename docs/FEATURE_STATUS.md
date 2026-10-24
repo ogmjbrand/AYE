@@ -56,6 +56,18 @@ Checked in a browser: walked into a mini flat, bought a TV and a sofa (balance 2
 
 ## Life OS milestone (verified)
 
+- **Phone** (`src/components/phone/`, `src/lib/phone.ts`, see `docs/PHONE.md`): a smartphone everyone carries (P or the Phone button). It has a status bar (game time, battery that drains away from home and charges at home, notification dot), two home pages and an App Library sorted by category, app search, a dock you can edit, a notification centre, recent apps and back/home buttons. Movement is blocked while it's open. 23 working apps:
+  - Bank: the game's ledger.
+  - Wallet: savings goal.
+  - Jobs: career, plus applying to Alafia Spa.
+  - Messages and Phone: texting and calling people you've met, once a day each.
+  - Contacts, Cars (garage and selling), Houses (buy from OGM Homes, move between homes you own).
+  - Shops, Ride: a taxi with a real fare that takes you there.
+  - Health, Spa, Events, Courses, Songhai Gist (news from your game).
+  - Travel, Maps and Life OS: open the game's own panels.
+  - Calculator, Camera (real pictures of the 3D view), Photos, Help and Settings (wallpaper, notifications, sounds, layout).
+
+  Notifications come from real changes: money, the morning statement, promotions, achievements and events. The phone's own data is saved per character on the device.
 - **Life OS** (`src/components/os/`): a glass side panel (bottom sheet on phones) over the running world. Open with the Life button or L. Sections: Today, Goals, Skills, People, Career, Money, Profile, Settings.
 - **Engine** (`src/lib/life.ts`, `src/lib/lifeState.ts`): progress comes only from comparing the game before and after real actions. Every reward is paid once and recorded in the money history.
   - 3 daily missions and 2 weekly challenges, picked from what you can actually do.

@@ -306,6 +306,8 @@ export interface Relationship {
   points: number;
   /** Game day (totalMinutes / 1440) of the last activity, or -1. */
   lastDay: number;
+  /** Game day you last texted or called them, if ever (one a day). */
+  lastPhone?: number;
 }
 
 export function friendshipLevel(points: number): number {
@@ -382,6 +384,7 @@ export function sanitiseRelationships(data: unknown): Record<string, Relationshi
     const points = typeof r.points === 'number' && Number.isFinite(r.points) ? Math.max(0, Math.min(MAX_POINTS, Math.round(r.points))) : 0;
     const lastDay = typeof r.lastDay === 'number' && Number.isInteger(r.lastDay) && r.lastDay >= -1 ? r.lastDay : -1;
     out[id] = { points, lastDay };
+    if (typeof r.lastPhone === 'number' && Number.isInteger(r.lastPhone) && r.lastPhone >= 0) out[id].lastPhone = r.lastPhone;
   }
   return out;
 }

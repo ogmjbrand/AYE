@@ -174,6 +174,10 @@ export type GameAction =
   | { type: 'travel'; to: string; mode: TravelMode }
   | { type: 'socialise'; residentId: string; activity: Activity }
   | { type: 'nightOut'; residentId: string }
+  /** On your phone: text or call someone you've met (once a day each, wherever they are). */
+  | { type: 'phoneFriend'; residentId: string; kind: PhoneContact }
+  /** A taxi booked on the phone: the fare for this many metres, and the minutes the ride takes. */
+  | { type: 'ride'; metres: number }
   | { type: 'wait'; minutes: number }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   /** A meal bought out; `lift` is what a good meal does besides filling you (a restaurant's fun, an espresso's energy). */
@@ -388,6 +392,46 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
     needs: addNeeds(next.needs, SOCIAL_GAINS[activity]),
     relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + Math.round(a.points * modifiers(state.life).friendship)), lastDay: today } },
   };
+}
+
+/**
+ * Your phone: a text or a call to someone you've already met (you have their
+ * number), wherever they are. One a day each; a call takes a few minutes and
+ * does more for you both than a text. It doesn't use up meeting them in person.
+ */
+export type PhoneContact = 'text' | 'call';
+export const PHONE_CONTACT: Record<PhoneContact, { points: number; social: number; minutes: number }> = {
+  text: { points: 2, social: 6, minutes: 0 },
+  call: { points: 4, social: 12, minutes: 10 },
+};
+function phoneFriend(state: GameState, residentId: string, kind: PhoneContact, career: Career, lifestyle: Lifestyle): GameState {
+  const rel = state.relationships[residentId];
+  const c = PHONE_CONTACT[kind];
+  if (state.summary || !rel || !residentById(residentId) || !c) return state;
+  const today = gameDay(state.time.totalMinutes);
+  if (rel.lastPhone === today) return state;
+  let next = state;
+  for (let i = 0; i < c.minutes; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    needs: addNeeds(next.needs, { social: c.social }),
+    relationships: { ...next.relationships, [residentId]: { ...rel, points: Math.min(MAX_POINTS, rel.points + Math.round(c.points * modifiers(state.life).friendship)), lastPhone: today } },
+  };
+}
+
+/** A taxi across the city: a flag fare plus a rate per metre, and the minutes it takes (pick-up included). */
+export const RIDE_BASE_FARE = 20;
+export const RIDE_PER_METRE = 0.3;
+export const RIDE_MAX_METRES = 3000;
+export const rideFare = (metres: number) => RIDE_BASE_FARE + Math.round(Math.max(0, metres) * RIDE_PER_METRE);
+export const rideMinutes = (metres: number) => 3 + Math.ceil(Math.max(0, metres) / 250);
+function ride(state: GameState, metres: number, career: Career, lifestyle: Lifestyle): GameState {
+  if (state.summary || !Number.isFinite(metres) || metres <= 0 || metres > RIDE_MAX_METRES) return state;
+  const fare = rideFare(metres);
+  if (state.balance < fare) return state;
+  let next: GameState = { ...state, balance: state.balance - fare, today: { ...state.today, expenses: state.today.expenses + fare } };
+  for (let i = 0; i < rideMinutes(metres); i++) next = tick(next, career, lifestyle, false);
+  return next;
 }
 
 /** What time with a friend does for you. */
@@ -843,6 +887,10 @@ function baseReducer(
       return socialise(state, action.residentId, action.activity, career, lifestyle);
     case 'nightOut':
       return nightOut(state, action.residentId, career, lifestyle);
+    case 'phoneFriend':
+      return phoneFriend(state, action.residentId, action.kind, career, lifestyle);
+    case 'ride':
+      return ride(state, action.metres, career, lifestyle);
     case 'wait': {
       // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work.
       // A sit is applied in small steps as it plays out, so any whole number of minutes up to the longest option

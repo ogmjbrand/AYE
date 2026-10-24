@@ -27,6 +27,8 @@ export interface NavItem {
   onClick: () => void;
   active?: boolean;
   title?: string;
+  /** A count on the button (unread notifications). */
+  badge?: number;
 }
 
 /** The title plate at the top of the screen: the venue or area you're in. */
@@ -477,7 +479,10 @@ export function HUD({
               aria-pressed={n.active || undefined}
               className={`flex min-w-[3.4rem] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:min-w-[4.5rem] sm:px-2.5 sm:text-[11px] ${n.active ? 'bg-ui-gold/20 text-ui-gold-strong' : 'text-ui-ink/85 hover:bg-white/5 hover:text-ui-gold-strong'}`}
             >
-              <Icon name={n.icon} className="h-5 w-5" />
+              <span className="relative">
+                <Icon name={n.icon} className="h-5 w-5" />
+                {!!n.badge && <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#e5484d] px-1 text-[9px] font-bold leading-none text-white" aria-label={`${n.badge} unread`}>{n.badge > 9 ? '9+' : n.badge}</span>}
+              </span>
               <span className="whitespace-nowrap">{n.label}</span>
             </button>
           ))}
@@ -487,7 +492,7 @@ export function HUD({
       {/* Keyboard hint: desktop only */}
       <div className="absolute bottom-5 right-5 hidden text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] lg:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
-        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom · <span className="font-semibold">L</span> phone</p>
+        <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom · <span className="font-semibold">P</span> phone · <span className="font-semibold">L</span> Life OS</p>
       </div>
     </div>
   );
