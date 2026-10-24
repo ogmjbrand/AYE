@@ -1255,7 +1255,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   // A night out is charged once, as before; afterwards you sit outside with your friend's name for a moment
   const goOutWith = (residentId: string) => {
-    nightOut(residentId);
+    nightOut(residentId, !!character.wardrobe.equipped.scent);
     const first = residentById(residentId)?.name.split(' ')[0];
     sitOnTerrace(`${district.nightlife.name}${first ? ` after a night out with ${first}` : ''}`, 6);
   };
@@ -1775,7 +1775,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           relationship={state.relationships[talking.id]}
           today={gameDay(state.time.totalMinutes)}
           balance={state.balance}
-          onActivity={(activity) => socialise(talking.id, activity)}
+          onActivity={(activity) => socialise(talking.id, activity, !!character.wardrobe.equipped.scent)}
           onStayOver={() => { setTalking(null); rest(false, true); }}
           onClose={() => setTalking(null)}
         />

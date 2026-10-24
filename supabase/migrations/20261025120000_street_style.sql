@@ -299,4 +299,10 @@ insert into public.shop_items (id, kind, price, career, pay_bonus) values
   ('rings-solitaire-gold', 'fashion', 1800, null, 0),
   ('rings-cocktail-ruby-silver', 'fashion', 1100, null, 0),
   ('rings-cocktail-emerald-gold', 'fashion', 1100, null, 0),
-  ('rings-band-silver', 'fashion', 300, null, 0);
+  ('rings-band-silver', 'fashion', 300, null, 0),
+  ('scent-ambre-rose', 'fashion', 1400, null, 0),
+  ('scent-lait-caramel', 'fashion', 1300, null, 0),
+  ('scent-cerise-noire', 'fashion', 1300, null, 0),
+  ('scent-fleur-blanche', 'fashion', 1200, null, 0),
+  ('scent-vanille-aura', 'fashion', 1250, null, 0),
+  ('scent-oud-nuit', 'fashion', 1600, null, 0);

@@ -101,8 +101,8 @@ export function FashionStore({ mode, shop, districtId, onSaveOutfit, onWearOutfi
           </section>
         )}
         <ItemRow
-          title={slot === 'hair' ? 'Natural colour' : slot === 'bag' ? 'No bag' : slot === 'nails' ? 'Natural nails' : ADORNMENT_SLOTS.includes(slot) ? 'None' : 'Original'}
-          subtitle={slot === 'hair' ? 'Your own hair colour' : slot === 'bag' ? 'Hands free' : slot === 'nails' ? 'Short and bare' : ADORNMENT_SLOTS.includes(slot) ? 'Nothing on' : 'What you were wearing'}
+          title={slot === 'hair' ? 'Natural colour' : slot === 'bag' ? 'No bag' : slot === 'nails' ? 'Natural nails' : ADORNMENT_SLOTS.includes(slot) || slot === 'scent' ? 'None' : 'Original'}
+          subtitle={slot === 'hair' ? 'Your own hair colour' : slot === 'bag' ? 'Hands free' : slot === 'nails' ? 'Short and bare' : slot === 'scent' ? 'No fragrance' : ADORNMENT_SLOTS.includes(slot) ? 'Nothing on' : 'What you were wearing'}
           swatch="repeating-linear-gradient(45deg, #2a2d33 0 6px, #353a42 6px 12px)"
           active={shownId === null}
           actions={

@@ -30,7 +30,7 @@ now shown under its official name).
 **Still missing:**
 - Jackets and coats as separate garments (a jacket restyles your top).
 - New dress and wig shapes: these need new 3D garments.
-- Perfume. |
+- Nothing else from the look boards: perfume is in too (6 fragrances under Accessories; wearing one gives +2 friendship and +5 social each time you spend time with someone). |
 | 11 | Business advertising platform | **Not started** | Needs accounts, a review/approval process, payments and legal review first. Billboards exist in the world but only show built-in art. |
 | 12a | Character Life OS, missions, wishes, dreams, perks, achievements | **Done (this milestone)** | See below. |
 | 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled and labelled so; there are no fake player counts. **Every person is a real 3D person:** residents, staff, students, patients, the body-type chart in the creator (your own person in each shape), you at the wheel of your car, and keke drivers in traffic. No grey stand-in figures while people load. |

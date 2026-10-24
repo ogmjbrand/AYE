@@ -172,8 +172,9 @@ export type GameAction =
   /** Freshen up at the basin in your hotel room. */
   | { type: 'hotelWash' }
   | { type: 'travel'; to: string; mode: TravelMode }
-  | { type: 'socialise'; residentId: string; activity: Activity }
-  | { type: 'nightOut'; residentId: string }
+  /** `scent`: you're wearing a fragrance (people warm to you a little more). */
+  | { type: 'socialise'; residentId: string; activity: Activity; scent?: boolean }
+  | { type: 'nightOut'; residentId: string; scent?: boolean }
   /** On your phone: text or call someone you've met (once a day each, wherever they are). */
   | { type: 'phoneFriend'; residentId: string; kind: PhoneContact }
   /** A taxi booked on the phone: the fare for this many metres, and the minutes the ride takes. */
@@ -375,7 +376,10 @@ function travel(state: GameState, to: string, mode: TravelMode, career: Career, 
  * one activity per resident per game day. Treats cost money; hanging out
  * needs a friendship and takes an hour.
  */
-function socialise(state: GameState, residentId: string, activity: Activity, career: Career, lifestyle: Lifestyle): GameState {
+/** Wearing a fragrance: a little more friendship and a little more lift from time together. */
+export const SCENT_BONUS = { points: 2, social: 5 } as const;
+
+function socialise(state: GameState, residentId: string, activity: Activity, career: Career, lifestyle: Lifestyle, scent = false): GameState {
   const resident = residentById(residentId);
   const a = ACTIVITIES[activity];
   if (state.summary || !resident || !a || resident.district !== state.districtId) return state;
@@ -389,8 +393,8 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   for (let i = 0; i < a.minutes; i++) next = tick(next, career, lifestyle, false);
   return {
     ...next,
-    needs: addNeeds(next.needs, SOCIAL_GAINS[activity]),
-    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + Math.round(a.points * modifiers(state.life).friendship)), lastDay: today } },
+    needs: addNeeds(next.needs, { ...SOCIAL_GAINS[activity], social: (SOCIAL_GAINS[activity].social ?? 0) + (scent ? SCENT_BONUS.social : 0) }),
+    relationships: { ...next.relationships, [residentId]: { ...rel, points: Math.min(MAX_POINTS, rel.points + Math.round(a.points * modifiers(state.life).friendship) + (scent ? SCENT_BONUS.points : 0)), lastDay: today } },
   };
 }
 
@@ -449,7 +453,7 @@ export const SIT_FUN_PER_MINUTE = 0.3;
  * only, you pay both covers, it takes two hours and counts as your time
  * together today. Friends only, like a hang-out.
  */
-function nightOut(state: GameState, residentId: string, career: Career, lifestyle: Lifestyle): GameState {
+function nightOut(state: GameState, residentId: string, career: Career, lifestyle: Lifestyle, scent = false): GameState {
   const resident = residentById(residentId);
   if (state.summary || !resident || resident.district !== state.districtId || !canStartNightOut(state.time)) return state;
   const cost = nightOutCost(districtById(state.districtId).nightlife);
@@ -460,8 +464,8 @@ function nightOut(state: GameState, residentId: string, career: Career, lifestyl
   for (let i = 0; i < NIGHT_OUT_MINUTES; i++) next = tick(next, career, lifestyle, false);
   return {
     ...next,
-    needs: addNeeds(next.needs, NIGHT_OUT_GAINS),
-    relationships: { ...next.relationships, [residentId]: { points: Math.min(MAX_POINTS, rel.points + Math.round(NIGHT_OUT_POINTS * modifiers(state.life).friendship)), lastDay: today } },
+    needs: addNeeds(next.needs, { ...NIGHT_OUT_GAINS, social: (NIGHT_OUT_GAINS.social ?? 0) + (scent ? SCENT_BONUS.social : 0) }),
+    relationships: { ...next.relationships, [residentId]: { ...rel, points: Math.min(MAX_POINTS, rel.points + Math.round(NIGHT_OUT_POINTS * modifiers(state.life).friendship) + (scent ? SCENT_BONUS.points : 0)), lastDay: today } },
   };
 }
 
@@ -884,9 +888,9 @@ function baseReducer(
     case 'workTask':
       return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
     case 'socialise':
-      return socialise(state, action.residentId, action.activity, career, lifestyle);
+      return socialise(state, action.residentId, action.activity, career, lifestyle, action.scent);
     case 'nightOut':
-      return nightOut(state, action.residentId, career, lifestyle);
+      return nightOut(state, action.residentId, career, lifestyle, action.scent);
     case 'phoneFriend':
       return phoneFriend(state, action.residentId, action.kind, career, lifestyle);
     case 'ride':

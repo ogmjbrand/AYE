@@ -6,11 +6,11 @@
  */
 import { districtById } from './geography';
 
-export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'bag' | 'neck' | 'ears' | 'wrist' | 'eyes' | 'nails' | 'rings';
-export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag', 'neck', 'ears', 'wrist', 'eyes', 'nails', 'rings'];
+export type Slot = 'top' | 'bottom' | 'shoes' | 'hair' | 'bag' | 'neck' | 'ears' | 'wrist' | 'eyes' | 'nails' | 'rings' | 'scent';
+export const SLOTS: readonly Slot[] = ['top', 'bottom', 'shoes', 'hair', 'bag', 'neck', 'ears', 'wrist', 'eyes', 'nails', 'rings', 'scent'];
 export const SLOT_LABEL: Record<Slot, string> = {
   top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', hair: 'Hair colour', bag: 'Bags',
-  neck: 'Necklaces', ears: 'Earrings', wrist: 'Watches & bangles', eyes: 'Sunglasses', nails: 'Nails', rings: 'Rings',
+  neck: 'Necklaces', ears: 'Earrings', wrist: 'Watches & bangles', eyes: 'Sunglasses', nails: 'Nails', rings: 'Rings', scent: 'Fragrance',
 };
 /** Worn pieces drawn on the body (world/Adornments.tsx), not restyled fabric. */
 export const ADORNMENT_SLOTS: readonly Slot[] = ['neck', 'ears', 'wrist', 'eyes', 'nails', 'rings'];
@@ -129,7 +129,7 @@ export interface FashionItem {
   slot: Slot;
   price: number;
   collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Accessories' | 'Rewards' | 'Workout' | 'Joggers' | 'Office' | 'Evening' | 'Gala'
-    | 'Couture' | 'Jewellery' | 'Eyewear' | 'Nails';
+    | 'Couture' | 'Jewellery' | 'Eyewear' | 'Nails' | 'Fragrance';
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
@@ -156,6 +156,12 @@ const dress = (key: string, name: string, price: number, collection: FashionItem
   { ...item(`top-${key}`, 'top', `${name} · bodice`, Math.round(price * 0.55), collection, pattern, colors, scale), dress: true },
   item(`bottom-${key}`, 'bottom', `${name} · skirt`, Math.round(price * 0.45), collection, pattern, colors, scale),
 ];
+
+/** A fragrance: colours are [the scent's colour in the bottle, glass, cap]. Worn, it isn't seen: people warm to you a little more (lib/gameState.ts SCENT_BONUS). */
+const scent = (id: string, name: string, price: number, colors: [string, string, string]): FashionItem => {
+  const base = item(id, 'scent', name, price, 'Fragrance', 'solid', colors);
+  return { ...base, style: { ...base.style, fabric: FABRICS.acrylic } };
+};
 
 /** Jewellery, sunglasses and nails: colours are [metal or frame, stones or lens, accent]. */
 const worn = (id: string, slot: Slot, name: string, price: number, kind: Piece['kind'], colors: [string, string?, string?], pendant?: Pendant): FashionItem => {
@@ -556,6 +562,13 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   worn('rings-cocktail-ruby-silver', 'rings', 'Ruby cocktail ring · Silver', 1100, 'cocktail', ['#d6d8dc', '#b8121c', '#f2f4f8']),
   worn('rings-cocktail-emerald-gold', 'rings', 'Emerald cocktail ring · Gold', 1100, 'cocktail', ['#d8b048', '#1d6e52', '#f2f4f8']),
   worn('rings-band-silver', 'rings', 'Plain band · Silver', 300, 'band', ['#d6d8dc', '#d6d8dc', '#d6d8dc']),
+  // Fragrance (our own scents; the bottles from the boards, without their labels)
+  scent('scent-ambre-rose', 'Ambre Rose eau de parfum · Rose, saffron & oud', 1400, ['#c88a5a', '#f2ece6', '#c9a24f']),
+  scent('scent-lait-caramel', 'Lait Caramel eau de parfum · Milk, caramel & musk', 1300, ['#f0d2c4', '#f2ece6', '#c9a24f']),
+  scent('scent-cerise-noire', 'Cerise Noire eau de parfum · Black cherry & tonka', 1300, ['#6e0f1e', '#f2ece6', '#c9a24f']),
+  scent('scent-fleur-blanche', 'Fleur Blanche eau de parfum · Jasmine & white tea', 1200, ['#f2e6a8', '#f2ece6', '#f2f2f2']),
+  scent('scent-vanille-aura', 'Vanille Aura eau de parfum · Vanilla, amber & peach', 1250, ['#e89a6a', '#f2ece6', '#c8ccd0']),
+  scent('scent-oud-nuit', 'Oud Nuit eau de parfum · Oud, leather & incense', 1600, ['#2a1a14', '#3a3a3e', '#c9a24f']),
   // Sunglasses
   worn('eyes-oval-cream', 'eyes', 'Oval sunglasses · Cream & brown', 480, 'oval', ['#e2cfa6', '#5a3c22']),
   worn('eyes-rect-black-pink', 'eyes', 'Rectangle sunglasses · Black & pink', 450, 'rect', ['#121214', '#f0a0b8']),
@@ -622,7 +635,7 @@ export const COLOUR_CHOICES: readonly { name: string; hex: string }[] = [
 /** Whether you can choose this piece's colour: single-colour pieces, but not hair dye (each dye is its own shade). */
 export const recolourable = (i: FashionItem) => i.style.pattern === 'solid' && i.slot !== 'hair' && i.collection !== 'Rewards'
   // Jewellery and frames are metal and stones; two-tone bags and nail art keep their own colours
-  && !['neck', 'ears', 'wrist', 'eyes', 'rings'].includes(i.slot) && ((i.slot !== 'bag' && i.slot !== 'nails') || i.style.colors[1] === i.style.colors[0]);
+  && !['neck', 'ears', 'wrist', 'eyes', 'rings', 'scent'].includes(i.slot) && ((i.slot !== 'bag' && i.slot !== 'nails') || i.style.colors[1] === i.style.colors[0]);
 
 /** An item's style in the colour you chose for it (its own colour if none, or if the choice isn't one on offer). */
 export function styleIn(i: FashionItem, colour?: string): Style {

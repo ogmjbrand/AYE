@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APPS, DEFAULT_DOCK, MAX_PHOTOS, batteryNow, loadPhone, newPhone, replyFrom, sanitisePhone, savePhone, searchApps, unreadCount,
 } from './phone';
-import { PHONE_CONTACT, RIDE_MAX_METRES, createGameState, createTime, gameReducer, rideFare, rideMinutes, type GameState } from './gameState';
+import { PHONE_CONTACT, SCENT_BONUS, RIDE_MAX_METRES, createGameState, createTime, gameReducer, rideFare, rideMinutes, type GameState } from './gameState';
 import { lifeReducer } from './life';
 import { RESIDENTS, sanitiseRelationships } from './people';
 
@@ -123,5 +123,17 @@ describe('a taxi', () => {
     const s0 = createGameState(1000, createTime(12, 0));
     const s1 = lifeReducer(s0, { type: 'ride', metres: 400 }, 'engineer', 'ordinary');
     expect(s1.life.ledger.find((e) => e.label === 'Taxi ride')?.amount).toBe(-rideFare(400));
+  });
+});
+
+describe('wearing a fragrance', () => {
+  const r = RESIDENTS[0];
+  const base = (): GameState => ({ ...createGameState(1000, createTime(12, 0)), districtId: r.district, needs: { energy: 80, hygiene: 80, fun: 50, social: 40 }, relationships: { [r.id]: { points: 10, lastDay: -1, lastPhone: 3 } } });
+  it('people warm to you a little more, and it keeps the day you last phoned', () => {
+    const plain = act(base(), { type: 'socialise', residentId: r.id, activity: 'chat' });
+    const scented = act(base(), { type: 'socialise', residentId: r.id, activity: 'chat', scent: true });
+    expect(scented.relationships[r.id].points - plain.relationships[r.id].points).toBe(SCENT_BONUS.points);
+    expect(scented.needs.social).toBeGreaterThan(plain.needs.social);
+    expect(scented.relationships[r.id].lastPhone).toBe(3);
   });
 });
