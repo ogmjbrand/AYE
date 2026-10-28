@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TASK_REWARD, type WorkTask } from '../lib/workTasks';
+import type { WorkPerformance } from '../lib/gameState';
 
 interface WorkTaskPanelProps {
   task: WorkTask;
   workplace: string;
   /** The player's current hourly pay, to show the bonus. */
   hourlyPay: number;
+  workPerformance: WorkPerformance;
   onAnswer: (choice: number) => void;
   onClose: () => void;
 }
@@ -23,7 +25,7 @@ function shuffledOrder(id: string, n: number) {
 }
 
 /** One decision from the player's job, with feedback and the reward once answered. */
-export function WorkTaskPanel({ task, workplace, hourlyPay, onAnswer, onClose }: WorkTaskPanelProps) {
+export function WorkTaskPanel({ task, workplace, hourlyPay, workPerformance, onAnswer, onClose }: WorkTaskPanelProps) {
   const [picked, setPicked] = useState<number | null>(null);
   const order = useMemo(() => shuffledOrder(task.id, task.options.length), [task]);
 
@@ -40,6 +42,8 @@ export function WorkTaskPanel({ task, workplace, hourlyPay, onAnswer, onClose }:
   };
   const result = picked === null ? null : task.options[picked];
   const reward = result ? TASK_REWARD[result.quality] : null;
+  const decisions = workPerformance.excellent + workPerformance.reasonable + workPerformance.poor;
+  const excellentRate = decisions === 0 ? 0 : Math.round((workPerformance.excellent / decisions) * 100);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
@@ -60,6 +64,17 @@ export function WorkTaskPanel({ task, workplace, hourlyPay, onAnswer, onClose }:
           </button>
         </header>
         <div className="space-y-4 p-5">
+          <section aria-label="Career performance" className="rounded-lg border border-ui-line/70 bg-black/10 px-3 py-2">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-semibold">Career record</span>
+              <span className="text-ui-muted">{decisions} {decisions === 1 ? 'decision' : 'decisions'} · {excellentRate}% excellent</span>
+            </div>
+            <div className="mt-2 flex gap-3 text-[11px] text-ui-muted">
+              <span>Excellent {workPerformance.excellent}</span>
+              <span>Reasonable {workPerformance.reasonable}</span>
+              <span>Needs work {workPerformance.poor}</span>
+            </div>
+          </section>
           <p className="m-0 text-sm">{task.situation}</p>
           <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-ui-muted">What do you do?</p>
           <ul className="m-0 grid list-none gap-2 p-0">

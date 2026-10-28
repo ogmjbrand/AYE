@@ -15,7 +15,7 @@
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import type { Seat } from './seating';
-import type { MenuItem } from './restaurant';
+import type { MenuItem } from './palms';
 
 export const CANTINA_NAME = 'Cantina Ayé';
 

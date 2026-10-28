@@ -8,14 +8,11 @@ import { DIETS, type Diet } from './food';
 import { GENDERS, HERITAGES, type Gender } from './identity';
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from './places';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, lookById, type BodyType } from './looks';
-import { sanitiseWardrobe } from './fashion';
+import { itemById, sanitiseWardrobe } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { STARTER_HOME_ID, forSale, homeById } from './homes';
 import { sanitiseEquipment } from './equipment';
-import { sanitiseCars } from './cars';
-import { sanitiseSchool } from './school';
 import { SONGHAI_CODE, songhaiRegion } from './songhai';
-import { sanitiseShift } from './hospital';
 import { sanitiseStay } from './hotel';
 import { sanitiseSpaJob } from './spa';
 import { DEFAULT_DISTRICT_ID, isDistrictId } from './geography';
@@ -24,6 +21,12 @@ import { sanitiseNeeds } from './needs';
 import { sanitiseFurniture } from './furniture';
 import { sanitiseLife } from './lifeState';
 import { recogniseExisting } from './life';
+import { sanitiseOfficeCareer } from './officeCareer';
+import { sanitiseCampus } from './campus';
+import { sanitiseHospital } from './hospital';
+import { sanitiseHomeDecor } from './homeDecor';
+import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId } from './skinTone';
+import { sanitiseOwnedVehicles, vehicleById } from './vehicleCatalog';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -36,6 +39,29 @@ const CAREERS: readonly Career[] = [
 const isNum = (v: unknown, min = -Infinity, max = Infinity): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 const isInt = (v: unknown, min: number, max: number): v is number => isNum(v, min, max) && Number.isInteger(v);
+
+/** The vehicle catalogue model nearest each car sold before the catalogue (lib/vehicleCatalog.ts). */
+const LEGACY_CAR_MODEL: Record<string, string> = {
+  hatch: 'epe-city',
+  saloon: 'marina-sedan',
+  suv: 'ikorodu-sport',
+  'ev-suv': 'ikorodu-sport',
+  executive: 'lekki-grand',
+  limousine: 'lekki-grand',
+  coupe: 'victoria-coupe',
+};
+
+/** Cars from older saves ({ id, color }) as owned catalogue vehicles, in the model's first paint. */
+export function legacyVehicles(cars: unknown): { modelId: string; colour: string }[] {
+  if (!Array.isArray(cars)) return [];
+  const out: { modelId: string; colour: string }[] = [];
+  for (const c of cars) {
+    const id = typeof c === 'object' && c !== null ? (c as { id?: unknown }).id : undefined;
+    const model = typeof id === 'string' ? vehicleById(LEGACY_CAR_MODEL[id] ?? '') : undefined;
+    if (model && !out.some((o) => o.modelId === model.id)) out.push({ modelId: model.id, colour: model.colours[0] });
+  }
+  return out;
+}
 
 function readJson(storage: Storage, key: string): unknown {
   try {
@@ -84,10 +110,13 @@ export function parseCharacter(data: unknown): Character | null {
     heightCm: isNum(c.heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max) ? Math.round(c.heightCm) : defaultHeightCm(body),
     // Unknown items (e.g. removed from the catalogue) are dropped; nothing is lost otherwise
     wardrobe: sanitiseWardrobe(c.wardrobe),
+    homeDecor: sanitiseHomeDecor(c.homeDecor),
     // Saves from before body shape start average
     shape: sanitiseShape(c.shape),
-    // Saves from before skin tone keep the person's own skin
+    // Saves from before skin tone keep the person's own skin. An older save may hold a tone id here (the tint below)
     skinTone: isNum(c.skinTone, -1, 1) ? Math.round(c.skinTone * 100) / 100 : 0,
+    skinToneId: isSkinToneId(c.skinToneId) ? c.skinToneId : isSkinToneId(c.skinTone) ? c.skinTone : DEFAULT_SKIN_TONE,
+    skinColor: isSkinColor(c.skinColor) ? c.skinColor : undefined,
   };
 }
 
@@ -121,6 +150,10 @@ export function loadProgress(character: Character, storage: Storage = localStora
   const p = data as Record<string, unknown>;
   const time = p.time as Record<string, unknown> | undefined;
   const today = p.today as Record<string, unknown> | undefined;
+  const performanceData = typeof p.workPerformance === 'object' && p.workPerformance !== null
+    ? p.workPerformance as Record<string, unknown>
+    : {};
+  const performanceCount = (value: unknown) => isInt(value, 0, 1_000_000_000) ? value : 0;
   if (
     p.characterId !== character.id ||
     !isNum(p.balance, 0) ||
@@ -144,6 +177,7 @@ export function loadProgress(character: Character, storage: Storage = localStora
       expenses: today.expenses,
       // Saves from before work shifts have no minutes recorded
       minutesWorked: isInt(today.minutesWorked, 0, 24 * 60) ? today.minutesWorked : 0,
+      ...(isInt(today.purchases, 0, 1000) ? { purchases: today.purchases } : {}),
     },
     minutesWorkedThisHour: isNum(p.minutesWorkedThisHour, 0, 60) ? p.minutesWorkedThisHour : 0,
     // Saves from before hunger existed start fed
@@ -159,7 +193,8 @@ export function loadProgress(character: Character, storage: Storage = localStora
     // Saves from before promotions start with no experience
     workMinutes: isInt(p.workMinutes, 0, Number.MAX_SAFE_INTEGER) ? p.workMinutes : 0,
     equipment: sanitiseEquipment(p.equipment),
-    cars: sanitiseCars(p.cars, isDistrictId),
+    // Cars bought before the vehicle catalogue are kept as the closest catalogue model
+    ownedVehicles: sanitiseOwnedVehicles(Array.isArray(p.ownedVehicles) ? p.ownedVehicles : legacyVehicles(p.cars)),
     // Saves from before travel are in the first district
     districtId: isDistrictId(p.districtId) ? p.districtId : DEFAULT_DISTRICT_ID,
     relationships: sanitiseRelationships(p.relationships),
@@ -169,10 +204,23 @@ export function loadProgress(character: Character, storage: Storage = localStora
     furniture: sanitiseFurniture(p.furniture),
     // Saves from before Life OS start with a fresh profile, skills and goals
     life: sanitiseLife(p.life),
-    school: sanitiseSchool(p.school),
-    shift: sanitiseShift(p.shift),
     // Saves from before the hotel have no booking
     hotel: sanitiseStay(p.hotel),
+    lastShowcaseDay: isInt(p.lastShowcaseDay, -1, Math.floor(time.totalMinutes / 1440)) ? p.lastShowcaseDay : -1,
+    fashionMissionItemId: typeof p.fashionMissionItemId === 'string' && itemById(p.fashionMissionItemId)
+      ? p.fashionMissionItemId
+      : null,
+    fashionMissionCompleted: p.fashionMissionCompleted === true
+      && typeof p.fashionMissionItemId === 'string'
+      && !!itemById(p.fashionMissionItemId),
+    workPerformance: {
+      excellent: performanceCount(performanceData.excellent),
+      reasonable: performanceCount(performanceData.reasonable),
+      poor: performanceCount(performanceData.poor),
+    },
+    officeCareer: sanitiseOfficeCareer(p.officeCareer),
+    campus: sanitiseCampus(p.campus),
+    hospital: sanitiseHospital(p.hospital),
   };
   // Every character gets the starter flat once: a save from before it, with no home, is given it now
   // (someone evicted later stays evicted). Nothing else changes
@@ -196,6 +244,6 @@ function sanitiseOwned(data: unknown): string[] {
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life, school, shift, hotel } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, cars, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, school, shift, hotel }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital }));
 }

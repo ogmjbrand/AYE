@@ -1,5 +1,5 @@
 /**
- * Alafia Spa, Ayemara: a walk-in day spa beside Uptown Gardens. Two ways to
+ * Alafia Spa, Ayemara: a walk-in day spa past Marina Motors. Two ways to
  * play it:
  *
  *  - As a guest: book a treatment at reception (full body, deep tissue,
@@ -20,7 +20,7 @@
  * middle of the near wall (−z), like the other venues.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
-import { run, type WallSeg } from './university';
+import { run, type WallSeg } from './buildingShell';
 import type { Needs } from './needs';
 import type { Seat } from './seating';
 

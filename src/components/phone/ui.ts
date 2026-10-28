@@ -18,7 +18,6 @@ export interface PhoneActions {
   onGo: (link: LifeLink) => void;
   buyHome: (id: string) => void;
   moveIn: (id: string) => void;
-  sellCar: (id: string) => void;
   spaHire: () => void;
   setSavingsGoal: (amount: number | null) => void;
   /** Opens the district map; null without the Smartphone upgrade. */

@@ -23,7 +23,11 @@ describe('generated districts', () => {
 
   it('use all three street plans, laid every way', () => {
     const generated = DISTRICTS.slice(2);
-    const plan = (d: (typeof generated)[number]) => d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' : d.layout.buildings.length === 22 ? 'marina' : 'osu';
+    // Each plan is told apart by its road and its number of buildings (the template's own count)
+    const plan = (d: (typeof generated)[number]) =>
+      d.layout.buildings.length === TEMPLATES.marina.spec.layout.buildings.length && d.layout.roadHalfWidth === 4 && d.layout.pavementWidth === 3 ? 'marina' :
+      d.layout.buildings.length === TEMPLATES.avenue.spec.layout.buildings.length && d.layout.roadHalfWidth === 5 && d.layout.pavementWidth === 3 ? 'avenue' :
+      'osu';
     const seen = new Set(generated.map((d) => `${plan(d)}:${Math.sign(d.layout.crossStreet.minZ)}:${Math.sign(d.travelDesk.position[0])}`));
     expect(seen.size).toBe(12);
     expect(generated.filter((d) => plan(d) === 'avenue').length).toBeGreaterThan(40);
@@ -43,8 +47,13 @@ describe('generated districts', () => {
     const b = turned.layout.park!.benches[0], o = L.layout.park!.benches[0];
     expect(b.x).toBeCloseTo(-o.x);
     expect(Math.cos(b.facing - o.facing)).toBeCloseTo(-1);
-    // Parked buses stay on the right-hand kerb, facing the way the traffic goes
-    for (const v of turned.layout.vehicles) expect(Math.cos(v.heading)).toBeCloseTo(Math.sign(v.position[0]));
+    // Every parked vehicle, including cross-street cars, rotates with its spot.
+    expect(turned.layout.vehicles).toHaveLength(asBuilt.layout.vehicles.length);
+    for (const [index, vehicle] of turned.layout.vehicles.entries()) {
+      const original = asBuilt.layout.vehicles[index];
+      expect(vehicle.position).toEqual([-original.position[0], original.position[1], -original.position[2]]);
+      expect(Math.cos(vehicle.heading - original.heading)).toBeCloseTo(-1);
+    }
   });
 
   it('name the shops and homes after the city, and price them for it', () => {

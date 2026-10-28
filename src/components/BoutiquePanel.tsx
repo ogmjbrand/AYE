@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Vector3 } from 'three';
 import { COLOUR_CHOICES, recolourable, styleIn, swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
 import { Avatar } from './Avatar';
+import type { SkinToneId } from '../lib/skinTone';
 import { useSnapshot, type SnapshotJob } from './snapshot/store';
 import { ACCESSORY_TABS, CLOTHES_TABS, DRESS_NOTE, HAIR_TABS, NOT_YET, cartTotal, rangeFor, setsIn, type BoutiqueSection, type FashionSet, type ShopTab } from '../lib/boutique';
 import { Icon } from './os/icons';
+import { stillController } from '../hooks/usePlayerController';
 
 const svg = (path: string) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='${path}'/></svg>`)}")`;
 const SHAPE: Record<Slot, string> = {
@@ -20,6 +21,7 @@ const SHAPE: Record<Slot, string> = {
   nails: svg('M14 30 Q14 10 24 10 Q34 10 34 30 L34 90 L14 90 Z M40 22 Q40 2 50 2 Q60 2 60 22 L60 90 L40 90 Z M66 30 Q66 10 76 10 Q86 10 86 30 L86 90 L66 90 Z'),
   rings: svg('M50 30 A26 26 0 1 1 49.9 30 Z M50 40 A16 16 0 1 0 50.1 40 Z M42 8 L58 8 L64 22 L36 22 Z'),
   scent: svg('M40 4 L60 4 L60 18 L56 18 L56 26 Q82 30 82 56 L82 86 Q82 96 72 96 L28 96 Q18 96 18 86 L18 56 Q18 30 44 26 L44 18 L40 18 Z'),
+  hairstyle: svg('M50 6 C20 6 13 34 18 60 C20 78 14 90 9 95 L34 95 C30 80 34 64 34 50 C34 30 42 22 50 22 C58 22 66 30 66 50 C66 64 70 80 66 95 L91 95 C86 90 80 78 82 60 C87 34 80 6 50 6 Z'),
   hair: svg('M50 6 C20 6 13 34 18 60 C20 78 14 90 9 95 L34 95 C30 80 34 64 34 50 C34 30 42 22 50 22 C58 22 66 30 66 50 C66 64 70 80 66 95 L91 95 C86 90 80 78 82 60 C87 34 80 6 50 6 Z'),
 };
 
@@ -34,7 +36,7 @@ function Garment({ item, colour, className = '', style }: { item: FashionItem; c
   );
 }
 
-const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
+const STILL = stillController();
 
 /** Who you are, for pictures of clothes on your own character. */
 export interface WearerLook {
@@ -42,6 +44,8 @@ export interface WearerLook {
   heightCm?: number;
   shape?: BodyShape;
   skinTone?: number;
+  skinToneId?: SkinToneId;
+  skinColor?: string;
 }
 
 /** A picture of the piece on your character, framed on where it's worn (sets: the whole outfit). */
@@ -54,6 +58,7 @@ function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, st
     bottom: { position: [0.25, 0.34 * h, 1.5], target: [0, 0.3 * h, 0], fov: 32 },
     shoes: { position: [0.45, 0.22, 0.75], target: [0, 0.06, 0.05], fov: 30 },
     hair: { position: [0.3, 0.94 * h, 0.75], target: [0, 0.92 * h, 0], fov: 30 },
+    hairstyle: { position: [0.3, 0.94 * h, 0.75], target: [0, 0.92 * h, 0], fov: 30 },
     bag: { position: [1.0, 0.42 * h, 0.75], target: [0.2, 0.36 * h, 0], fov: 32 },
     neck: { position: [0.12, 0.84 * h, 0.55], target: [0, 0.8 * h, 0], fov: 30 },
     ears: { position: [0.42, 0.93 * h, 0.32], target: [0.04, 0.92 * h, 0], fov: 28 },
@@ -65,8 +70,8 @@ function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, st
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {
-    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => `${i.id}${colours[i.id] ?? ''}`).join('+')}`,
-    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
+    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${w.skinToneId ?? ''}:${w.skinColor ?? ''}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => `${i.id}${colours[i.id] ?? ''}`).join('+')}`,
+    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} skinToneId={w.skinToneId} skinColor={w.skinColor} />,
     camera,
     size: 320,
   };

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useDistrict } from './DistrictContext';
-import { isOpen } from '../lib/restaurant';
+import { isOpen } from '../lib/palms';
 import { groundHeightAt } from '../lib/world';
 import { PottedPalm } from './PottedPalm';
 import { palmsSign } from './signs';

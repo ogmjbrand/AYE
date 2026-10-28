@@ -26,7 +26,6 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, forSale, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
-import { carById, carResale, fuelCost, type OwnedCar, type ParkedSpot } from './cars';
 import { GUEST_ROOM, NIGHT_PRICE, WASH_HYGIENE, WASH_MINUTES, checkoutFor, stayIsValid, type HotelStay } from './hotel';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
 import { WAIT_OPTIONS } from './parks';
@@ -35,7 +34,7 @@ const MAX_WAIT = Math.max(...WAIT_OPTIONS);
 import { NIGHT_OUT_MINUTES, NIGHT_OUT_POINTS, canStartNightOut, nightOutCost } from './nightlife';
 import { travelOption, type TravelMode } from './travel';
 import { TASK_REWARD, taskForHour } from './workTasks';
-import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, residentById, type Activity, type Relationship } from './people';
+import { ACTIVITIES, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel, gameDay, isAdultResident, residentById, type Activity, type Relationship } from './people';
 import { FULL_NEEDS, MOOD_TASK_MULTIPLIER, SLEEP_ENERGY, TIRED_THRESHOLD, addNeeds, decayNeeds, decayNeedsAsleep, moodLabel, moodScore, type Needs } from './needs';
 import { catalogueItem, findSpot, fits, homeComfort, walkable, nextUid, replaceAll, resaleValue, furnitureUse, type OwnedFurniture } from './furniture';
 import { interiorFor, type Interior } from './interiors';
@@ -43,8 +42,42 @@ import { emptyLife, modifiers, type LifeState } from './lifeState';
 import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
 import { CLIENTS_PER_DAY, clientById, emptySpaJob, isOpen as spaOpen, onShiftHours, rollSpaDay, satisfaction, serviceById, sessionPay, stars, type SpaJob } from './spa';
-import { clockIn, clockOut, emptyShift, patientById, rollShift, saw, type ShiftState } from './hospital';
-import { STUDY, emptySchool, handIn, joinClub, leaveClass, minutesLeftInClass, participate, rollDay, schoolMinute, startClass, studied, visit, type CampusRoom, type CampusVisit, type SchoolState, type StudyKind } from './school';
+import { canResidentAcceptHug } from './hug';
+import { fashionShowcaseResult } from './fashionShowcase';
+import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
+import { itemById, type Slot } from './fashion';
+import { type OwnedVehicle, vehicleById, vehicleColourById } from './vehicleCatalog';
+import {
+  OFFICE_TASK_MINUTES,
+  createOfficeCareer,
+  officeShiftClockIn,
+  officeShiftClockOut,
+  officeTaskAnswer,
+  type OfficeCareerState,
+  type OfficeTaskId,
+} from './officeCareer';
+import {
+  CLASS_MINUTES,
+  STUDY_MINUTES,
+  attendClass,
+  campusForDay,
+  createCampusState,
+  studySession,
+  submitAssignment,
+  type CampusState,
+  type ClassSlot,
+} from './campus';
+import {
+  BRIEFING_MINUTES,
+  PATIENT_MINUTES,
+  brief,
+  clockIn,
+  clockOut,
+  createHospitalState,
+  hospitalForDay,
+  treatPatient,
+  type HospitalState,
+} from './hospital';
 
 export type Period = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -62,6 +95,14 @@ export interface DayLedger {
   expenses: number;
   /** Game minutes spent at the workplace during working hours. */
   minutesWorked: number;
+  /** Discretionary purchases (clothes, equipment, vehicles) made today; absent in older saves. */
+  purchases?: number;
+}
+
+export interface WorkPerformance {
+  excellent: number;
+  reasonable: number;
+  poor: number;
 }
 
 export interface DaySummary extends DayLedger {
@@ -103,8 +144,8 @@ export interface GameState {
   workMinutes: number;
   /** Owned equipment ids (lib/equipment.ts). */
   equipment: string[];
-  /** Cars you own (lib/cars.ts). */
-  cars: OwnedCar[];
+  /** One owned vehicle per catalogue model; paint colours are catalogue ids. */
+  ownedVehicles: OwnedVehicle[];
   /** The district the player is in (lib/geography.ts). */
   districtId: string;
   /** Friendships with residents (lib/people.ts), by resident id. */
@@ -117,38 +158,29 @@ export interface GameState {
   furniture: OwnedFurniture[];
   /** Profile, skills, missions, wishes, dream, achievements and money history (lib/lifeState.ts, lib/life.ts). */
   life: LifeState;
-  /** Classes, assignments and academic record at AYE Global University (lib/school.ts). */
-  school: SchoolState;
-  /** A doctor's shift at AYE General Hospital (lib/hospital.ts). */
-  shift: ShiftState;
   /** A night booked at the Grand Lagoon Hotel (lib/hotel.ts), until check-out. */
   hotel: HotelStay | null;
+  /** Game day of the last fashion showcase, or -1 if none. */
+  lastShowcaseDay: number;
+  /** First clothing item bought for the persistent first-look mission. */
+  fashionMissionItemId: string | null;
+  /** Whether the first-look mission has paid out. */
+  fashionMissionCompleted: boolean;
+  /** Career decision record, retained across days and browser sessions. */
+  workPerformance: WorkPerformance;
+  /** Separate Office Worker career, paid only by completing and clocking out of a shift. */
+  officeCareer: OfficeCareerState;
+  /** University attendance, assignments and study. */
+  campus: CampusState;
+  /** Hospital doctor shift progress. */
+  hospital: HospitalState;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
 export type FurnitureTarget = { uid: string } | { builtin: number };
 
 export type GameAction =
-  /** One game minute; `onCampus` is being inside AYE Global University (counts for a class you're seated in). */
-  | { type: 'tick'; atWorkplace: boolean; onCampus?: boolean }
-  /** Take your seat for a class in the room you're in (lib/school.ts has the rules). */
-  | { type: 'startClass'; classId: string; room: CampusRoom }
-  | { type: 'leaveClass' }
-  | { type: 'participate'; what: 'notes' | 'asked' }
-  /** Sit through the rest of the class you're in (time passes minute by minute, on campus). */
-  | { type: 'finishClass' }
-  | { type: 'study'; kind: StudyKind; room: CampusRoom }
-  | { type: 'handIn'; room: CampusRoom }
-  | { type: 'campusVisit'; place: CampusVisit }
-  | { type: 'joinClub'; id: string }
-  /** Chatting with classmates in the student centre or courtyard. */
-  | { type: 'campusChat'; room: CampusRoom }
-  | { type: 'freshenUp'; room: CampusRoom }
-  /** Clock in or out with the hospital supervisor (doctors). */
-  | { type: 'clockIn' }
-  | { type: 'clockOut' }
-  /** See a patient: time passes on shift (paid as hospital work), counted once per patient per day. */
-  | { type: 'seePatient'; patientId: string }
+  | { type: 'tick'; atWorkplace: boolean }
   | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
   | { type: 'buyHome'; homeId: string }
@@ -161,12 +193,6 @@ export type GameAction =
   | { type: 'spaSession'; clientId: string; choices: readonly number[] }
   | { type: 'moveOut' }
   | { type: 'buyEquipment'; id: string }
-  | { type: 'buyCar'; id: string; color: string }
-  | { type: 'sellCar'; id: string }
-  /** Fuel for driving this many metres in this car. */
-  | { type: 'fuel'; carId: string; metres: number }
-  /** Leave a car parked on the street (a spot), or take it with you (null) when you get in and drive. */
-  | { type: 'parkCar'; carId: string; spot: ParkedSpot | null }
   /** Pay for a night at the hotel: the guest room's key until noon tomorrow. */
   | { type: 'bookHotel' }
   /** Freshen up at the basin in your hotel room. */
@@ -190,6 +216,22 @@ export type GameAction =
   | { type: 'storeFurniture'; uid: string }
   | { type: 'useFurniture'; target: FurnitureTarget; near: boolean }
   | { type: 'exercise'; minutes: number; atPark: boolean }
+  | { type: 'hug'; residentId: string }
+  | { type: 'fashionShowcase'; owned: string[]; equipped: Partial<Record<Slot, string>> }
+  | { type: 'buyFashionItem'; id: string }
+  | { type: 'officeApply'; atReception: boolean }
+  | { type: 'officeClockIn'; atReception: boolean }
+  | { type: 'officeTask'; taskId: OfficeTaskId; choice: number; atStation: OfficeTaskId | null }
+  | { type: 'officeClockOut'; atReception: boolean }
+  | { type: 'campusClass'; slot: ClassSlot['id']; inHall: boolean }
+  | { type: 'campusAssignment'; choice: number; atDesk: boolean }
+  | { type: 'campusStudy'; atLibrary: boolean }
+  | { type: 'hospitalClockIn'; atReception: boolean }
+  | { type: 'hospitalBrief'; atSupervisor: boolean }
+  | { type: 'hospitalPatient'; choice: number; atWard: boolean }
+  | { type: 'hospitalClockOut'; atReception: boolean }
+  | { type: 'buyVehicle'; modelId: string; colour: string }
+  | { type: 'paintVehicle'; modelId: string; colour: string }
   | { type: 'dismissSummary' };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -253,7 +295,7 @@ function eat(state: GameState, price: number, gain: number, lift: Partial<Needs>
 /** Spends money on something that isn't food (clothes, hair). Refused if the player can't afford it. */
 function purchase(state: GameState, price: number): GameState {
   if (!(price > 0) || state.balance < price || state.summary) return state;
-  return { ...state, balance: state.balance - price, today: { ...state.today, expenses: state.today.expenses + price } };
+  return { ...state, balance: state.balance - price, today: { ...state.today, expenses: state.today.expenses + price, purchases: (state.today.purchases ?? 0) + 1 } };
 }
 
 export function getPeriod(hour: number): Period {
@@ -285,7 +327,16 @@ export function createTime(hour = 8, minute = 0, dayOfWeek = 2): GameTime {
 }
 
 export function createGameState(balance: number, time: GameTime = createTime()): GameState {
-  return { time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, owned: [], starterGiven: false, spa: emptySpaJob(), workMinutes: 0, equipment: [], cars: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1, needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(), hotel: null };
+  return {
+    time, balance, today: emptyLedger(), minutesWorkedThisHour: 0, fullness: 100, summary: null, home: null, owned: [], starterGiven: false, spa: emptySpaJob(),
+    workMinutes: 0, equipment: [], ownedVehicles: [], districtId: DEFAULT_DISTRICT_ID, relationships: {}, lastTaskHour: -1,
+    needs: FULL_NEEDS, furniture: [], life: emptyLife(), hotel: null,
+    lastShowcaseDay: -1, fashionMissionItemId: null, fashionMissionCompleted: false,
+    workPerformance: { excellent: 0, reasonable: 0, poor: 0 },
+    officeCareer: createOfficeCareer(),
+    campus: createCampusState(Math.floor(time.totalMinutes / 1440)),
+    hospital: createHospitalState(Math.floor(time.totalMinutes / 1440)),
+  };
 }
 
 export function emptyLedger(): DayLedger {
@@ -304,6 +355,13 @@ function advanceMinute(time: GameTime): GameTime {
     dayOfWeek = (dayOfWeek + 1) % 7;
   }
   return { hour, minute, totalMinutes: time.totalMinutes + 1, dayOfWeek, period: getPeriod(hour) };
+}
+
+/** Campus activities take game time and are paid through the normal hourly wage while on campus. */
+function runCampusMinutes(state: GameState, career: Career, lifestyle: Lifestyle, minutes: number): GameState {
+  let next = state;
+  for (let minute = 0; minute < minutes; minute++) next = tick(next, career, lifestyle, true);
+  return next;
 }
 
 /**
@@ -398,6 +456,26 @@ function socialise(state: GameState, residentId: string, activity: Activity, car
   };
 }
 
+/** A completed consensual hug modestly builds a relationship at most once per game day. */
+function completeHug(state: GameState, residentId: string): GameState {
+  const resident = residentById(residentId);
+  if (state.summary || !resident || resident.district !== state.districtId || !isAdultResident(resident)) return state;
+  const rel = state.relationships[residentId] ?? { points: 0, lastDay: -1, lastHugDay: -1 };
+  const today = gameDay(state.time.totalMinutes);
+  if (!canResidentAcceptHug(isAdultResident(resident), rel.points) || (rel.lastHugDay ?? -1) === today) return state;
+  return {
+    ...state,
+    relationships: {
+      ...state.relationships,
+      [residentId]: {
+        ...rel,
+        points: Math.min(MAX_POINTS, rel.points + 2),
+        lastHugDay: today,
+      },
+    },
+  };
+}
+
 /**
  * Your phone: a text or a call to someone you've already met (you have their
  * number), wherever they are. One a day each; a call takes a few minutes and
@@ -483,12 +561,52 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   const reward = TASK_REWARD[option.quality];
   const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
   const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))] * modifiers(state.life).taskBonus);
+  const performanceKey = option.quality === 'best' ? 'excellent' : option.quality === 'ok' ? 'reasonable' : 'poor';
   return {
     ...state,
     balance: state.balance + bonus,
     today: { ...state.today, income: state.today.income + bonus },
     workMinutes: state.workMinutes + reward.xpMinutes,
     lastTaskHour: hour,
+    workPerformance: {
+      ...state.workPerformance,
+      [performanceKey]: state.workPerformance[performanceKey] + 1,
+    },
+  };
+}
+
+/** Attend the daily boutique showcase; the reward is recalculated from owned, equipped items. */
+function fashionShowcase(
+  state: GameState,
+  owned: string[],
+  equipped: Partial<Record<Slot, string>>,
+  career: Career,
+  lifestyle: Lifestyle,
+): GameState {
+  const today = gameDay(state.time.totalMinutes);
+  if (state.summary || state.lastShowcaseDay === today) return state;
+  const result = fashionShowcaseResult({ owned, equipped });
+  const completesMission = fashionMissionStage(state.fashionMissionItemId, state.fashionMissionCompleted, { owned, equipped }) === 'showcase';
+  const missionReward = completesMission ? FASHION_MISSION_REWARD : 0;
+  let next = state;
+  for (let minute = 0; minute < 30; minute++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    balance: next.balance + result.reward + missionReward,
+    today: { ...next.today, income: next.today.income + result.reward + missionReward },
+    lastShowcaseDay: today,
+    fashionMissionCompleted: state.fashionMissionCompleted || completesMission,
+  };
+}
+
+function buyFashionItem(state: GameState, id: string): GameState {
+  const item = itemById(id);
+  if (!item || state.balance < item.price || state.summary) return state;
+  return {
+    ...state,
+    balance: state.balance - item.price,
+    today: { ...state.today, expenses: state.today.expenses + item.price, purchases: (state.today.purchases ?? 0) + 1 },
+    fashionMissionItemId: state.fashionMissionItemId ?? (item.slot === 'hair' ? null : item.id),
   };
 }
 
@@ -712,105 +830,14 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
   };
 }
 
-/** Minutes passing on campus: each one through the normal clock (students are at their workplace there), and for any class you're in. */
-function campusMinutes(state: GameState, minutes: number, career: Career, lifestyle: Lifestyle): GameState {
-  let next = state;
-  for (let i = 0; i < minutes; i++) {
-    next = tick(next, career, lifestyle, career === 'student');
-    next = { ...next, school: schoolMinute(next.school, next.time.totalMinutes, true) };
-  }
-  return next;
-}
-
-/** Social chat with classmates: time, plus social and a little fun. */
-const CHAT_MINUTES = 10;
-const FRESHEN_MINUTES = 5;
-/** Rooms where a finished assignment can be handed in. */
-const HAND_IN_ROOMS: readonly CampusRoom[] = ['library', 'lab', 'services'];
-
-function campusAction(state: GameState, action: GameAction, career: Career, lifestyle: Lifestyle): GameState | null {
-  if (state.summary) return null;
-  const t = state.time;
-  const school = rollDay(state.school, t.totalMinutes);
-  switch (action.type) {
-    case 'startClass':
-      if (career !== 'student') return state;
-      return { ...state, school: startClass(school, action.classId, action.room, t.totalMinutes, t.dayOfWeek) };
-    case 'leaveClass':
-      return { ...state, school: leaveClass(school) };
-    case 'participate':
-      return { ...state, school: participate(school, action.what) };
-    case 'finishClass': {
-      const left = minutesLeftInClass(school, t.totalMinutes);
-      if (!school.inClass || left <= 0 || left > 120) return state;
-      return campusMinutes({ ...state, school }, left, career, lifestyle);
-    }
-    case 'study': {
-      const st = STUDY[action.kind];
-      if (career !== 'student' || !st || !st.rooms.includes(action.room) || school.inClass) return state;
-      const next = campusMinutes({ ...state, school }, st.minutes, career, lifestyle);
-      return {
-        ...next,
-        school: studied(next.school, action.kind),
-        needs: addNeeds(next.needs, { social: st.social ?? 0, fun: -3 }),
-      };
-    }
-    case 'handIn':
-      if (career !== 'student' || !HAND_IN_ROOMS.includes(action.room)) return state;
-      return { ...state, school: handIn(school) };
-    case 'campusVisit':
-      return { ...state, school: visit(school, action.place, t.totalMinutes) };
-    case 'joinClub':
-      return { ...state, school: joinClub(school, action.id) };
-    case 'campusChat': {
-      if (action.room !== 'centre' && action.room !== 'outside') return state;
-      const next = campusMinutes({ ...state, school }, CHAT_MINUTES, career, lifestyle);
-      return { ...next, needs: addNeeds(next.needs, { social: 15, fun: 5 }), school: visit(next.school, 'students', next.time.totalMinutes) };
-    }
-    case 'clockIn':
-      if (career !== 'doctor') return state;
-      return { ...state, shift: clockIn(state.shift, t.totalMinutes) };
-    case 'clockOut':
-      return { ...state, shift: clockOut(rollShift(state.shift, t.totalMinutes)) };
-    case 'seePatient': {
-      const shift = rollShift(state.shift, t.totalMinutes);
-      const p = patientById(action.patientId);
-      if (career !== 'doctor' || !p || !shift.clockedIn || shift.seen.includes(p.id)) return state;
-      let next: GameState = { ...state, shift };
-      // On shift in the hospital, so each of these minutes is paid work at the doctor's rate
-      for (let i = 0; i < p.minutes; i++) next = tick(next, career, lifestyle, true);
-      return { ...next, shift: saw(rollShift(next.shift, next.time.totalMinutes), p.id) };
-    }
-    case 'freshenUp': {
-      if (action.room !== 'restrooms') return state;
-      const next = campusMinutes({ ...state, school }, FRESHEN_MINUTES, career, lifestyle);
-      return { ...next, needs: addNeeds(next.needs, { hygiene: 25 }) };
-    }
-    default:
-      return null;
-  }
-}
-
 export function gameReducer(
   state: GameState,
   action: GameAction,
   career: Career,
   lifestyle: Lifestyle,
 ): GameState {
-  const campus = campusAction(state, action, career, lifestyle);
-  if (campus) return campus;
-  if (action.type === 'tick') {
-    if (state.summary) return state;
-    const next = tick(state, career, lifestyle, action.atWorkplace);
-    return { ...next, school: schoolMinute(next.school, next.time.totalMinutes, action.onCampus === true), shift: rollShift(next.shift, next.time.totalMinutes) };
-  }
-  const next = baseReducer(state, action, career, lifestyle);
-  // Anything else that passes time (sleep, travel, a park bench…) happens off campus: a class you were in ends
-  if (next !== state && next.time.totalMinutes !== state.time.totalMinutes && (next.school.inClass || next.shift.clockedIn)) {
-    // Sleeping, travelling or a park bench happens off campus and off shift
-    return { ...next, school: rollDay(leaveClass(next.school), next.time.totalMinutes), shift: clockOut(rollShift(next.shift, next.time.totalMinutes)) };
-  }
-  return next;
+  if (action.type === 'tick') return state.summary ? state : tick(state, career, lifestyle, action.atWorkplace);
+  return baseReducer(state, action, career, lifestyle);
 }
 
 function baseReducer(
@@ -833,24 +860,8 @@ function baseReducer(
         ...state,
         equipment: [...state.equipment, item.id],
         balance: state.balance - item.price,
-        today: { ...state.today, expenses: state.today.expenses + item.price },
+        today: { ...state.today, expenses: state.today.expenses + item.price, purchases: (state.today.purchases ?? 0) + 1 },
       };
-    }
-    case 'buyCar': {
-      const car = carById(action.id);
-      if (!car || state.cars.some((c) => c.id === car.id) || state.balance < car.price || state.summary) return state;
-      return {
-        ...state,
-        cars: [...state.cars, { id: car.id, color: car.colors.includes(action.color) ? action.color : car.colors[0] }],
-        balance: state.balance - car.price,
-        today: { ...state.today, expenses: state.today.expenses + car.price },
-      };
-    }
-    case 'sellCar': {
-      const car = carById(action.id);
-      if (!car || !state.cars.some((c) => c.id === car.id) || state.summary) return state;
-      const value = carResale(car);
-      return { ...state, cars: state.cars.filter((c) => c.id !== car.id), balance: state.balance + value, today: { ...state.today, income: state.today.income + value } };
     }
     case 'bookHotel': {
       const now = state.time.totalMinutes;
@@ -868,27 +879,123 @@ function baseReducer(
       for (let i = 0; i < WASH_MINUTES; i++) next = tick(next, career, lifestyle, false);
       return { ...next, needs: addNeeds(next.needs, { hygiene: WASH_HYGIENE }) };
     }
-    case 'parkCar': {
-      if (!state.cars.some((c) => c.id === action.carId)) return state;
-      const spot = action.spot;
-      if (spot && ![spot.x, spot.z, spot.heading].every(Number.isFinite)) return state;
-      return { ...state, cars: state.cars.map((c) => {
-        if (c.id !== action.carId) return c;
-        const car: OwnedCar = { id: c.id, color: c.color };
-        return spot ? { ...car, parked: { ...spot } } : car;
-      }) };
-    }
-    case 'fuel': {
-      const car = carById(action.carId);
-      if (!car || !state.cars.some((c) => c.id === car.id) || !(action.metres > 0) || state.summary) return state;
-      const cost = fuelCost(car, action.metres);
-      if (cost <= 0) return state;
-      return { ...state, balance: state.balance - cost, today: { ...state.today, expenses: state.today.expenses + cost } };
-    }
     case 'workTask':
       return workTask(state, action.taskId, action.choice, action.atWorkplace, career);
+    case 'officeApply':
+      if (!action.atReception || state.summary || state.officeCareer.employed || state.officeCareer.activeShift) return state;
+      return { ...state, officeCareer: { ...state.officeCareer, employed: true } };
+    case 'officeClockIn': {
+      if (state.summary || !action.atReception) return state;
+      const result = officeShiftClockIn(
+        state.officeCareer,
+        Math.floor(state.time.totalMinutes / 1440),
+        state.time.totalMinutes,
+        state.time,
+        action.atReception,
+      );
+      return result.result === 'ok' ? { ...state, officeCareer: result.career } : state;
+    }
+    case 'officeTask': {
+      if (state.summary || action.atStation !== action.taskId) return state;
+      const result = officeTaskAnswer(state.officeCareer, action.taskId, action.choice, true);
+      if (result.result === 'wrong-place' || result.result === 'no-shift' || result.result === 'task-completed' || result.result === 'task-unavailable') return state;
+      let next = state;
+      if (result.result === 'ok') {
+        for (let minute = 0; minute < OFFICE_TASK_MINUTES; minute++) {
+          next = tick(next, career, lifestyle, false);
+        }
+      }
+      return { ...next, officeCareer: result.career };
+    }
+    case 'officeClockOut': {
+      if (state.summary || !action.atReception) return state;
+      const result = officeShiftClockOut(state.officeCareer, state.time.totalMinutes, action.atReception);
+      if (result.result !== 'ok') return state;
+      return {
+        ...state,
+        officeCareer: result.career,
+        balance: state.balance + result.payment,
+        today: { ...state.today, income: state.today.income + result.payment },
+      };
+    }
+    case 'campusClass': {
+      if (state.summary || career !== 'student') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = attendClass(campusForDay(state.campus, day), action.slot, state.time.hour * 60 + state.time.minute, action.inHall);
+      if (result.result !== 'ok') return state;
+      return { ...runCampusMinutes(state, career, lifestyle, CLASS_MINUTES), campus: result.campus };
+    }
+    case 'campusAssignment': {
+      if (state.summary || career !== 'student') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = submitAssignment(campusForDay(state.campus, day), day, action.choice, action.atDesk);
+      if (result.result !== 'ok') return state;
+      return { ...runCampusMinutes(state, career, lifestyle, 30), campus: result.campus };
+    }
+    case 'campusStudy': {
+      if (state.summary || career !== 'student') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = studySession(campusForDay(state.campus, day), action.atLibrary);
+      if (result.result !== 'ok') return state;
+      return { ...runCampusMinutes(state, career, lifestyle, STUDY_MINUTES), campus: result.campus };
+    }
+    case 'hospitalClockIn': {
+      if (state.summary || career !== 'doctor') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = clockIn(hospitalForDay(state.hospital, day), state.time.hour * 60 + state.time.minute, action.atReception);
+      return result.result === 'ok' ? { ...state, hospital: result.hospital } : state;
+    }
+    case 'hospitalBrief': {
+      if (state.summary || career !== 'doctor') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = brief(hospitalForDay(state.hospital, day), action.atSupervisor);
+      if (result.result !== 'ok') return state;
+      return { ...runCampusMinutes(state, career, lifestyle, BRIEFING_MINUTES), hospital: result.hospital };
+    }
+    case 'hospitalPatient': {
+      if (state.summary || career !== 'doctor') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = treatPatient(hospitalForDay(state.hospital, day), day, action.choice, action.atWard);
+      if (result.result !== 'ok') return state;
+      return { ...runCampusMinutes(state, career, lifestyle, PATIENT_MINUTES), hospital: result.hospital };
+    }
+    case 'hospitalClockOut': {
+      if (state.summary || career !== 'doctor') return state;
+      const day = Math.floor(state.time.totalMinutes / 1440);
+      const result = clockOut(hospitalForDay(state.hospital, day), action.atReception);
+      return result.result === 'ok' ? { ...state, hospital: result.hospital } : state;
+    }
     case 'socialise':
       return socialise(state, action.residentId, action.activity, career, lifestyle, action.scent);
+    case 'hug':
+      return completeHug(state, action.residentId);
+    case 'fashionShowcase':
+      return fashionShowcase(state, action.owned, action.equipped, career, lifestyle);
+    case 'buyFashionItem':
+      return buyFashionItem(state, action.id);
+    case 'buyVehicle': {
+      const vehicle = vehicleById(action.modelId);
+      const colour = vehicle?.colours.includes(action.colour) ? action.colour : null;
+      if (!vehicle || !colour || state.summary || state.ownedVehicles.some((owned) => owned.modelId === vehicle.id) || state.balance < vehicle.price) return state;
+      return {
+        ...state,
+        balance: state.balance - vehicle.price,
+        today: { ...state.today, expenses: state.today.expenses + vehicle.price, purchases: (state.today.purchases ?? 0) + 1 },
+        ownedVehicles: [...state.ownedVehicles, { modelId: vehicle.id, colour }],
+      };
+    }
+    case 'paintVehicle': {
+      const vehicle = vehicleById(action.modelId);
+      if (!vehicle || !vehicleColourById(action.colour) || !vehicle.colours.includes(action.colour)) return state;
+      const owned = state.ownedVehicles.find((item) => item.modelId === vehicle.id);
+      if (!owned || owned.colour === action.colour) return state;
+      return {
+        ...state,
+        ownedVehicles: state.ownedVehicles.map((item) =>
+          item.modelId === vehicle.id ? { ...item, colour: action.colour } : item,
+        ),
+      };
+    }
     case 'nightOut':
       return nightOut(state, action.residentId, career, lifestyle, action.scent);
     case 'phoneFriend':
@@ -943,7 +1050,6 @@ function baseReducer(
     case 'exercise':
       return exercise(state, action.minutes, action.atPark, career, lifestyle);
     default:
-      // Campus actions are handled by campusAction
       return state;
   }
 }

@@ -1,8 +1,23 @@
 {
   "surfaces": {
-    "road": { "color": "textures/road/color.webp", "normal": "textures/road/normal.webp", "roughness": "textures/road/roughness.webp", "tileMeters": 4 },
-    "pavement": null,
-    "ground": { "color": "textures/ground/color.webp", "normal": "textures/ground/normal.webp", "roughness": "textures/ground/roughness.webp", "ao": "textures/ground/ao.webp", "tileMeters": 2.5 },
+    "road": {
+      "color": "environment/road/Asphalt015_1K-JPG_Color.jpg",
+      "normal": "environment/road/Asphalt015_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/road/Asphalt015_1K-JPG_Roughness.jpg",
+      "tileMeters": 2
+    },
+    "pavement": {
+      "color": "environment/pavement/PavingStones036_1K-JPG_Color.jpg",
+      "normal": "environment/pavement/PavingStones036_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/pavement/PavingStones036_1K-JPG_Roughness.jpg",
+      "tileMeters": 2.5
+    },
+    "ground": {
+      "color": "environment/ground/Ground003_1K-JPG_Color.jpg",
+      "normal": "environment/ground/Ground003_1K-JPG_NormalGL.jpg",
+      "roughness": "environment/ground/Ground003_1K-JPG_Roughness.jpg",
+      "tileMeters": 6
+    },
     "roof": null,
     "concrete": null
   },

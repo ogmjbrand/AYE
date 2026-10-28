@@ -56,7 +56,7 @@ const HAND_BUILT: readonly Resident[] = [
   // Lagos, Marina Boulevard: people at work in their uniforms
   {
     id: 'captain-ade', district: 'lagos.marina', name: 'Captain Ade Martins', role: 'Airline captain', lookId: 'pilot-male-01',
-    position: [27.5, 0, 8.6], facing: Math.PI, route: [[27.5, 8.6], [31.5, 8.6]],
+    position: [37, 0, 8.6], facing: Math.PI, route: [[37, 8.6], [41, 8.6]],
     lines: [
       'Just landed from Accra. Smooth flight, for once.',
       'You should book a trip at the travel desk. The lagoon looks beautiful from the air.',
@@ -301,6 +301,10 @@ export const RESIDENTS: readonly Resident[] = [...HAND_BUILT, ...[...NIGERIA, ..
 
 export const residentById = (id: string) => RESIDENTS.find((r) => r.id === id);
 export const residentsIn = (districtId: string) => RESIDENTS.filter((r) => r.district === districtId);
+/** Every resident drawn from an adult look: the everyday adults and the people at work in uniform (business, pilot, police…). Never a child or teen look. */
+export const isAdultResident = (resident: Resident) =>
+  /^(?:female|male)-adult-|^(?:business|construction|medical|pilot|police)-(?:female|male)-/i.test(resident.lookId)
+  && !/child|kid|teen/i.test(resident.lookId);
 
 export interface Relationship {
   points: number;
@@ -308,6 +312,8 @@ export interface Relationship {
   lastDay: number;
   /** Game day you last texted or called them, if ever (one a day). */
   lastPhone?: number;
+  /** Game day of the last completed hug, or -1 for older saves. */
+  lastHugDay?: number;
 }
 
 export function friendshipLevel(points: number): number {
@@ -360,11 +366,19 @@ export function residentPose(r: Resident, t: number): Pose {
 }
 
 // Where each resident is right now (written by the 3D world each frame), so talking uses their real spot
-const livePositions = new Map<string, { x: number; z: number }>();
-export function setLivePosition(id: string, x: number, z: number) {
-  livePositions.set(id, { x, z });
+const livePositions = new Map<string, { x: number; z: number; facing: number }>();
+export function setLivePosition(id: string, x: number, z: number, facing?: number) {
+  const resident = residentById(id);
+  livePositions.set(id, { x, z, facing: facing ?? resident?.facing ?? 0 });
 }
 export const residentPosition = (r: Resident) => livePositions.get(r.id) ?? { x: r.position[0], z: r.position[2] };
+export const residentFacing = (r: Resident) => livePositions.get(r.id)?.facing ?? r.facing;
+export function residentPositionsIn(districtId: string): { x: number; z: number }[] {
+  return residentsIn(districtId).flatMap((resident) => {
+    const position = livePositions.get(resident.id);
+    return position ? [position] : [];
+  });
+}
 
 /** The resident within talking distance in this district, if any. */
 export function residentNear(districtId: string, x: number, z: number): Resident | undefined {
@@ -383,7 +397,8 @@ export function sanitiseRelationships(data: unknown): Record<string, Relationshi
     const r = v as Record<string, unknown>;
     const points = typeof r.points === 'number' && Number.isFinite(r.points) ? Math.max(0, Math.min(MAX_POINTS, Math.round(r.points))) : 0;
     const lastDay = typeof r.lastDay === 'number' && Number.isInteger(r.lastDay) && r.lastDay >= -1 ? r.lastDay : -1;
-    out[id] = { points, lastDay };
+    const lastHugDay = typeof r.lastHugDay === 'number' && Number.isInteger(r.lastHugDay) && r.lastHugDay >= -1 ? r.lastHugDay : -1;
+    out[id] = { points, lastDay, lastHugDay };
     if (typeof r.lastPhone === 'number' && Number.isInteger(r.lastPhone) && r.lastPhone >= 0) out[id].lastPhone = r.lastPhone;
   }
   return out;

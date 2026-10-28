@@ -1,124 +1,234 @@
-import { useEffect, useState } from 'react';
-import { CARS, carResale, type CarModel, type OwnedCar } from '../lib/cars';
-import { CarBody } from '../world/CarBody';
-import { Snapshot } from './snapshot/Snapshot';
-import type { SnapshotJob } from './snapshot/store';
-import { Icon } from './os/icons';
+import { useEffect, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import type { Group } from 'three';
+import type { OwnedVehicle, VehicleCategory, VehicleListing } from '../lib/vehicleCatalog';
+import { VEHICLE_CATALOG, vehicleColourById } from '../lib/vehicleCatalog';
+import { Car } from '../world/Props';
 
-const carJob = (car: CarModel, color: string): SnapshotJob => ({
-  key: `car:${car.id}:${color}`,
-  scene: () => <CarBody model={car.id} color={color} />,
-  view: [1, 0.55, 1.15],
-  size: 320,
-});
+interface DealershipPanelProps {
+  balance: number;
+  purchasePaused?: boolean;
+  ownedVehicles: readonly OwnedVehicle[];
+  initialModelId?: string;
+  onBuy: (modelId: string, colour: string) => void;
+  onPaint: (modelId: string, colour: string) => void;
+  onSpawn: (modelId: string) => boolean;
+  onClose: () => void;
+}
 
-function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
+const CATEGORY_LABEL: Record<VehicleCategory, string> = {
+  economy: 'Economy',
+  sedan: 'Sedan',
+  suv: 'SUV',
+  luxury: 'Luxury',
+  sports: 'Sports',
+  pickup: 'Pickup',
+};
+
+function VehiclePreview({ vehicle, colour }: { vehicle: VehicleListing; colour: string }) {
+  const turntable = useRef<Group>(null);
+  useFrame((_, delta) => {
+    if (turntable.current) turntable.current.rotation.y += delta * 0.24;
+  });
   return (
-    <span className={`inline-flex items-center gap-1 font-display text-sm font-bold tabular-nums ${dark ? 'text-[#2a1c06]' : 'text-ui-gold-strong'}`}>
-      <span className="grid h-4 w-4 place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#3a2606]"><Icon name="coin" className="h-3 w-3" /></span>
-      {Math.round(amount).toLocaleString()}
-    </span>
+    <group ref={turntable}>
+      <Car vehicle={{
+        position: [0, 0, 0],
+        heading: 0,
+        color: colour,
+        kind: 'car',
+        bodyStyle: vehicle.bodyStyle,
+      }} />
+    </group>
   );
 }
 
-/**
- * The car dealer: every model with its price, speed and fuel use. Pick a
- * colour and buy; cars you own can be sold back for half.
- */
-export function DealershipPanel({ name, balance, owned, onBuy, onSell, onClose }: {
-  name: string;
-  balance: number;
-  owned: readonly OwnedCar[];
-  onBuy: (id: string, color: string) => void;
-  onSell: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [open, setOpen] = useState<CarModel | null>(null);
-  const [color, setColor] = useState<string>('');
-  const [note, setNote] = useState<string | null>(null);
+export function DealershipPanel({ balance, purchasePaused = false, ownedVehicles, initialModelId, onBuy, onPaint, onSpawn, onClose }: DealershipPanelProps) {
+  const [tab, setTab] = useState<'showroom' | 'garage'>('showroom');
+  const [selectedId, setSelectedId] = useState(
+    () => VEHICLE_CATALOG.find((vehicle) => vehicle.id === initialModelId)?.id ?? VEHICLE_CATALOG[0].id,
+  );
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [selectedColourId, setSelectedColourId] = useState(VEHICLE_CATALOG[0].colours[0]);
+  const [message, setMessage] = useState<string | null>(null);
+  const selected = VEHICLE_CATALOG.find((vehicle) => vehicle.id === selectedId) ?? VEHICLE_CATALOG[0];
+  const owned = ownedVehicles.find((vehicle) => vehicle.modelId === selected.id);
+  const selectedColour = owned
+    ? vehicleColourById(owned.colour)
+    : vehicleColourById(selected.colours.includes(selectedColourId) ? selectedColourId : selected.colours[0]);
+  const listings = tab === 'garage'
+    ? VEHICLE_CATALOG.filter((vehicle) => ownedVehicles.some((item) => item.modelId === vehicle.id))
+    : VEHICLE_CATALOG;
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (open) setOpen(null);
-      else onClose();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-  const mine = (id: string) => owned.find((o) => o.id === id);
-  const pick = (car: CarModel) => { setOpen(car); setColor(mine(car.id)?.color ?? car.colors[0]); setNote(null); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  const buySelected = () => {
+    if (purchasePaused) {
+      setMessage('Purchases are unavailable while you review the daily summary.');
+      return;
+    }
+    if (owned) {
+      setMessage('This model is already in your garage.');
+      return;
+    }
+    if (balance < selected.price) {
+      setMessage(`You need ${(selected.price - balance).toLocaleString()} more GHAI for this car.`);
+      setConfirmId(null);
+      return;
+    }
+    if (confirmId !== selected.id) {
+      setConfirmId(selected.id);
+      setMessage(`Confirm the ${selected.name} purchase for ${selected.price.toLocaleString()} GHAI.`);
+      return;
+    }
+    onBuy(selected.id, selectedColour?.id ?? selected.colours[0]);
+    setConfirmId(null);
+    setMessage(`${selected.name} was added to your garage.`);
+  };
+
+  const takeOut = () => {
+    if (onSpawn(selected.id)) setMessage(`${selected.name} is ready outside. W/S accelerate or reverse; A/D steer; E exits.`);
+    else setMessage('There is no clear vehicle space at the dealership. Try again in a moment.');
+  };
+
+  const choose = (vehicle: VehicleListing) => {
+    setSelectedId(vehicle.id);
+    setMessage(null);
+    setConfirmId(null);
+    setSelectedColourId(vehicle.colours[0]);
+  };
 
   return (
-    <aside role="dialog" aria-label={name}
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[80vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[28rem] sm:rounded-3xl">
-      <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
-        <button type="button" onClick={() => (open ? setOpen(null) : onClose())} aria-label={open ? 'Back to the showroom' : `Close ${name}`}
-          className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-          <Icon name="back" className="h-4 w-4" />
-        </button>
-        <h2 className="m-0 font-display text-xl font-bold">{open ? open.name : name}</h2>
-        <span className="ml-auto"><Coin amount={balance} /></span>
-      </header>
-
-      {!open ? (
-        <ul className="m-0 grid min-h-0 list-none gap-2.5 overflow-y-auto p-3">
-          {CARS.map((car) => {
-            const have = mine(car.id);
-            return (
-              <li key={car.id}>
-                <button type="button" onClick={() => pick(car)}
-                  className="flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-ui-gold/20 bg-gradient-to-b from-[#1a2622] to-[#111916] p-2 text-left hover:border-ui-gold/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-                  <span className="block h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]">
-                    <Snapshot job={carJob(car, have?.color ?? car.colors[0])} alt={car.name} className="h-full w-full" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">{car.name}</span>
-                    <span className="block text-[11px] text-ui-muted">{car.kind} · {Math.round(car.speed * 3.6)} km/h · {car.fuelPerKm} GHAI/km</span>
-                    <span className="mt-1 block">{have ? <span className="text-xs font-semibold text-ui-accent-strong">Yours</span> : <Coin amount={car.price} />}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="min-h-0 overflow-y-auto p-4">
-          <div className="aspect-[16/10] w-full overflow-hidden rounded-2xl border border-ui-gold/20 bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]">
-            <Snapshot job={carJob(open, color)} alt={`${open.name} in this colour`} className="h-full w-full" />
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/65 p-0 sm:items-center sm:p-5" onClick={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dealership-title"
+        onClick={(event) => event.stopPropagation()}
+        className="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-ui-line bg-[#171a1b] text-ui-ink shadow-[0_24px_90px_rgba(0,0,0,0.6)] sm:rounded-2xl"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-ui-line/80 px-5 py-4 sm:px-7">
+          <div>
+            <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.2em] text-ui-accent-strong">Marina Boulevard · Lagos</p>
+            <h2 id="dealership-title" className="m-0 mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">Marina Motors</h2>
+            <p className="m-0 mt-1 text-xs text-ui-muted">Available balance <strong className="tabular-nums text-ui-ink">{balance.toLocaleString()} GHAI</strong></p>
           </div>
-          <p className="m-0 mt-3 text-sm text-ui-ink/90">{open.description}</p>
-          <dl className="m-0 mt-3 grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-xl border border-ui-line/70 p-2.5"><dt className="text-ui-muted">Top speed</dt><dd className="m-0 mt-0.5 font-semibold">{Math.round(open.speed * 3.6)} km/h</dd></div>
-            <div className="rounded-xl border border-ui-line/70 p-2.5"><dt className="text-ui-muted">Fuel</dt><dd className="m-0 mt-0.5 font-semibold">{open.fuelPerKm} GHAI/km</dd></div>
-            <div className="rounded-xl border border-ui-line/70 p-2.5"><dt className="text-ui-muted">Walking</dt><dd className="m-0 mt-0.5 font-semibold">{(open.speed / 4.2).toFixed(1)}× faster</dd></div>
-          </dl>
-          {!mine(open.id) && (
-            <div className="mt-3">
-              <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-ui-muted">Colour</p>
-              <div className="mt-1.5 flex gap-2" role="radiogroup" aria-label="Colour">
-                {open.colors.map((c) => (
-                  <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={c} onClick={() => setColor(c)}
-                    className={`h-8 w-8 rounded-full border-2 ${color === c ? 'border-ui-gold' : 'border-transparent'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold`} style={{ background: c }} />
-                ))}
+          <button type="button" onClick={onClose} className="rounded-lg border border-ui-line px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ui-muted transition hover:border-ui-accent hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">
+            Close
+          </button>
+        </header>
+        <nav aria-label="Dealership sections" className="flex gap-2 border-b border-ui-line/70 px-5 py-3 sm:px-7">
+          {(['showroom', 'garage'] as const).map((section) => (
+            <button
+              key={section}
+              type="button"
+              onClick={() => {
+                setTab(section);
+                setMessage(null);
+                if (section === 'garage' && !ownedVehicles.some((vehicle) => vehicle.modelId === selected.id)) {
+                  const firstOwned = ownedVehicles[0];
+                  if (firstOwned) setSelectedId(firstOwned.modelId);
+                }
+              }}
+              aria-pressed={tab === section}
+              className={`border-b-2 px-1 pb-2 text-xs font-semibold uppercase tracking-[0.14em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${tab === section ? 'border-ui-accent text-ui-accent-strong' : 'border-transparent text-ui-muted hover:text-ui-ink'}`}
+            >
+              {section === 'showroom' ? 'Showroom' : `Garage · ${ownedVehicles.length}`}
+            </button>
+          ))}
+        </nav>
+        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
+          <div className="min-h-0 overflow-y-auto px-5 py-4 sm:px-7">
+            {listings.length === 0 ? (
+              <div className="flex min-h-48 flex-col justify-center">
+                <p className="m-0 text-sm font-semibold">Your garage is empty.</p>
+                <p className="mb-0 mt-1 max-w-md text-sm leading-relaxed text-ui-muted">Browse the showroom to choose a car. Each model can be purchased once and remains saved with its paint colour.</p>
+                <button type="button" onClick={() => setTab('showroom')} className="mt-5 w-fit rounded-lg border border-ui-accent/70 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ui-accent-strong transition hover:bg-ui-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Browse cars</button>
               </div>
+            ) : (
+              <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2">
+                {listings.map((vehicle) => {
+                  const isOwned = ownedVehicles.some((item) => item.modelId === vehicle.id);
+                  return (
+                    <button
+                      key={vehicle.id}
+                      type="button"
+                      onClick={() => choose(vehicle)}
+                      aria-pressed={vehicle.id === selected.id}
+                      className={`group border-b border-ui-line/60 py-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${vehicle.id === selected.id ? 'border-ui-accent/70' : 'hover:border-ui-accent/40'}`}
+                    >
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="font-display text-lg font-semibold tracking-tight">{vehicle.name}</span>
+                        <span className="shrink-0 text-[10px] uppercase tracking-wider text-ui-muted">{CATEGORY_LABEL[vehicle.category]}</span>
+                      </span>
+                      <span className="mt-1 block text-sm tabular-nums text-ui-accent-strong">{vehicle.price.toLocaleString()} GHAI</span>
+                      <span className="mt-2 block text-[11px] leading-relaxed text-ui-muted tabular-nums">{vehicle.topSpeedKph} km/h · 0–100 in {vehicle.accelerationSeconds}s · {vehicle.seats} seats</span>
+                      <span className={`mt-2 inline-block text-[10px] font-semibold uppercase tracking-[0.14em] ${isOwned ? 'text-ui-accent-strong' : 'text-ui-muted'}`}>{isOwned ? 'In your garage' : 'Available'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <aside className="flex min-h-0 flex-col border-t border-ui-line/70 bg-[#202425] px-5 py-4 sm:px-7 lg:border-l lg:border-t-0">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <p className="m-0 text-xs font-semibold uppercase tracking-[0.16em] text-ui-muted">Vehicle preview</p>
+              <span className="text-[10px] uppercase tracking-wider text-ui-accent-strong">Stylised fallback model</span>
             </div>
-          )}
-          {mine(open.id) ? (
-            <button type="button" onClick={() => { onSell(open.id); setNote(`Sold the ${open.name} for ${carResale(open).toLocaleString()} GHAI.`); setOpen(null); }}
-              className="mt-4 w-full rounded-2xl border border-ui-gold/40 px-4 py-3 font-semibold text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-              Sell back · {carResale(open).toLocaleString()} GHAI
-            </button>
-          ) : (
-            <button type="button" disabled={balance < open.price} onClick={() => { onBuy(open.id, color); setNote(`The ${open.name} is yours. Tap Drive on the bar to get in.`); setOpen(null); }}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#e9c77e] to-[#b8862f] px-4 py-3 font-semibold text-[#2a1c06] shadow-lg hover:brightness-110 disabled:cursor-not-allowed disabled:from-ui-line disabled:to-ui-line disabled:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">
-              {balance < open.price ? 'Not enough GHAI' : <>Buy · <Coin amount={open.price} dark /></>}
-            </button>
-          )}
+            <div className="h-36 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(ellipse_at_50%_70%,#414747_0%,#222627_55%,#1b1f20_100%)] sm:h-40">
+              <Canvas camera={{ position: [5.5, 3.4, 6.2], fov: 38 }} dpr={[1, 1.25]} gl={{ antialias: true, powerPreference: 'low-power' }}>
+                <ambientLight intensity={1.4} />
+                <directionalLight position={[4, 7, 5]} intensity={2} />
+                <VehiclePreview vehicle={selected} colour={selectedColour?.hex ?? '#e7e2d7'} />
+              </Canvas>
+            </div>
+            <p className="m-0 mt-2 text-[11px] leading-relaxed text-ui-muted">No realistic vehicle models are installed yet. This low-poly in-game preview is a temporary placeholder, not a production car asset.</p>
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="Paint colours">
+              {selected.colours.map((colourId) => {
+                const colour = vehicleColourById(colourId)!;
+                const current = owned?.colour ?? (selected.colours.includes(selectedColourId) ? selectedColourId : selected.colours[0]);
+                return (
+                  <button
+                    key={colour.id}
+                    type="button"
+                    onClick={() => {
+                      if (owned) onPaint(selected.id, colour.id);
+                      else {
+                        setSelectedColourId(colour.id);
+                        setMessage(`${colour.name} selected for the ${selected.name}.`);
+                      }
+                    }}
+                    aria-label={`Select ${colour.name}`}
+                    aria-pressed={current === colour.id}
+                    title={owned ? `Paint owned car ${colour.name}` : colour.name}
+                    className={`h-7 w-7 rounded-full border-2 transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent ${current === colour.id ? 'border-ui-accent-strong' : 'border-white/25'}`}
+                    style={{ backgroundColor: colour.hex }}
+                  />
+                );
+              })}
+            </div>
+            <p className="m-0 mt-1 text-[10px] text-ui-muted">{selectedColour?.name ?? vehicleColourById(selected.colours[0])?.name} paint{owned ? ' · saved to garage' : ''}</p>
+            <div className="mt-auto pt-4">
+              {message && <p role="status" className="mb-3 mt-0 text-xs leading-relaxed text-ui-accent-strong">{message}</p>}
+              {owned ? (
+                <button type="button" onClick={takeOut} className="w-full rounded-lg bg-ui-accent px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#191a18] transition hover:brightness-110 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent">
+                  Take this car out
+                </button>
+              ) : (
+                <button type="button" onClick={buySelected} disabled={tab === 'garage' || purchasePaused} className="w-full rounded-lg bg-ui-accent px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#191a18] transition hover:brightness-110 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-45">
+                  {confirmId === selected.id ? 'Confirm purchase' : `Purchase · ${selected.price.toLocaleString()} GHAI`}
+                </button>
+              )}
+            </div>
+          </aside>
         </div>
-      )}
-      <footer className="shrink-0 border-t border-ui-gold/20 px-4 py-3 text-[11px] text-ui-muted" aria-live="polite">
-        {note ?? 'Fuel is paid as you drive. Cars are the game’s own models; prices are in GHAI.'}
-      </footer>
-    </aside>
+      </section>
+    </div>
   );
 }

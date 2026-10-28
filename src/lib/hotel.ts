@@ -19,9 +19,9 @@
  * entrance in the middle, the corridor runs north with three rooms either side.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
-import { run, type WallSeg } from './university';
+import { run, type WallSeg } from './buildingShell';
 import type { Seat } from './seating';
-import type { MenuItem } from './restaurant';
+import type { MenuItem } from './palms';
 
 export const HOTEL_NAME = 'Grand Lagoon Hotel';
 /** One night, in GHAI. */

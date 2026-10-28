@@ -10,7 +10,7 @@ import {
 } from '../lib/hotel';
 import { RealModel } from './RealModel';
 import { HotelDish } from './HotelDishes';
-import { WALL_T, wallBox, type WallSeg } from '../lib/university';
+import { WALL_T, wallBox, type WallSeg } from '../lib/buildingShell';
 import {
   bathFloorTexture, curtainTexture, damaskTexture, flowerPrintTexture, hotelPlasterTexture, parquetTexture, rugTexture, stoneTileTexture, tileBorderTexture,
 } from './hotelTextures';

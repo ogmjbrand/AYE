@@ -20,6 +20,8 @@ const character: Character = {
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
   body: 'feminine', lookId: 'female-adult-10', heightCm: 168, skinTone: 0, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15, bust: 0, waist: 0, shoulders: 0, legs: 0 },
   wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
+  homeDecor: [],
+  skinToneId: 'rich',
 };
 
 describe('character save', () => {
@@ -69,10 +71,35 @@ describe('character save', () => {
     expect(parseCharacter(old)!.wardrobe).toEqual({ owned: [], equipped: {} });
   });
 
+  it('characters saved before home décor existed retain a valid empty furniture list', () => {
+    const { homeDecor, ...old } = { ...character, homeDecor: [{ id: 'old', itemId: 'decor-rug', homeId: 'test-home', at: [0, 0] as const, rotation: 0 }] };
+    void homeDecor;
+    expect(parseCharacter(old)!.homeDecor).toEqual([]);
+  });
+
   it('characters saved before body shape existed are average', () => {
     const { shape, ...old } = character;
     void shape;
     expect(parseCharacter(old)!.shape).toEqual({ weight: 0, muscle: 0, curves: 0, belly: 0, bust: 0, waist: 0, shoulders: 0, legs: 0 });
+  });
+
+  it('preserves selected skin tone and safely defaults older or invalid values', () => {
+    expect(parseCharacter({ ...character, skinToneId: 'deep' })?.skinToneId).toBe('deep');
+    expect(parseCharacter({ ...character, skinToneId: 'unknown-tone' })?.skinToneId).toBe('original');
+    // Main-branch saves kept the tone id in skinTone
+    expect(parseCharacter({ ...character, skinToneId: undefined, skinTone: 'deep' })?.skinToneId).toBe('deep');
+    const { skinToneId: _skinToneId, ...old } = character;
+    void _skinToneId;
+    expect(parseCharacter(old)?.skinToneId).toBe('original');
+    // The deeper/lighter shade is kept, and an invalid one falls back to the person's own skin
+    expect(parseCharacter({ ...character, skinTone: 0.4 })?.skinTone).toBe(0.4);
+    expect(parseCharacter({ ...character, skinTone: 7 })?.skinTone).toBe(0);
+  });
+
+  it('persists a validated custom skin colour without affecting older saves', () => {
+    expect(parseCharacter({ ...character, skinToneId: 'custom', skinColor: '#8a5237' })?.skinColor).toBe('#8a5237');
+    expect(parseCharacter({ ...character, skinColor: 'not-a-colour' })?.skinColor).toBeUndefined();
+    expect(parseCharacter(character)?.skinColor).toBeUndefined();
   });
 
   it('drops unknown or unowned wardrobe items', () => {
@@ -111,9 +138,19 @@ describe('character save', () => {
 describe('progress save', () => {
   it('restores balance and clock for the same character', () => {
     const s = new MemoryStorage();
-    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini', starterGiven: true };
+    const state = { ...createGameState(4321, createTime(13, 5, 4)), today: { income: 10, expenses: 3, minutesWorked: 90 }, minutesWorkedThisHour: 12, home: 'palm-view-mini', starterGiven: true, lastShowcaseDay: 0 };
     saveProgress('abc', state, s);
     expect(loadProgress(character, s)).toEqual(state);
+  });
+
+  it('persists owned vehicle models and paint across a progress reload', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(5_500, createTime(13, 5, 4)),
+      ownedVehicles: [{ modelId: 'epe-city', colour: 'lagoon-blue' }],
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).ownedVehicles).toEqual(state.ownedVehicles);
   });
 
   it('loads progress saved before work shifts existed', () => {
@@ -130,6 +167,52 @@ describe('progress save', () => {
     // Every character is given the starter flat, once
     expect(p.home).toBe(STARTER_HOME_ID);
     expect(p.starterGiven).toBe(true);
+    expect(p.lastShowcaseDay).toBe(-1);
+    expect(p.fashionMissionItemId).toBeNull();
+    expect(p.fashionMissionCompleted).toBe(false);
+    expect(p.workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 0 });
+    expect(p.ownedVehicles).toEqual([]);
+  });
+
+  it('persists fashion mission progress and ignores unknown catalogue items', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(100),
+      fashionMissionItemId: 'top-ankara-sunset',
+      fashionMissionCompleted: true,
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s)).toMatchObject({
+      fashionMissionItemId: 'top-ankara-sunset',
+      fashionMissionCompleted: true,
+    });
+
+    saveProgress('abc', { ...state, fashionMissionItemId: 'removed-item' }, s);
+    expect(loadProgress(character, s)).toMatchObject({
+      fashionMissionItemId: null,
+      fashionMissionCompleted: false,
+    });
+  });
+
+  it('persists career performance and sanitises invalid saved counters', () => {
+    const s = new MemoryStorage();
+    const state = {
+      ...createGameState(100),
+      workPerformance: { excellent: 8, reasonable: 3, poor: 2 },
+    };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).workPerformance).toEqual(state.workPerformance);
+    saveProgress('abc', { ...state, workPerformance: { excellent: -1, reasonable: 2.5, poor: 4 } }, s);
+    expect(loadProgress(character, s).workPerformance).toEqual({ excellent: 0, reasonable: 0, poor: 4 });
+  });
+
+  it('restores the last attended fashion showcase and rejects future days', () => {
+    const s = new MemoryStorage();
+    const state = { ...createGameState(100, createTime(10, 0, 2)), lastShowcaseDay: 0 };
+    saveProgress('abc', state, s);
+    expect(loadProgress(character, s).lastShowcaseDay).toBe(0);
+    saveProgress('abc', { ...state, lastShowcaseDay: 3 }, s);
+    expect(loadProgress(character, s).lastShowcaseDay).toBe(-1);
   });
 
   it('remembers which city you are in, and falls back to the first for unknown places', () => {
@@ -140,13 +223,27 @@ describe('progress save', () => {
     expect(loadProgress(character, s).districtId).toBe('lagos.marina');
   });
 
-  it('remembers where your car is parked, unless that place is gone', () => {
+  it('keeps cars bought before the vehicle catalogue as the nearest catalogue model', () => {
     const s = new MemoryStorage();
-    const spot = { districtId: 'accra.osu', x: 2, z: 14, heading: 1 };
-    saveProgress('abc', { ...createGameState(100), cars: [{ id: 'hatch', color: '#f2f2ee', parked: spot }] }, s);
-    expect(loadProgress(character, s).cars[0].parked).toEqual(spot);
-    saveProgress('abc', { ...createGameState(100), cars: [{ id: 'hatch', color: '#f2f2ee', parked: { ...spot, districtId: 'atlantis' } }] }, s);
-    expect(loadProgress(character, s).cars[0]).toEqual({ id: 'hatch', color: expect.any(String) });
+    const old = { ...createGameState(100), cars: [{ id: 'hatch', color: '#f2f2ee', parked: { districtId: 'accra.osu', x: 2, z: 14, heading: 1 } }, { id: 'coupe', color: '#b0283a' }, { id: 'nope', color: '#000' }] };
+    saveProgress('abc', old as unknown as ReturnType<typeof createGameState>, s);
+    // saveProgress writes the current format; put the old field back the way an old save had it
+    const raw = JSON.parse(s.getItem('aye_progress')!);
+    delete raw.ownedVehicles;
+    raw.cars = old.cars;
+    s.setItem('aye_progress', JSON.stringify(raw));
+    expect(loadProgress(character, s).ownedVehicles).toEqual([
+      { modelId: 'epe-city', colour: 'pearl-white' },
+      { modelId: 'victoria-coupe', colour: 'pearl-white' },
+    ]);
+  });
+
+  it('reads a tone id saved in skinTone by older main-branch builds as the skin tint', () => {
+    const s = new MemoryStorage();
+    saveCharacter({ ...character, skinTone: 'deep' as unknown as number, skinToneId: undefined }, s);
+    const c = loadCharacter(s)!;
+    expect(c.skinToneId).toBe('deep');
+    expect(c.skinTone).toBe(0);
   });
 
   it('drops a home that no longer exists', () => {

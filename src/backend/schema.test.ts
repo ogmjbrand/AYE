@@ -163,3 +163,55 @@ describe('player life on the server', () => {
     await expect(as(BOB, `select public.update_profile($1, '{}')`, [alice])).rejects.toThrow(/no such character/);
   });
 });
+
+describe('player profile privacy foundation', () => {
+  beforeAll(async () => {
+    await as(ALICE, `select public.create_player_profile($1, $2, $3)`, ['ada_player', 'Ada Player', 'A private bio']);
+    await as(BOB, `select public.create_player_profile($1, $2, $3)`, ['bob_player', 'Bob Player', 'A public bio']);
+  });
+
+  it('requires authentication and only exposes each profile to its owner by default', async () => {
+    await expect(as(null, `select public.create_player_profile('guest_player', 'Guest')`)).rejects.toThrow(/permission denied/);
+    expect(await as<{ username: string; discoverable: boolean; messaging_privacy: string }>(
+      ALICE,
+      'select username, discoverable, messaging_privacy from public.player_profiles',
+    )).toEqual([{ username: 'ada_player', discoverable: false, messaging_privacy: 'friends' }]);
+    expect(await as(BOB, 'select id from public.player_profiles where id = $1', [ALICE])).toEqual([]);
+    expect(await as(ALICE, 'select * from public.search_player_profiles($1)', ['bob'])).toEqual([]);
+  });
+
+  it('returns only public fields for explicitly discoverable profiles', async () => {
+    await as(BOB, `select public.update_player_profile($1, $2, $3, $4, $5)`, [
+      'bob_player', 'Bob Player', 'A public bio', true, 'nobody',
+    ]);
+
+    const profiles = await as<{ id: string; username: string; display_name: string; bio: string }>(
+      ALICE,
+      'select * from public.search_player_profiles($1, $2)',
+      ['bob_', 20],
+    );
+    expect(profiles).toEqual([{
+      id: BOB,
+      username: 'bob_player',
+      display_name: 'Bob Player',
+      bio: 'A public bio',
+    }]);
+    expect(Object.keys(profiles[0])).toEqual(['id', 'username', 'display_name', 'bio']);
+    expect(await as(ALICE, 'select id from public.player_profiles where id = $1', [BOB])).toEqual([]);
+  });
+
+  it('prevents direct writes and rejects invalid or duplicate usernames', async () => {
+    await expect(as(ALICE, `insert into public.player_profiles (id, username, display_name) values ($1, 'forged', 'Forged')`, [BOB]))
+      .rejects.toThrow(/permission denied/);
+    await expect(as(ALICE, `update public.player_profiles set username = 'forged' where id = $1`, [BOB]))
+      .rejects.toThrow(/permission denied/);
+    await expect(as(ALICE, `select public.update_player_profile($1, $2, $3, $4, $5)`, [
+      'bob_player', 'Ada Player', 'A private bio', false, 'friends',
+    ])).rejects.toThrow(/duplicate key/);
+    await expect(as(ALICE, `select public.update_player_profile($1, $2, $3, $4, $5)`, [
+      'invalid username', 'Ada Player', 'A private bio', false, 'friends',
+    ])).rejects.toThrow(/check constraint/);
+    await expect(as(ALICE, 'select * from public.search_player_profiles($1, $2)', ['a%', 100]))
+      .rejects.toThrow(/invalid username prefix/);
+  });
+});

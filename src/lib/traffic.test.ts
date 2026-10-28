@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DISTRICTS } from './geography';
-import { TRAFFIC, initTraffic, stepTraffic, type Car } from './traffic';
+import { pedestrianInTrafficPath, TRAFFIC, initTraffic, stepTraffic, type Car } from './traffic';
 import { DANFO_SIZE } from './world';
 
-const run = (cars: Car[], lanes: Parameters<typeof stepTraffic>[1], person: { x: number; z: number } | null, seconds: number) => {
+const run = (cars: Car[], lanes: Parameters<typeof stepTraffic>[1], person: Parameters<typeof stepTraffic>[2], seconds: number) => {
   for (let t = 0; t < seconds; t += 0.05) cars = stepTraffic(cars, lanes, person, 0.05);
   return cars;
 };
@@ -43,5 +43,36 @@ describe.each(DISTRICTS.map((d) => [d.id, d.layout] as const))('traffic in %s', 
     expect(distance).toBeGreaterThan(DANFO_SIZE[2] / 2);
     const later = run(stopped, lanes, null, 5);
     expect(later[0].speed).toBeGreaterThan(5);
+  });
+
+  it('brakes for every pedestrian in the lane, including residents', () => {
+    const lane = lanes[0];
+    const approaching: Car[] = [{ lane: 0, z: -30 * lane.dir, speed: TRAFFIC.maxSpeed }];
+    const stopped = run(approaching, lanes, [{ x: lane.x, z: 0 }, { x: lane.x, z: 12 }], 20);
+    expect(stopped[0].speed).toBeCloseTo(0, 1);
+    expect((0 - stopped[0].z) * lane.dir).toBeGreaterThan(DANFO_SIZE[2] / 2);
+  });
+
+  it('detects a predicted collision and ignores pedestrians outside the vehicle path', () => {
+    const lane = lanes[0];
+    const approaching: Car[] = [{ lane: 0, z: -7 * lane.dir, speed: TRAFFIC.maxSpeed }];
+    expect(pedestrianInTrafficPath({ x: lane.x, z: 0, vx: 0, vz: 0 }, approaching, lanes)).toBe(true);
+    expect(pedestrianInTrafficPath({
+      x: lane.x + TRAFFIC.laneHalfWidth + 1,
+      z: 0,
+      vx: 0,
+      vz: 0,
+    }, approaching, lanes)).toBe(false);
+  });
+
+  it('detects a pedestrian moving across a vehicle path', () => {
+    const lane = lanes[0];
+    const car: Car[] = [{ lane: 0, z: 0, speed: TRAFFIC.maxSpeed }];
+    expect(pedestrianInTrafficPath({
+      x: lane.x + 2.2,
+      z: 0,
+      vx: -4,
+      vz: 0,
+    }, car, lanes)).toBe(true);
   });
 });

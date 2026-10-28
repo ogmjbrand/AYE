@@ -5,10 +5,11 @@ import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
 import { hasProgress, loadProgress, saveProgress } from '../lib/save';
 import type { TravelMode } from '../lib/travel';
-import type { ParkedSpot } from '../lib/cars';
 import type { Activity } from '../lib/people';
 import type { Needs } from '../lib/needs';
-import type { CampusRoom, CampusVisit, StudyKind } from '../lib/school';
+import type { Wardrobe } from '../lib/fashion';
+import type { OfficeTaskId } from '../lib/officeCareer';
+import type { ClassSlot } from '../lib/campus';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -19,12 +20,10 @@ export const MS_PER_GAME_MINUTE = 3000;
  *
  * `isAtWorkplace` is read on every tick to decide whether that minute is paid.
  */
-export function useGameState(character: Character, isAtWorkplace: () => boolean, isOnCampus: () => boolean = () => false) {
+export function useGameState(character: Character, isAtWorkplace: () => boolean) {
   const atWorkRef = useRef(isAtWorkplace);
-  const onCampusRef = useRef(isOnCampus);
   useEffect(() => {
     atWorkRef.current = isAtWorkplace;
-    onCampusRef.current = isOnCampus;
   });
 
   const reducer = useCallback(
@@ -37,7 +36,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
 
   useEffect(() => {
     const interval = setInterval(
-      () => dispatch({ type: 'tick', atWorkplace: atWorkRef.current(), onCampus: onCampusRef.current() }),
+      () => dispatch({ type: 'tick', atWorkplace: atWorkRef.current() }),
       MS_PER_GAME_MINUTE,
     );
     return () => clearInterval(interval);
@@ -59,10 +58,6 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     spaSession: (clientId: string, choices: readonly number[]) => dispatch({ type: 'spaSession', clientId, choices }),
     moveOut: () => dispatch({ type: 'moveOut' }),
     buyEquipment: (id: string) => dispatch({ type: 'buyEquipment', id }),
-    buyCar: (id: string, color: string) => dispatch({ type: 'buyCar', id, color }),
-    sellCar: (id: string) => dispatch({ type: 'sellCar', id }),
-    fuel: (carId: string, metres: number) => dispatch({ type: 'fuel', carId, metres }),
-    parkCar: (carId: string, spot: ParkedSpot | null) => dispatch({ type: 'parkCar', carId, spot }),
     bookHotel: () => dispatch({ type: 'bookHotel' }),
     hotelWash: () => dispatch({ type: 'hotelWash' }),
     travel: (to: string, mode: TravelMode) => dispatch({ type: 'travel', to, mode }),
@@ -70,8 +65,27 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     nightOut: (residentId: string, scent = false) => dispatch({ type: 'nightOut', residentId, scent }),
     phoneFriend: (residentId: string, kind: PhoneContact) => dispatch({ type: 'phoneFriend', residentId, kind }),
     ride: (metres: number) => dispatch({ type: 'ride', metres }),
+    hug: (residentId: string) => dispatch({ type: 'hug', residentId }),
+    fashionShowcase: (wardrobe: Wardrobe) => dispatch({
+      type: 'fashionShowcase',
+      owned: wardrobe.owned,
+      equipped: wardrobe.equipped,
+    }),
+    buyFashionItem: (id: string) => dispatch({ type: 'buyFashionItem', id }),
     wait: (minutes: number) => dispatch({ type: 'wait', minutes }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
+    officeApply: (atReception: boolean) => dispatch({ type: 'officeApply', atReception }),
+    officeClockIn: (atReception: boolean) => dispatch({ type: 'officeClockIn', atReception }),
+    officeTask: (taskId: OfficeTaskId, choice: number, atStation: OfficeTaskId | null) =>
+      dispatch({ type: 'officeTask', taskId, choice, atStation }),
+    officeClockOut: (atReception: boolean) => dispatch({ type: 'officeClockOut', atReception }),
+    campusClass: (slot: ClassSlot['id'], inHall: boolean) => dispatch({ type: 'campusClass', slot, inHall }),
+    campusAssignment: (choice: number, atDesk: boolean) => dispatch({ type: 'campusAssignment', choice, atDesk }),
+    campusStudy: (atLibrary: boolean) => dispatch({ type: 'campusStudy', atLibrary }),
+    hospitalClockIn: (atReception: boolean) => dispatch({ type: 'hospitalClockIn', atReception }),
+    hospitalBrief: (atSupervisor: boolean) => dispatch({ type: 'hospitalBrief', atSupervisor }),
+    hospitalPatient: (choice: number, atWard: boolean) => dispatch({ type: 'hospitalPatient', choice, atWard }),
+    hospitalClockOut: (atReception: boolean) => dispatch({ type: 'hospitalClockOut', atReception }),
     dismissSummary: () => dispatch({ type: 'dismissSummary' }),
     eat: (price: number, fullness: number, lift?: Partial<Needs>) => dispatch({ type: 'eat', price, fullness, lift }),
     purchase: (price: number) => dispatch({ type: 'purchase', price }),
@@ -85,19 +99,9 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean,
     setProfile: (bio: string, traits: TraitId[]) => dispatch({ type: 'setProfile', bio, traits }),
     setDream: (dream: DreamId) => dispatch({ type: 'setDream', dream }),
     dismissWish: (id: string) => dispatch({ type: 'dismissWish', id }),
-    startClass: (classId: string, room: CampusRoom) => dispatch({ type: 'startClass', classId, room }),
-    leaveClass: () => dispatch({ type: 'leaveClass' }),
-    participate: (what: 'notes' | 'asked') => dispatch({ type: 'participate', what }),
-    finishClass: () => dispatch({ type: 'finishClass' }),
-    study: (kind: StudyKind, room: CampusRoom) => dispatch({ type: 'study', kind, room }),
-    handIn: (room: CampusRoom) => dispatch({ type: 'handIn', room }),
-    campusVisit: (place: CampusVisit) => dispatch({ type: 'campusVisit', place }),
-    joinClub: (id: string) => dispatch({ type: 'joinClub', id }),
-    campusChat: (room: CampusRoom) => dispatch({ type: 'campusChat', room }),
-    freshenUp: (room: CampusRoom) => dispatch({ type: 'freshenUp', room }),
-    clockIn: () => dispatch({ type: 'clockIn' }),
-    clockOut: () => dispatch({ type: 'clockOut' }),
-    seePatient: (patientId: string) => dispatch({ type: 'seePatient', patientId }),
     setSavingsGoal: (amount: number | null) => dispatch({ type: 'setSavingsGoal', amount }),
+    drove: (metres: number) => dispatch({ type: 'drove', metres }),
+    buyVehicle: (modelId: string, colour: string) => dispatch({ type: 'buyVehicle', modelId, colour }),
+    paintVehicle: (modelId: string, colour: string) => dispatch({ type: 'paintVehicle', modelId, colour }),
   };
 }

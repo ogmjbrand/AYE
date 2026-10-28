@@ -35,7 +35,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       b(-26, -36, 10, 10, 13, 'shop', '#2a2c30', 'Eko Motors'),
       // East side, north of the cross street
       b(13, -6, 10, 12, 16, 'office', '#eceae4', 'General Hospital'),
-      b(14, 12, 12, 12, 38, 'tower', '#486a7e'),
+      { ...b(14, 12, 12, 12, 38, 'tower', '#486a7e', 'Marina Heights'), entry: { side: 'west', offset: 0, width: 1.8, height: 2.42 } },
+      { ...b(28, 12, 12, 15, 8, 'shop', '#c7d0cf', 'Marina Motors'), entry: { side: 'west', offset: 0, width: 2.2, height: 2.5 } },
       b(11, 20, 6, 3.6, 7, 'shop', '#5b4a5e', 'Lagoon Live'),
       b(11, 27, 6, 10, 7, 'shop', '#e0b98f', 'Art Studio'),
       b(24, 27, 10, 10, 15, 'residential', '#efe3c8', 'Eko Gardens'),
@@ -44,8 +45,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       // East side, south of the cross street
       b(14, -36, 12, 12, 46, 'tower', '#3f5f73', 'Marina Heights'),
       b(28, -36, 8, 10, 12, 'residential', '#dcc2a2', 'Lagoon Villa'),
-      // Alafia Spa, behind the tower and north of the airport stop, its door facing south
-      b(25.5, 16, 9, 6, 7, 'shop', '#efe6d8', 'Alafia Spa'),
+      // Alafia Spa, past Marina Motors on the way to the airport stop, its door facing south
+      b(39, 30, 8, 6, 7, 'shop', '#efe6d8', 'Alafia Spa'),
       // OGM Homes, the estate agency, on the cross street west of Eko Motors
       b(-38, -34, 10, 8, 8, 'office', '#e7e1d6', 'OGM Homes'),
     ],
@@ -59,6 +60,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       { position: [3, 0, 36.5], heading: 0, color: '#f2b705' },
       { position: [-3, 0, -36], heading: Math.PI, color: '#f2b705' },
       { position: [-3, 0, 10], heading: Math.PI, color: '#e9a800' },
+      { position: [13, 0, 4], heading: -Math.PI / 2, color: '#e7e2d7', kind: 'car', bodyStyle: 'sedan' },
+      { position: [13, 0, 20], heading: -Math.PI / 2, color: '#427b91', kind: 'car', bodyStyle: 'suv' },
     ],
     // Danfos and the odd private car, driving on the right
     traffic: [
@@ -115,6 +118,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   fashionHouse: { name: 'Fashion House', kind: 'Boutique & salon', position: [5.5, 0, 39] },
   gadgetHub: { name: 'Gadget Hub', kind: 'Phones, laptops & work kit', position: [-5.5, 0, 38] },
   travelDesk: { name: 'Marina Travel', kind: 'Flights & coaches', position: [5.5, 0, -12] },
+  carDealership: { name: 'Marina Motors', kind: 'Car dealership', position: [20.5, 0, 12] },
   park: {
     id: 'uptown-gardens', name: 'Uptown Gardens', kind: 'Public park', position: [26, 0, -3.5],
     description: 'Shade trees, benches and a breeze off the lagoon. Locals come here to sit out the heat of the afternoon.',
@@ -126,7 +130,7 @@ export const LAGOS_MARINA: DistrictSpec = {
   dealership: { id: 'eko-motors', name: 'Eko Motors', kind: 'Car dealership', door: [-26, 0, -29.6], facing: 0 },
   restaurant: { id: 'the-palms', name: 'The Palms Restaurant', kind: 'Fine dining & lounge', door: [-21, 0, -14.3], facing: Math.PI },
   bar: { id: 'cantina-aye', name: 'Cantina Ayé', kind: 'Bar & cantina', door: [-33, 0, -14.3], facing: Math.PI },
-  spa: { id: 'alafia-spa', name: 'Alafia Spa', kind: 'Day spa · massage & wellness', door: [24.5, 0, 12.2], facing: Math.PI },
+  spa: { id: 'alafia-spa', name: 'Alafia Spa', kind: 'Day spa · massage & wellness', door: [38, 0, 26.2], facing: Math.PI },
   agency: { id: 'ogm-homes', name: 'OGM Homes', kind: 'Estate agency · homes for sale', door: [-38, 0, -29.2], facing: 0 },
   hotel: { id: 'grand-lagoon', name: 'Grand Lagoon Hotel', kind: 'Hotel · rooms by the night', door: [-24, 0, 32.2], facing: Math.PI },
   homes: [
@@ -181,6 +185,6 @@ export const LAGOS_MARINA: DistrictSpec = {
     athlete: { name: 'Sports Complex', description: 'Train and compete', position: [24, 0, 40], neighborhood: 'parks' },
     engineer: { name: 'Tech Campus', description: 'Build and innovate', position: [-16, 0, 24], neighborhood: 'industrial' },
     doctor: { name: 'Hospital', description: 'Heal and help others', position: [5.5, 0, -6], neighborhood: 'downtown' },
-    pilot: { name: 'Airport', description: 'Fly across the world', position: [29, 0, 12], neighborhood: 'parks' },
+    pilot: { name: 'Airport', description: 'Fly across the world', position: [38, 0, 12], neighborhood: 'parks' },
   },
 };

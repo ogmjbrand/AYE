@@ -1,16 +1,18 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Vector3, type Group } from 'three';
+import type { Group } from 'three';
 import { Avatar } from '../components/Avatar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LOOKS } from '../lib/looks';
 import type { PlayerHandle } from '../hooks/usePlayerController';
-import { initTraffic, stepTraffic, type Car as MovingCar } from '../lib/traffic';
+import { clearTrafficSnapshot, initTraffic, setTrafficSnapshot, stepTraffic, type Car as MovingCar } from '../lib/traffic';
 import { DANFO_SIZE, movingObstacles } from '../lib/world';
+import { residentPositionsIn } from '../lib/people';
 import { BuiltInVehicle } from './Props';
-import { useLayout } from './DistrictContext';
+import { useDistrict, useLayout } from './DistrictContext';
+import { stillController } from '../hooks/usePlayerController';
 
-const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
+const STILL = stillController();
 /** Keke riders: computer-controlled drivers, a different person in each, seated at the handlebars. */
 const RIDERS = LOOKS.filter((l) => l.body === 'masculine');
 const RIDER_SEAT = { z: 0.55, height: 0.85 };
@@ -29,9 +31,10 @@ function Rider({ index, heading }: { index: number; heading: number }) {
   );
 }
 
-/** Minibuses, cars, tricycles and jeepneys driving the boulevard; they stop for the player and are solid to walk into. */
+/** Minibuses, cars, tricycles and jeepneys driving the boulevard. Road traffic yields to the player and active residents; moving vehicles remain solid to the player. */
 export function Traffic({ player }: { player: PlayerHandle }) {
   const { traffic } = useLayout();
+  const district = useDistrict();
   const cars = useRef<MovingCar[]>(initTraffic(traffic));
   const groups = useRef<(Group | null)[]>([]);
   const looks = useMemo(
@@ -42,10 +45,19 @@ export function Traffic({ player }: { player: PlayerHandle }) {
     [traffic],
   );
 
-  useEffect(() => () => { movingObstacles.length = 0; }, []);
+  useEffect(() => () => {
+    movingObstacles.length = 0;
+    clearTrafficSnapshot();
+  }, []);
 
   useFrame((_, dt) => {
-    cars.current = stepTraffic(cars.current, traffic, { x: player.position.x, z: player.position.z }, Math.min(dt, 0.1));
+    cars.current = stepTraffic(
+      cars.current,
+      traffic,
+      [{ x: player.position.x, z: player.position.z }, ...residentPositionsIn(district.id)],
+      Math.min(dt, 0.1),
+    );
+    setTrafficSnapshot(cars.current, traffic);
     movingObstacles.length = 0;
     cars.current.forEach((car, i) => {
       groups.current[i]?.position.set(looks[i].x, 0, car.z);

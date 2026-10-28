@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildWalkGrid, clearLine, findPath, walkGridFor, type Point } from './pathfinding';
 import { PLAYER_RADIUS, resolveCollisions, type Obstacle } from './world';
 import { DISTRICTS } from './geography';
+import { HOME_RADIUS, allHomes, distanceToDoor } from './homes';
 
 const box = (x: number, z: number, w: number, d: number): Obstacle => ({ position: [x, 0, z], size: [w, 1, d] });
 
@@ -72,6 +73,20 @@ describe('path finding', () => {
         const path = findPath(g, from, to);
         expect(path, `${d.id} → ${to.x},${to.z}`).not.toBeNull();
         expect(routeIsClear(obstacles, from, path!), `${d.id} → ${to.x},${to.z}`).toBe(true);
+      }
+    }
+  });
+
+  it('routes from each district spawn to every home entrance', () => {
+    for (const district of DISTRICTS) {
+      const grid = walkGridFor(district.layout.obstacles);
+      const start = { x: district.spawn[0], z: district.spawn[2] };
+      for (const home of allHomes().filter((entry) => entry.district === district.id)) {
+        const path = findPath(grid, start, { x: home.door[0], z: home.door[2] });
+        expect(path, `${district.id} → ${home.id}`).not.toBeNull();
+        expect(routeIsClear(district.layout.obstacles, start, path!), `${district.id} → ${home.id}`).toBe(true);
+        const end = path![path!.length - 1] ?? start;
+        expect(distanceToDoor(home, end.x, end.z), `${district.id} → ${home.id}`).toBeLessThanOrEqual(HOME_RADIUS);
       }
     }
   });

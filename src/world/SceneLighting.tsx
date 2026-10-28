@@ -14,10 +14,11 @@ import { lightingAt, type HdriKey } from './timeOfDay';
 
 /** Real city light for reflections and image-based lighting (ambientCG, CC0; the visible sky is SkyDome's). */
 const HDRI: Record<HdriKey, string> = {
-  day: `${import.meta.env.BASE_URL}assets/hdri/city-day_1k.exr`,
-  golden: `${import.meta.env.BASE_URL}assets/hdri/town-dusk_1k.exr`,
-  night: `${import.meta.env.BASE_URL}assets/hdri/street-night_1k.exr`,
+  day: `${import.meta.env.BASE_URL}assets/environment/sky-day/DaySkyHDRI026A_1K_HDR.exr`,
+  golden: `${import.meta.env.BASE_URL}assets/environment/sky-golden/DaySkyHDRI030A_1K_HDR.exr`,
+  night: `${import.meta.env.BASE_URL}assets/hdri/dikhololo_night_1k.hdr`,
 };
+const INDOOR_HDRI = `${import.meta.env.BASE_URL}assets/environment/sky-indoor/IndoorEnvironmentHDRI020_1K_HDR.exr`;
 
 const SHADOW_EXTENT = 32;
 const sunOffset = new Vector3();
@@ -41,12 +42,13 @@ function setBackground(scene: Scene, color: string) {
   scene.background = new Color(color);
 }
 
-export function SceneLighting({ gameTime, player, indoor }: {
+export function SceneLighting({ gameTime, player, indoor: indoorProp }: {
   gameTime: GameTime;
   player: PlayerHandle;
-  /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. */
-  indoor?: IndoorMood;
+  /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. `true`: a bright, daylit work building. */
+  indoor?: IndoorMood | boolean;
 }) {
+  const indoor: IndoorMood | undefined = indoorProp === true ? 'campus' : indoorProp || undefined;
   const quality = useQuality();
   const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
   const sun = useRef<DirectionalLight>(null);
@@ -135,7 +137,7 @@ export function SceneLighting({ gameTime, player, indoor }: {
       {/* Image-based lighting and reflections; the scene still works if it fails to load */}
       <ErrorBoundary fallback={null}>
         <Suspense fallback={null}>
-          <Environment files={HDRI[l.hdri]} environmentIntensity={l.envIntensity} />
+          <Environment files={indoor ? INDOOR_HDRI : HDRI[l.hdri]} environmentIntensity={indoor ? 0.45 : l.envIntensity} />
         </Suspense>
       </ErrorBoundary>
     </>

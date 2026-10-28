@@ -11,14 +11,16 @@
  */
 import type { Career } from '../components/CharacterCreation';
 import type { District } from './geography';
+import { OFFICE_WORKPLACE } from './officeCareer';
 
 export type Category =
   | 'restaurants' | 'shopping' | 'universities' | 'hospitals' | 'gyms'
-  | 'workplaces' | 'parks' | 'nightlife' | 'residential' | 'transport';
+  | 'workplaces' | 'parks' | 'nightlife' | 'residential' | 'transport' | 'vehicles';
 
 export const CATEGORIES: readonly { id: Category; label: string }[] = [
   { id: 'restaurants', label: 'Restaurants' },
   { id: 'shopping', label: 'Shops & malls' },
+  { id: 'vehicles', label: 'Car dealerships' },
   { id: 'universities', label: 'Universities' },
   { id: 'hospitals', label: 'Hospitals' },
   { id: 'gyms', label: 'Gyms' },
@@ -84,6 +86,14 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
     },
     { id: id('travel'), name: district.travelDesk.name, kind: district.travelDesk.kind, categories: ['transport'], status: 'open', note: 'Book a flight or coach to another city', position: at(district.travelDesk.position) },
   );
+  if (district.carDealership) {
+    out.push({
+      id: id('car-dealership'), name: district.carDealership.name, kind: 'Car dealership',
+      categories: ['vehicles', 'shopping'], status: 'open',
+      note: 'Browse cars, buy and customise a vehicle, or take an owned car out',
+      position: at(district.carDealership.position),
+    });
+  }
   for (const h of district.homes) {
     const yours = h.id === homeId;
     out.push({
@@ -100,6 +110,17 @@ export function cityDirectory(district: District, playerCareer: Career, homeId: 
       status: mine ? 'open' : 'visit',
       note: mine ? 'Your workplace: paid 09:00–17:00, hourly tasks' : `Workplace for ${CAREER_WORD[career]}; nothing for you to do here yet`,
       position: at(w.position),
+    });
+  }
+  if (district.id === OFFICE_WORKPLACE.districtId) {
+    out.push({
+      id: `${district.id}.office-worker`,
+      name: OFFICE_WORKPLACE.name,
+      kind: 'Office Worker career',
+      categories: ['workplaces'],
+      status: 'open',
+      note: 'Apply, clock in, complete workplace tasks and collect payroll',
+      position: { x: OFFICE_WORKPLACE.position[0], z: OFFICE_WORKPLACE.position[2] },
     });
   }
   // Not in the world yet: listed so players know they're coming, never with a Go button

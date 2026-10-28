@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Diet } from '../lib/food';
-import { COURSES, PALMS_MENU, orderProblem, suitsYou, type Course, type MenuItem } from '../lib/restaurant';
+import { COURSES, PALMS_MENU, orderProblem, suitsYou, type Course, type MenuItem } from '../lib/palms';
 import { NEED_LABEL, type NeedKey } from '../lib/needs';
 import { DishModel } from '../world/Dishes';
 import { Snapshot } from './snapshot/Snapshot';

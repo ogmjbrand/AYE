@@ -2,26 +2,19 @@ import { useEffect, useState } from 'react';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { District, PlaceKind } from '../lib/geography';
 import { WORLD_BOUND } from '../lib/world';
+import { compass } from '../lib/locations';
 
 const KIND_COLOR: Record<PlaceKind, string> = {
-  food: '#f0a35e',
-  shop: '#c39be0',
-  workplace: '#8ab4d8',
-  home: '#7cc4b0',
-  public: '#a4a7ad',
-  nightlife: '#d4a3b9',
-  park: '#b4a77a',
+  food: '#f2a16d',
+  shop: '#c5a5ee',
+  workplace: '#82c7ec',
+  home: '#78d4b5',
+  public: '#c7cbd1',
+  nightlife: '#f28cab',
+  park: '#90cb79',
+  dealership: '#e1bd72',
 };
-const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public', nightlife: 'Nightlife', park: 'Parks' };
-
-/** Compass point for a direction on the map (+z is north). */
-function compass(dx: number, dz: number) {
-  const names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  // East is -x in this world (the camera looks down +z with +x on the left)
-  const angle = Math.atan2(-dx, dz);
-  return names[(Math.round(angle / (Math.PI / 4)) + 8) % 8];
-}
-
+const KIND_LABEL: Record<PlaceKind, string> = { food: 'Food', shop: 'Shops', workplace: 'Work', home: 'Homes', public: 'Public', nightlife: 'Nightlife', park: 'Parks', dealership: 'Car dealerships' };
 /**
  * Smartphone map of the district: roads, buildings, area names and every place
  * as a labelled pin. Filter by kind, zoom in on where you are, and pick a

@@ -20,6 +20,9 @@ import {
   EDIT_STAGES, STAGES, STARTER_PRESETS, applyPreset, buildCharacter, draftFrom, newDraft, problems, randomise, starterItems, withBody,
   type Draft, type StageId,
 } from '../lib/creator';
+import type { HomeDecorPlacement } from '../lib/homeDecor';
+import type { SkinToneId } from '../lib/skinTone';
+import { SkinTonePicker } from './SkinTonePicker';
 
 export type Lifestyle = 'student' | 'ordinary' | 'middle-class' | 'luxury';
 export type Career =
@@ -50,8 +53,14 @@ export interface Character {
   shape: BodyShape;
   /** -1 lighter … 1 deeper than the person's own skin; 0 (or missing in old saves) keeps it. */
   skinTone?: number;
+  /** A skin tint over the person's own skin (lib/skinTone.ts); 'original' or missing keeps it. */
+  skinToneId?: SkinToneId;
+  /** A custom colour for the tint. */
+  skinColor?: string;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
+  /** Furniture owned and placed in the player's homes. Older saves omit this. */
+  homeDecor?: HomeDecorPlacement[];
   lifestyle: Lifestyle;
   career: Career;
   diet: Diet;
@@ -132,7 +141,7 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
 
   return (
     <Shell
-      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={focus}
+      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} skinToneId={draft.skinToneId} skinColor={draft.skinColor} styles={styles} focus={focus}
       avatarName={draft.name.trim() || 'New avatar'}
       previewSub={`${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
       nav={nav}
@@ -338,6 +347,7 @@ function FaceStage({ draft, set }: StageProps) {
         </div>
         <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>
       </div>
+      <SkinTonePicker skinTone={draft.skinToneId} skinColor={draft.skinColor} onChange={(skinToneId, skinColor) => set({ skinToneId, skinColor })} />
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
@@ -555,10 +565,10 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, focus, onFocus, onRandomise }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, skinToneId, skinColor, focus, onFocus, onRandomise }: {
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
-  shape: BodyShape; skinTone: number; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
+  shape: BodyShape; skinTone: number; skinToneId: SkinToneId; skinColor: string; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
   onRandomise?: () => void;
 }) {
@@ -585,7 +595,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive />
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} focus={focus} interactive />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

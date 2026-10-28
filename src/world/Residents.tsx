@@ -6,6 +6,8 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import { NOTICE_RADIUS, STROLL_SPEED, residentPose, residentsIn, setLivePosition, type Resident } from '../lib/people';
+import { HUG_DURATION_MS, hugPathPose, hugPositionBlend } from '../lib/hug';
+import { pedestrianInTrafficPath, trafficSnapshot } from '../lib/traffic';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { groundHeightAt } from '../lib/world';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -13,6 +15,12 @@ import { useDistrict } from './DistrictContext';
 import { withRelaxedHands } from '../components/handPose';
 import { Gestures, type GestureActions } from '../components/Gestures';
 import { conversationGesture, shouldWave, type Gesture } from '../lib/bodyLanguage';
+import type { HugSession } from '../lib/hug';
+import { generateNpcAppearance } from '../lib/npcFashion';
+import { applyBodyShape } from '../components/bodyShapeSkin';
+import { OutfitStyler } from '../components/Avatar';
+import { GarmentLayer } from '../components/GarmentLoader';
+import { getGarmentModel } from '../lib/fashion';
 
 /** Name tag above a resident: their name and that they are a computer-controlled resident. */
 function nameTag(name: string) {
@@ -36,8 +44,17 @@ function nameTag(name: string) {
   return t;
 }
 
-function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; player: PlayerHandle; talkingTo: string | null }) {
+function ResidentFigure({ resident, player, talkingTo, hugSession }: {
+  resident: Resident;
+  player: PlayerHandle;
+  talkingTo: string | null;
+  hugSession: HugSession | null;
+}) {
   const look = lookById(resident.lookId);
+  const appearance = useMemo(
+    () => generateNpcAppearance(resident.id, resident.role, look.body === 'feminine'),
+    [resident.id, resident.role, look.body],
+  );
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
   // Own copy of the person: the player may be wearing the same look, with its own clothes and shape
@@ -70,6 +87,7 @@ function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; p
     const h = box.max.y - box.min.y;
     return h > 0 ? look.height / h : 1;
   }, [figure, look.height]);
+  useEffect(() => applyBodyShape(figure, appearance.shape), [figure, appearance.shape]);
   const clipsWithHands = useMemo(() => withRelaxedHands(animations), [animations]);
   const { actions, names, mixer } = useAnimations(clipsWithHands, group);
   const clips = useMemo(() => ({
@@ -101,16 +119,40 @@ function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; p
   useFrame((_, dt) => {
     const step = Math.min(dt, 0.1);
     const here = residentPose(resident, clock.current);
+    const activeHug = hugSession?.residentId === resident.id ? hugSession : null;
     const near = Math.hypot(player.position.x - here.x, player.position.z - here.z) < NOTICE_RADIUS;
-    if (!near) clock.current += step;
-    const pose = near ? { ...here, moving: false } : residentPose(resident, clock.current);
-    const want = near ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
+    const next = residentPose(resident, clock.current + step);
+    const traffic = trafficSnapshot();
+    const threatened = next.moving && pedestrianInTrafficPath({
+      x: here.x,
+      z: here.z,
+      vx: (next.x - here.x) / step,
+      vz: (next.z - here.z) / step,
+    }, traffic.cars, traffic.lanes);
+    if (!near && !threatened && !activeHug) clock.current += step;
+    const hugElapsed = activeHug ? Date.now() - activeHug.startedAt : 0;
+    const hugBlend = activeHug ? hugPositionBlend(hugElapsed, activeHug.approachMs) : 0;
+    const hugReleasing = activeHug !== null && hugElapsed >= activeHug.approachMs + HUG_DURATION_MS;
+    const hugWalking = activeHug !== null && (hugElapsed < activeHug.approachMs || hugReleasing);
+    const pose = activeHug
+      ? {
+        ...hugPathPose(
+          activeHug.residentFrom,
+          activeHug.residentTarget,
+          activeHug.residentPath,
+          hugBlend,
+          hugReleasing,
+        ),
+        moving: hugWalking,
+      }
+      : near ? { ...here, moving: false } : residentPose(resident, clock.current);
+    const want = activeHug ? pose.facing : near ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
     // Turn smoothly along the shortest way round
     const diff = Math.atan2(Math.sin(want - heading.current), Math.cos(want - heading.current));
     heading.current += diff * Math.min(1, step * 6);
     root.current?.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
     if (group.current) group.current.rotation.y = heading.current;
-    setLivePosition(resident.id, pose.x, pose.z);
+    setLivePosition(resident.id, pose.x, pose.z, heading.current);
     // Body language: a wave when you come over, then talking and listening in turns while you chat
     const inConversation = talkingTo === resident.id;
     if (inConversation && conversationStart.current === null) conversationStart.current = mixer.time;
@@ -121,7 +163,9 @@ function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; p
       lastWave.current = mixer.time;
       waveUntil.current = mixer.time + gestures.Wave.getClip().duration;
     }
-    const gesture: Gesture | null = conversationStart.current !== null
+    const gesture: Gesture | null = activeHug && !hugWalking
+      ? 'Hug'
+      : conversationStart.current !== null
       ? conversationGesture('resident', mixer.time - conversationStart.current)
       : mixer.time < waveUntil.current ? 'Wave' : null;
     const anim = pose.moving && clips.walk ? 'walk' : gesture && gestures[gesture] ? gesture : 'idle';
@@ -142,6 +186,15 @@ function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; p
     <group ref={root} position={[x, groundHeightAt(x, z), z]}>
       <group ref={group} rotation={[0, resident.facing, 0]}>
         <primitive object={figure} scale={scale} />
+        <OutfitStyler scene={figure} lookId={look.id} styles={appearance.styles} skinToneId={appearance.skinTone} />
+        {appearance.hairstyleItemId && getGarmentModel(appearance.hairstyleItemId) && (
+          <GarmentLayer
+            groupRef={group}
+            model={getGarmentModel(appearance.hairstyleItemId)!}
+            isEquipped
+            avatarScale={scale}
+          />
+        )}
       </group>
       <Gestures body={look.body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />
       <sprite position={[0, look.height + 0.35, 0]} scale={[0.9, 0.28, 1]}>
@@ -152,7 +205,11 @@ function ResidentFigure({ resident, player, talkingTo }: { resident: Resident; p
 }
 
 /** The residents of the current district, strolling their usual routes. */
-export function Residents({ player, talkingTo = null }: { player: PlayerHandle; talkingTo?: string | null }) {
+export function Residents({ player, talkingTo = null, hugSession = null }: {
+  player: PlayerHandle;
+  talkingTo?: string | null;
+  hugSession?: HugSession | null;
+}) {
   const district = useDistrict();
   const people = residentsIn(district.id);
   return (
@@ -160,7 +217,7 @@ export function Residents({ player, talkingTo = null }: { player: PlayerHandle; 
       {people.map((r) => (
         <ErrorBoundary key={r.id} fallback={null}>
           <Suspense fallback={null}>
-            <ResidentFigure resident={r} player={player} talkingTo={talkingTo} />
+            <ResidentFigure resident={r} player={player} talkingTo={talkingTo} hugSession={hugSession} />
           </Suspense>
         </ErrorBoundary>
       ))}

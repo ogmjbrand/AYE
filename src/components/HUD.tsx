@@ -1,16 +1,16 @@
 import type { PlayerHandle } from '../hooks/usePlayerController';
-import { ShiftStatus, StudentStatus, TodaysGoals, type ShiftHud, type StudentHud } from './StudentPanels';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useRef, useState } from 'react';
+import { CarFront, Check, ChevronDown, ChevronRight, MapPin, TriangleAlert } from 'lucide-react';
 import { assetUrl } from '../lib/assetManifest';
-import { HUNGRY_THRESHOLD, isWorkingHours, type GameTime } from '../lib/gameState';
+import { HOURLY_WAGE, HUNGRY_THRESHOLD, WORK_END_HOUR, WORK_START_HOUR, isWorkingHours, type DayLedger, type GameTime } from '../lib/gameState';
 import { nearestVendor, type FoodVendor } from '../lib/food';
 import { useWorkplaceStatus } from '../hooks/useWorkplaceStatus';
 import { TouchStick } from './TouchStick';
 import { homeAtDoor, type Home } from '../lib/homes';
 import { barAt, counterAt, hotelAt, restaurantAt, spaAt, type District, type PlaceKind } from '../lib/geography';
-import { OPEN_HOUR as RESTAURANT_OPENS, isOpen as restaurantOpen } from '../lib/restaurant';
+import { OPEN_HOUR as RESTAURANT_OPENS, isOpen as restaurantOpen } from '../lib/palms';
 import { OPEN_HOUR as BAR_OPENS, isOpen as barOpen } from '../lib/cantina';
 import { venueAt } from '../lib/nightlife';
 import { parkAt } from '../lib/parks';
@@ -18,6 +18,10 @@ import { residentNear, type Resident } from '../lib/people';
 import { TIRED_THRESHOLD, type Needs } from '../lib/needs';
 import { Icon, type IconName } from './os/icons';
 import { ICON_PATHS } from './os/iconPaths';
+import { careerLevel } from '../lib/progression';
+import { CAREER_LABEL } from '../lib/labels';
+import { ARRIVE_RADIUS, compass } from '../lib/locations';
+import { dailyGoals, goalDay, parseFlags, updateFlags, type GoalFlags } from '../lib/dailyGoals';
 
 /** One button on the bottom bar. The bar changes with where you are (street, home, restaurant, boutique). */
 export interface NavItem {
@@ -61,16 +65,30 @@ interface HUDProps {
   onTalk?: (resident: Resident) => void;
   /** This hour's task at your workplace, if one is on offer. */
   workTask?: { place: string; onOpen: () => void } | null;
-  /** At a university's front marker on the street: in through the gate to the campus. */
-  campusEntry?: { name: string; onOpen: () => void } | null;
-  /** At a car dealer's showroom door. */
-  dealerEntry?: { name: string; onOpen: () => void; verb?: string } | null;
-  /** Overrides the work status line (e.g. "In class", read from the save). */
+  /** Standing at a building's entrance on the street: the office, the university, the hospital, the car dealer. */
+  outsideOffice?: { name: string; onOpen: () => void };
+  outsideUniversity?: { name: string; onOpen: () => void };
+  outsideHospital?: { name: string; onOpen: () => void };
+  outsideDealership?: { name: string; onOpen: () => void };
+  /** Overrides the work status line (e.g. "In class"). */
   statusOverride?: { label: string; tone: 'good' | 'warn' } | null;
-  /** The student's goals and status panels (lib/school.ts). */
-  student?: StudentHud | null;
-  /** A doctor's shift panels (lib/hospital.ts). */
-  shift?: ShiftHud | null;
+  /** On campus (a student's workplace): counts as at work. */
+  onCampus?: boolean;
+  campusStatus?: { classesToday: number; classesTotal: number; assignmentDone: boolean; credits: number; standing: string };
+  hospitalStatus?: { onShift: boolean; patientsToday: number; patientsTarget: number; shiftsCompleted: number };
+  /** Today's money and purchases, which drive the daily goals. */
+  today?: DayLedger;
+  /** The end-of-day summary is showing: the player has rested. */
+  summaryShown?: boolean;
+  /** Experience in the current career, in worked minutes (lib/progression.ts). */
+  workMinutes?: number;
+  /** Opens the career panel (the career card's button). */
+  onOpenCareer?: () => void;
+  /** Driving: get out of the car. */
+  onExitVehicle?: () => void;
+  /** The destination being tracked, in district metres. */
+  tracked?: { name: string; position: readonly [number, number, number] } | null;
+  onStopTracking?: () => void;
   /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   /** Opens the gadget shop when standing at it. */
@@ -137,8 +155,8 @@ function Portrait({ character }: { character?: Character }) {
   );
 }
 
-const POI_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm' };
-const POI_COLOR: Record<PlaceKind, string> = { food: '#e0913f', shop: '#b07fd6', workplace: '#5b9bd5', home: '#3fbf8e', public: '#8a8f96', nightlife: '#d46a92', park: '#7aa54a' };
+const POI_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm', dealership: 'car' };
+const POI_COLOR: Record<PlaceKind, string> = { food: '#e0913f', shop: '#b07fd6', workplace: '#5b9bd5', home: '#3fbf8e', public: '#8a8f96', nightlife: '#d46a92', park: '#7aa54a', dealership: '#c9a35e' };
 const ICON_2D = new Map<IconName, Path2D>();
 const path2d = (name: IconName) => {
   let p = ICON_2D.get(name);
@@ -255,6 +273,36 @@ function Minimap({ district, at, direction, homePlaceId, workPlaceId, size }: { 
   );
 }
 
+const EMPTY_LEDGER: DayLedger = { income: 0, expenses: 0, minutesWorked: 0 };
+
+/** Today's goals (lib/dailyGoals.ts), folded away with a tap. */
+function GoalsPanel({ goals }: { goals: ReturnType<typeof dailyGoals> }) {
+  const [open, setOpen] = useState(true);
+  const firstOpen = goals.find((goal) => !goal.done)?.id;
+  return (
+    <section className={`${GLASS} pointer-events-auto w-56 rounded-2xl p-3`} aria-label="Today's goals">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full items-center justify-between text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+        Today&apos;s goals
+        <ChevronDown size={16} aria-hidden="true" className={`text-ui-gold-strong transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && (
+        <ul className="m-0 mt-2 list-none space-y-0.5 p-0">
+          {goals.map((goal) => (
+            <li key={goal.id} className={`flex items-center gap-2.5 rounded-lg px-2 py-1 text-[12px] ${goal.id === firstOpen ? 'bg-white/10' : goal.done ? 'text-ui-muted' : 'text-ui-ink/85'}`}>
+              <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${goal.done ? 'border-ui-gold bg-ui-gold/20 text-ui-gold-strong' : 'border-white/30'}`} aria-hidden="true">
+                {goal.done && <Check size={11} strokeWidth={3} />}
+              </span>
+              <span className={goal.done ? 'line-through decoration-white/30' : ''}>{goal.label}</span>
+              <span className="sr-only">{goal.done ? 'completed' : 'not completed'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /** A warning chip for a need that is costing you (pay, mood). */
 function NeedChip({ icon, text, onClick }: { icon: IconName; text: string; onClick?: () => void }) {
   return (
@@ -281,11 +329,21 @@ export function HUD({
   busy = false,
   onTalk,
   workTask,
-  campusEntry,
-  dealerEntry,
+  outsideOffice,
+  outsideUniversity,
+  outsideHospital,
+  outsideDealership,
   statusOverride,
-  student,
-  shift,
+  onCampus = false,
+  campusStatus,
+  hospitalStatus,
+  today = EMPTY_LEDGER,
+  summaryShown = false,
+  workMinutes = 0,
+  onOpenCareer,
+  onExitVehicle,
+  tracked = null,
+  onStopTracking,
   insideHome,
   onOpenGadgets,
   onEnterRestaurant,
@@ -325,7 +383,9 @@ export function HUD({
   const bar = barAt(district, px, pz);
   const hotel = hotelAt(district, px, pz);
   const spa = spaAt(district, px, pz);
-  const prompt = vendor && onOpenVendor
+  const prompt = outsideDealership
+    ? { verb: 'Go into', place: outsideDealership.name, onOpen: outsideDealership.onOpen }
+    : vendor && onOpenVendor
     ? { verb: 'Order food at', place: vendor.name, onOpen: () => onOpenVendor(vendor) }
     : restaurant && onEnterRestaurant
       ? { verb: restaurantOpen(gameTime.hour) ? 'Go into' : `Closed until ${RESTAURANT_OPENS}:00:`, place: restaurant.name, onOpen: onEnterRestaurant }
@@ -346,20 +406,23 @@ export function HUD({
             : parkAt(district.park, px, pz) && onOpenPark
               ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark }
               : null;
-  const resident = !prompt && !campusEntry && !dealerEntry && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const streetPrompt = prompt ?? (campusEntry ? { verb: 'Enter', place: campusEntry.name, onOpen: campusEntry.onOpen } : null) ?? (dealerEntry ? { verb: dealerEntry.verb ?? 'Browse cars at', place: dealerEntry.name, onOpen: dealerEntry.onOpen } : null) ?? (resident && onTalk
+  const streetPrompt = prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : door.price !== undefined ? `For sale (OGM Homes): ${door.kind} at` : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }
-    : null);
-  const placePrompt = busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
+    : null)
+    ?? (outsideUniversity ? { verb: 'Go into', place: outsideUniversity.name, onOpen: outsideUniversity.onOpen } : null)
+    ?? (outsideHospital ? { verb: 'Go into', place: outsideHospital.name, onOpen: outsideHospital.onOpen } : null)
+    ?? (outsideOffice ? { verb: 'Go into', place: outsideOffice.name, onOpen: outsideOffice.onOpen } : null);
+  const placePrompt = controller.drivingVehicleId || busy ? null : insideHome ? insideHome.prompt() : streetPrompt;
 
   const shiftHours = isWorkingHours(gameTime) && !!character && character.career !== 'none';
   const status = statusOverride
     ? { label: statusOverride.label, dot: statusOverride.tone === 'good' ? 'bg-ui-accent' : 'bg-ui-warn', text: statusOverride.tone === 'good' ? 'text-ui-accent-strong' : 'text-ui-warn' }
     : !shiftHours ? null
-    : workplaceStatus.isAtWorkplace
+    : workplaceStatus.isAtWorkplace || onCampus
       ? { label: 'Working', dot: 'bg-ui-accent', text: 'text-ui-accent-strong' }
       : { label: insideHome ? 'Not at work' : `Not at work · ${workplaceStatus.distanceToWorkplace} m`, dot: 'bg-ui-warn', text: 'text-ui-warn' };
 
@@ -373,6 +436,21 @@ export function HUD({
   const mapAt = mapPosition ?? { x: px, z: pz };
   const homePlaceId = homeId ? `${district.id}.home.${homeId}` : null;
   const location = neighborhood?.name ?? district.name;
+  const hasCareer = !!character && character.career !== 'none';
+
+  // Daily goals: from the ledger, plus the few things it doesn't record (kept in this browser)
+  const outfitSignature = JSON.stringify(character?.wardrobe?.equipped ?? {});
+  const goalKey = `aye.dailyGoals.v1.${character?.name ?? 'guest'}`;
+  const [goalFlags, setGoalFlags] = useState<GoalFlags | null>(() => {
+    try { return parseFlags(window.localStorage.getItem(goalKey)); } catch { return null; }
+  });
+  const inDowntown = !insideHome && neighborhood?.id === 'downtown';
+  const nextFlags = updateFlags(goalFlags, goalDay(gameTime), outfitSignature, inDowntown);
+  if (nextFlags !== goalFlags) setGoalFlags(nextFlags);
+  useEffect(() => {
+    try { if (goalFlags) window.localStorage.setItem(goalKey, JSON.stringify(goalFlags)); } catch { /* storage unavailable */ }
+  }, [goalFlags, goalKey]);
+  const goals = dailyGoals(nextFlags, today, today.minutesWorked > 0, summaryShown);
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
@@ -397,13 +475,75 @@ export function HUD({
             {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}
           </div>
         )}
-        {student && !small && <TodaysGoals goals={student.goals} />}
-        {shift && !small && <TodaysGoals goals={shift.goals} />}
+        {!small && <GoalsPanel goals={goals} />}
+        {tracked && (
+          <div role="status" className={`${GLASS} pointer-events-auto flex items-center gap-2.5 rounded-2xl px-3 py-2 text-xs`}>
+            <MapPin size={15} aria-hidden="true" className="shrink-0 text-ui-gold-strong" />
+            <div className="min-w-0">
+              <p className="m-0 truncate font-semibold">{tracked.name}</p>
+              <p className="m-0 tabular-nums text-ui-muted">
+                {(() => {
+                  const d = Math.hypot(tracked.position[0] - px, tracked.position[2] - pz);
+                  return d < ARRIVE_RADIUS ? "You're here" : `${Math.round(d)} m ${compass(tracked.position[0] - px, tracked.position[2] - pz)}`;
+                })()}
+              </p>
+            </div>
+            {onStopTracking && (
+              <button type="button" onClick={onStopTracking} aria-label="Stop tracking" className="shrink-0 rounded px-1.5 py-0.5 text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">✕</button>
+            )}
+          </div>
+        )}
       </div>
-      {(student || shift) && !small && (
-        <div className="absolute right-5 top-[4.6rem]">
-          {student ? <StudentStatus s={student} /> : shift && <ShiftStatus s={shift} />}
+
+      {/* Right: your career today (wide screens) */}
+      {hasCareer && character && !small && (
+        <section className={`${GLASS} pointer-events-auto absolute right-5 top-[4.6rem] hidden w-60 rounded-2xl lg:block`} aria-label="Active career">
+          <button type="button" onClick={onOpenCareer} disabled={!onOpenCareer} title="Career details"
+            className="flex w-full items-center gap-3 px-3.5 pb-2 pt-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold disabled:cursor-default">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{CAREER_LABEL[character.career]}</span>
+              <span className={`block truncate text-xs ${status?.text ?? 'text-ui-muted'}`}>{status?.label ?? 'Off duty'} · {careerLevel(character.career, workMinutes).title}</span>
+            </span>
+            {onOpenCareer && <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-ui-gold-strong" />}
+          </button>
+          <dl className="m-0 space-y-1.5 border-t border-white/10 px-3.5 pb-3 pt-2 text-[11px]">
+            <div className="flex justify-between gap-2"><dt className="text-ui-muted">Shift</dt><dd className="m-0 tabular-nums">{twoDigits(WORK_START_HOUR)}:00 – {twoDigits(WORK_END_HOUR)}:00</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-ui-muted">{character.career === 'student' ? 'Allowance' : 'Pay'}</dt><dd className="m-0 tabular-nums text-ui-gold-strong">{HOURLY_WAGE[character.career]} GHAI / hour</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-ui-muted">Earned today</dt><dd className="m-0 tabular-nums text-ui-gold-strong">{today.income.toLocaleString()} GHAI</dd></div>
+            {campusStatus && character.career === 'student' && (
+              <>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">Classes today</dt><dd className="m-0 tabular-nums">{campusStatus.classesToday} / {campusStatus.classesTotal}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">Assignment</dt><dd className="m-0">{campusStatus.assignmentDone ? 'Submitted' : 'Due today'}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">Credits · standing</dt><dd className="m-0">{campusStatus.credits} · {campusStatus.standing}</dd></div>
+              </>
+            )}
+            {hospitalStatus && character.career === 'doctor' && (
+              <>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">On shift</dt><dd className="m-0">{hospitalStatus.onShift ? 'Clocked in' : 'Clocked out'}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">Patients today</dt><dd className="m-0 tabular-nums">{hospitalStatus.patientsToday} / {hospitalStatus.patientsTarget}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-ui-muted">Shifts completed</dt><dd className="m-0 tabular-nums">{hospitalStatus.shiftsCompleted}</dd></div>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
+
+      {controller.trafficWarning && (
+        <p role="status" className="absolute left-1/2 top-[8.5rem] m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg">
+          <TriangleAlert size={16} aria-hidden="true" />
+          Vehicle approaching: waiting for a safe gap.
+        </p>
+      )}
+      {controller.drivingVehicleId && (
+        <div className={`${GLASS} absolute left-1/2 top-[8.5rem] flex -translate-x-1/2 items-center gap-3 rounded-xl px-3 py-2 text-xs`}>
+          <span className="flex items-center gap-2 font-semibold"><CarFront size={16} className="text-ui-gold-strong" />Driving · {Math.round(Math.abs(controller.vehicleSpeed) * 3.6)} km/h</span>
+          <span className="hidden text-ui-muted sm:inline">W/S drive · A/D steer · E get out</span>
         </div>
+      )}
+      {controller.drivingVehicleId && onExitVehicle && (
+        <button type="button" onClick={onExitVehicle} className={`${GLASS} pointer-events-auto absolute bottom-28 right-4 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-wider text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:right-6`}>
+          Get out
+        </button>
       )}
 
       {/* Top-centre: the venue or area */}

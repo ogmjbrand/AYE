@@ -9,13 +9,24 @@ import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
 import type { Slot, Style } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
+import { DEFAULT_SKIN_TONE, type SkinToneId } from '../lib/skinTone';
 
 export type PreviewFocus = 'body' | 'face';
 
 /** A standing-still controller so the avatar plays its idle animation. */
 function useStillController(): PlayerHandle {
   return useMemo(
-    () => ({ position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} }),
+    () => ({
+      position: new Vector3(),
+      direction: 0,
+      velocity: new Vector3(),
+      trafficWarning: false,
+      drivingVehicleId: null,
+      vehicleSpeed: 0,
+      applyMovement: () => {},
+      faceTowards: () => {},
+      moveToPose: () => {},
+    }),
     [],
   );
 }
@@ -70,18 +81,30 @@ function FocusRig({ focus, height, controls }: { focus: PreviewFocus; height: nu
   return null;
 }
 
+function PreviewError() {
+  return (
+    <div role="alert" className="grid h-full place-items-center px-6 text-center text-sm text-red-300">
+      The character preview could not load. Check the Vite console and private texture files; saved character data is unchanged.
+    </div>
+  );
+}
+
 /**
  * Live 3D preview of the in-game character model (the same GLB the game uses),
  * with the chosen person, height, shape, skin tone and clothes applied. When
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, focus = 'body', interactive = false }: {
+export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, hairstyleItemId, focus = 'body', interactive = false }: {
   shape?: BodyShape;
   skinTone?: number;
   lookId?: string;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
+  /** A skin tint (lib/skinTone.ts) and an optional custom colour for it. */
+  skinToneId?: SkinToneId;
+  skinColor?: string;
+  hairstyleItemId?: string | null;
   focus?: PreviewFocus;
   interactive?: boolean;
 }) {
@@ -106,9 +129,9 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
         </Suspense>
       </ErrorBoundary>
       <Turntable spin={spin} faceFront={interactive && focus === 'face'}>
-        <ErrorBoundary fallback={null}>
+        <ErrorBoundary fallback={<PreviewError />}>
           <Suspense fallback={null}>
-            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} />
+            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

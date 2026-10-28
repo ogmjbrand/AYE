@@ -3,6 +3,7 @@
  * Units are metres. The main boulevard runs north–south along Z, crossed by
  * one east–west street. Buildings sit back from the pavements.
  */
+import type { VehicleBodyStyle } from './vehicleCatalog';
 
 export type BuildingStyle = 'tower' | 'office' | 'residential' | 'shop';
 
@@ -15,6 +16,8 @@ export interface Building {
   style: BuildingStyle;
   /** Shown on signage for shops and landmark buildings. */
   name?: string;
+  /** Ground-level architectural opening on the west facade, relative to its centre line. */
+  entry?: { side: 'west'; offset: number; width: number; height: number };
 }
 
 /** Any solid, axis-aligned footprint the player cannot walk through. */
@@ -39,6 +42,7 @@ export interface Vehicle {
   stripes?: boolean;
   /** A minibus (default) or an ordinary car. Both take up DANFO_SIZE for collisions. */
   kind?: VehicleKind;
+  bodyStyle?: VehicleBodyStyle;
 }
 
 /** Minibus (danfo, tro-tro, matatu), car, motor tricycle (keke, tuk-tuk, bajaj) or Philippine jeepney. */

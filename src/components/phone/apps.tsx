@@ -7,7 +7,7 @@ import { NEED_KEYS, NEED_LABEL, moodLabel } from '../../lib/needs';
 import { FRIENDSHIP_LEVELS, friendshipLevel, gameDay, residentById, type Resident } from '../../lib/people';
 import { careerLevel, hoursToNextLevel } from '../../lib/progression';
 import { equipmentPay } from '../../lib/equipment';
-import { CARS, carById, carResale } from '../../lib/cars';
+import { VEHICLE_CATALOG, vehicleById, vehicleColourById } from '../../lib/vehicleCatalog';
 import { BAND_LABEL, allHomes, forSale, homeById, homesForSale, moveInFee } from '../../lib/homes';
 import { CLOSE_HOUR, LEVELS, OPEN_HOUR, SERVICES, SHIFT_END, SHIFT_START, isOpen as spaOpen, levelOf, rollSpaDay } from '../../lib/spa';
 import { districtById } from '../../lib/geography';
@@ -431,36 +431,30 @@ function Contacts({ ctx }: { ctx: AppCtx }) {
 function Cars({ ctx }: { ctx: AppCtx }) {
   const { state } = ctx;
   const [flash, say] = useFlash();
-  const [selling, setSelling] = useState<string | null>(null);
-  const dealer = ctx.destinations.find((d) => d.id.includes('.cars.'));
-  const owned = state.cars;
+  const dealer = ctx.destinations.find((d) => d.id.endsWith('car-dealership'));
+  const owned = state.ownedVehicles;
   return (
     <>
       {flash}
       <Section title="Your garage">
-        {owned.length === 0 && <Row title="No car yet" sub="Buy one at the dealership, then drive it anywhere. Fuel is paid as you go." />}
+        {owned.length === 0 && <Row title="No car yet" sub="Buy one at the car showroom, then take it out and drive it on the streets." />}
         {owned.map((c) => {
-          const m = carById(c.id);
+          const m = vehicleById(c.modelId);
           if (!m) return null;
-          const where = c.parked ? (c.parked.districtId === state.districtId ? 'Parked in this city' : `Parked in ${districtById(c.parked.districtId).city.name}`) : 'With you';
+          const paint = vehicleColourById(c.colour);
           return (
-            <Row key={c.id} title={<span className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-white/40" style={{ background: c.color }} />{m.name}</span>}
-              sub={`${m.kind} · ${where} · resale ${ghai(carResale(m))}`}
-              right={<Btn small tone="ghost" onClick={() => setSelling(c.id)}>Sell</Btn>} />
+            <Row key={c.modelId} title={<span className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-white/40" style={{ background: paint?.hex }} />{m.name}</span>}
+              sub={`${m.seats} seats · ${paint?.name ?? 'Paint'} · top speed ${m.topSpeedKph} km/h`} />
           );
         })}
       </Section>
-      {selling && carById(selling) && (
-        <Confirm title={`Sell your ${carById(selling)!.name}?`} body={`The dealer pays ${ghai(carResale(carById(selling)!))} (half the new price), straight into your account.`} yes="Sell"
-          onYes={() => { const m = carById(selling)!; ctx.act.sellCar(selling); setSelling(null); say(`Sold. ${ghai(carResale(m))} is in your account.`); }} onNo={() => setSelling(null)} />
-      )}
       <Section title={dealer ? `Showroom · ${dealer.name}` : 'Showroom'}>
-        {CARS.map((m) => {
-          const have = owned.some((c) => c.id === m.id);
-          return <Row key={m.id} title={m.name} sub={`${m.kind} · ${m.fuelPerKm} GHAI/km fuel`} right={have ? <span className="text-ui-accent-strong">Yours</span> : <span className={state.balance >= m.price ? 'text-white' : 'text-white/45'}>{ghai(m.price)}</span>} />;
+        {VEHICLE_CATALOG.map((m) => {
+          const have = owned.some((c) => c.modelId === m.id);
+          return <Row key={m.id} title={m.name} sub={`${m.seats} seats · 0–100 in ${m.accelerationSeconds}s`} right={have ? <span className="text-ui-accent-strong">Yours</span> : <span className={state.balance >= m.price ? 'text-white' : 'text-white/45'}>{ghai(m.price)}</span>} />;
         })}
       </Section>
-      {dealer ? <><Note>Choose the colour and collect the keys at the dealership.</Note><GoButtons ctx={ctx} d={dealer} onResult={say} /></> : <Note>This city has no car dealership. The one in Lagos is on Marina Boulevard.</Note>}
+      {dealer ? <><Note>Choose the paint, buy and collect the keys at the showroom.</Note><GoButtons ctx={ctx} d={dealer} onResult={say} /></> : <Note>This city has no car showroom. Travel to a city that has one.</Note>}
     </>
   );
 }

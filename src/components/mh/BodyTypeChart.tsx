@@ -1,11 +1,11 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, type OrthographicCamera } from 'three';
-import { Vector3 } from 'three';
 import { Avatar } from '../Avatar';
 import { FEMININE_SHAPE_PRESETS, presetFor, type BodyShape } from '../../lib/bodyShape';
+import { stillController } from '../../hooks/usePlayerController';
 
-const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), applyMovement: () => {} };
+const STILL = stillController();
 
 const GAP = 0.7;
 

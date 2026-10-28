@@ -96,8 +96,8 @@ describe('texting and calling', () => {
   });
 
   it('the day you last phoned is saved', () => {
-    expect(sanitiseRelationships({ [r.id]: { points: 12, lastDay: 3, lastPhone: 4 } })[r.id]).toEqual({ points: 12, lastDay: 3, lastPhone: 4 });
-    expect(sanitiseRelationships({ [r.id]: { points: 12, lastDay: 3, lastPhone: 'x' } })[r.id]).toEqual({ points: 12, lastDay: 3 });
+    expect(sanitiseRelationships({ [r.id]: { points: 12, lastDay: 3, lastPhone: 4 } })[r.id]).toEqual({ points: 12, lastDay: 3, lastHugDay: -1, lastPhone: 4 });
+    expect(sanitiseRelationships({ [r.id]: { points: 12, lastDay: 3, lastPhone: 'x' } })[r.id]).toEqual({ points: 12, lastDay: 3, lastHugDay: -1 });
   });
 });
 

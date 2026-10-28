@@ -7,11 +7,10 @@ import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
-import { resolveStyles, type Slot } from '../lib/fashion';
-import type { OwnedCar } from '../lib/cars';
-import { CarBody } from '../world/CarBody';
-import { driverSeat } from '../lib/carShapes';
+import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
 import { LOOKS } from '../lib/looks';
+import { residentById, residentPosition } from '../lib/people';
+import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -20,8 +19,10 @@ interface PlayerProps {
   tryOn?: Partial<Record<Slot, string | null>>;
   /** Talking with a resident (gestures in turns). */
   conversing?: boolean;
-  /** Driving your car: the car is shown instead of you on foot. */
-  car?: OwnedCar | null;
+  conversationTarget?: string | null;
+  hugSession?: HugSession | null;
+  onHugComplete?: (residentId: string) => void;
+  eating?: boolean;
 }
 
 /** If your own look can't be loaded: the first built-in person, so you're still a real person on screen. */
@@ -35,18 +36,62 @@ function DefaultPerson({ controller, sitHeight }: { controller: PlayerHandle; si
   );
 }
 
-export function Player({ controller, character, tryOn, conversing = false, car = null }: PlayerProps) {
+export function Player({
+  controller,
+  character,
+  tryOn,
+  conversing = false,
+  conversationTarget = null,
+  hugSession = null,
+  onHugComplete,
+  eating = false,
+}: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
+  const completedHug = useRef<string | null>(null);
 
   const equipped = character?.wardrobe.equipped;
   const colours = character?.wardrobe.colours;
   const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn, colours), [equipped, tryOn, colours]);
+  const visibleShoeId = resolveFashionItemId(equipped ?? {}, tryOn, 'shoes');
+  const visibleHairstyleId = resolveFashionItemId(equipped ?? {}, tryOn, 'hairstyle');
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
-    controller.applyMovement(Math.min(delta, 0.1));
+    if (hugSession) {
+      const elapsed = Date.now() - hugSession.startedAt;
+      const blend = hugPositionBlend(elapsed, hugSession.approachMs);
+      const reverse = elapsed >= hugSession.approachMs + HUG_DURATION_MS;
+      const pose = hugPathPose(hugSession.playerFrom, hugSession.playerTarget, hugSession.playerPath, blend, reverse);
+      const previousX = controller.position.x;
+      const previousZ = controller.position.z;
+      controller.moveToPose(
+        pose.x,
+        pose.z,
+        pose.facing,
+        1,
+      );
+      const seconds = Math.max(0.001, Math.min(delta, 0.1));
+      controller.velocity.set(
+        (controller.position.x - previousX) / seconds,
+        0,
+        (controller.position.z - previousZ) / seconds,
+      );
+      if (elapsed >= hugSessionDurationMs(hugSession.approachMs) && completedHug.current !== hugSession.residentId) {
+        completedHug.current = hugSession.residentId;
+        controller.velocity.set(0, 0, 0);
+        onHugComplete?.(hugSession.residentId);
+      }
+    } else {
+      completedHug.current = null;
+      controller.applyMovement(Math.min(delta, 0.1));
+    }
+    const resident = conversationTarget ? residentById(conversationTarget) : undefined;
+    if (conversing && resident) {
+      const target = residentPosition(resident);
+      controller.faceTowards(target.x, target.z, delta);
+    }
 
     // Apply position and rotation to the visual group, standing on the pavement or road
     const g = groupRef.current;
@@ -72,17 +117,26 @@ export function Player({ controller, character, tryOn, conversing = false, car =
     }
   });
 
-  const person = (sitHeight?: number) => (
-    <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={car ? { ...styles, bag: undefined } : styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} sitHeight={sitHeight} />
-  );
   // Nothing stands in for you while you load: a real person or no one
-  const seat = car ? driverSeat(car.id) : null;
   return (
     <group ref={groupRef}>
-      {car && <CarBody model={car.id} color={car.color} lightsOn />}
-      <ErrorBoundary fallback={<DefaultPerson controller={controller} sitHeight={seat?.height} />}>
+      <ErrorBoundary fallback={<DefaultPerson controller={controller} />}>
         <Suspense fallback={null}>
-          {seat ? <group position={[seat.x, 0, seat.z]}>{person(seat.height)}</group> : person()}
+          <Avatar
+            controller={controller}
+            lookId={character?.lookId}
+            heightCm={character?.heightCm}
+            styles={styles}
+            shape={character?.shape}
+            skinTone={character?.skinTone}
+            skinToneId={character?.skinToneId}
+            skinColor={character?.skinColor}
+            conversing={conversing}
+            hugSession={hugSession}
+            eating={eating}
+            shoeItemId={visibleShoeId}
+            hairstyleItemId={visibleHairstyleId}
+          />
         </Suspense>
       </ErrorBoundary>
     </group>

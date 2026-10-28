@@ -1,17 +1,29 @@
 # AYE asset acquisition checklist
 
-**Status (October 2026): section 1 (player character with Idle/Walk/Run) is installed from Microsoft Rocketbox. Nothing from sections 3–4 has been downloaded yet.**
-The game currently runs on procedural textures, procedural buildings and
-vehicles. The player character is a Microsoft Rocketbox avatar (MIT, realistic
+**Status (October 2026):** the Rocketbox player with Idle/Walk/Run is installed. Four CC0 MakeHuman hair meshes (afro, braids, ponytail and long waves) are selectable, previewable and saved separately from hair colour. Character creation also offers independently saved skin-tone tints applied to exposed skin while preserving the source texture. NPCs now receive stable, role-aware material styles, skin tones, body shapes and compatible head-attached hair. Their clothes are the existing Rocketbox baked garments restyled by masks; there are no modular garment, shoe, dress or accessory meshes.
+The city uses ambientCG PBR maps for asphalt, paving and exposed ground,
+venue/tier-specific tile materials for interiors, and ambientCG EXR lighting
+for day, golden hour and indoor venues. Snow is retained but not applied to the
+Nigerian city. Buildings and vehicles remain procedural. The player character
+is a Microsoft Rocketbox avatar (MIT, realistic
 proportions and photo-sourced textures, but a ~6.7k-triangle mesh from the 2010s;
-see `public/assets/CREDITS.md`). Every slot in
-`public/assets/manifest.json` is `null`.
+see `public/assets/CREDITS.md`). `public/assets/manifest.json` enables road,
+pavement and ground; roof, concrete, avatar and vehicle entries use built-ins.
 
-The development container that wrote this cannot reach ambientCG, Poly Haven,
-Mixamo, Sketchfab or Fab, so **no asset IDs below have been checked against
-the live sites**. Names are search terms and selection criteria, not file
-names. When you pick a file, record its real ID and licence in
-`public/assets/CREDITS.md`.
+Live metadata for some sources is reachable, but obtaining model files can
+require authorized account access. MakeHuman system clothing and shoe assets
+are available locally, but their HM08 proxy fit and skeleton weights must be
+converted to a compatible wearable rig before registration. Names below are
+search terms and selection criteria, not file names. Record each selected
+asset's real ID and exact licence in `public/assets/CREDITS.md`.
+
+The current filesystem and supplied archive scan is recorded in
+[`ASSET_INVENTORY.md`](./ASSET_INVENTORY.md). It found licensed Rocketbox
+characters, MakeHuman morph-target source data, and four converted CC0 hair
+meshes. The downloaded clothing and shoe meshes remain fitted to the MakeHuman
+body and have not been verified on Rocketbox; no furniture meshes were found.
+Reference images are not product meshes and are not treated as redistributable
+assets.
 
 Tick each box only when the file is in place **and** `npm.cmd run assets:check`
 passes **and** you have looked at it in the game at http://localhost:5173.
@@ -27,30 +39,36 @@ anyone.
 |---|---|---|
 | CC0 (ambientCG, Poly Haven, Kenney, Quaternius) | `public/assets/textures/…`, `public/assets/models/…` | Yes |
 | CC-BY (many Sketchfab models) | same as CC0, **plus** a credit line in `CREDITS.md` | Yes |
-| Mixamo, Fab "Standard licence", Sketchfab "Standard/Editorial", paid packs, MetaHuman exports | `public/assets/private/…` | **No** (git-ignored) |
+| Private, non-redistributable, or unverified assets | Outside `public/`; `assets-src/private-avatars/` is reserved for the local avatar lab | No; never include in a production build |
 
-Files in `public/assets/private/` load in the game on your laptop like any
-other asset; they just never leave your machine. Keep your own backup.
+**Do not put private assets in `public/`, even in a git-ignored folder.** Vite
+copies everything under `public/` into the production build, whether or not Git
+tracks it. The legacy `public/assets/private/` folder is not a safe place for
+unlicensed or non-redistributable files.
 
-Paths in `manifest.json` are relative to `public/assets/`, so a private file
-is listed as `"private/characters/player.glb"`.
+Only assets cleared for distribution belong in `public/assets/` or
+`public/assets/manifest.json`. The local avatar lab reads from
+`assets-src/private-avatars/` during development; it is not part of the game
+manifest or production build.
 
 ---
 
 ## 1. Detailed human character (GLB)
 
-- [ ] **File:** `public/assets/private/characters/player.glb`
-      (or `public/assets/models/characters/player.glb` if CC0/CC-BY).
-- [ ] **Manifest:** `"avatar": { "url": "private/characters/player.glb", "height": 1.78 }`.
+- [ ] **File:** `public/assets/models/characters/player.glb` only after its
+      source and redistribution licence are verified.
+- [ ] **Manifest:** `"avatar": { "url": "models/characters/player.glb", "height": 1.78 }`.
       `height` is the standing height in metres; allowed range 1.2–2.3.
+- [ ] If rights are not verified, keep the asset outside `public/` and do not
+      register it in the production manifest.
 
 **Where to get one**
 
 | Source | Realism | Licence notes |
 |---|---|---|
 | Mixamo (mixamo.com, free Adobe account) | Medium | Free for games; files may not be redistributed, so use `private/`. |
-| Reallusion Character Creator 4 + ActorCore (paid) | High; good African skin, hair and clothing options | Game export needs the right Reallusion export licence. Check before buying. Use `private/`. |
-| MetaHuman (Epic) | Highest | Epic's licence terms changed in 2025. Read the current MetaHuman EULA about use outside Unreal before exporting. Raw exports are far too heavy and need heavy reduction (below). Use `private/`. |
+| Reallusion Character Creator 4 + ActorCore (paid) | High; good African skin, hair and clothing options | Game export needs the right Reallusion export licence. Check before buying; keep uncleared exports outside `public/`. |
+| MetaHuman (Epic) | Highest | Epic's licence terms changed in 2025. Read the current MetaHuman EULA about use outside Unreal before exporting. Raw exports are far too heavy and need heavy reduction (below); keep uncleared exports outside `public/`. |
 | Sketchfab, filtered by *Downloadable* and *CC-BY* or *CC0*, searching "rigged African man" or "rigged character PBR" | Varies | CC-BY needs credit. Check that it is actually rigged. |
 
 **Technical requirements (`assets:check` tests the ones marked ✓)**
@@ -58,7 +76,7 @@ is listed as `"private/characters/player.glb"`.
 - ✓ Rigged: one skinned mesh with a skeleton. A static statue won't animate.
 - ✓ Under **80,000 triangles**; aim for 30,000–60,000 on Intel integrated graphics.
 - ✓ Textures **2048 px or smaller** (1024 is fine for clothing). Use PBR metal/roughness, not specular/gloss.
-- ✓ **No Draco compression** (the game's loader uses meshopt). `npm run assets:optimize` produces the right format.
+- ✓ **No Draco compression** (the game's avatar, vehicle and clothing loaders configure MeshoptDecoder). `npm run assets:optimize` produces the right format.
 - Y-up, metres, facing **+Z**, feet at the origin, rest pose T or A.
 - At most 4 bone influences per vertex (Blender's glTF exporter does this by default).
 - Under ~15 MB after optimisation; aim for under 8 MB.
@@ -105,10 +123,10 @@ doesn't use height maps (too costly on integrated graphics).
 
 | Slot | Search for | Folder | Used on |
 |---|---|---|---|
-| [ ] `road` | "Asphalt": worn, fine aggregate, no painted lines | `textures/road/` | Boulevard and cross street |
-| [ ] `pavement` | "PavingStones": interlocking concrete pavers, as on Lagos pavements | `textures/pavement/` | Raised pavements and park footpaths |
-| [ ] `concrete` | "Concrete": plain, lightly stained | `textures/concrete/` | Plain grey kerbs, balcony slabs and ledges |
-| [ ] `ground` (optional) | "Ground" / "Dirt": red laterite soil looks right for Lagos | `textures/ground/` | Unpaved ground |
+| [x] `road` | "Asphalt015": worn, fine aggregate, no painted lines | `environment/road/` | Boulevard and cross street |
+| [x] `pavement` | "PavingStones036": interlocking concrete pavers, as on Lagos pavements | `environment/pavement/` | Raised pavements |
+| [ ] `concrete` | "Concrete": plain, lightly stained | `textures/concrete/` | Balcony slabs and ledges (small areas) |
+| [x] `ground` (optional) | "Ground003": suitable exposed soil | `environment/ground/` | Unpaved ground |
 | [ ] `roof` (optional) | "Concrete" or "Roofing" | `textures/roof/` | Flat roofs |
 
 Manifest entry (repeat per slot). `tileMeters` is the real-world width one
@@ -138,11 +156,20 @@ take the concrete texture.
 
 `assets:check` warns above 3 MB per colour or normal image and above 2 MB per roughness or AO image, and flags a DirectX normal map by its name.
 
+### Integrated interior and environment maps
+
+Tiles074 is used in boutiques, Tiles075 in offices, Tiles076 in penthouses, and
+Tiles078 in homes and restaurants. DaySkyHDRI026A and DaySkyHDRI030A provide
+time-aware outdoor image-based lighting; IndoorEnvironmentHDRI020 is selected
+only inside venues. Snow007A remains unused outside a suitable snowy setting.
+The assets and ambientCG CC0 licence are recorded in `public/assets/CREDITS.md`.
+
 ## 4. Vehicles and buildings
 
 ### Danfo (slot ready)
 
-- [ ] **File:** `public/assets/models/vehicles/danfo.glb` (CC0/CC-BY) or `public/assets/private/vehicles/danfo.glb`.
+- [ ] **File:** `public/assets/models/vehicles/danfo.glb` only when cleared
+      for redistribution.
 - [ ] **Manifest:** `"vehicles": { "danfo": { "url": "models/vehicles/danfo.glb", "length": 5, "rotateY": 0 } }`.
   - `length`: bumper to bumper in metres (2–20). The game rescales the model to it.
   - `rotateY`: 0, 90, 180 or 270. Use it if the model appears backwards or sideways.
@@ -155,7 +182,34 @@ take the concrete texture.
   - ideally one material.
 - Where to look:
   - Sketchfab (*Downloadable*, licence CC-BY/CC0), searching "danfo", "Lagos bus" and "Volkswagen T3 van" (the classic danfo base vehicle). Repaint it yellow with the two black stripes.
-  - Fab.com: check the licence; "Standard" goes in `private/`.
+  - Fab.com: check the licence; non-redistributable files must stay outside
+    `public/` and must not be listed in the production manifest.
+
+### Marina Motors (temporary procedural vehicle models)
+
+The dealership catalogue currently uses low-poly procedural vehicle shapes
+with different body silhouettes and saved paint colours. They are explicitly
+labelled as temporary previews; the game does not contain production-quality
+car models yet.
+
+The supplied Downloads were inspected without importing them into the game:
+
+- `GLTF.rar` contains `GLTF/1.glb` (263,104,868 bytes after extraction), with
+  195 meshes and 71 materials. Its model parts have generic names and the
+  archive contains no licence or provenance document; it is also far beyond
+  the game's recommended runtime asset budget.
+- `texture.rar` contains motorcycle-part texture maps (fairings, handlebars,
+  wheels and related parts), not a compatible car model.
+- `Final_3Ds+Max+2021_Vray.rar` contains an Acura 3ds Max scene and a single
+  `Main Body.obj` mesh, but no car-ready glTF, material library or licence file.
+- `FBX.rar` contains an anonymous 240 MB FBX and baked maps, but no licence
+  document. `CGT_Free_Pack.zip` has no car or vehicle model entries.
+
+None of these files is imported or redistributed by this change. To replace
+the placeholders, provide a car-ready, licensed glTF for the catalogue (or
+distinct compatible variants), ideally under 40,000 triangles, 2K textures,
+and 15 MB per model after optimization. Record its source and licence in
+`public/assets/CREDITS.md`, then register it through the vehicle asset manifest.
 
 ### Buildings (no slot yet)
 
@@ -172,6 +226,27 @@ requirements will be:
 Near‑photoreal African street architecture is unlikely to exist as free
 downloads. Expect to commission it or use photogrammetry, which is a budget
 decision for you.
+
+### Shoes and garment models (not yet installed)
+
+The fashion catalogue currently has **no real garment GLB files**. Its shoe
+preview is procedural placeholder geometry, and the garment model registry
+must stay empty until compatible, licensed files are actually present. Do not
+add placeholder paths or generated meshes to the registry as if they were
+finished products.
+
+For each shoe model:
+
+- Save the optimised file under `public/assets/clothing/shoes/` and register
+  its path in `src/lib/fashion.ts`.
+- Use CC0 or CC-BY assets that may be redistributed in this public repository;
+  add the source URL, asset ID and exact licence to `public/assets/CREDITS.md`.
+- Keep the GLB below 30,000 triangles with textures no larger than 2048 px.
+- Match the shoe pair's scale, orientation and placement to the Rocketbox feet.
+  Bone attachment alone does not make a shoe fitted or rigged; inspect walking
+  and sitting in-game before calling it complete.
+- Rigged garments must use a compatible skeleton. Runtime retargeting is not
+  implemented; incompatible skinned models must not be attached as props.
 
 ## 5. Optimise, check, test
 

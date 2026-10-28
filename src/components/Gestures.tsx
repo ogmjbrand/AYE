@@ -6,6 +6,7 @@ import { gesturesUrl, type Gesture } from '../lib/bodyLanguage';
 import type { BodyType } from '../lib/looks';
 import { ErrorBoundary } from './ErrorBoundary';
 import { withRelaxedHands } from './handPose';
+import { createHugClip } from '../lib/hugAnimation';
 
 export type GestureActions = Partial<Record<Gesture, AnimationAction>>;
 
@@ -33,6 +34,13 @@ function GestureClips({ body, mixer, root, idle, onLoad }: GesturesProps) {
         action.clampWhenFinished = true;
       }
       actions[clip.name as Gesture] = action;
+    }
+    const hugClip = createHugClip(target);
+    if (hugClip) {
+      const hug = mixer.clipAction(hugClip, target);
+      hug.setLoop(LoopOnce, 1);
+      hug.clampWhenFinished = false;
+      actions.Hug = hug;
     }
     onLoad(actions);
     return () => {

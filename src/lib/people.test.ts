@@ -29,7 +29,8 @@ describe('residents', () => {
   });
 
   it('sanitises saved relationships', () => {
-    expect(sanitiseRelationships({ tunde: { points: 500, lastDay: 3 }, ghost: { points: 5 }, adaeze: 'x' })).toEqual({ tunde: { points: 100, lastDay: 3 } });
+    expect(sanitiseRelationships({ tunde: { points: 500, lastDay: 3 }, ghost: { points: 5 }, adaeze: 'x' }))
+      .toEqual({ tunde: { points: 100, lastDay: 3, lastHugDay: -1 } });
   });
 });
 

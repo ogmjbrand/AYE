@@ -21,7 +21,7 @@ import { AFRICA } from './districts/africa';
 import { AREA_NAMES, CITY_NAMES, SONGHAI_CODE, songhaiText, stateOfCity } from './songhai';
 import { WORLD } from './districts/world';
 
-export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park';
+export type PlaceKind = 'food' | 'shop' | 'workplace' | 'home' | 'public' | 'nightlife' | 'park' | 'dealership';
 type Spot = readonly [number, number, number];
 
 export interface Place {
@@ -72,6 +72,7 @@ export interface DistrictSpec {
   vendors: readonly FoodVendor[];
   fashionHouse: Counter;
   gadgetHub: Counter;
+  carDealership?: Counter;
   travelDesk: Counter;
   homes: readonly Home[];
   workplaces: Record<Exclude<Career, 'none'>, CareerLocation>;
@@ -156,6 +157,7 @@ function buildDistrict(spec: DistrictSpec): District {
     ...spec.vendors.map((v): Place => ({ id: id(v.id), kind: 'food', name: v.name, position: v.position })),
     { id: id('fashion'), kind: 'shop', name: spec.fashionHouse.name, position: spec.fashionHouse.position },
     { id: id('gadgets'), kind: 'shop', name: spec.gadgetHub.name, position: spec.gadgetHub.position },
+    ...(spec.carDealership ? [{ id: id('car-dealership'), kind: 'dealership' as const, name: spec.carDealership.name, position: spec.carDealership.position }] : []),
     { id: id('travel'), kind: 'public', name: spec.travelDesk.name, position: spec.travelDesk.position },
     { id: id(`park.${spec.park.id}`), kind: 'park', name: spec.park.name, position: spec.park.position },
     { id: id(`night.${spec.nightlife.id}`), kind: 'nightlife', name: spec.nightlife.name, position: spec.nightlife.position },

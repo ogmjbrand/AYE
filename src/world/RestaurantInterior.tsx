@@ -4,7 +4,7 @@ import type { GameTime } from '../lib/gameState';
 import { lightingAt } from './timeOfDay';
 import {
   BAR, DINERS, HOST_DESK, PASS, PALMS_MENU, ROOM, ROOM_HEIGHT, STAFF, TABLES, TABLE_RADIUS, WAITER_ROUTE, type DiningTable,
-} from '../lib/restaurant';
+} from '../lib/palms';
 import type { Seat } from '../lib/seating';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { palmsSign } from './signs';

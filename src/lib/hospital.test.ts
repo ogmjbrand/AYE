@@ -1,76 +1,116 @@
 import { describe, expect, it } from 'vitest';
-import { findPath, walkGridFor } from './pathfinding';
-import { resolveCollisions } from './world';
 import {
-  DAILY_TARGET, H_ARRIVE, H_ROOMS, H_SPOTS, PATIENTS, clockIn, clockOut, emptyShift, hospitalLayout, hospitalRoomAt, hospitalSpotAt,
-  patientSpot, rollShift, sanitiseShift, saw,
+  HOSPITAL_PATIENTS_PER_SHIFT,
+  TRIAGE_CASES,
+  brief,
+  clockIn,
+  clockOut,
+  createHospitalState,
+  hospitalForDay,
+  nextPatientIndex,
+  sanitiseHospital,
+  treatPatient,
 } from './hospital';
+import { createGameState, createTime, gameReducer } from './gameState';
+import { HOSPITAL_INTERIOR, hospitalInteractionAt, isInWard } from './hospitalSite';
+import { doorSpot, interiorLayout } from './interiors';
 
-const layout = hospitalLayout();
-const grid = walkGridFor(layout.obstacles);
-const free = (x: number, z: number) => { const r = resolveCollisions(x, z, undefined, layout.obstacles); return Math.hypot(r.x - x, r.z - z) < 1e-6; };
-const reach = (x: number, z: number) => findPath(grid, { x: H_ARRIVE[0], z: H_ARRIVE[1] }, { x, z });
+describe('hospital shift rules', () => {
+  it('only clocks in at reception inside the clock-in window', () => {
+    const state = createHospitalState();
+    expect(clockIn(state, 10 * 60, false).result).toBe('wrong-place');
+    expect(clockIn(state, 8 * 60, true).result).toBe('not-open');
+    expect(clockIn(state, 16 * 60, true).result).toBe('too-late');
+    const ok = clockIn(state, 10 * 60, true);
+    expect(ok.result).toBe('ok');
+    if (ok.result === 'ok') expect(clockIn(ok.hospital, 10 * 60, true).result).toBe('already-on-shift');
+  });
 
-describe('hospital plan', () => {
-  it('every room, spot and patient can be reached on foot from the street', () => {
-    expect(free(H_ARRIVE[0], H_ARRIVE[1])).toBe(true);
-    for (const [id, r] of Object.entries(H_ROOMS)) {
-      expect(free(r.door[0], r.door[1]), `${id} door`).toBe(true);
-      const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
-      expect(hospitalRoomAt(cx, cz)).toBe(id);
+  it('requires a briefing before patients and tracks real accuracy', () => {
+    const on = clockIn(createHospitalState(), 9 * 60, true);
+    if (on.result !== 'ok') throw new Error('expected clock-in');
+    expect(treatPatient(on.hospital, 0, 0, true).result).toBe('not-ready');
+    const briefed = brief(on.hospital, true);
+    if (briefed.result !== 'ok') throw new Error('expected briefing');
+    const index = nextPatientIndex(briefed.hospital, 0)!;
+    const right = treatPatient(briefed.hospital, 0, TRIAGE_CASES[index].answer, true);
+    expect(right.result).toBe('ok');
+    if (right.result === 'ok') {
+      expect(right.correct).toBe(true);
+      expect(right.hospital.totalCorrect).toBe(1);
+      expect(treatPatient(right.hospital, 0, 0, false).result).toBe('wrong-place');
     }
-    for (const s of H_SPOTS) {
-      expect(free(s.x, s.z), `${s.id} ${s.patientId ?? ''}`).toBe(true);
-      expect(reach(s.x, s.z), `${s.id} ${s.patientId ?? ''}`).not.toBeNull();
-      expect(hospitalSpotAt(s.x, s.z)?.patientId).toBe(s.patientId);
+  });
+
+  it('completes a shift only after the full patient load', () => {
+    let state = createHospitalState();
+    const on = clockIn(state, 9 * 60, true);
+    if (on.result !== 'ok') throw new Error('expected clock-in');
+    const briefed = brief(on.hospital, true);
+    if (briefed.result !== 'ok') throw new Error('expected briefing');
+    state = briefed.hospital;
+    const early = clockOut(state, true);
+    expect(early.result === 'ok' && early.completed).toBe(false);
+    for (let i = 0; i < HOSPITAL_PATIENTS_PER_SHIFT; i++) {
+      const result = treatPatient(state, 0, 0, true);
+      if (result.result !== 'ok') throw new Error('expected patient');
+      state = result.hospital;
     }
-    for (const p of PATIENTS) expect(hospitalRoomAt(...patientSpot(p))).toBe(p.room);
+    expect(nextPatientIndex(state, 0)).toBeNull();
+    const done = clockOut(state, true);
+    expect(done.result === 'ok' && done.completed).toBe(true);
+    if (done.result === 'ok') expect(done.hospital.shiftsCompleted).toBe(1);
+  });
+
+  it('ends an open shift on a new day but keeps lifetime totals', () => {
+    const on = clockIn(createHospitalState(0), 9 * 60, true);
+    if (on.result !== 'ok') throw new Error('expected clock-in');
+    const next = hospitalForDay({ ...on.hospital, totalPatients: 3 }, 1);
+    expect(next.onShift).toBe(false);
+    expect(next.totalPatients).toBe(3);
+  });
+
+  it('sanitises corrupted saves', () => {
+    expect(sanitiseHospital(null)).toEqual(createHospitalState());
+    const cleaned = sanitiseHospital({ onShift: false, treated: [1, 99], totalPatients: 2, totalCorrect: 50 });
+    expect(cleaned.treated).toEqual([]);
+    expect(cleaned.totalCorrect).toBe(2);
   });
 });
 
-describe('shift rules', () => {
-  const nine = 2 * 1440 + 9 * 60 + 5;
-  it('clocks in only in shift hours, and a new day ends the shift', () => {
-    expect(clockIn(emptyShift(), 2 * 1440 + 8 * 60).clockedIn).toBe(false);
-    const s = clockIn(emptyShift(), nine);
-    expect(s.clockedIn).toBe(true);
-    expect(clockOut(s).clockedIn).toBe(false);
-    expect(rollShift(s, nine + 1440).clockedIn).toBe(false);
+describe('hospital in the game reducer', () => {
+  const doctor = (state: ReturnType<typeof createGameState>, action: Parameters<typeof gameReducer>[1]) =>
+    gameReducer(state, action, 'doctor', 'student');
+
+  it('pays only through the doctor hourly wage while treating patients', () => {
+    let state = createGameState(2500, createTime(9, 0));
+    state = doctor(state, { type: 'hospitalClockIn', atReception: true });
+    expect(state.hospital.onShift).toBe(true);
+    const income = state.today.income;
+    state = doctor(state, { type: 'hospitalBrief', atSupervisor: true });
+    state = doctor(state, { type: 'hospitalPatient', choice: 0, atWard: true });
+    state = doctor(state, { type: 'hospitalPatient', choice: 0, atWard: true });
+    expect(state.hospital.patientsToday).toBe(2);
+    expect(state.today.minutesWorked).toBe(75);
+    // Wage is credited when the hour ends, at the doctor rate
+    expect(state.today.income).toBeGreaterThan(income);
   });
-  it('counts each patient once a day, and the target once', () => {
-    let s = clockIn(emptyShift(), nine);
-    for (const p of PATIENTS) s = saw(s, p.id);
-    s = saw(s, PATIENTS[0].id);
-    expect(s.seen.length).toBe(PATIENTS.length);
-    expect(s.patientsTotal).toBe(PATIENTS.length);
-    expect(s.targetsMet).toBe(PATIENTS.length >= DAILY_TARGET ? 1 : 0);
-    const next = rollShift(s, nine + 1440);
-    expect(next.seen).toEqual([]);
-    expect(next.patientsTotal).toBe(PATIENTS.length);
-  });
-  it('sanitises saves', () => {
-    expect(sanitiseShift(undefined)).toEqual(emptyShift());
-    expect(sanitiseShift({ seen: ['bed-1', 'x', 'bed-1'], patientsTotal: -3 })).toMatchObject({ seen: ['bed-1'], patientsTotal: 0 });
+
+  it('ignores hospital actions for other careers and wrong places', () => {
+    const start = createGameState(2500, createTime(9, 0));
+    expect(gameReducer(start, { type: 'hospitalClockIn', atReception: true }, 'student', 'student')).toBe(start);
+    expect(doctor(start, { type: 'hospitalClockIn', atReception: false })).toBe(start);
   });
 });
 
-import { HOURLY_WAGE, createGameState, createTime, gameReducer } from './gameState';
-describe('shift in the game', () => {
-  it('pays seeing a patient as on-shift work, and only once per patient', () => {
-    let s = createGameState(1000, createTime(9, 40, 1));
-    s = gameReducer(s, { type: 'clockIn' }, 'doctor', 'ordinary');
-    expect(s.shift.clockedIn).toBe(true);
-    s = gameReducer(s, { type: 'seePatient', patientId: 'er' }, 'doctor', 'ordinary');
-    // 09:40 + 30 min = 10:10: the 09:40–10:00 hour was paid at the doctor's rate
-    expect(s.time.hour * 60 + s.time.minute).toBe(10 * 60 + 10);
-    expect(s.today.income).toBe(Math.round(HOURLY_WAGE.doctor * 20 / 60));
-    expect(s.shift.seen).toEqual(['er']);
-    const again = gameReducer(s, { type: 'seePatient', patientId: 'er' }, 'doctor', 'ordinary');
-    expect(again).toBe(s);
-  });
-  it('needs a clocked-in doctor', () => {
-    const s = createGameState(1000, createTime(10, 0, 1));
-    expect(gameReducer(s, { type: 'seePatient', patientId: 'er' }, 'doctor', 'ordinary').shift.seen).toEqual([]);
-    expect(gameReducer(s, { type: 'clockIn' }, 'engineer', 'ordinary').shift.clockedIn).toBe(false);
+describe('hospital interior', () => {
+  it('has a reachable door and working zones', () => {
+    const [x, z] = doorSpot(HOSPITAL_INTERIOR);
+    expect(hospitalInteractionAt(HOSPITAL_INTERIOR, x, z)).toBe('door');
+    expect(hospitalInteractionAt(HOSPITAL_INTERIOR, 0, -4.7)).toBe('reception');
+    expect(hospitalInteractionAt(HOSPITAL_INTERIOR, 11, 5)).toBe('supervisor');
+    expect(hospitalInteractionAt(HOSPITAL_INTERIOR, -9.5, 5)).toBe('patient');
+    expect(isInWard(-9.5, 5)).toBe(true);
+    expect(interiorLayout(HOSPITAL_INTERIOR)).toBeTruthy();
   });
 });

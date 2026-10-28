@@ -31,7 +31,7 @@ import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
-import { carById } from './cars';
+import { vehicleById } from './vehicleCatalog';
 import { clientById, serviceById as spaServiceById } from './spa';
 
 // ---------------------------------------------------------------- actions and links
@@ -41,7 +41,9 @@ export type LifeAction =
   | { type: 'setProfile'; bio: string; traits: TraitId[] }
   | { type: 'setDream'; dream: DreamId }
   | { type: 'dismissWish'; id: string }
-  | { type: 'setSavingsGoal'; amount: number | null };
+  | { type: 'setSavingsGoal'; amount: number | null }
+  /** Metres just driven in your own car (counted for the road-trip achievement). */
+  | { type: 'drove'; metres: number };
 
 export type AnyAction = GameAction | LifeAction;
 
@@ -121,9 +123,11 @@ export function eventsFor(prev: GameState, action: GameAction, next: GameState, 
     case 'buyFurniture': out.push({ kind: 'buyFurniture' }); break;
     case 'purchase': out.push({ kind: 'shop' }); break;
     case 'buyEquipment': out.push({ kind: 'gadget' }); break;
-    case 'buyCar': if (next.cars.length > prev.cars.length) out.push({ kind: 'buyCar' }); break;
-    case 'study': if (next.school.assignment !== prev.school.assignment || next.school.studiedToday > prev.school.studiedToday) out.push({ kind: 'study' }); break;
-    case 'fuel': if (next.balance < prev.balance) out.push({ kind: 'drive', metres: action.metres }); break;
+    case 'buyVehicle': if (next.ownedVehicles.length > prev.ownedVehicles.length) out.push({ kind: 'buyCar' }); break;
+    case 'campusStudy':
+    case 'campusAssignment':
+      if (next.campus !== prev.campus) out.push({ kind: 'study' });
+      break;
     case 'travel': out.push({ kind: 'trip', to: action.to }); break;
     case 'wait': out.push({ kind: 'park', minutes: action.minutes }); break;
     case 'exercise': out.push({ kind: 'run', minutes: action.minutes }); break;
@@ -433,10 +437,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('explorer-5', 'Explorer', 'Discover 5 places.', 'explore', 150, (c) => c.state.life.visited.length >= 5, 'top-explorer-kente'),
   a('explorer-25', 'Know your way around', 'Discover 25 places.', 'explore', 500, (c) => c.state.life.visited.length >= 25),
   a('cities-3', 'Frequent flyer', 'Visit 3 cities.', 'explore', 400, (c) => c.state.life.cities.length >= 3),
-  a('first-class', 'Front row', 'Attend a class at AYE Global University.', 'explore', 200, (c) => c.state.school.classesTotal >= 1),
-  a('first-assignment', 'Handed in', 'Hand in your first assignment.', 'explore', 300, (c) => c.state.school.assignmentsDone >= 1),
-  a('first-patient', 'First patient', 'See a patient on shift at the hospital.', 'explore', 200, (c) => c.state.shift.patientsTotal >= 1),
-  a('first-car', 'First wheels', 'Buy a car.', 'home', 300, (c) => c.state.cars.length >= 1),
+  a('first-class', 'Front row', 'Attend a class at AYE Global University.', 'explore', 200, (c) => c.state.campus.totalClasses >= 1),
+  a('first-assignment', 'Handed in', 'Hand in your first assignment.', 'explore', 300, (c) => c.state.campus.totalAssignments >= 1),
+  a('first-patient', 'First patient', 'See a patient on shift at the hospital.', 'explore', 200, (c) => c.state.hospital.totalPatients >= 1),
+  a('first-car', 'First wheels', 'Buy a car.', 'home', 300, (c) => c.state.ownedVehicles.length >= 1),
   a('road-trip', 'Road trip', 'Drive 10 km in your own car.', 'explore', 400, (c) => c.state.life.stats.driven >= 10_000),
   a('home', 'A place of your own', 'Rent a home.', 'home', 150, (c) => !!c.state.home),
   a('penthouse', 'Top floor', 'Live in a penthouse.', 'home', 1000, (c) => (homeById(c.state.home)?.rentPerNight ?? 0) >= 800),
@@ -568,9 +572,9 @@ function labelFor(prev: GameState, action: GameAction): string {
     case 'useFurniture': return 'Groceries';
     case 'workTask': return 'Work bonus';
     case 'buyHome': return `Bought: ${homeById(action.homeId)?.name ?? 'a home'}`;
-    case 'buyCar': return `Car: ${carById(action.id)?.name ?? ''}`;
-    case 'sellCar': return `Sold car: ${carById(action.id)?.name ?? ''}`;
-    case 'fuel': return 'Fuel';
+    case 'buyVehicle': return `Car: ${vehicleById(action.modelId)?.name ?? ''}`;
+    case 'buyFashionItem': return 'Clothes & styling';
+    case 'officeClockOut': return 'Office pay';
     case 'bookHotel': return 'Grand Lagoon Hotel: one night';
     default: return 'Living costs';
   }
@@ -751,11 +755,12 @@ function lifeOnly(s: GameState, action: LifeAction, career: Career): GameState {
       return { ...s, life: { ...s.life, savingsGoal: amount } };
     }
     case 'visit':
+    case 'drove':
       return s;
   }
 }
 
-const LIFE_TYPES: readonly LifeAction['type'][] = ['visit', 'setProfile', 'setDream', 'dismissWish', 'setSavingsGoal'];
+const LIFE_TYPES: readonly LifeAction['type'][] = ['visit', 'setProfile', 'setDream', 'dismissWish', 'setSavingsGoal', 'drove'];
 const isLifeAction = (a: AnyAction): a is LifeAction => (LIFE_TYPES as readonly string[]).includes(a.type);
 
 /** The game's reducer: core rules, then the life engine on top. */
@@ -764,6 +769,7 @@ export function lifeReducer(state: GameState, action: AnyAction, career: Career,
   let events: LifeEvent[];
   if (isLifeAction(action)) {
     if (action.type === 'visit') ({ state: next, events } = visit(state, action.placeId, career));
+    else if (action.type === 'drove') { next = state; events = Number.isFinite(action.metres) && action.metres > 0 && action.metres < 5000 ? [{ kind: 'drive', metres: action.metres }] : []; }
     else { next = lifeOnly(state, action, career); events = []; }
   } else {
     next = gameReducer(state, action, career, lifestyle);

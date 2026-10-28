@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADORNMENT_SLOTS, COLOUR_CHOICES, FABRICS, FASHION_ITEMS, MAX_OUTFITS, PATTERNS, SLOTS, itemById, recolourable, resolveStyles, sanitiseWardrobe, stockedIn, styleIn, swatchCss } from './fashion';
+import { ADORNMENT_SLOTS, COLOUR_CHOICES, FABRICS, FASHION_ITEMS, GARMENT_MODELS, getGarmentModel, itemById, MAX_OUTFITS, PATTERNS, recolourable, resolveFashionItemId, resolveStyles, sanitiseWardrobe, SLOT_LABEL, SLOTS, stockedIn, styleIn, swatchCss } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -22,6 +22,9 @@ describe('fashion catalogue', () => {
     expect(styles.top).toBe(itemById('top-ankara-royal')!.style);
     expect(styles.shoes).toBeUndefined();
     expect(styles.bottom).toBeUndefined();
+    expect(resolveFashionItemId(equipped, { shoes: 'shoes-metallic-gold' }, 'shoes')).toBe('shoes-metallic-gold');
+    expect(resolveFashionItemId(equipped, { shoes: null }, 'shoes')).toBeNull();
+    expect(resolveFashionItemId(equipped, undefined, 'shoes')).toBe('shoes-clean-white');
   });
 
   it('sanitises saved wardrobes', () => {
@@ -29,6 +32,10 @@ describe('fashion catalogue', () => {
     // Equipped items must be owned and in the right slot
     expect(sanitiseWardrobe({ owned: ['hair-copper'], equipped: { top: 'hair-copper', hair: 'hair-copper' } }))
       .toEqual({ owned: ['hair-copper'], equipped: { hair: 'hair-copper' } });
+    expect(sanitiseWardrobe({
+      owned: ['hair-copper', 'hairstyle-braids'],
+      equipped: { hair: 'hair-copper', hairstyle: 'hairstyle-braids' },
+    }).equipped).toEqual({ hair: 'hair-copper', hairstyle: 'hairstyle-braids' });
   });
 
   it('each boutique has its own range, plus the basics everywhere', () => {
@@ -66,13 +73,41 @@ describe('fashion catalogue', () => {
   });
   it('every garment has a fabric that suits it; hair dye keeps the hair finish', () => {
     for (const i of FASHION_ITEMS) {
-      if (i.slot === 'hair') expect(i.style.fabric, i.id).toBeUndefined();
+      if (i.slot === 'hair' || i.slot === 'hairstyle') expect(i.style.fabric, i.id).toBeUndefined();
       else expect(i.style.fabric, i.id).toBeDefined();
     }
     expect(itemById('top-silk-burgundy')!.style.fabric!.roughness).toBeLessThan(FABRICS.cotton.roughness);
     expect(itemById('bottom-denim-classic')!.style.fabric!.weave).toBe(2);
     expect(itemById('top-kente-adweneasa')!.style.fabric!.name).toBe('handwoven');
     expect(itemById('shoes-metallic-gold')!.style.fabric!.metalness).toBeGreaterThan(0.5);
+  });
+
+  it('keeps model-backed hairstyles separate from hair colour and material styling', () => {
+    const hairstyles = FASHION_ITEMS.filter((item) => item.slot === 'hairstyle');
+    expect(SLOT_LABEL.hair).toBe('Hair colour');
+    expect(SLOT_LABEL.hairstyle).toBe('Hairstyles');
+    expect(hairstyles.map((item) => item.id)).toEqual([
+      'hairstyle-afro',
+      'hairstyle-braids',
+      'hairstyle-ponytail',
+      'hairstyle-long',
+    ]);
+    for (const item of hairstyles) {
+      const model = getGarmentModel(item.id);
+      expect(model?.path, item.id).toMatch(/^hair\/.+\.glb$/);
+      expect(model?.thumbnail, item.id).toMatch(/^clothing\/hair\/.+\.png$/);
+      expect(model?.attachBones, item.id).toContain('Bip01 Head');
+    }
+    expect(resolveStyles({ hair: 'hair-copper', hairstyle: 'hairstyle-afro' })).toEqual({
+      hair: itemById('hair-copper')!.style,
+    });
+  });
+
+  it('only registers garment models for catalogue items', () => {
+    for (const [id, model] of Object.entries(GARMENT_MODELS)) {
+      expect(itemById(id), id).toBeDefined();
+      expect(model?.path, id).toMatch(/^[^/\\]+(?:[/\\][^/\\]+)*\.gl(?:b|tf)$/i);
+    }
   });
 });
 

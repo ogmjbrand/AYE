@@ -8,7 +8,7 @@ import { lightingAt } from './timeOfDay';
 import {
   DESK, LOBBY_Z1, ROOM, ROOMS, SPA_NAME, SPA_STAFF, STOREY, TABLE, WAITING_SEATS, roomDoorX, spaWalls, type Client, type TreatmentRoom,
 } from '../lib/spa';
-import { WALL_T } from '../lib/university';
+import { WALL_T } from '../lib/buildingShell';
 import { hotelPlasterTexture } from './hotelTextures';
 import { marbleTexture } from './venueTextures';
 import { HotelWalls } from './HotelInterior';

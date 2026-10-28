@@ -12,6 +12,7 @@ import { FASHION_ITEMS, sanitiseWardrobe, type FashionItem, type Slot, type Ward
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, looksFor, type BodyType } from './looks';
 import { AVERAGE_SHAPE, SHAPE_PRESETS, FEMININE_SHAPE_PRESETS, sanitiseShape, shapePresets, type BodyShape } from './bodyShape';
 import { STARTING_BALANCE } from './gameState';
+import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId, skinToneById, type SkinToneId } from './skinTone';
 
 export type StageId = 'identity' | 'body' | 'proportions' | 'face' | 'hair' | 'clothes' | 'review';
 
@@ -41,6 +42,10 @@ export interface Draft {
   shape: BodyShape;
   /** -1 lighter … 1 deeper than the person's own skin. */
   skinTone: number;
+  /** A skin tint (lib/skinTone.ts) layered over that; 'original' keeps the person's own colour. */
+  skinToneId: SkinToneId;
+  /** The tint's colour (a custom one, or the tone's own). */
+  skinColor: string;
   /** What's worn per slot: an item id, or null for the person's own garment or hair. */
   outfit: Partial<Record<Slot, string | null>>;
   lifestyle: Lifestyle;
@@ -73,6 +78,7 @@ export function newDraft(country = 'NG'): Draft {
   return {
     name: '', gender: 'unspecified', heritage: 'unspecified', ethnicGroup: '', country, region: '',
     body, lookId: looksFor(body)[0].id, heightCm: defaultHeightCm(body), shape: AVERAGE_SHAPE, skinTone: 0,
+    skinToneId: DEFAULT_SKIN_TONE, skinColor: skinToneById(DEFAULT_SKIN_TONE).color,
     outfit: {}, lifestyle: 'ordinary', career: 'none', diet: 'everything', traits: [], dream: null, homeId: null, bio: '',
   };
 }
@@ -82,6 +88,8 @@ export function draftFrom(c: Character): Draft {
   return {
     name: c.name, gender: c.gender, heritage: c.heritage, ethnicGroup: c.ethnicGroup, country: c.country, region: c.region,
     body: c.body, lookId: c.lookId, heightCm: c.heightCm, shape: sanitiseShape(c.shape), skinTone: c.skinTone ?? 0,
+    skinToneId: isSkinToneId(c.skinToneId) ? c.skinToneId : DEFAULT_SKIN_TONE,
+    skinColor: isSkinColor(c.skinColor) ? c.skinColor : skinToneById(isSkinToneId(c.skinToneId) ? c.skinToneId : DEFAULT_SKIN_TONE).color,
     outfit: { ...c.wardrobe.equipped }, lifestyle: c.lifestyle, career: c.career, diet: c.diet, traits: [], dream: null, homeId: null, bio: '',
   };
 }
@@ -188,13 +196,17 @@ export function buildCharacter(d: Draft, opts: { existing?: Character; id?: stri
     name: d.name.trim().slice(0, 32), gender: d.gender, heritage: d.heritage, ethnicGroup: d.ethnicGroup.trim().slice(0, 40),
     country: d.country, region: d.region.trim().slice(0, 60), body: d.body, lookId: d.lookId,
     heightCm: Math.round(Math.max(HEIGHT_RANGE.min, Math.min(HEIGHT_RANGE.max, d.heightCm))),
-    shape: sanitiseShape(d.shape), skinTone: clampTone(d.skinTone), wardrobe,
+    shape: sanitiseShape(d.shape), skinTone: clampTone(d.skinTone),
+    skinToneId: isSkinToneId(d.skinToneId) ? d.skinToneId : DEFAULT_SKIN_TONE,
+    skinColor: isSkinColor(d.skinColor) ? d.skinColor : undefined,
+    wardrobe,
   };
   if (existing) return { ...existing, ...appearance };
   return {
     id: opts.id ?? crypto.randomUUID(),
     ...appearance,
     lifestyle: d.lifestyle, career: d.career, diet: d.diet,
+    homeDecor: [],
     colorR: 54, colorG: 82, colorB: 125,
     balance: STARTING_BALANCE[d.lifestyle],
     createdAt: now,

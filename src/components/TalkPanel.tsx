@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useState } from 'react';
+import { HeartHandshake } from 'lucide-react';
 import {
   ACTIVITIES, COUCH_LEVEL, FRIENDSHIP_LEVELS, HANGOUT_LEVEL, MAX_POINTS, friendshipLevel,
   type Activity, type Relationship, type Resident,
@@ -11,12 +13,14 @@ interface TalkPanelProps {
   today: number;
   balance: number;
   onActivity: (activity: Activity) => void;
+  onRequestHug: () => string | null;
   onStayOver: () => void;
   onClose: () => void;
 }
 
 /** Talking to a resident: their line for your friendship level, and things to do together. */
-export function TalkPanel({ resident, relationship, today, balance, onActivity, onStayOver, onClose }: TalkPanelProps) {
+export function TalkPanel({ resident, relationship, today, balance, onActivity, onRequestHug, onStayOver, onClose }: TalkPanelProps) {
+  const [hugResponse, setHugResponse] = useState<string | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -48,6 +52,25 @@ export function TalkPanel({ resident, relationship, today, balance, onActivity, 
         </header>
         <div className="space-y-4 p-5">
           <blockquote className="m-0 rounded-lg border-l-2 border-ui-accent bg-black/20 px-4 py-3 text-sm italic">“{resident.lines[level]}”</blockquote>
+          <section className="space-y-2 rounded-xl border border-ui-line p-3" aria-label="Affection">
+            <div>
+              <p className="m-0 text-sm font-semibold">Respectful affection</p>
+              <p className="m-0 mt-1 text-xs text-ui-muted">Ask first. A hug is only shared when {first} is comfortable.</p>
+            </div>
+            <button
+              type="button"
+              disabled={relationship?.lastHugDay === today}
+              onClick={() => {
+                const response = onRequestHug();
+                if (response) setHugResponse(response);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-ui-line px-3 py-2 text-sm font-semibold hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <HeartHandshake size={17} aria-hidden="true" />
+              {relationship?.lastHugDay === today ? 'You shared a hug today' : 'Ask for a hug'}
+            </button>
+            {hugResponse && <p role="status" className="m-0 text-sm text-ui-muted">{hugResponse}</p>}
+          </section>
           <div>
             <div className="flex justify-between text-xs">
               <span className="font-semibold">{FRIENDSHIP_LEVELS[level].name}</span>
