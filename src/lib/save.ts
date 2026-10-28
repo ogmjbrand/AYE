@@ -25,6 +25,7 @@ import { sanitiseOfficeCareer } from './officeCareer';
 import { sanitiseCampus } from './campus';
 import { sanitiseHospital } from './hospital';
 import { sanitiseLiveWorld } from './liveEvents';
+import { sanitiseSupernatural } from './supernatural';
 import { sanitiseHomeDecor } from './homeDecor';
 import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId } from './skinTone';
 import { sanitiseOwnedVehicles, vehicleById } from './vehicleCatalog';
@@ -224,6 +225,8 @@ export function loadProgress(character: Character, storage: Storage = localStora
     hospital: sanitiseHospital(p.hospital),
     // Saves from before the living world start with normal events and no reputation
     world: sanitiseLiveWorld(p.world),
+    // Saves from before Divine Evolution: locked, in human form, full energy
+    supernatural: sanitiseSupernatural(p.supernatural),
   };
   // Every character gets the starter flat once: a save from before it, with no home, is given it now
   // (someone evicted later stays evicted). Nothing else changes
@@ -247,6 +250,6 @@ function sanitiseOwned(data: unknown): string[] {
 }
 
 export function saveProgress(characterId: string, state: GameState, storage: Storage = localStorage) {
-  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital, world } = state;
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital, world }));
+  const { time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital, world, supernatural } = state;
+  storage.setItem(PROGRESS_KEY, JSON.stringify({ characterId, time, balance, today, minutesWorkedThisHour, fullness, home, owned, starterGiven, spa, workMinutes, equipment, ownedVehicles, districtId, relationships, lastTaskHour, needs, furniture, life: { ...life, celebrations: [] }, hotel, lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer, campus, hospital, world, supernatural }));
 }

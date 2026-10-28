@@ -43,6 +43,7 @@ import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
 import { CLIENTS_PER_DAY, clientById, emptySpaJob, isOpen as spaOpen, onShiftHours, rollSpaDay, satisfaction, serviceById, sessionPay, stars, type SpaJob } from './spa';
 import { canResidentAcceptHug } from './hug';
+import { canHeal, emptySupernatural, heal, HEALING_MINUTES, passMinute, returnToHuman, sleepRecovery, transform, unlock, type Supernatural } from './supernatural';
 import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
@@ -177,6 +178,8 @@ export interface GameState {
   hospital: HospitalState;
   /** Unplanned events in the city, how often they happen, and your reputation (lib/liveEvents.ts). */
   world: LiveWorld;
+  /** Divine Evolution: unlock, form, supernatural energy and recovery (lib/supernatural.ts). */
+  supernatural: Supernatural;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -218,6 +221,11 @@ export type GameAction =
   /** Seen how the last event went. */
   | { type: 'eventSeen' }
   | { type: 'setEventFrequency'; frequency: EventFrequency }
+  /** Divine Evolution: unlock (balance checked), take your supernatural form, return to human form, heal in your sanctuary. */
+  | { type: 'ascendUnlock' }
+  | { type: 'transform' }
+  | { type: 'returnToHuman' }
+  | { type: 'sanctuaryHeal'; atHome: boolean }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   /** A meal bought out; `lift` is what a good meal does besides filling you (a restaurant's fun, an espresso's energy). */
   | { type: 'eat'; price: number; fullness: number; lift?: Partial<Needs> }
@@ -349,6 +357,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     campus: createCampusState(Math.floor(time.totalMinutes / 1440)),
     hospital: createHospitalState(Math.floor(time.totalMinutes / 1440)),
     world: emptyLiveWorld(),
+    supernatural: emptySupernatural(),
   };
 }
 
@@ -875,7 +884,8 @@ export function gameReducer(
     if (state.summary) return state;
     const next = tick(state, career, lifestyle, action.atWorkplace);
     const world = directWorld(next.world, next.districtId, next.time.totalMinutes, career);
-    return world === next.world ? next : { ...next, world };
+    const supernatural = passMinute(next.supernatural);
+    return world === next.world && supernatural === next.supernatural ? next : { ...next, world, supernatural };
   }
   return baseReducer(state, action, career, lifestyle);
 }
@@ -889,8 +899,29 @@ function baseReducer(
   switch (action.type) {
     case 'tick':
       return state;
-    case 'sleep':
-      return state.summary ? state : sleep(state, career, lifestyle, action.atHome, action.atFriend);
+    case 'sleep': {
+      if (state.summary) return state;
+      const slept = sleep(state, career, lifestyle, action.atHome, action.atFriend);
+      return slept === state ? state : { ...slept, supernatural: sleepRecovery(slept.supernatural, action.atHome) };
+    }
+    case 'ascendUnlock': {
+      const supernatural = unlock(state.supernatural, state.balance, state.time.totalMinutes);
+      return supernatural === state.supernatural ? state : { ...state, supernatural };
+    }
+    case 'transform': {
+      const supernatural = transform(state.supernatural);
+      return supernatural === state.supernatural || state.summary ? state : { ...state, supernatural };
+    }
+    case 'returnToHuman': {
+      const supernatural = returnToHuman(state.supernatural);
+      return supernatural === state.supernatural ? state : { ...state, supernatural };
+    }
+    case 'sanctuaryHeal': {
+      if (state.summary || !canHeal(state.supernatural, action.atHome).ok) return state;
+      let next = state;
+      for (let i = 0; i < HEALING_MINUTES; i++) next = tick(next, career, lifestyle, false);
+      return { ...next, supernatural: heal(next.supernatural) };
+    }
     case 'moveIn':
       return moveIn(state, action.homeId);
     case 'buyEquipment': {

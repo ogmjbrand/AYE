@@ -14,6 +14,8 @@ import { SceneLighting } from './world/SceneLighting';
 import { LampPool } from './world/LampPool';
 import { LiveEventScene } from './world/LiveEventScene';
 import { QuestsScreen } from './components/QuestsScreen';
+import { DivinePanel } from './components/DivinePanel';
+import { TransformAura } from './world/TransformAura';
 import { LevelUp } from './components/LevelUp';
 import { levelProgress, totalXp } from './lib/lifeState';
 import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
@@ -470,6 +472,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, phoneFriend, ride, bookHotel, hotelWash, buyVehicle, paintVehicle,
     drove, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut,
     eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
+    ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -573,6 +576,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // Open for one event: it closes by itself when that event ends
   const [eventPanelFor, setEventPanelFor] = useState<string | null>(null);
   const [questsOpen, setQuestsOpen] = useState(false);
+  const [divineOpen, setDivineOpen] = useState(false);
   // Level-ups already shown (any from before this session count as shown)
   const [levelsShown, setLevelsShown] = useState(() => new Set(state.life.celebrations.filter((c) => c.kind === 'Level up').map((c) => c.id)));
   const levelUp = state.life.celebrations.find((c) => c.kind === 'Level up' && !levelsShown.has(c.id)) ?? null;
@@ -1608,9 +1612,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen);
     return () => setMovementBlocked(false);
-  }, [eventPanelOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+  }, [eventPanelOpen, divineOpen, questsOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1905,6 +1909,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         ? { id: 'restaurant', label: 'Restaurant', icon: 'restaurant', onClick: () => setVendor(restaurantVendor), active: vendor !== null, title: 'Your table, the menu and the bill' }
         : { id: 'career', label: 'Career', icon: 'career', onClick: () => toggleOs('career'), active: osOpen && osTab === 'career', title: 'Your job, pay and promotions' },
     { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
+    { id: 'divine', label: 'Divine', icon: 'crown', onClick: () => setDivineOpen((o) => !o), active: divineOpen || state.supernatural.form === 'transformed', title: 'Divine Evolution: supernatural forms and your sanctuary' },
   ];
   const whereabouts = {
     place: inWorkplace ? `${plate.title}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : inCantina && district.bar ? `${district.bar.name}, ${district.city.name}` : inHotel && district.hotel ? `${district.hotel.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
@@ -2455,6 +2460,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             minDistance={2.5}
             maxDistance={40}
           />
+          <TransformAura player={controller} active={state.supernatural.form === 'transformed'} />
           <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
@@ -2624,6 +2630,21 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       <Celebrations items={state.life.celebrations} />
+      {divineOpen && (
+        <DivinePanel
+          s={state.supernatural}
+          balance={state.balance}
+          atHome={atHome()}
+          hasHome={!!state.home}
+          onUnlock={ascendUnlock}
+          onTransform={transformForm}
+          onReturnToHuman={returnToHuman}
+          onHeal={() => sanctuaryHeal(atHome())}
+          onGoHome={() => { setDivineOpen(false); onGo({ to: 'home' }); }}
+          onRest={() => { setDivineOpen(false); rest(atHome()); }}
+          onClose={() => setDivineOpen(false)}
+        />
+      )}
       {questsOpen && (
         <QuestsScreen state={state} character={character} onGo={(link) => { setQuestsOpen(false); onGo(link); }} onSetDream={setDream} onClose={() => setQuestsOpen(false)} />
       )}
