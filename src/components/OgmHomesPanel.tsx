@@ -42,7 +42,7 @@ export function OgmHomesPanel({ balance, homeId, owned, onBuy, onMoveIn, onClose
 
   return (
     <aside role="dialog" aria-label="OGM Homes"
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[80vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[28rem] sm:rounded-3xl">
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[80vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[28rem] sm:rounded-3xl">
       <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
         <button type="button" onClick={() => (open ? setOpen(null) : onClose())} aria-label={open ? 'Back to the listings' : 'Close OGM Homes'}
           className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">

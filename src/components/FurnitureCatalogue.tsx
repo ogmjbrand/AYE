@@ -119,7 +119,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
         aria-modal="true"
         aria-labelledby="catalogue-title"
         onClick={(e) => e.stopPropagation()}
-        className="mt-auto flex max-h-[82vh] w-full flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:m-4 sm:mt-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[34rem] sm:rounded-3xl"
+        className="mt-auto flex max-h-[82vh] w-full flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:m-4 sm:mt-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[34rem] sm:rounded-3xl"
       >
         <header className="shrink-0 border-b border-ui-gold/20 px-4 pb-3 pt-3">
           <div className="flex items-center gap-3">
@@ -149,7 +149,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
 
         {preview ? (
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ui-gold/20 bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]">
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ui-gold/20 bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#100d0b)]">
               <PiecePreview item={preview} />
             </div>
             <p className="m-0 mt-1 text-center text-[11px] text-ui-faint">Drag to turn it round.</p>
@@ -167,7 +167,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
             {items.map((item) => (
               <li key={item.id}>
                 <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-ui-gold/20 bg-gradient-to-b from-[#1a2622] to-[#111916]">
-                  <button type="button" onClick={() => setPreviewId(item.id)} className="block aspect-square w-full bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold" aria-label={`Preview the ${item.name}`}>
+                  <button type="button" onClick={() => setPreviewId(item.id)} className="block aspect-square w-full bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#100d0b)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold" aria-label={`Preview the ${item.name}`}>
                     <Snapshot job={pieceJob(item)} alt={item.name} className="h-full w-full" />
                   </button>
                   <div className="flex flex-1 flex-col gap-1 px-2.5 pb-2.5 pt-2">
@@ -191,7 +191,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
                 const item = catalogueItem(o.itemId)!;
                 return (
                   <li key={o.uid} className="flex gap-3 rounded-2xl border border-ui-gold/20 bg-[#141d1a] p-2.5">
-                    <span className="block h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]"><Snapshot job={pieceJob(item)} alt="" className="h-full w-full" /></span>
+                    <span className="block h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#100d0b)]"><Snapshot job={pieceJob(item)} alt="" className="h-full w-full" /></span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="m-0 text-sm font-semibold">{item.name}</p>

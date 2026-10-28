@@ -177,7 +177,7 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
 
   return (
     <aside role="dialog" aria-label={TITLE[section]}
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[26rem] sm:rounded-3xl">
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[26rem] sm:rounded-3xl">
       <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
         <button type="button" onClick={onClose} aria-label={`Close ${TITLE[section]}`}
           className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
@@ -295,7 +295,7 @@ export function AssistantPanel({ name, shop, onSection, onFitting, onDecor, onCl
   }, [onClose]);
   const chip = 'rounded-full border border-ui-gold/40 px-3.5 py-2 text-sm font-semibold text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold';
   return (
-    <div role="dialog" aria-label={`${name}, the store assistant`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-lg rounded-3xl border border-ui-gold/40 bg-[#0d1412]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
+    <div role="dialog" aria-label={`${name}, the store assistant`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-lg rounded-3xl border border-ui-gold/40 bg-[#0b0a09]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
       <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Store Assistant · computer-controlled</p>
       <p className="m-0 mt-2 text-sm">“Welcome to {shop}! Explore our new collections. Anything you like, try it on before you buy.”</p>
       <div className="mt-3 flex flex-wrap gap-2">

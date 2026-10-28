@@ -1,38 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 /*
- * AYE design system. Charcoal surfaces, a restrained emerald accent for
- * actions and progress, warm gold for rewards and celebrations. These are
- * softer, deeper tones than the logo's flat brand colours, which stay on the
- * logo only.
+ * AYE design system: black and gold. Near-black surfaces, warm dark cards
+ * with fine gold borders, gold gradient buttons, cream-gold serif titles
+ * (Cinzel) over a clean sans body, and green kept for "done". Colours are
+ * measured from the AYE app design.
  */
 @theme {
-  --color-ui-ink: #f2efe8;
-  --color-ui-muted: #a7aaa9;
-  --color-ui-faint: #707572;
-  --color-ui-panel: #131615;
-  --color-ui-raised: #1b1f1d;
-  --color-ui-line: #2f3532;
-  --color-ui-accent: #3fbf8e;
-  --color-ui-accent-strong: #7fdcb6;
-  --color-ui-gold: #d4a85a;
-  --color-ui-gold-strong: #ecc98a;
+  --color-ui-ink: #f2eee4;
+  --color-ui-muted: #a8a397;
+  --color-ui-faint: #6f6a61;
+  --color-ui-panel: #0b0a09;
+  --color-ui-raised: #1a1815;
+  --color-ui-line: #3a3122;
+  --color-ui-accent: #d79d3c;
+  --color-ui-accent-strong: #f0c67e;
+  --color-ui-gold: #d79d3c;
+  --color-ui-gold-strong: #f0c67e;
+  --color-ui-cream: #f6f0c0;
+  --color-ui-success: #4eae42;
   --color-ui-warn: #f0a35e;
   --color-ui-danger: #ec8b7f;
 
-  /* Character creation: charcoal with muted gold accents */
-  --color-cc-bg: #0f1012;
-  --color-cc-panel: #17181b;
-  --color-cc-field: #1f2125;
-  --color-cc-line: #2e3036;
-  --color-cc-ink: #f5f2ec;
-  --color-cc-muted: #a9a7a1;
-  --color-cc-gold: #c9a45c;
-  --color-cc-gold-strong: #e2c27f;
+  /* Character creation: the same black and gold */
+  --color-cc-bg: #050505;
+  --color-cc-panel: #12100e;
+  --color-cc-field: #1a1815;
+  --color-cc-line: #3a3122;
+  --color-cc-ink: #f2eee4;
+  --color-cc-muted: #a8a397;
+  --color-cc-gold: #d79d3c;
+  --color-cc-gold-strong: #f0c67e;
 
   --font-sans: 'DM Sans', sans-serif;
-  --font-display: 'Manrope', sans-serif;
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+}
+
+/* Gold buttons and fills: the design's top-lit gradient rather than a flat colour */
+.bg-ui-accent,
+.bg-ui-gold,
+.bg-cc-gold {
+  background-image: linear-gradient(180deg, #e8b452 0%, #d79d3c 55%, #c88a2c 100%);
 }
 
 html,
@@ -51,7 +60,8 @@ body {
 
 /* Life OS: soft glass panels over the living world */
 .os-glass {
-  background: linear-gradient(160deg, rgb(27 31 29 / 0.92), rgb(16 19 18 / 0.9));
+  background: linear-gradient(160deg, rgb(20 18 16 / 0.95), rgb(8 7 6 / 0.94));
+  border-color: rgb(215 157 60 / 0.28);
   backdrop-filter: blur(14px);
   box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.04);
 }

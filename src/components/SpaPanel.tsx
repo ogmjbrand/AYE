@@ -14,7 +14,7 @@ function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
   );
 }
 
-const SHELL = 'fixed inset-x-0 bottom-0 z-40 flex max-h-[82vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[28rem] sm:rounded-3xl';
+const SHELL = 'fixed inset-x-0 bottom-0 z-40 flex max-h-[82vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[28rem] sm:rounded-3xl';
 const GOLD_BUTTON = 'flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#e9c77e] to-[#b8862f] px-4 py-3 font-semibold text-[#2a1c06] shadow-lg hover:brightness-110 disabled:cursor-not-allowed disabled:from-ui-line disabled:to-ui-line disabled:text-ui-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold';
 const LINE_BUTTON = 'w-full rounded-2xl border border-ui-gold/40 px-4 py-3 font-semibold text-ui-gold-strong hover:border-ui-gold disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold';
 

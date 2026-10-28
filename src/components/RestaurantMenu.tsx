@@ -62,7 +62,7 @@ export function RestaurantMenu({ menu = PALMS_MENU, title = 'Menu', diet, balanc
     <aside
       role="dialog"
       aria-label="Menu"
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0d1412]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[25rem] sm:rounded-3xl"
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[25rem] sm:rounded-3xl"
     >
       <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
         <button type="button" onClick={() => (open ? setOpen(null) : onClose())} aria-label={open ? 'Back to the menu' : 'Close the menu'}
@@ -91,7 +91,7 @@ export function RestaurantMenu({ menu = PALMS_MENU, title = 'Menu', diet, balanc
                 <li key={item.id}>
                   <button type="button" onClick={() => setOpen(item)}
                     className="group flex w-full flex-col overflow-hidden rounded-2xl border border-ui-gold/20 bg-gradient-to-b from-[#1a2622] to-[#111916] text-left transition hover:border-ui-gold/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
-                    <span className="relative block aspect-[4/3] w-full bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]">
+                    <span className="relative block aspect-[4/3] w-full bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#100d0b)]">
                       <Snapshot job={dishJob(item)} alt={item.name} className="h-full w-full" />
                       {!ok && <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-ui-danger">Not for your diet</span>}
                     </span>
@@ -109,7 +109,7 @@ export function RestaurantMenu({ menu = PALMS_MENU, title = 'Menu', diet, balanc
 
       {open && (
         <div className="overflow-y-auto p-4">
-          <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ui-gold/20 bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#121a17)]">
+          <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ui-gold/20 bg-[radial-gradient(circle_at_50%_40%,#2c3a34,#100d0b)]">
             <Snapshot job={dishJob(open)} alt={open.name} className="h-full w-full" />
           </div>
           <p className="m-0 mt-3 text-sm text-ui-ink/90">{open.description}</p>
@@ -140,7 +140,7 @@ export function HostPanel({ name, open, onTable, onMenu, onClose }: { name: stri
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div role="dialog" aria-label={`${name}, the host`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-3xl border border-ui-gold/40 bg-[#0d1412]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
+    <div role="dialog" aria-label={`${name}, the host`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-3xl border border-ui-gold/40 bg-[#0b0a09]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
       <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Host · computer-controlled</p>
       <p className="m-0 mt-2 text-sm">
         {open ? '“Good evening, and welcome to The Palms. A table for one? Right this way.”' : '“I’m sorry, the kitchen is closed. We open again at 11:00.”'}

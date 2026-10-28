@@ -3,7 +3,7 @@ import type { Career } from './CharacterCreation';
 import { canDo, templateFor, type ActiveEvent, type PastEvent } from '../lib/liveEvents';
 import { REPUTATIONS, type RepId } from '../lib/reputation';
 
-const GLASS = 'border border-white/10 bg-[#15181c]/80 text-ui-ink shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md';
+const GLASS = 'border border-white/10 bg-[#0b0a09]/80 text-ui-ink shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md';
 const SEVERITY_TONE = { emergency: 'text-[#ff8a7a]', minor: 'text-ui-gold-strong', opportunity: 'text-ui-accent-strong' } as const;
 const SEVERITY_WORD = { emergency: 'Emergency', minor: 'Someone needs help', opportunity: 'Opportunity' } as const;
 const money = (n: number) => `${Math.round(n).toLocaleString()} GHAI`;

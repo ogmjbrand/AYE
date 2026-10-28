@@ -122,7 +122,7 @@ interface HUDProps {
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** Dark glass with a thin gold edge, opaque enough to read over a bright sky without a costly backdrop blur. */
-const GLASS = 'border border-ui-gold/35 bg-[#0d1412]/85 shadow-[0_8px_24px_rgba(0,0,0,0.4)]';
+const GLASS = 'border border-ui-gold/35 bg-[#0b0a09]/85 shadow-[0_8px_24px_rgba(0,0,0,0.4)]';
 const ROUND =
   `pointer-events-auto grid h-10 w-10 place-items-center rounded-full ${GLASS} text-ui-gold-strong transition hover:border-ui-gold hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold sm:h-11 sm:w-11`;
 
@@ -149,7 +149,7 @@ function Portrait({ character }: { character?: Character }) {
   const [broken, setBroken] = useState<string | null>(null);
   const src = character ? assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`) : null;
   return (
-    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a3a33] to-[#121a17] sm:h-12 sm:w-12">
+    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a2418] to-[#100d0b] sm:h-12 sm:w-12">
       {src && broken !== src
         ? <img src={src} alt="" onError={() => setBroken(src)} className="h-full w-full object-cover" draggable={false} />
         : <span className="font-display text-lg font-bold text-ui-gold-strong">{character?.name.slice(0, 1).toUpperCase() ?? '?'}</span>}

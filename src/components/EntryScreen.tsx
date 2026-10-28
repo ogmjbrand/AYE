@@ -8,7 +8,8 @@ import { formatHome } from '../lib/places';
 import { DISTRICTS } from '../lib/geography';
 import { SONGHAI } from '../lib/songhai';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
-import { FolderOpen, UserRound } from 'lucide-react';
+import { Dumbbell, Globe2, Sparkles, Target, Trophy } from 'lucide-react';
+import { AyeWordmark, SplashScene } from './AyeBrand';
 import { CloudAccountPanel } from './CloudAccountPanel';
 
 interface EntryScreenProps {
@@ -30,14 +31,22 @@ const QUALITY_INFO: Record<QualityMode, { label: string; detail: string }> = {
   low: { label: 'Low', detail: 'Fewer effects and a lower resolution, for laptops with integrated graphics and phones.' },
 };
 
-// Dusk skyline drawn in CSS: layered tower silhouettes with lit windows under a purple-to-teal sky
-const NIGHT_CITY = {
-  backgroundColor: '#07080d',
-  backgroundImage:
-    'repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,214,140,0.10) 38px 40px, transparent 40px 71px), ' +
-    'linear-gradient(180deg, rgba(7,8,13,0) 55%, rgba(7,8,13,0.95) 100%), ' +
-    'linear-gradient(180deg, #1a1030 0%, #1b2a48 45%, #0f2530 80%)',
-} as const;
+/** The design's gold call to action: full width, uppercase, top-lit gold. */
+const GOLD_BUTTON =
+  'w-full rounded-xl bg-gradient-to-b from-[#e8b452] via-[#d79d3c] to-[#c88a2c] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.14em] text-black shadow-[0_6px_24px_rgba(215,157,60,0.28)] transition hover:brightness-110 ' +
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f0c67e]';
+const DARK_BUTTON =
+  'w-full rounded-xl border border-[#d79d3c]/60 bg-[#1a1815] px-6 py-3 text-sm font-semibold text-cc-ink transition hover:border-[#f0c67e] ' +
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f0c67e]';
+
+/** What AYE is about, as the welcome lists it. Each one is something the game really does. */
+const WELCOME_POINTS = [
+  { icon: Dumbbell, text: 'Build better habits' },
+  { icon: Target, text: 'Complete daily and weekly quests' },
+  { icon: Trophy, text: 'Level up your avatar and career' },
+  { icon: Globe2, text: 'Unlock new cities and worlds' },
+  { icon: Sparkles, text: 'Become the best version of you' },
+] as const;
 
 const PRIMARY =
   'w-full rounded-lg bg-cc-gold px-4 py-3 font-display font-bold tracking-wide text-cc-bg transition hover:bg-cc-gold-strong ' +
@@ -69,91 +78,65 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
 
   const startNew = () => (saved ? setPanel('confirm-new') : onNewLife());
 
-  const preview = saved && (
-    <CharacterPreview
-      lookId={saved.lookId}
-      heightCm={saved.heightCm}
-      styles={resolveStyles(saved.wardrobe.equipped)}
-      shape={saved.shape}
-      skinTone={saved.skinTone}
-      skinToneId={saved.skinToneId}
-      skinColor={saved.skinColor}
-      hairstyleItemId={saved.wardrobe.equipped.hairstyle}
-    />
-  );
-
   if (panel === 'splash') {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto text-cc-ink" style={NIGHT_CITY}>
-        <div className="mx-auto grid min-h-full max-w-6xl items-center gap-6 px-6 py-10 lg:grid-cols-2">
-          <main className="flex flex-col items-center text-center lg:items-start lg:text-left">
-            <h1 className="sr-only">AYE</h1>
-            <img
-              src={`${import.meta.env.BASE_URL}assets/brand/              aye-mark.webp`}
-              alt="AYE"
-                            className="h-auto w-56 drop-shadow-[0_12px_40px_rgba(0,0,0,0.7)] sm:w-72"
-            />
-            <p className="mt-4 text-balance font-display text-sm font-bold uppercase tracking-[0.22em] text-emerald-300 sm:text-base">Your life. Your choices. Your world.</p>
-            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-cc-muted">A global life simulation game</p>
-            <button
-              type="button"
-              onClick={() => setPanel('menu')}
-              autoFocus
-              className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-700 px-6 py-4 font-display text-lg font-bold text-white shadow-[0_0_28px_rgba(16,185,129,0.45)] transition hover:from-emerald-400 hover:to-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-            >
-              Play Now
-            </button>
-          </main>
-          <div className="relative hidden h-[min(72dvh,42rem)] lg:block" aria-label={saved ? `${saved.name}, your saved character` : undefined}>
-            {preview}
-          </div>
-        </div>
+      <div className="fixed inset-0 z-50 overflow-hidden bg-[#050505] text-cc-ink">
+        <SplashScene />
+        <main className="relative flex min-h-full flex-col items-center px-6 pb-10 pt-[12vh] text-center">
+          <h1 className="sr-only">AYE</h1>
+          <AyeWordmark />
+          <p className="mt-6 font-display text-sm font-semibold uppercase leading-relaxed tracking-[0.2em] text-ui-cream drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] sm:text-base">
+            Discipline today<br />A better you tomorrow
+          </p>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setPanel('menu')}
+            autoFocus
+            className={`${GOLD_BUTTON} max-w-xs`}
+          >
+            Get started
+          </button>
+          <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-cc-muted">A global life simulation game</p>
+        </main>
       </div>
     );
   }
 
   if (panel === 'menu') {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto text-cc-ink" style={NIGHT_CITY}>
-        <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 py-8 sm:px-8 sm:py-12">
-          <div className="flex flex-1 flex-col justify-center">
-            <h1 className="text-center font-display text-3xl font-bold uppercase tracking-[0.12em] text-cc-gold-strong sm:text-4xl">Welcome to AYE</h1>
-            <p className="mt-2 text-center text-cc-muted">How would you like to start?</p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={startNew}
-                className="group flex min-h-72 flex-col items-center justify-end rounded-2xl border-2 border-emerald-500/70 bg-black/60 p-6 text-center shadow-[0_0_30px_rgba(16,185,129,0.25)] backdrop-blur transition hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-              >
-                <UserRound size={44} className="text-emerald-400" aria-hidden="true" />
-                <span className="mt-3 font-display text-xl font-bold">Start New Game</span>
-                <span className="mt-1 text-sm text-cc-muted">Create your character and begin your journey</span>
-              </button>
-              <button
-                type="button"
-                onClick={onContinue}
-                disabled={!saved}
-                className="group relative flex min-h-72 flex-col items-center justify-end overflow-hidden rounded-2xl border border-cc-line bg-black/60 p-6 text-center backdrop-blur transition enabled:hover:border-cc-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cc-gold disabled:opacity-50"
-              >
-                {saved && <div className="pointer-events-none absolute inset-x-0 top-0 h-3/5">{preview}</div>}
-                <FolderOpen size={36} className="relative text-cc-gold" aria-hidden="true" />
-                <span className="relative mt-3 font-display text-xl font-bold">{saved ? `Continue as ${saved.name}` : 'Continue Game'}</span>
-                <span className="relative mt-1 text-sm text-cc-muted">{saved ? 'Load your saved life and continue where you left off' : 'No saved game on this device yet'}</span>
-              </button>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-[#050505] text-cc-ink">
+        <div className="mx-auto flex min-h-full max-w-md flex-col px-5 py-10">
+          <div className="flex flex-1 flex-col items-center">
+            <h1 className="sr-only">Welcome to AYE</h1>
+            <AyeWordmark size="text-6xl" crown="h-9 w-14" />
+            <p className="mt-6 text-center font-display text-lg font-semibold uppercase leading-snug tracking-[0.12em] text-ui-gold-strong">Turn your goals<br />into a game</p>
+            <ul className="mt-8 grid w-full list-none gap-0 p-0">
+              {WELCOME_POINTS.map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-4 border-b border-white/5 py-3 last:border-0">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#1a1815] text-ui-ink"><Icon size={18} aria-hidden="true" /></span>
+                  <span className="text-sm text-[#c6c6c6]">{text}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 grid w-full gap-3">
+              <button type="button" onClick={startNew} className={GOLD_BUTTON}>{saved ? 'New life' : 'Get started'}</button>
+              {saved && (
+                <button type="button" onClick={onContinue} className={DARK_BUTTON}>Continue as {saved.name}</button>
+              )}
+              {saved && onEditLook && (
+                <button type="button" onClick={onEditLook} className={DARK_BUTTON}>Change {saved.name}&rsquo;s appearance</button>
+              )}
             </div>
-            {saved && onEditLook && (
-              <button type="button" onClick={onEditLook} className={`${SECONDARY} mx-auto mt-4 w-full max-w-sm`}>
-                Change {saved.name}&rsquo;s appearance
-              </button>
-            )}
             <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
               <button type="button" onClick={() => setPanel('account')} className={LINK}>AYE Connect account</button>
               <button type="button" onClick={() => setPanel('help')} className={LINK}>How to play</button>
               <button type="button" onClick={() => setPanel('settings')} className={LINK}>Settings</button>
             </div>
           </div>
+          <p className="mt-6 text-center text-[11px] uppercase tracking-[0.2em] text-cc-muted">A better you. Everyday.</p>
           <footer className="mt-8 text-center text-xs text-cc-muted">
-            Early build · Your life is saved in this browser only; online accounts are coming · In-game money (ⓒ) is virtual and has no cash value
+            Early build · Your life is saved in this browser only; online accounts are coming · In-game money (GHAI) is virtual and has no cash value
           </footer>
         </div>
       </div>
