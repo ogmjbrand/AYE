@@ -9,7 +9,7 @@ import { DISTRICTS } from '../lib/geography';
 import { SONGHAI } from '../lib/songhai';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
 import { Dumbbell, Globe2, Sparkles, Target, Trophy } from 'lucide-react';
-import { AyeWordmark, SplashScene } from './AyeBrand';
+import { AyeLogo, SplashScene } from './AyeBrand';
 import { CloudAccountPanel } from './CloudAccountPanel';
 
 interface EntryScreenProps {
@@ -84,9 +84,12 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
         <SplashScene />
         <main className="relative flex min-h-full flex-col items-center px-6 pb-10 pt-[12vh] text-center">
           <h1 className="sr-only">AYE</h1>
-          <AyeWordmark />
-          <p className="mt-6 font-display text-sm font-semibold uppercase leading-relaxed tracking-[0.2em] text-ui-cream drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] sm:text-base">
-            Discipline today<br />A better you tomorrow
+          <AyeLogo className="w-64 sm:w-80" />
+          <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-ui-cream drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] sm:text-base">
+            Your life. Your choices. Your world.
+          </p>
+          <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-ui-gold-strong drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
+            <span className="h-px w-8 bg-ui-gold/70" aria-hidden="true" />Reality in game form.<span className="h-px w-8 bg-ui-gold/70" aria-hidden="true" />
           </p>
           <div className="flex-1" />
           <button
@@ -109,7 +112,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
         <div className="mx-auto flex min-h-full max-w-md flex-col px-5 py-10">
           <div className="flex flex-1 flex-col items-center">
             <h1 className="sr-only">Welcome to AYE</h1>
-            <AyeWordmark size="text-6xl" crown="h-9 w-14" />
+            <AyeLogo className="w-48" />
             <p className="mt-6 text-center font-display text-lg font-semibold uppercase leading-snug tracking-[0.12em] text-ui-gold-strong">Turn your goals<br />into a game</p>
             <ul className="mt-8 grid w-full list-none gap-0 p-0">
               {WELCOME_POINTS.map(({ icon: Icon, text }) => (

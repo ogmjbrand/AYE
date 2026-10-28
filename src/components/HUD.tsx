@@ -91,6 +91,8 @@ interface HUDProps {
   onStopTracking?: () => void;
   /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
+  /** Player level and progress through it (lib/lifeState.ts levelProgress). */
+  level?: { level: number; into: number; span: number };
   /** Help at something happening in the city (lib/liveEvents.ts): comes before every other street prompt. */
   eventPrompt?: () => { verb: string; place: string; onOpen: () => void } | null;
   /** Opens the gadget shop when standing at it. */
@@ -346,6 +348,7 @@ export function HUD({
   onExitVehicle,
   tracked = null,
   eventPrompt,
+  level,
   onStopTracking,
   insideHome,
   onOpenGadgets,
@@ -463,7 +466,15 @@ export function HUD({
           <Portrait character={character} />
           <div className="min-w-0">
             <p className="m-0 max-w-[9rem] truncate text-sm font-semibold leading-tight sm:max-w-[12rem]">{character?.name ?? 'You'}</p>
-            <p className="m-0 font-display text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
+            {level && (
+              <div className="mt-0.5 flex items-center gap-1.5" title={`${level.into.toLocaleString()} / ${level.span.toLocaleString()} XP to level ${level.level + 1}`}>
+                <span className="text-[10px] font-bold leading-none text-ui-gold-strong">Lv {level.level}</span>
+                <span className="h-1 w-16 overflow-hidden rounded-full bg-[#2a2620]" role="progressbar" aria-label={`Level ${level.level} progress`} aria-valuemin={0} aria-valuemax={level.span} aria-valuenow={Math.round(level.into)}>
+                  <span className="block h-full rounded-full bg-gradient-to-r from-[#c88a2c] to-[#f0c67e]" style={{ width: `${Math.min(100, (level.into / Math.max(1, level.span)) * 100)}%` }} />
+                </span>
+              </div>
+            )}
+            <p className="m-0 text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
               {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}
             </p>
             {status && (

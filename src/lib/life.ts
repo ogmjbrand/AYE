@@ -19,6 +19,7 @@ import { gameReducer, currentMood, rideFare, type GameAction, type GameState } f
 import {
   HISTORY_SIZE, LEDGER_SIZE, MAX_TRAITS, PERKS, SKILLS, TRAITS, modifiers, perksOf, skillLevel,
   type Celebration, type DreamId, type LifeState, type Mission, type SkillId, type StatKey, type TraitId, type Wish,
+  levelReward, playerLevel, totalXp,
 } from './lifeState';
 import { taskForHour } from './workTasks';
 import { addNeeds, type Needs } from './needs';
@@ -698,6 +699,10 @@ function settle(s: GameState, career: Career): GameState {
     next = pay(next, w.reward, `Wish: ${t ? t.title(ctx, w) : w.template}`, 'Wish fulfilled', t ? t.title(ctx, w) : w.template, 8);
     next = { ...next, needs: { ...next.needs, fun: Math.min(100, next.needs.fun + 5) } };
   }
+  // Player level: every level reached pays once
+  const level = playerLevel(totalXp(next.life.skills));
+  for (let l = next.life.level + 1; l <= level; l++) next = pay(next, levelReward(l), `Level ${l}`, 'Level up', `You reached level ${l}`, 8);
+  if (level > next.life.level) next = { ...next, life: { ...next.life, level } };
   // Dream milestones, in order
   const dream = dreamById(next.life.dream?.id);
   if (dream) {

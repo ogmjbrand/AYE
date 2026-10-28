@@ -13,6 +13,9 @@ import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
 import { LampPool } from './world/LampPool';
 import { LiveEventScene } from './world/LiveEventScene';
+import { QuestsScreen } from './components/QuestsScreen';
+import { LevelUp } from './components/LevelUp';
+import { levelProgress, totalXp } from './lib/lifeState';
 import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
 import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, templateFor, type ActiveEvent } from './lib/liveEvents';
 import PostEffects from './world/PostEffects';
@@ -569,6 +572,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const liveEvent = state.world.active && state.world.active.districtId === district.id ? state.world.active : null;
   // Open for one event: it closes by itself when that event ends
   const [eventPanelFor, setEventPanelFor] = useState<string | null>(null);
+  const [questsOpen, setQuestsOpen] = useState(false);
+  // Level-ups already shown (any from before this session count as shown)
+  const [levelsShown, setLevelsShown] = useState(() => new Set(state.life.celebrations.filter((c) => c.kind === 'Level up').map((c) => c.id)));
+  const levelUp = state.life.celebrations.find((c) => c.kind === 'Level up' && !levelsShown.has(c.id)) ?? null;
   const eventPanelOpen = !!liveEvent && eventPanelFor === liveEvent.id;
   /** Where the event wants you: the search target once you know where to look, otherwise the scene. */
   const eventGoal = liveEvent
@@ -1878,6 +1885,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       ? { id: 'home', label: 'Decor', icon: 'decor', onClick: () => setCatalogueOpen(true), active: catalogueOpen, title: 'Buy, place and arrange furniture' }
       : inWorkplace ? { id: 'home', label: 'Leave', icon: 'go', onClick: goOutside, title: 'Back out to the street' }
       : { id: 'home', label: 'Home', icon: 'home', onClick: () => onGo(state.home ? { to: 'home' } : { to: 'homes' }), title: state.home ? 'Walk home' : 'Find a home to rent' },
+    { id: 'quests', label: 'Quests', icon: 'goals', onClick: () => setQuestsOpen((o) => !o), active: questsOpen, title: 'Daily, weekly and story quests' },
     { id: 'phone', label: 'Phone', icon: 'phone', onClick: () => { setPhoneStart(null); setPhoneOpen((o) => !o); }, active: phoneOpen, badge: myPhone.phone.notifications ? unreadCount(myPhone.phone) : 0, title: 'Your phone: bank, messages, jobs, homes, rides and more (P)' },
     {
       id: 'map', label: 'Map', icon: 'map', active: mapOpen || locationsOpen,
@@ -2616,6 +2624,17 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       <Celebrations items={state.life.celebrations} />
+      {questsOpen && (
+        <QuestsScreen state={state} character={character} onGo={(link) => { setQuestsOpen(false); onGo(link); }} onSetDream={setDream} onClose={() => setQuestsOpen(false)} />
+      )}
+      {levelUp && !state.summary && (
+        <LevelUp
+          level={Number(levelUp.text.match(/\d+/)?.[0] ?? state.life.level)}
+          reward={levelUp.reward}
+          unlocked={state.life.celebrations.filter((c) => c.t === levelUp.t && (c.kind === 'Perk unlocked' || c.kind === 'Achievement' || c.kind === 'Skill up')).map((c) => c.text)}
+          onContinue={() => setLevelsShown((s) => new Set([...s, levelUp.id]))}
+        />
+      )}
       {phoneOpen && (
         <Phone
           state={state}
@@ -2741,6 +2760,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           : trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
         onStopTracking={() => (liveEvent?.responding ? eventDismiss() : setTrackedId(null))}
         eventPrompt={eventPrompt}
+        level={levelProgress(totalXp(state.life.skills))}
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {

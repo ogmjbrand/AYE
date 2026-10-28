@@ -1,5 +1,5 @@
 /**
- * The AYE wordmark (a gold crown over AYE in Cinzel) and the splash scene: a
+ * The AYE logo, a gold crown over AYE in Cinzel for smaller headings, and the splash scene: a
  * sunset over mountains and a lit city, seen by someone sitting on a cliff.
  * Drawn as SVG so it is sharp on every screen and needs no image download.
  */
@@ -21,6 +21,11 @@ export function Crown({ className = 'h-8 w-12' }: { className?: string }) {
       {[3, 30, 57].map((x, i) => <circle key={x} cx={x} cy={i === 1 ? 4 : 10} r="3" fill="#f7dc96" />)}
     </svg>
   );
+}
+
+/** The AYE logo: the heart of green, red, white and gold ribbons around a golden globe, over AYE. */
+export function AyeLogo({ className = 'w-64' }: { className?: string }) {
+  return <img src={`${import.meta.env.BASE_URL}assets/brand/aye-mark.webp`} alt="AYE" className={`h-auto drop-shadow-[0_12px_40px_rgba(0,0,0,0.6)] ${className}`} draggable={false} />;
 }
 
 /** Crown over AYE. `size` sets the wordmark's text size class. */

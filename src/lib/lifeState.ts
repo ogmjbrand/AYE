@@ -35,6 +35,25 @@ export function skillProgress(xp: number): number {
   return (xp - xpForLevel(l)) / (xpForLevel(l + 1) - xpForLevel(l));
 }
 
+// ---------------------------------------------------------------- player level
+
+/** Every skill's experience together: the player's overall experience. */
+export const totalXp = (skills: Record<SkillId, number>) => Object.values(skills).reduce((sum, v) => sum + v, 0);
+/** Experience needed for a player level: 100 for level 2, 6,600 for 12, 42,000 for 29 (every skill maxed). */
+export const xpForPlayerLevel = (level: number) => 50 * level * (level - 1);
+export function playerLevel(xp: number): number {
+  let level = 1;
+  while (xpForPlayerLevel(level + 1) <= xp) level++;
+  return level;
+}
+/** Where you are within your level: experience into it and how much the level spans. */
+export function levelProgress(xp: number): { level: number; into: number; span: number } {
+  const level = playerLevel(xp);
+  return { level, into: xp - xpForPlayerLevel(level), span: xpForPlayerLevel(level + 1) - xpForPlayerLevel(level) };
+}
+/** GHAI paid for reaching a level. */
+export const levelReward = (level: number) => 50 * level;
+
 // ---------------------------------------------------------------- traits
 
 export type TraitId = 'ambitious' | 'foodie' | 'sociable' | 'homebody' | 'active' | 'creative' | 'thrifty';
@@ -154,6 +173,8 @@ export interface LifeState {
   celebrations: Celebration[];
   /** Recent time with people, newest last. */
   history: Interaction[];
+  /** Player level already rewarded (lib/lifeState.ts playerLevel). */
+  level: number;
 }
 
 const SKILL_IDS = SKILLS.map((s) => s.id);
@@ -182,6 +203,7 @@ export function emptyLife(): LifeState {
     ledger: [],
     celebrations: [],
     history: [],
+    level: 1,
   };
 }
 
@@ -298,6 +320,9 @@ export function sanitiseLife(data: unknown): LifeState {
         return o && typeof o.label === 'string' && typeof o.amount === 'number' && Number.isFinite(o.amount) ? [{ t: num(o.t), label: o.label.slice(0, 80), amount: o.amount }] : [];
       }).slice(-LEDGER_SIZE)
       : [],
+    // Saves from before player levels start at the level their skills already earn (not paid again); never above it
+    level: Math.min(playerLevel(totalXp(Object.fromEntries(SKILL_IDS.map((k) => [k, num(skills[k], 0, xpForLevel(MAX_SKILL_LEVEL))])) as Record<SkillId, number>)),
+      Number.isInteger(d.level) && (d.level as number) >= 1 ? (d.level as number) : Infinity),
     celebrations: [],
     history: Array.isArray(d.history)
       ? d.history.flatMap((e) => {
