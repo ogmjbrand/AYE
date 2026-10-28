@@ -31,6 +31,7 @@ import { interiorFor, type FurnitureKind } from './interiors';
 import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import { templateFor, type Severity } from './liveEvents';
+import { gearById } from './careerGear';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
 import { vehicleById } from './vehicleCatalog';
@@ -577,6 +578,9 @@ function recordMoney(prev: GameState, action: GameAction, next: GameState): Game
 function labelFor(prev: GameState, action: GameAction): string {
   switch (action.type) {
     case 'eat': return 'Meal out';
+    case 'buyGear': return `Work gear: ${gearById(action.itemId)?.name ?? 'equipment'}`;
+    case 'repairGear': return `Repair: ${gearById(prev.gear.find((o) => o.uid === action.uid)?.itemId ?? '')?.name ?? 'equipment'}`;
+    case 'sellGear': return `Sold: ${gearById(prev.gear.find((o) => o.uid === action.uid)?.itemId ?? '')?.name ?? 'equipment'}`;
     case 'eventAct': return prev.world.active ? `Helped: ${templateFor(prev.world.active.kind).title.toLowerCase()}` : 'Helped in the city';
     case 'purchase': return 'Clothes & styling';
     case 'buyFurniture': return `Furniture: ${catalogueItem(action.itemId)?.name ?? ''}`;

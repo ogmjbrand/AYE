@@ -15,6 +15,7 @@ import { LampPool } from './world/LampPool';
 import { LiveEventScene } from './world/LiveEventScene';
 import { QuestsScreen } from './components/QuestsScreen';
 import { DivinePanel } from './components/DivinePanel';
+import { InventoryPanel } from './components/InventoryPanel';
 import { TransformAura } from './world/TransformAura';
 import { LevelUp } from './components/LevelUp';
 import { levelProgress, totalXp } from './lib/lifeState';
@@ -73,7 +74,7 @@ import { TravelPanel } from './components/TravelPanel';
 import { TalkPanel } from './components/TalkPanel';
 import { WorkTaskPanel } from './components/WorkTaskPanel';
 import { taskForHour, type WorkTask } from './lib/workTasks';
-import { careerLevel } from './lib/progression';
+import { careerLevel, levelIndex } from './lib/progression';
 import { equipmentPay } from './lib/equipment';
 import { HOURLY_WAGE, isWorkingHours, type GameTime } from './lib/gameState';
 import { Residents } from './world/Residents';
@@ -473,6 +474,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     drove, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut,
     eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
+    buyGear, equipGear, unequipGear, repairGear, sellGear,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -577,6 +579,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [eventPanelFor, setEventPanelFor] = useState<string | null>(null);
   const [questsOpen, setQuestsOpen] = useState(false);
   const [divineOpen, setDivineOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  /** Your rank in your career: what gear you're qualified for. */
+  const careerRank = levelIndex(character.career, state.workMinutes);
   // Level-ups already shown (any from before this session count as shown)
   const [levelsShown, setLevelsShown] = useState(() => new Set(state.life.celebrations.filter((c) => c.kind === 'Level up').map((c) => c.id)));
   const levelUp = state.life.celebrations.find((c) => c.kind === 'Level up' && !levelsShown.has(c.id)) ?? null;
@@ -1612,9 +1617,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen || inventoryOpen);
     return () => setMovementBlocked(false);
-  }, [eventPanelOpen, divineOpen, questsOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+  }, [eventPanelOpen, divineOpen, questsOpen, inventoryOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -1902,7 +1907,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     },
     drivingModel
       ? { id: 'drive', label: 'Get out', icon: 'car', onClick: leaveVehicle, active: true, title: `Get out of your ${drivingModel.name}` }
-      : { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setStore('wardrobe'), active: store === 'wardrobe', title: 'Change into clothes you own' },
+      : { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setInventoryOpen((o) => !o), active: inventoryOpen || store === 'wardrobe', title: 'Everything you own: work gear, clothes, gadgets, vehicles' },
     inPalms || inCantina
       ? { id: 'restaurant', label: inCantina ? 'Menu' : 'Restaurant', icon: 'restaurant', onClick: () => setMenuOpen((o) => !o), active: menuOpen, title: 'The menu' }
       : inWorkplace && insideRestaurant && restaurantVendor
@@ -2217,6 +2222,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           balance={state.balance}
           career={character.career}
           onBuy={(item) => buyEquipment(item.id)}
+          gear={state.gear}
+          rankIndex={careerRank}
+          onBuyGear={buyGear}
           onClose={() => setGadgets(false)}
         />
       )}
@@ -2630,6 +2638,20 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         />
       )}
       <Celebrations items={state.life.celebrations} />
+      {inventoryOpen && (
+        <InventoryPanel
+          state={state}
+          character={character}
+          career={character.career}
+          rankIndex={careerRank}
+          onEquip={equipGear}
+          onUnequip={unequipGear}
+          onRepair={repairGear}
+          onSell={sellGear}
+          onOpenWardrobe={() => { setInventoryOpen(false); setStore('wardrobe'); }}
+          onClose={() => setInventoryOpen(false)}
+        />
+      )}
       {divineOpen && (
         <DivinePanel
           s={state.supernatural}

@@ -26,6 +26,7 @@ import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, forSale, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
 import { equipmentById, equipmentPay } from './equipment';
+import { buy as buyGearPiece, canBuy as canBuyGear, equip as equipGearPiece, gearById, gearPay, repairCost as gearRepairCost, resaleValue as gearResale, unequip as unequipGearPiece, wear as wearGear, type OwnedGear } from './careerGear';
 import { GUEST_ROOM, NIGHT_PRICE, WASH_HYGIENE, WASH_MINUTES, checkoutFor, stayIsValid, type HotelStay } from './hotel';
 import { DEFAULT_DISTRICT_ID, districtById, isDistrictId } from './geography';
 import { WAIT_OPTIONS } from './parks';
@@ -180,6 +181,8 @@ export interface GameState {
   world: LiveWorld;
   /** Divine Evolution: unlock, form, supernatural energy and recovery (lib/supernatural.ts). */
   supernatural: Supernatural;
+  /** Work gear you own: equipped or spare, and its condition (lib/careerGear.ts). */
+  gear: OwnedGear[];
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -226,6 +229,12 @@ export type GameAction =
   | { type: 'transform' }
   | { type: 'returnToHuman' }
   | { type: 'sanctuaryHeal'; atHome: boolean }
+  /** Work gear (lib/careerGear.ts): buy, equip or put away, repair, sell. */
+  | { type: 'buyGear'; itemId: string }
+  | { type: 'equipGear'; uid: string }
+  | { type: 'unequipGear'; uid: string }
+  | { type: 'repairGear'; uid: string }
+  | { type: 'sellGear'; uid: string }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   /** A meal bought out; `lift` is what a good meal does besides filling you (a restaurant's fun, an espresso's energy). */
   | { type: 'eat'; price: number; fullness: number; lift?: Partial<Needs> }
@@ -358,6 +367,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     hospital: createHospitalState(Math.floor(time.totalMinutes / 1440)),
     world: emptyLiveWorld(),
     supernatural: emptySupernatural(),
+    gear: [],
   };
 }
 
@@ -401,10 +411,12 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   const time = advanceMinute(state.time);
   const today = { ...state.today, minutesWorked: state.today.minutesWorked + worked };
   const workMinutes = state.workMinutes + worked;
-  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, needs, workMinutes };
+  // Equipped gear wears with every paid minute
+  const gear = worked ? wearGear(state.gear, career) : state.gear;
+  if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, needs, workMinutes, gear };
 
   // Paid at the rate of the level held when the hour ends
-  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
+  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(gear, career);
   const income = Math.round((wage * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
   const expenses = Math.min(Math.round(HOURLY_LIVING_COST[lifestyle] * mods.livingCost), afterIncome);
@@ -418,6 +430,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
     fullness,
     needs,
     workMinutes,
+    gear,
   };
 }
 
@@ -581,7 +594,7 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   const option = task.options[choice];
   if (!option) return state;
   const reward = TASK_REWARD[option.quality];
-  const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career);
+  const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(state.gear, career);
   const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))] * modifiers(state.life).taskBonus);
   const performanceKey = option.quality === 'best' ? 'excellent' : option.quality === 'ok' ? 'reasonable' : 'poor';
   return {
@@ -932,6 +945,44 @@ function baseReducer(
         equipment: [...state.equipment, item.id],
         balance: state.balance - item.price,
         today: { ...state.today, expenses: state.today.expenses + item.price, purchases: (state.today.purchases ?? 0) + 1 },
+      };
+    }
+    case 'buyGear': {
+      const item = gearById(action.itemId);
+      if (!item || state.summary || !canBuyGear(item, career, levelIndex(career, state.workMinutes), state.balance, state.gear).ok) return state;
+      return {
+        ...state,
+        gear: buyGearPiece(state.gear, item, `${item.id}@${state.time.totalMinutes}`),
+        balance: state.balance - item.price,
+        today: { ...state.today, expenses: state.today.expenses + item.price, purchases: (state.today.purchases ?? 0) + 1 },
+      };
+    }
+    case 'equipGear': {
+      const gear = equipGearPiece(state.gear, action.uid, levelIndex(career, state.workMinutes));
+      return gear === state.gear ? state : { ...state, gear };
+    }
+    case 'unequipGear':
+      return state.gear.some((o) => o.uid === action.uid && o.equipped) ? { ...state, gear: unequipGearPiece(state.gear, action.uid) } : state;
+    case 'repairGear': {
+      const piece = state.gear.find((o) => o.uid === action.uid);
+      const cost = piece ? gearRepairCost(piece) : 0;
+      if (!piece || state.summary || cost <= 0 || state.balance < cost) return state;
+      return {
+        ...state,
+        gear: state.gear.map((o) => (o.uid === piece.uid ? { ...o, condition: 100 } : o)),
+        balance: state.balance - cost,
+        today: { ...state.today, expenses: state.today.expenses + cost },
+      };
+    }
+    case 'sellGear': {
+      const piece = state.gear.find((o) => o.uid === action.uid);
+      if (!piece || state.summary) return state;
+      const value = gearResale(piece);
+      return {
+        ...state,
+        gear: state.gear.filter((o) => o.uid !== piece.uid),
+        balance: state.balance + value,
+        today: { ...state.today, income: state.today.income + value },
       };
     }
     case 'bookHotel': {
