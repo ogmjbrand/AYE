@@ -3,6 +3,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC } from './WorldNPC';
 import { signTexture } from './textures';
 import { UNIVERSITY } from '../lib/university';
+import { Lamp } from './LampPool';
 
 const [DOOR_X, , DOOR_Z] = UNIVERSITY.position;
 // The building face the entrance sits on
@@ -19,7 +20,7 @@ function Streetlight({ position }: { position: [number, number, number] }) {
         <boxGeometry args={[0.8, 0.08, 0.2]} />
         <meshStandardMaterial color="#fff3cf" emissive="#ffe3a0" emissiveIntensity={0.8} />
       </mesh>
-      <pointLight position={[0.35, 4.1, 0]} color="#ffe6b0" intensity={0.8} distance={9} />
+      <Lamp position={[0.35, 4.1, 0]} color="#ffe6b0" intensity={0.8} distance={9} />
     </group>
   );
 }
@@ -214,7 +215,7 @@ export function UniversityExterior() {
         </group>
       ))}
       <CampusApproach />
-      <pointLight position={[FACADE_X + 1.6, 3.8, DOOR_Z]} color="#ffe6b0" intensity={1.1} distance={9} />
+      <Lamp position={[FACADE_X + 1.6, 3.8, DOOR_Z]} color="#ffe6b0" intensity={1.1} distance={9} />
       <mesh position={[DOOR_X + 0.2, 0.02, DOOR_Z]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.1, 1.3, 40]} />
         <meshBasicMaterial color="#6fd3a2" transparent opacity={0.8} />

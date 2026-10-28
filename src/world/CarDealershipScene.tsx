@@ -7,6 +7,7 @@ import { VEHICLE_CATALOG, vehicleColourById } from '../lib/vehicleCatalog';
 import { Car } from './Props';
 import { WorldNPC } from './WorldNPC';
 import { signTexture } from './textures';
+import { Lamp } from './LampPool';
 
 export function CarDealershipExterior() {
   const sign = useMemo(() => signTexture('MARINA MOTORS', '#232b2e', '#d8c18a'), []);
@@ -34,7 +35,7 @@ export function CarDealershipExterior() {
           <meshStandardMaterial map={sign} emissiveMap={sign} emissive="#ffffff" emissiveIntensity={0.14} />
         </mesh>
       </group>
-      <pointLight position={[21.4, 4.5, 12]} color="#ffe0a2" intensity={1.3} distance={9} />
+      <Lamp position={[21.4, 4.5, 12]} color="#ffe0a2" intensity={1.3} distance={9} />
       {[4, 20].map((z) => (
         <group key={z}>
           <mesh position={[13, 0.015, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>

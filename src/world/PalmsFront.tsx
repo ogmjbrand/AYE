@@ -4,6 +4,7 @@ import { isOpen } from '../lib/palms';
 import { groundHeightAt } from '../lib/world';
 import { PottedPalm } from './PottedPalm';
 import { palmsSign } from './signs';
+import { Lamp } from './LampPool';
 
 /**
  * The Palms' street front on the cross street: dark green and gold, big
@@ -86,7 +87,7 @@ export function PalmsFront({ hour, night }: { hour: number; night: number }) {
             <meshStandardMaterial color="#fff2d6" emissive="#ffd99a" emissiveIntensity={open ? 1.5 + 2 * night : 0} toneMapped={false} />
           </mesh>
         ))}
-        {open && night > 0.2 && <pointLight position={[0, 2.5, -1.2]} intensity={6 * night} distance={7} decay={1.8} color="#ffcf8a" />}
+        <Lamp position={[0, 2.5, -1.2]} intensity={open && night > 0.2 ? 6 * night : 0} distance={7} decay={1.8} color="#ffcf8a" />
       </group>
       {/* Name board above the canopy */}
       <mesh position={[r.door[0], 3.55, faceZ - 0.05]} rotation={[0, Math.PI, 0]}>

@@ -4,6 +4,7 @@ import { useDistrict } from './DistrictContext';
 import { CANTINA_NAME, isOpen } from '../lib/cantina';
 import { groundHeightAt } from '../lib/world';
 import { brickTexture, cantinaSignTexture, papelPicadoTexture } from './cantinaTextures';
+import { Lamp } from './LampPool';
 
 /** A potted cactus by the door: a terracotta pot, a ribbed column and two arms. */
 function Cactus({ x, z }: { x: number; z: number }) {
@@ -99,7 +100,7 @@ export function CantinaFront({ hour, night }: { hour: number; night: number }) {
       ))}
       <Cactus x={r.door[0] - 1.35} z={faceZ - 0.45} />
       <Cactus x={r.door[0] + 1.35} z={faceZ - 0.45} />
-      {open && <pointLight position={[r.door[0], 2.9, faceZ - 1]} intensity={1.5 + 4 * night} distance={7} decay={1.7} color="#ffc27a" />}
+      <Lamp position={[r.door[0], 2.9, faceZ - 1]} intensity={open ? 1.5 + 4 * night : 0} distance={7} decay={1.7} color="#ffc27a" />
     </group>
   );
 }

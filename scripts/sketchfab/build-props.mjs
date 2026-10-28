@@ -18,14 +18,15 @@
  * badge on the grille, the lettering on the tyres, two round badges and the
  * modeller's stickers on the body, the fuel-company stickers on the windows),
  * and the wheels use the yellow sheet instead of the blue one with its decals.
+ * Its mesh is simplified to about 40% of its triangles: it is street scenery.
  *
  * Output: public/assets/models/props/*.glb (meshopt, WebP textures).
  */
 import { mkdirSync, statSync } from 'node:fs';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { dedup, prune, textureCompress, meshopt, weld } from '@gltf-transform/functions';
-import { MeshoptEncoder } from 'meshoptimizer';
+import { dedup, prune, simplify, textureCompress, meshopt, weld } from '@gltf-transform/functions';
+import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
 const SRC = 'assets-src/sketchfab/source';
@@ -188,6 +189,7 @@ async function debadgeMotorhome(doc) {
 
 mkdirSync(OUT, { recursive: true });
 await MeshoptEncoder.ready;
+await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
 for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024]]) {
@@ -199,6 +201,8 @@ for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vendi
     prune(),
     dedup(),
     weld(),
+    // The motorhome is parked in the street, never seen up close: 43k triangles down to about 17k
+    ...(name === 'motorhome' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.25, error: 0.004 })] : []),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [size, size], quality: 82 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );

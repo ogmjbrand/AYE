@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
@@ -11,8 +11,11 @@ import { activeLayout, groundHeightAt, movingObstacles, setActiveLayout } from '
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
+import { LampPool } from './world/LampPool';
+import PostEffects from './world/PostEffects';
+import { WarmUp } from './world/WarmUp';
 import { Streets } from './world/Streets';
-import { QualityContext, settingsFor, useQuality, type Quality } from './world/quality';
+import { QualityContext, initialAutoQuality, settingsFor, useQuality, type Quality } from './world/quality';
 import { lightingAt } from './world/timeOfDay';
 import { FpsMeter } from './world/FpsMeter';
 import { Player } from './components/Player';
@@ -148,8 +151,6 @@ import { RestaurantScene } from './world/RestaurantScene';
 import { cancelDiningTransaction, createDiningTransaction, settleDiningTransaction, transitionDiningTransaction } from './lib/restaurant';
 import './App.css';
 
-// High tier only; the post-processing libraries are fetched on first use
-const PostEffects = lazy(() => import('./world/PostEffects'));
 
 interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
@@ -328,6 +329,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
   return (
     <>
       <SceneLighting gameTime={gameTime} player={controller} />
+      <LampPool focus={controller} />
       <Streets />
       <Buildings />
       <Skyline />
@@ -556,6 +558,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
   /** Inside anywhere (your home, a venue or a workplace): not on the street. */
   const offStreet = indoors || inWorkplace || inPalms || inCantina || inHotel || inSpa || inBoutique;
+  /** Which place the canvas is showing; a new one is prepared (shaders and textures) before it is drawn. */
+  const sceneKey = venueLayout ? venueLayout.id : indoors ? `home.${home!.id}` : venue !== null ? `venue.${venue}` : `city.${district.id}`;
+  const [sceneReady, setSceneReady] = useState(false);
   // The phone in your pocket: it charges while you're at home
   const phoneCharging = indoors && !!home && home.id === state.home;
   const myPhone = usePhone(character.id, state, phoneCharging);
@@ -2059,8 +2064,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     setArrival(`${item.name} placed in ${home.name}.`);
   };
 
-  // 'auto' starts high and drops to low on sustained low frame rates; the player can force either
-  const [autoQuality, setAutoQuality] = useState<Quality>('high');
+  // 'auto' starts high (low on phones and small machines) and drops to low on sustained low frame rates; the player can force either
+  const [autoQuality, setAutoQuality] = useState<Quality>(initialAutoQuality);
   const settings = settingsFor(qualityMode === 'auto' ? autoQuality : qualityMode);
   const decorPlacementItem = decorPlacement ? decorItemById(decorPlacement.itemId) : undefined;
 
@@ -2330,6 +2335,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         >
           {/* Drop to the low tier (no AO or contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
+          <WarmUp sceneKey={sceneKey} onReady={setSceneReady} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
           <ClickToMove player={controller} showRoute={showRoute} />
@@ -2392,11 +2398,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
               <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} />
             )}
           </DistrictContext.Provider>
-          {settings.ambientOcclusion && (
-            <Suspense fallback={null}>
-              <PostEffects />
-            </Suspense>
-          )}
+          <PostEffects />
           <OrbitControlsImpl
             ref={controlsRef}
             makeDefault
@@ -2409,6 +2411,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
+      {!sceneReady && (
+        <div className="scene-preparing" role="status" aria-live="polite">
+          <span className="scene-preparing__spinner" aria-hidden="true" />
+          Getting {offStreet ? 'inside' : district.name} ready…
+        </div>
+      )}
 
       {talking && (
         <TalkPanel

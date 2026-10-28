@@ -4,6 +4,7 @@ import { useDistrict } from './DistrictContext';
 import { HOTEL_NAME } from '../lib/hotel';
 import { groundHeightAt } from '../lib/world';
 import { PottedPalm } from './PottedPalm';
+import { Lamp } from './LampPool';
 
 /** The name in gold capitals on a dark band. */
 function nameBoard(): CanvasTexture {
@@ -58,7 +59,7 @@ export function HotelFront({ night }: { night: number }) {
       </group>
       <PottedPalm position={[r.door[0] - 2.5, 0, faceZ - 0.7]} height={2.4} />
       <PottedPalm position={[r.door[0] + 2.5, 0, faceZ - 0.7]} height={2.4} rotation={1.1} />
-      <pointLight position={[r.door[0], 2.6, faceZ - 1.2]} intensity={1 + 4 * night} distance={8} decay={1.7} color="#ffd9a0" />
+      <Lamp position={[r.door[0], 2.6, faceZ - 1.2]} intensity={1 + 4 * night} distance={8} decay={1.7} color="#ffd9a0" />
     </group>
   );
 }

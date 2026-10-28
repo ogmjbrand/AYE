@@ -3,6 +3,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC } from './WorldNPC';
 import { signTexture } from './textures';
 import { HOSPITAL } from '../lib/hospitalSite';
+import { Lamp } from './LampPool';
 
 const [DOOR_X, , DOOR_Z] = HOSPITAL.position;
 // The hospital's west face, which looks towards the entrance spot
@@ -53,7 +54,7 @@ export function HospitalExterior() {
         <planeGeometry args={[2.4, 4.6]} />
         <meshStandardMaterial color="#d8c14a" roughness={1} />
       </mesh>
-      <pointLight position={[FACADE_X - 1.6, 3.6, DOOR_Z]} color="#e8f6ff" intensity={1.1} distance={9} />
+      <Lamp position={[FACADE_X - 1.6, 3.6, DOOR_Z]} color="#e8f6ff" intensity={1.1} distance={9} />
       <mesh position={[DOOR_X, 0.02, DOOR_Z]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.1, 1.3, 40]} />
         <meshBasicMaterial color="#6fd3a2" transparent opacity={0.8} />

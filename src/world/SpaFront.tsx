@@ -3,6 +3,7 @@ import { useDistrict } from './DistrictContext';
 import { groundHeightAt } from '../lib/world';
 import { plainSign } from './signs';
 import { PottedPalm } from './PottedPalm';
+import { Lamp } from './LampPool';
 
 /**
  * Alafia Spa's entrance: a warm-lit glass front with teak frames, the name
@@ -40,7 +41,7 @@ export function SpaFront({ night }: { night: number }) {
       ))}
       <PottedPalm position={[-3.6, 0, 0.7]} height={2.3} />
       <PottedPalm position={[3.6, 0, 0.7]} height={2.3} rotation={1.1} />
-      <pointLight position={[0, 2.5, 1.2]} intensity={0.8 + 3 * night} distance={7} decay={1.7} color="#ffd2a0" />
+      <Lamp position={[0, 2.5, 1.2]} intensity={0.8 + 3 * night} distance={7} decay={1.7} color="#ffd2a0" />
     </group>
   );
 }
