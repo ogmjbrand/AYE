@@ -43,6 +43,7 @@ import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
 import { CLIENTS_PER_DAY, clientById, emptySpaJob, isOpen as spaOpen, onShiftHours, rollSpaDay, satisfaction, serviceById, sessionPay, stars, type SpaJob } from './spa';
 import { canResidentAcceptHug } from './hug';
+import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
 import { itemById, type Slot } from './fashion';
@@ -174,6 +175,8 @@ export interface GameState {
   campus: CampusState;
   /** Hospital doctor shift progress. */
   hospital: HospitalState;
+  /** Unplanned events in the city, how often they happen, and your reputation (lib/liveEvents.ts). */
+  world: LiveWorld;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -206,6 +209,15 @@ export type GameAction =
   /** A taxi booked on the phone: the fare for this many metres, and the minutes the ride takes. */
   | { type: 'ride'; metres: number }
   | { type: 'wait'; minutes: number }
+  /** On your way to the current event: it's tracked on the map. */
+  | { type: 'eventRespond' }
+  /** Hide the current event's alert (it still happens). */
+  | { type: 'eventDismiss' }
+  /** Do one of the current event's objectives, standing at `at`. */
+  | { type: 'eventAct'; objectiveId: string; at: { x: number; z: number } }
+  /** Seen how the last event went. */
+  | { type: 'eventSeen' }
+  | { type: 'setEventFrequency'; frequency: EventFrequency }
   | { type: 'workTask'; taskId: string; choice: number; atWorkplace: boolean }
   /** A meal bought out; `lift` is what a good meal does besides filling you (a restaurant's fun, an espresso's energy). */
   | { type: 'eat'; price: number; fullness: number; lift?: Partial<Needs> }
@@ -336,6 +348,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     officeCareer: createOfficeCareer(),
     campus: createCampusState(Math.floor(time.totalMinutes / 1440)),
     hospital: createHospitalState(Math.floor(time.totalMinutes / 1440)),
+    world: emptyLiveWorld(),
   };
 }
 
@@ -830,13 +843,40 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
   };
 }
 
+/**
+ * Doing one of the current event's objectives: you must be at the scene (or
+ * at the search target), able to do it, and in time. It takes its minutes,
+ * off the clock for work, then pays its reward.
+ */
+function eventAct(state: GameState, objectiveId: string, at: { x: number; z: number }, career: Career, lifestyle: Lifestyle): GameState {
+  const e = state.world.active;
+  if (state.summary || !e || e.districtId !== state.districtId || !Number.isFinite(at.x) || !Number.isFinite(at.z)) return state;
+  if (!canDo(e, objectiveId, career, state.equipment, state.time.totalMinutes).ok) return state;
+  const o = templateFor(e.kind).objectives.find((x) => x.id === objectiveId)!;
+  const spot = o.atTarget ? e.target : e.scene;
+  if (!spot || Math.hypot(at.x - spot.x, at.z - spot.z) > (o.atTarget ? FIND_RADIUS : SCENE_RADIUS)) return state;
+  let next = state;
+  for (let i = 0; i < o.minutes; i++) next = tick(next, career, lifestyle, false);
+  return {
+    ...next,
+    balance: next.balance + o.reward,
+    today: { ...next.today, income: next.today.income + o.reward },
+    world: completeObjective(next.world, o.id),
+  };
+}
+
 export function gameReducer(
   state: GameState,
   action: GameAction,
   career: Career,
   lifestyle: Lifestyle,
 ): GameState {
-  if (action.type === 'tick') return state.summary ? state : tick(state, career, lifestyle, action.atWorkplace);
+  if (action.type === 'tick') {
+    if (state.summary) return state;
+    const next = tick(state, career, lifestyle, action.atWorkplace);
+    const world = directWorld(next.world, next.districtId, next.time.totalMinutes, career);
+    return world === next.world ? next : { ...next, world };
+  }
   return baseReducer(state, action, career, lifestyle);
 }
 
@@ -1002,6 +1042,24 @@ function baseReducer(
       return phoneFriend(state, action.residentId, action.kind, career, lifestyle);
     case 'ride':
       return ride(state, action.metres, career, lifestyle);
+    case 'eventRespond':
+    case 'eventDismiss': {
+      const e = state.world.active;
+      if (!e) return state;
+      const active = action.type === 'eventRespond' ? { ...e, responding: true, dismissed: false } : { ...e, dismissed: true, responding: false };
+      return { ...state, world: { ...state.world, active } };
+    }
+    case 'eventSeen':
+      return state.world.lastResult ? { ...state, world: { ...state.world, lastResult: null } } : state;
+    case 'setEventFrequency': {
+      const w = state.world;
+      if (w.frequency === action.frequency) return state;
+      // Switching events off clears one you haven't joined in; one you're helping with runs its course
+      const active = action.frequency === 'off' && w.active && !w.active.done.length ? null : w.active;
+      return { ...state, world: { ...w, frequency: action.frequency, active, nextAt: 0 } };
+    }
+    case 'eventAct':
+      return eventAct(state, action.objectiveId, action.at, career, lifestyle);
     case 'wait': {
       // Sitting on a park bench: time passes as it would anywhere (costs, hunger), off the clock for work.
       // A sit is applied in small steps as it plays out, so any whole number of minutes up to the longest option

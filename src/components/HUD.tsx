@@ -91,6 +91,8 @@ interface HUDProps {
   onStopTracking?: () => void;
   /** Set while inside a building: replaces the street prompts. The prompt is worked out from where you stand on every refresh. */
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
+  /** Help at something happening in the city (lib/liveEvents.ts): comes before every other street prompt. */
+  eventPrompt?: () => { verb: string; place: string; onOpen: () => void } | null;
   /** Opens the gadget shop when standing at it. */
   onOpenGadgets?: () => void;
   /** Goes into the district's restaurant when standing at its door. */
@@ -343,6 +345,7 @@ export function HUD({
   onOpenCareer,
   onExitVehicle,
   tracked = null,
+  eventPrompt,
   onStopTracking,
   insideHome,
   onOpenGadgets,
@@ -408,7 +411,7 @@ export function HUD({
               : null;
   const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
   const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
-  const streetPrompt = prompt ?? (resident && onTalk
+  const streetPrompt = eventPrompt?.() ?? prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome
     ? { verb: door.id === homeId ? 'Go into your home at' : door.price !== undefined ? `For sale (OGM Homes): ${door.kind} at` : `To let: ${door.kind} at`, place: door.building, onOpen: () => onOpenHome(door) }

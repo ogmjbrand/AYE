@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
-import { Box3, CanvasTexture, Material, SRGBColorSpace, type Group, type Mesh } from 'three';
+import { Box3, Material, type Group, type Mesh } from 'three';
+import { nameTag } from './nameTag';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
@@ -21,28 +22,6 @@ import { applyBodyShape } from '../components/bodyShapeSkin';
 import { OutfitStyler } from '../components/Avatar';
 import { GarmentLayer } from '../components/GarmentLoader';
 import { getGarmentModel } from '../lib/fashion';
-
-/** Name tag above a resident: their name and that they are a computer-controlled resident. */
-function nameTag(name: string) {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 160;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = 'rgba(21,24,28,0.78)';
-  ctx.beginPath();
-  ctx.roundRect(8, 8, 496, 144, 36);
-  ctx.fill();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#f1ede6';
-  ctx.font = "700 56px Manrope, 'DM Sans', sans-serif";
-  ctx.fillText(name, 256, 74);
-  ctx.fillStyle = '#a4a7ad';
-  ctx.font = "500 34px 'DM Sans', sans-serif";
-  ctx.fillText('Resident · computer-controlled', 256, 124);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  return t;
-}
 
 function ResidentFigure({ resident, player, talkingTo, hugSession }: {
   resident: Resident;

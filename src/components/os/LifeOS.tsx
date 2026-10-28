@@ -7,6 +7,7 @@ import {
   type LifeLink, type Suggestion,
 } from '../../lib/life';
 import { MAX_TRAITS, PERKS, PERK_LEVEL, SKILLS, TRAITS, perksOf, skillLevel, skillProgress, type DreamId, type Mission, type TraitId } from '../../lib/lifeState';
+import { REPUTATIONS, TIERS, tierOf } from '../../lib/reputation';
 import { NEED_LABEL, TIRED_THRESHOLD, moodLabel, type NeedKey } from '../../lib/needs';
 import { FRIENDSHIP_LEVELS, friendshipLevel, gameDay, HANGOUT_LEVEL } from '../../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../../lib/progression';
@@ -56,6 +57,8 @@ export interface LifeOSProps {
     onRest: () => void; restWhere: () => string;
     /** Back to the main menu (the game saves as you play). */
     onExitToMenu: () => void;
+    /** How often unplanned events happen in the city (lib/liveEvents.ts). */
+    events: string; onCycleEvents: () => void;
   };
   onClose: () => void;
 }
@@ -681,6 +684,28 @@ function Profile({ state, character, onSetProfile, onOpenWardrobe, onEditLook, o
           <dt className="text-ui-muted">Vehicles</dt><dd className="m-0 text-ui-faint">Not available yet: car dealerships aren&rsquo;t built.</dd>
         </dl>
       </Card>
+
+      <SectionTitle>Reputation</SectionTitle>
+      <Card>
+        <ul className="m-0 grid list-none gap-3 p-0">
+          {REPUTATIONS.map((r) => {
+            const points = state.world.reputation[r.id];
+            const tier = tierOf(points);
+            const from = TIERS[tier.index].min;
+            return (
+              <li key={r.id}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold">{r.label}</span>
+                  <span className="text-xs tabular-nums text-ui-muted">{tier.name} · {points}{tier.next !== null ? ` / ${tier.next}` : ''}</span>
+                </div>
+                <Bar value={tier.next === null ? 100 : ((points - from) / (tier.next - from)) * 100} tone="gold" label={`${r.label}: ${tier.name}`} />
+                <p className="m-0 mt-1 text-[11px] text-ui-muted">{r.how}</p>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="m-0 mt-3 text-[11px] text-ui-muted">Built by what you do, never bought. Everyone starts unknown, and nothing basic needs a reputation.</p>
+      </Card>
     </>
   );
 }
@@ -698,6 +723,16 @@ function Settings({ settings }: LifeOSProps) {
             <p className="m-0 text-[11px] text-ui-muted">Your life saves as you play, so nothing is lost.</p>
           </div>
           <button type="button" onClick={settings.onExitToMenu} className="rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Main menu</button>
+        </div>
+      </Card>
+      <SectionTitle>The living world</SectionTitle>
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="m-0 text-sm font-semibold">City events</p>
+            <p className="m-0 text-[11px] text-ui-muted">Accidents, emergencies, missing people and busy restaurants you can help with. Calm makes them rare; Off stops them, so the city stays peaceful.</p>
+          </div>
+          <button type="button" onClick={settings.onCycleEvents} className="shrink-0 rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">{settings.events}</button>
         </div>
       </Card>
       <SectionTitle>Graphics</SectionTitle>

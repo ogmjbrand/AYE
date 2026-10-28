@@ -29,6 +29,7 @@ import { homeById } from './homes';
 import { interiorFor, type FurnitureKind } from './interiors';
 import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
+import { templateFor, type Severity } from './liveEvents';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
 import { vehicleById } from './vehicleCatalog';
@@ -422,6 +423,11 @@ export interface Achievement {
 
 const a = (id: string, title: string, description: string, category: Achievement['category'], reward: number, check: Achievement['check'], unlock?: string): Achievement =>
   ({ id, title, description, category, reward, check, ...(unlock ? { unlock } : {}) });
+/** City events (lib/liveEvents.ts) you've helped with, the one going on now included. */
+const helpedEvents = (c: Ctx, severity?: Severity) => [
+  ...c.state.world.history.filter((p) => p.outcome === 'helped').map((p) => p.kind),
+  ...(c.state.world.active?.done.length ? [c.state.world.active.kind] : []),
+].filter((k) => !severity || templateFor(k).severity === severity).length;
 const careerTop = (c: Ctx) => c.career !== 'none' && levelIndex(c.career, c.state.workMinutes) === careerLadder(c.career).length - 1;
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
@@ -433,6 +439,9 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('best-friend', 'Best friends', 'Have a best friend.', 'people', 500, (c) => friendsAt(c, 4) >= 1, 'top-friendship-ankara'),
   a('met-5', 'Friendly face', 'Meet 5 people.', 'people', 200, (c) => c.state.life.stats.met >= 5),
   a('events-3', 'Out and about', 'Join 3 city events.', 'explore', 300, (c) => c.state.life.stats.events >= 3, 'top-festival-adire'),
+  a('first-responder', 'First responder', 'Help at an emergency in the city.', 'people', 300, (c) => helpedEvents(c, 'emergency') >= 1),
+  a('helped-10', 'Pillar of the community', 'Help with 10 city events.', 'people', 1000, (c) => helpedEvents(c) >= 10),
+  a('respected', 'Respected', 'Become Respected for something: community trust, professional standing or another reputation.', 'people', 500, (c) => Object.values(c.state.world.reputation).some((v) => v >= 100)),
   a('night-out', 'Night on the town', 'Go on a night out with a friend.', 'people', 150, (c) => c.state.life.stats.nightsOut >= 1),
   a('explorer-5', 'Explorer', 'Discover 5 places.', 'explore', 150, (c) => c.state.life.visited.length >= 5, 'top-explorer-kente'),
   a('explorer-25', 'Know your way around', 'Discover 25 places.', 'explore', 500, (c) => c.state.life.visited.length >= 25),
@@ -537,6 +546,12 @@ function recordMoney(prev: GameState, action: GameAction, next: GameState): Game
     const fare = rideFare(action.metres);
     entries.push({ label: 'Taxi ride', amount: -fare });
     if (delta + fare) entries.push({ label: 'Living costs', amount: delta + fare, merge: true });
+  } else if (action.type === 'eventAct' && next.world.active) {
+    // Helping takes time: the reward's own line, and the living costs of those minutes on their own
+    const delta = next.balance - prev.balance;
+    const main = next.world.active.earned - (prev.world.active?.earned ?? 0);
+    if (main) entries.push({ label: labelFor(prev, action), amount: main });
+    if (delta - main) entries.push({ label: 'Living costs', amount: delta - main, merge: true });
   } else if (action.type === 'spaTreat' || action.type === 'spaSession') {
     // A treatment takes time: the treatment's own line, and the living costs of those minutes on their own
     const delta = next.balance - prev.balance;
@@ -561,6 +576,7 @@ function recordMoney(prev: GameState, action: GameAction, next: GameState): Game
 function labelFor(prev: GameState, action: GameAction): string {
   switch (action.type) {
     case 'eat': return 'Meal out';
+    case 'eventAct': return prev.world.active ? `Helped: ${templateFor(prev.world.active.kind).title.toLowerCase()}` : 'Helped in the city';
     case 'purchase': return 'Clothes & styling';
     case 'buyFurniture': return `Furniture: ${catalogueItem(action.itemId)?.name ?? ''}`;
     case 'sellFurniture': return `Sold: ${catalogueItem(prev.furniture.find((o) => o.uid === action.uid)?.itemId)?.name ?? 'furniture'}`;

@@ -10,6 +10,7 @@ import type { Needs } from '../lib/needs';
 import type { Wardrobe } from '../lib/fashion';
 import type { OfficeTaskId } from '../lib/officeCareer';
 import type { ClassSlot } from '../lib/campus';
+import type { EventFrequency } from '../lib/liveEvents';
 
 /** Real milliseconds per game minute. */
 export const MS_PER_GAME_MINUTE = 3000;
@@ -73,6 +74,11 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     }),
     buyFashionItem: (id: string) => dispatch({ type: 'buyFashionItem', id }),
     wait: (minutes: number) => dispatch({ type: 'wait', minutes }),
+    eventRespond: () => dispatch({ type: 'eventRespond' }),
+    eventDismiss: () => dispatch({ type: 'eventDismiss' }),
+    eventAct: (objectiveId: string, at: { x: number; z: number }) => dispatch({ type: 'eventAct', objectiveId, at }),
+    eventSeen: () => dispatch({ type: 'eventSeen' }),
+    setEventFrequency: (frequency: EventFrequency) => dispatch({ type: 'setEventFrequency', frequency }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
     officeApply: (atReception: boolean) => dispatch({ type: 'officeApply', atReception }),
     officeClockIn: (atReception: boolean) => dispatch({ type: 'officeClockIn', atReception }),

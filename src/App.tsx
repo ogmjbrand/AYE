@@ -12,6 +12,9 @@ import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
 import { LampPool } from './world/LampPool';
+import { LiveEventScene } from './world/LiveEventScene';
+import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
+import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, templateFor, type ActiveEvent } from './lib/liveEvents';
 import PostEffects from './world/PostEffects';
 import { WarmUp } from './world/WarmUp';
 import { Streets } from './world/Streets';
@@ -164,6 +167,8 @@ interface CityProps {
   talkingTo: string | null;
   hugSession: HugSession | null;
   onHugComplete: (residentId: string) => void;
+  /** Something happening in this district right now (lib/liveEvents.ts). */
+  liveEvent: ActiveEvent | null;
 }
 
 interface CameraFollowProps {
@@ -320,7 +325,7 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
@@ -350,6 +355,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} />
       <Traffic player={controller} />
       <Campers />
+      {liveEvent && <LiveEventScene event={liveEvent} minute={gameTime.totalMinutes} />}
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour
         ? <DrivenVehicle controller={controller} colour={colour.hex} bodyStyle={model.bodyStyle} />
@@ -460,6 +466,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture,
     exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, phoneFriend, ride, bookHotel, hotelWash, buyVehicle, paintVehicle,
     drove, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut,
+    eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -558,6 +565,34 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
   /** Inside anywhere (your home, a venue or a workplace): not on the street. */
   const offStreet = indoors || inWorkplace || inPalms || inCantina || inHotel || inSpa || inBoutique;
+  /** Something happening in this district (an accident, a missing person…), if anything. */
+  const liveEvent = state.world.active && state.world.active.districtId === district.id ? state.world.active : null;
+  // Open for one event: it closes by itself when that event ends
+  const [eventPanelFor, setEventPanelFor] = useState<string | null>(null);
+  const eventPanelOpen = !!liveEvent && eventPanelFor === liveEvent.id;
+  /** Where the event wants you: the search target once you know where to look, otherwise the scene. */
+  const eventGoal = liveEvent
+    ? (liveEvent.target && liveEvent.done.includes('listen') && !liveEvent.done.includes('find') ? liveEvent.target : liveEvent.scene)
+    : null;
+  /** Standing at the event's scene, or at its search target. */
+  const atEventScene = () => !!liveEvent && !offStreet && !controller.drivingVehicleId && Math.hypot(controller.position.x - liveEvent.scene.x, controller.position.z - liveEvent.scene.z) <= SCENE_RADIUS;
+  const atEventTarget = () => !!liveEvent?.target && !offStreet && !controller.drivingVehicleId && Math.hypot(controller.position.x - liveEvent.target.x, controller.position.z - liveEvent.target.z) <= FIND_RADIUS;
+  /** Helping at the event: at the target you find who you're looking for; at the scene the panel opens. */
+  const helpAtEvent = () => {
+    if (!liveEvent) return;
+    if (atEventTarget() && canDo(liveEvent, 'find', character.career, state.equipment, state.time.totalMinutes).ok) {
+      eventAct('find', { x: controller.position.x, z: controller.position.z });
+      setArrival('You found Baba Femi. Walk him back to his daughter at the park.');
+      return;
+    }
+    if (atEventScene()) setEventPanelFor(liveEvent.id);
+  };
+  const eventPrompt = () => {
+    if (!liveEvent) return null;
+    const t = templateFor(liveEvent.kind);
+    if (atEventTarget() && canDo(liveEvent, 'find', character.career, state.equipment, state.time.totalMinutes).ok) return { verb: 'You\u2019ve found', place: 'Baba Femi', onOpen: helpAtEvent };
+    return atEventScene() ? { verb: 'Help with the', place: t.title.toLowerCase(), onOpen: helpAtEvent } : null;
+  };
   /** Which place the canvas is showing; a new one is prepared (shaders and textures) before it is drawn. */
   const sceneKey = venueLayout ? venueLayout.id : indoors ? `home.${home!.id}` : venue !== null ? `venue.${venue}` : `city.${district.id}`;
   const [sceneReady, setSceneReady] = useState(false);
@@ -1534,6 +1569,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         else if (nearSpot(doorSpot(interior))) goOutside();
         return;
       }
+      if (eventPrompt()) {
+        helpAtEvent();
+        return;
+      }
       const { x, z } = controller.position;
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
@@ -1562,9 +1601,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen);
     return () => setMovementBlocked(false);
-  }, [vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+  }, [eventPanelOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -2395,7 +2434,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} />
             )}
           </DistrictContext.Provider>
           <PostEffects />
@@ -2620,10 +2659,36 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             onRest: () => { setOsOpen(false); rest(atHome()); },
             restWhere: () => atHome() ? `In your bed at ${home!.name}.` : state.home ? 'Away from home: you\u2019ll sleep rough and wake less rested. Your bed is better.' : 'You have no home, so you\u2019ll sleep rough and wake less rested.',
             onExitToMenu,
+            events: FREQUENCY_LABEL[state.world.frequency],
+            onCycleEvents: () => setEventFrequency(EVENT_FREQUENCIES[(EVENT_FREQUENCIES.indexOf(state.world.frequency) + 1) % EVENT_FREQUENCIES.length]),
           }}
           onClose={() => setOsOpen(false)}
         />
       )}
+      {liveEvent && !liveEvent.dismissed && !eventPanelOpen && !state.summary && (
+        <div className="pointer-events-none fixed inset-x-0 top-[4.75rem] z-30 flex justify-center px-3 pointer-coarse:top-[12rem]">
+          <EventAlert
+            event={liveEvent}
+            minutesLeft={Math.max(0, liveEvent.endsAt - state.time.totalMinutes)}
+            distance={offStreet ? null : Math.hypot(controller.position.x - (eventGoal ?? liveEvent.scene).x, controller.position.z - (eventGoal ?? liveEvent.scene).z)}
+            onRespond={eventRespond}
+            onDismiss={eventDismiss}
+          />
+        </div>
+      )}
+      {eventPanelOpen && liveEvent && (
+        <EventPanel
+          event={liveEvent}
+          career={character.career}
+          equipment={state.equipment}
+          minute={state.time.totalMinutes}
+          atScene={atEventScene()}
+          atTarget={atEventTarget()}
+          onAct={(id) => eventAct(id, { x: controller.position.x, z: controller.position.z })}
+          onClose={() => setEventPanelFor(null)}
+        />
+      )}
+      {state.world.lastResult && !state.summary && !eventPanelOpen && <EventResult result={state.world.lastResult} onClose={eventSeen} />}
       {arrival && (
         <p role="status" className="pointer-events-none fixed left-1/2 top-24 z-40 m-0 -translate-x-1/2 rounded-xl border border-ui-line bg-ui-panel/90 px-4 py-2 text-sm text-ui-ink shadow-xl">
           {arrival}
@@ -2671,8 +2736,11 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         workMinutes={state.workMinutes}
         onOpenCareer={() => toggleOs('career')}
         onExitVehicle={leaveVehicle}
-        tracked={trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
-        onStopTracking={() => setTrackedId(null)}
+        tracked={liveEvent?.responding && eventGoal
+          ? { name: eventGoal === liveEvent.target ? 'Baba Femi (last seen here)' : templateFor(liveEvent.kind).title, position: [eventGoal.x, 0, eventGoal.z] }
+          : trackedLocation?.position ? { name: trackedLocation.name, position: trackedLocation.position } : null}
+        onStopTracking={() => (liveEvent?.responding ? eventDismiss() : setTrackedId(null))}
+        eventPrompt={eventPrompt}
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
