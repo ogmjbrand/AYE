@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "assets:check": "node scripts/check-assets.mjs",
-    "assets:optimize": "node scripts/optimize-glb.mjs"
+    "assets:optimize": "node scripts/optimize-glb.mjs",
+    "check:push": "node scripts/check-large-files.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

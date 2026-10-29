@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, Euler, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type Object3D } from 'three';
+import { Box3, Color, Euler, LoopOnce, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
@@ -21,7 +21,9 @@ import { Adornments } from '../world/Adornments';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { GarmentLayer } from './GarmentLoader';
 import { getGarmentModel } from '../lib/fashion';
-import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, type SkinToneId } from '../lib/skinTone';
+import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, skinToneDepth, type SkinToneId } from '../lib/skinTone';
+import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
+import { createReachHugClip } from '../lib/hugAnimation';
 import { findRigBone } from '../lib/characterRig';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
@@ -121,7 +123,32 @@ function updateLocomotion(
 }
 
 /**
- * Rigged, animated human: one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
+ * The Character Creator 5 body wears its own modelled clothes: the wardrobe
+ * recolours them by material, and skin tone tints the skin (lib/cc5Body.ts).
+ */
+function Cc5Styler({ scene, styles, skinTone }: { scene: Object3D; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
+  useEffect(() => {
+    const [r, g, b] = cc5SkinMultiplier(skinTone);
+    scene.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      for (const m of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as MeshStandardMaterial[]) {
+        if (!m.color) continue;
+        const base = (m.userData.cc5Base ??= m.color.clone()) as Color;
+        const slot = cc5SlotOf(m.name);
+        const wear = slot ? cc5GarmentColor(styles[slot]) : null;
+        if (wear) m.color.set(wear);
+        else if (CC5_SKIN_MATERIALS.test(m.name)) m.color.setRGB(base.r * r, base.g * g, base.b * b);
+        else m.color.copy(base);
+      }
+    });
+  }, [scene, styles, skinTone]);
+  return null;
+}
+
+/**
+ * Rigged, animated human: the player body (the Character Creator 5 character,
+ * lib/assetManifest.ts) when it's built, else one of the looks in lib/looks.ts (see public/assets/CREDITS.md). Picks idle / walk /
  * run from the player's speed and cross-fades between them.
  */
 /** A copy of the cached model with its own materials and none of the shared styling installed. */
@@ -220,8 +247,9 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   useEffect(() => {
     applyBodyShape(scene, JSON.parse(shapeKey) as BodyShape);
   }, [scene, shapeKey]);
-  // Garment maps exist only for the built-in looks, not for a model listed in the asset manifest
-  const styledLook = assetManifest().avatar ? null : lookById(lookId).id;
+  // Garment maps exist only for the built-in looks; the player body (CC5) is styled by material
+  const playerBody = assetManifest().avatar !== null;
+  const styledLook = playerBody ? null : lookById(lookId).id;
 
   const relaxed = useMemo(() => createRelaxedHands(scene, clipsWithHands), [scene, clipsWithHands]);
   const eatingBones = useMemo(() => ({
@@ -236,9 +264,39 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   const forearmOffset = useRef(new Quaternion());
   const handOffset = useRef(new Quaternion());
 
-  // Gestures (talk, listen) arrive in their own file after the person is on screen
-  const [gestures, setGestures] = useState<GestureActions>({});
-  const body = assetManifest().avatar ? null : lookById(lookId).body;
+  // Built-in looks: gestures (talk, listen, wave, sit, hug) arrive in their own file after the person is on screen
+  const [loadedGestures, setGestures] = useState<GestureActions>({});
+  const body = playerBody ? null : lookById(lookId).body;
+  // The player body carries its gestures in its own file, retargeted to its skeleton (scripts/cc5);
+  // set up once mounted, when the animation root exists
+  const [ownGestures, setOwnGestures] = useState<GestureActions | null>(null);
+  useEffect(() => {
+    const root = group.current;
+    if (!playerBody || !root) return;
+    const out: GestureActions = {};
+    for (const name of ['Talk', 'Listen', 'Wave', 'Sit'] as const) {
+      const clip = clipsWithHands.find((c) => c.name === name);
+      if (!clip) continue;
+      const action = mixer.clipAction(clip, root);
+      if (name === 'Wave') {
+        action.setLoop(LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
+      out[name] = action;
+    }
+    const hugClip = createReachHugClip(scene, clipsWithHands.find((c) => c.name === clips.Idle));
+    if (hugClip) {
+      const hug = mixer.clipAction(hugClip, root);
+      hug.setLoop(LoopOnce, 1);
+      out.Hug = hug;
+    }
+    setOwnGestures(out);
+    return () => {
+      for (const a of Object.values(out)) a?.stop();
+      setOwnGestures(null);
+    };
+  }, [playerBody, clipsWithHands, clips, mixer, scene]);
+  const gestures = ownGestures ?? loadedGestures;
   const idleClip = useMemo(() => clipsWithHands.find((c) => c.name === clips.Idle), [clipsWithHands, clips]);
   const conversationStart = useRef<number | null>(null);
 
@@ -296,6 +354,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
       {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} />}
+      {/* The CC5 body has no garment maps: its own clothes are recoloured, and a chosen swatch deepens or lightens its skin */}
+      {playerBody && <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={Math.max(-1, Math.min(1, skinTone + skinToneDepth(skinToneId)))} />}
       {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}
       {styles && (styles.neck || styles.ears || styles.wrist || styles.eyes || styles.nails || styles.rings) && <Adornments scene={scene} styles={styles} />}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}

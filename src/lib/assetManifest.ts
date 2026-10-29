@@ -154,15 +154,52 @@ async function dropMissingFiles(m: AssetManifest): Promise<AssetManifest> {
   return { ...m, surfaces };
 }
 
+/**
+ * The player's body is the Character Creator 5 character (node scripts/cc5/build.mjs).
+ * The built-in Rocketbox looks are only a fallback: when its files aren't there
+ * (they're private, so a fresh copy of the repository doesn't have them), or in
+ * the development server with ?avatar=default to compare. The saved character
+ * is not changed; only the model drawn for it is.
+ */
+export const CC5_INFO = 'private/characters/cc5/aaron.json';
+
+export function wantsCc5Avatar(search: string, dev: boolean): boolean {
+  return !(dev && new URLSearchParams(search).get('avatar') === 'default');
+}
+
+/** The CC5 avatar entry the build wrote, validated like a manifest avatar; null if unusable. */
+async function cc5Avatar(): Promise<AvatarFile | null> {
+  try {
+    const res = await fetch(assetUrl(CC5_INFO), { cache: 'no-cache' });
+    if (!res.ok || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
+    const { manifest, problems } = parseManifest({ avatar: (await res.json()).avatar });
+    for (const p of problems) console.warn(`[AYE assets] CC5 avatar: ${p}`);
+    return manifest.avatar && (await exists(manifest.avatar.url)) ? manifest.avatar : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Loads public/assets/manifest.json once at startup. Never throws. */
 export async function loadAssetManifest(): Promise<void> {
   try {
     const res = await fetch(assetUrl('manifest.json'), { cache: 'no-cache' });
-    if (!res.ok) return;
-    const { manifest, problems } = parseManifest(await res.json());
-    for (const p of problems) console.warn(`[AYE assets] ${p}`);
-    current = await dropMissingFiles(manifest);
+    if (res.ok) {
+      const { manifest, problems } = parseManifest(await res.json());
+      for (const p of problems) console.warn(`[AYE assets] ${p}`);
+      current = await dropMissingFiles(manifest);
+    }
   } catch (err) {
     console.warn('[AYE assets] manifest.json could not be read; using built-in assets', err);
+  }
+  // A model listed in manifest.json stays the player's body; otherwise it's the CC5 character
+  if (!current.avatar && wantsCc5Avatar(window.location.search, import.meta.env.DEV)) {
+    const avatar = await cc5Avatar();
+    if (avatar) {
+      current = { ...current, avatar };
+      console.info(`[AYE assets] player body: ${avatar.url}`);
+    } else {
+      console.warn('[AYE assets] the CC5 player body is not built (node scripts/cc5/build.mjs); using the built-in looks for now.');
+    }
   }
 }

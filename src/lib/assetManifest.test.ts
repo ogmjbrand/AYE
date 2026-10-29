@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseManifest } from './assetManifest';
+import { parseManifest, wantsCc5Avatar } from './assetManifest';
 
 describe('asset manifest', () => {
   it('accepts a valid manifest', () => {
@@ -72,5 +72,14 @@ describe('asset manifest', () => {
     const bad = parseManifest({ surfaces: { road: { color: 'textures/road/color.jpg', ao: '../secret.jpg', tileMeters: 4 } } });
     expect(bad.manifest.surfaces.road?.ao).toBeUndefined();
     expect(bad.problems.some((p) => p.includes('road.ao'))).toBe(true);
+  });
+
+  it('the CC5 character is the player body; the old looks only by request in development', () => {
+    expect(wantsCc5Avatar('', false)).toBe(true);
+    expect(wantsCc5Avatar('', true)).toBe(true);
+    expect(wantsCc5Avatar('?avatar=default', true)).toBe(false);
+    // Players can't switch back to the old looks from the address bar
+    expect(wantsCc5Avatar('?avatar=default', false)).toBe(true);
+    expect(wantsCc5Avatar('?avatar=other', true)).toBe(true);
   });
 });

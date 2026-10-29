@@ -20,6 +20,10 @@ export function skinToneById(id: SkinToneId) {
   return SKIN_TONES.find((tone) => tone.id === id) ?? SKIN_TONES[0];
 }
 
+/** Each swatch as a depth on the skin shader's scale: deeper (to 1) or lighter (to -1) than the person's own skin. */
+const DEPTH: Record<SkinToneId, number> = { original: 0, deep: 0.9, dark: 0.65, rich: 0.35, golden: 0.1, warm: -0.2, light: -0.55, custom: 0 };
+export const skinToneDepth = (id: SkinToneId) => DEPTH[id];
+
 export function isSkinColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 }

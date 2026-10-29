@@ -14,7 +14,13 @@ import { HEIGHT_RANGE, bodyForGender, lookById, looksFor, type BodyType } from '
 import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wardrobe } from '../lib/fashion';
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
-import { assetUrl } from '../lib/assetManifest';
+import { assetManifest, assetUrl } from '../lib/assetManifest';
+
+/** The player's body is the Character Creator 5 character (lib/assetManifest.ts), unless it isn't available. */
+const hasPlayerBody = () => assetManifest().avatar !== null;
+/** What the person looks like, for the stages' descriptions: the CC5 character (HUMAN.fbx: Classic_Slick_Back, Stubble) or the chosen look. */
+const describedLook = (lookId: string): { hair: string; facialHair?: string; covered?: boolean; outfit: string } =>
+  hasPlayerBody() ? { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers' } : lookById(lookId);
 import { STARTING_BALANCE } from '../lib/gameState';
 import {
   EDIT_STAGES, STAGES, STARTER_PRESETS, applyPreset, buildCharacter, draftFrom, newDraft, problems, randomise, starterItems, withBody,
@@ -143,7 +149,9 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
     <Shell
       lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} skinToneId={draft.skinToneId} skinColor={draft.skinColor} styles={styles} focus={focus}
       avatarName={draft.name.trim() || 'New avatar'}
-      previewSub={`${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
+      previewSub={hasPlayerBody()
+        ? `Character Creator 5 · ${draft.heightCm} cm`
+        : `${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
       nav={nav}
       title={stage.title}
       kicker={editing ? 'Change your appearance' : 'Create your life'}
@@ -261,6 +269,15 @@ function BodyStage({ draft, set, setDraft }: StageProps & { setDraft: (f: (d: Dr
         </div>
         <p className="mt-2 text-xs text-cc-muted">A starting point for person, figure, skin and clothes. Change anything afterwards, or press Randomise on the preview.</p>
       </div>
+      {hasPlayerBody() ? (
+        <div>
+          <p className={SECTION_LABEL}>Person</p>
+          <div className="rounded-lg border border-cc-gold bg-cc-gold/10 px-3 py-2.5 text-sm text-cc-ink">
+            Your character, made in Character Creator 5
+          </div>
+          <p className="mt-2 text-xs text-cc-muted">Their own face, hair and modelled clothes. Choose the height, skin tone, hair colour and the colours you wear; the 3D preview shows them as you go.</p>
+        </div>
+      ) : (
       <div>
         <p className={SECTION_LABEL}>Person</p>
         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Person">
@@ -274,6 +291,7 @@ function BodyStage({ draft, set, setDraft }: StageProps & { setDraft: (f: (d: Dr
         </div>
         <p className="mt-2 text-xs text-cc-muted">Real people from the Microsoft Rocketbox library. Each comes with their own face, hairstyle and clothes cut; you shape the body, skin, hair colour and fabrics next.</p>
       </div>
+      )}
     </>
   );
 }
@@ -325,13 +343,15 @@ function ProportionsStage({ draft, set }: StageProps) {
           <Slider key={s.key} id={`shape-${s.key}`} label={s.label} min={s.min} max={1} step={0.05} value={shape[s.key]} onChange={(v) => set({ shape: { ...shape, [s.key]: v } })} ends={s.ends} />
         ))}
       </div>
-      <p className="text-xs text-cc-muted">Shape changes the 3D model itself: each part of the body is filled out or slimmed down around the skeleton, so walking, running and sitting animations still fit. Every slider stays within natural limits.</p>
+      {hasPlayerBody()
+        ? <p className="text-xs text-cc-muted">Your Character Creator body keeps the proportions it was modelled with; these settings are saved with your life.</p>
+        : <p className="text-xs text-cc-muted">Shape changes the 3D model itself: each part of the body is filled out or slimmed down around the skeleton, so walking, running and sitting animations still fit. Every slider stays within natural limits.</p>}
     </>
   );
 }
 
 function FaceStage({ draft, set }: StageProps) {
-  const look = lookById(draft.lookId);
+  const look = describedLook(draft.lookId);
   return (
     <>
       <div className="space-y-2.5">
@@ -351,21 +371,25 @@ function FaceStage({ draft, set }: StageProps) {
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
-        <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person under Person for a different face.</p>
+        {hasPlayerBody()
+          ? <p className="mt-1 text-xs text-cc-muted">Your face as you made it in Character Creator 5.</p>
+          : <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person under Person for a different face.</p>}
       </div>
     </>
   );
 }
 
 function HairStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = lookById(draft.lookId);
+  const look = describedLook(draft.lookId);
   const options = editing ? FASHION_ITEMS.filter((i) => i.slot === 'hair' && editing.wardrobe.owned.includes(i.id)) : starterItems(draft.country).filter((i) => i.slot === 'hair');
   return (
     <>
       <div>
         <p className={SECTION_LABEL}>Hairstyle</p>
         <p className="text-sm text-cc-ink">{look.hair}</p>
-        <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>
+        {hasPlayerBody()
+          ? <p className="mt-1 text-xs text-cc-muted">The style you gave your character in Character Creator 5. Pick a colour below.</p>
+          : <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>}
       </div>
       <div>
         <p className={SECTION_LABEL}>{look.covered ? 'Headwear colour' : 'Hair colour'}</p>
@@ -395,12 +419,14 @@ function SwatchRow({ items, value, onPick, originalLabel }: { slot: Slot; items:
 }
 
 function ClothesStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = lookById(draft.lookId);
+  const look = describedLook(draft.lookId);
   const pool = editing ? FASHION_ITEMS.filter((i) => editing.wardrobe.owned.includes(i.id)) : starterItems(draft.country);
   return (
     <>
       <p className="text-sm text-cc-muted">
-        {look.outfit}. Choose the fabric and colour of each piece; it&rsquo;s applied to the garment on the 3D model, keeping its folds.
+        {look.outfit}. {hasPlayerBody()
+          ? 'Choose the colour of each piece; it’s applied to the garment on the 3D model, keeping its folds (patterned fabrics show their main colour).'
+          : 'Choose the fabric and colour of each piece; it’s applied to the garment on the 3D model, keeping its folds.'}
         {editing ? ' These are the clothes you own; buy more at the boutique.' : ' Starter pieces are free and yours to keep.'}
       </p>
       {(['top', 'bottom', 'shoes'] as const).map((slot) => (
@@ -418,7 +444,7 @@ function ClothesStage({ draft, set, editing }: StageProps & { editing?: Characte
 }
 
 function ReviewStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = lookById(draft.lookId);
+  const look = describedLook(draft.lookId);
   const preset = presetFor(draft.shape, draft.body);
   const wearing = (['top', 'bottom', 'shoes', 'hair'] as const)
     .map((s) => (draft.outfit[s] ? FASHION_ITEMS.find((i) => i.id === draft.outfit[s])?.name : null))
