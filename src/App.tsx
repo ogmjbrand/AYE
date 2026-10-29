@@ -28,6 +28,7 @@ import { levelProgress, totalXp } from './lib/lifeState';
 import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
 import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, templateFor, type ActiveEvent } from './lib/liveEvents';
 import PostEffects from './world/PostEffects';
+import { HOME_MODELS, preloadRealModels } from './world/realModels';
 import { WarmUp, type WarmProgress } from './world/WarmUp';
 import { Streets } from './world/Streets';
 import { QualityContext, initialAutoQuality, settingsFor, useQuality, type Quality } from './world/quality';
@@ -638,6 +639,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [warmProgress, setWarmProgress] = useState<WarmProgress | null>(null);
   const [warmSkip, setWarmSkip] = useState(0);
   const [warmSlow, setWarmSlow] = useState(false);
+  // Once the street is up, quietly fetch what your home's kitchen and decor need, so walking in is quick
+  const hasHome = !!state.home;
+  useEffect(() => {
+    if (!sceneReady || !hasHome || !sceneKey.startsWith('city.')) return;
+    const id = setTimeout(() => preloadRealModels(HOME_MODELS), 4000);
+    return () => clearTimeout(id);
+  }, [sceneReady, hasHome, sceneKey]);
   useEffect(() => {
     if (sceneReady) return;
     const id = setTimeout(() => setWarmSlow(true), 6000);

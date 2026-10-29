@@ -3,18 +3,10 @@ import { useGLTF } from '@react-three/drei';
 import { Box3, Vector3, type Mesh, type MeshPhysicalMaterial } from 'three';
 import { assetUrl } from '../lib/assetManifest';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { modelPath, type RealModelName } from './realModels';
 
-/** Photoreal pieces built by scripts/khronos/build-furniture.mjs (CC0 / CC-BY 4.0, see CREDITS.md). */
-type FurnitureName = 'sofa-velvet-champagne' | 'sofa-velvet-blush' | 'chair-velvet-peacock' | 'chair-velvet-mango' | 'vase-flowers' | 'plant-potted';
-/** Props built by scripts/sketchfab/build-props.mjs (CC-BY 4.0, see CREDITS.md). */
-export type PropName = 'sub-sandwich' | 'bento-box' | 'vending-machine' | 'motorhome' | 'fridge-retro';
-/** Real-size food scanned by ambientCG (CC0), built by scripts/ambientcg/build-food.mjs. */
-export type FoodName = 'bread-loaf' | 'bread-rustic' | 'bread-roll' | 'bread-baguette' | 'cookie' | 'avocado' | 'kiwi' | 'pear' | 'pear-green'
-  | 'pastry' | 'cake' | 'apple' | 'apple-red' | 'melon';
-export type RealModelName = FurnitureName | PropName | FoodName;
-const PROPS: ReadonlySet<string> = new Set<PropName>(['sub-sandwich', 'bento-box', 'vending-machine', 'motorhome', 'fridge-retro']);
-const FOOD: ReadonlySet<string> = new Set<FoodName>(['bread-loaf', 'bread-rustic', 'bread-roll', 'bread-baguette', 'cookie', 'avocado', 'kiwi', 'pear', 'pear-green', 'pastry', 'cake', 'apple', 'apple-red', 'melon']);
-const modelPath = (name: RealModelName) => `models/${PROPS.has(name) ? 'props' : FOOD.has(name) ? 'food' : 'furniture'}/${name}.glb`;
+export type { FoodName, PropName, RealModelName } from './realModels';
+
 
 interface Props {
   name: RealModelName;
