@@ -15,6 +15,7 @@ import {
   type Texture,
 } from 'three';
 import { seeded } from '../lib/world';
+import { memoTexture } from './textureCache';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -477,8 +478,12 @@ export function roof(): SurfaceSet {
   });
 }
 
-/** Text sign (shop names, billboards). Not cached: one per sign. */
+/** Text sign (shop names, billboards), drawn once per wording and colours. */
 export function signTexture(text: string, bg: string, fg: string, width = 512, height = 128): Texture {
+  return memoTexture(`sign:${text}:${bg}:${fg}:${width}x${height}`, () => drawSign(text, bg, fg, width, height));
+}
+
+function drawSign(text: string, bg: string, fg: string, width: number, height: number): Texture {
   const c = document.createElement('canvas');
   c.width = width;
   c.height = height;

@@ -11,6 +11,8 @@ const MAX_LOAD_MS = 12000;
 const MAX_COMPILE_MS = 8000;
 /** Most time spent uploading textures ahead; the rest upload as they're first drawn. */
 const MAX_UPLOAD_MS = 6000;
+/** Upload work done between pauses that let the page draw the card and take input. */
+const YIELD_AFTER_MS = 50;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -76,13 +78,17 @@ export function WarmUp({ sceneKey, maxTextureSize, skip, onReady, onProgress }: 
         if (cancelled) return;
         const textures = sceneTextures(scene);
         const uploadStart = performance.now();
+        let sinceYield = performance.now();
         for (let i = 0; i < textures.length && !cancelled; i++) {
           if (performance.now() - uploadStart > MAX_UPLOAD_MS) break;
           capTexture(textures[i], maxTextureSize);
           gl.initTexture(textures[i]);
-          if (i % 4 === 3) {
+          // Let the page breathe only after real work: on a return visit every texture is
+          // already on the GPU, and yielding between them was what kept the card up for seconds
+          if (performance.now() - sinceYield > YIELD_AFTER_MS) {
             onProgress?.({ step: 'uploading', share: 0.6 + 0.4 * ((i + 1) / textures.length), detail: `Preparing textures · ${i + 1} of ${textures.length}` });
             await wait(0);
+            sinceYield = performance.now();
           }
         }
         // Anything not uploaded ahead is still capped before it's first drawn

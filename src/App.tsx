@@ -1639,6 +1639,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       else if (counter === 'travel') setTravelOpen(true);
       else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
       else if (parkAt(district.park, x, z)) setParkOpen(true);
+      // Your own front door comes before a passer-by, as on the HUD
+      else if (door && door.id === state.home) setHomePanel(door);
       else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
       else if (taskOnOffer()) setTask(taskOnOffer());
       else if (door) setHomePanel(door);

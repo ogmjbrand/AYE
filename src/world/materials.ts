@@ -78,10 +78,41 @@ function kerbConcrete() {
   return m;
 }
 
-/** A real pavement texture for park footpaths, or null to keep their plain packed-earth colour. */
+/** A real pavement texture for park footpaths, or null to keep their plain packed-earth colour. Loaded once. */
+let parkPath: MeshStandardMaterial | null | undefined;
 export function parkPathSurface() {
-  const files = assetManifest().surfaces.pavement;
-  return files ? surfaceFromFiles(files) : null;
+  if (parkPath === undefined) {
+    const files = assetManifest().surfaces.pavement;
+    parkPath = files ? surfaceFromFiles(files) : null;
+  }
+  return parkPath;
+}
+
+const TILED_MAPS = ['map', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap'] as const;
+const tiledCopies = new Map<string, MeshStandardMaterial>();
+const copiesOf = new Map<MeshStandardMaterial, MeshStandardMaterial[]>();
+/**
+ * A copy of a surface with its textures repeated `rx` × `ry` times, made once
+ * per size and kept for the session. Making a fresh copy every time a street
+ * mounted re-sent every image to the GPU on each visit. The copy shares the
+ * image (only the repeat differs) and follows the original's wetness.
+ */
+export function tiledMaterial(base: MeshStandardMaterial, rx: number, ry: number): MeshStandardMaterial {
+  const key = `${base.uuid}:${rx.toFixed(3)}:${ry.toFixed(3)}`;
+  let m = tiledCopies.get(key);
+  if (!m) {
+    m = base.clone();
+    for (const k of TILED_MAPS) {
+      const t = base[k];
+      if (!t) continue;
+      const c = t.clone();
+      c.repeat.set(rx, ry);
+      m[k] = c;
+    }
+    tiledCopies.set(key, m);
+    copiesOf.set(base, [...(copiesOf.get(base) ?? []), m]);
+  }
+  return m;
 }
 
 let cache: ReturnType<typeof build> | null = null;
@@ -152,9 +183,12 @@ export function setWetness(wet: number) {
     if (!(m instanceof MeshStandardMaterial)) continue;
     let dry = dryLook.get(m);
     if (!dry) { dry = { color: m.color.clone(), roughness: m.roughness, env: m.envMapIntensity }; dryLook.set(m, dry); }
-    m.color.copy(dry.color).multiplyScalar(1 - 0.4 * w);
-    m.roughness = dry.roughness * (1 - 0.72 * w);
-    m.envMapIntensity = dry.env * (1 + 1.4 * w);
+    // The tiled copies on the streets share the original's dry look
+    for (const t of [m, ...(copiesOf.get(m) ?? [])]) {
+      t.color.copy(dry.color).multiplyScalar(1 - 0.4 * w);
+      t.roughness = dry.roughness * (1 - 0.72 * w);
+      t.envMapIntensity = dry.env * (1 + 1.4 * w);
+    }
   }
 }
 

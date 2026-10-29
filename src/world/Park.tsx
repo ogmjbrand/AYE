@@ -3,7 +3,7 @@ import { Euler, MeshStandardMaterial, Vector3 } from 'three';
 import { useDistrict } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { seeded } from '../lib/world';
-import { parkPathSurface } from './materials';
+import { parkPathSurface, tiledMaterial } from './materials';
 import { pbr, pbrOpacity } from './pbr';
 
 // Dry-season colours: a sun-faded lawn, laterite paths, olive shade trees (muted, never the brand colours)
@@ -31,18 +31,7 @@ export function Park() {
     const base = parkPathSurface();
     if (!base || !park) return [];
     const tile = base.userData.tileMeters as number;
-    return park.paths.map((p) => {
-      const m = base.clone();
-      for (const key of ['map', 'normalMap', 'roughnessMap', 'aoMap'] as const) {
-        const t = base[key];
-        if (!t) continue;
-        const c = t.clone();
-        c.repeat.set((p.x1 - p.x0) / tile, (p.z1 - p.z0) / tile);
-        c.needsUpdate = true;
-        m[key] = c;
-      }
-      return m;
-    });
+    return park.paths.map((p) => tiledMaterial(base, (p.x1 - p.x0) / tile, (p.z1 - p.z0) / tile));
   }, [park]);
   const parts = useMemo(() => {
     if (!park) return null;

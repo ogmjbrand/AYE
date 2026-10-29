@@ -3,7 +3,7 @@ import { Vector3 } from 'three';
 import { PAVEMENT_HEIGHT, STREET_LENGTH } from '../lib/world';
 import { useLayout } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
-import { materials } from './materials';
+import { materials, tiledMaterial } from './materials';
 
 const HALF = STREET_LENGTH / 2;
 /** How far the (visual-only) boulevard extends, matching the skyline and ground. */
@@ -20,20 +20,8 @@ function Strip({
   const w = x1 - x0, d = z1 - z0;
   // Real textures from the asset manifest declare their own size in metres
   const tile = (material.userData.tileMeters as number | undefined) ?? tileDefault;
-  // Clone the material per strip so each gets its own texture repeat
-  const mat = useMemo(() => {
-    const m = material.clone();
-    for (const key of ['map', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap'] as const) {
-      const t = material[key];
-      if (t) {
-        const c = t.clone();
-        c.repeat.set((alongX ? d : w) / tile, (alongX ? w : d) / tile);
-        c.needsUpdate = true;
-        m[key] = c;
-      }
-    }
-    return m;
-  }, [material, w, d, tile, alongX]);
+  // Each strip size gets its own texture repeat (shared by every strip that size)
+  const mat = tiledMaterial(material, (alongX ? d : w) / tile, (alongX ? w : d) / tile);
   return (
     <mesh
       position={[(x0 + x1) / 2, y, (z0 + z1) / 2]}

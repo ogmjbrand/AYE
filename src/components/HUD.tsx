@@ -420,8 +420,11 @@ export function HUD({
             : parkAt(district.park, px, pz) && onOpenPark
               ? { verb: 'Sit on a bench in', place: district.park.name, onOpen: onOpenPark }
               : null;
-  const resident = !prompt && onTalk ? residentNear(district.id, px, pz) : undefined;
-  const door = !prompt && !resident && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
+  // Your own front door wins over a passer-by, so a resident on the pavement never keeps you out of your home
+  const doorHere = !prompt && onOpenHome ? homeAtDoor(district.id, px, pz) : undefined;
+  const ownDoor = doorHere?.id === homeId ? doorHere : undefined;
+  const resident = !prompt && !ownDoor && onTalk ? residentNear(district.id, px, pz) : undefined;
+  const door = ownDoor ?? (!resident ? doorHere : undefined);
   const streetPrompt = eventPrompt?.() ?? prompt ?? (resident && onTalk
     ? { verb: 'Talk to', place: resident.name, onOpen: () => onTalk(resident) }
     : null) ?? (workTask ? { verb: 'Take on a task at', place: workTask.place, onOpen: workTask.onOpen } : null) ?? (door && onOpenHome

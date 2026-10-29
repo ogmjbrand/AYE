@@ -1,7 +1,12 @@
 import { CanvasTexture, SRGBColorSpace } from 'three';
+import { memoTexture } from './textureCache';
 
 /** The name board: gold lettering and a palm on deep green, drawn once on a canvas. */
 export function palmsSign(title: string, subtitle: string) {
+  return memoTexture(`palms:${title}:${subtitle}`, () => drawPalmsSign(title, subtitle));
+}
+
+function drawPalmsSign(title: string, subtitle: string) {
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 256;
@@ -48,6 +53,10 @@ export function palmsSign(title: string, subtitle: string) {
 
 /** The boutique's neon: "Style Your Life" in script with AYE beneath, glowing on a dark panel. */
 export function neonSign() {
+  return memoTexture('neon', drawNeonSign);
+}
+
+function drawNeonSign() {
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 384;
@@ -72,6 +81,10 @@ export function neonSign() {
 
 /** A simple illuminated name board: white letters on black, a thin accent line. */
 export function plainSign(title: string, subtitle: string, accent = '#c9a052') {
+  return memoTexture(`plain:${title}:${subtitle}:${accent}`, () => drawPlainSign(title, subtitle, accent));
+}
+
+function drawPlainSign(title: string, subtitle: string, accent: string) {
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 256;
