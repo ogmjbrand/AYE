@@ -110,3 +110,32 @@ body {
     animation: none !important;
   }
 }
+
+/* Going to sleep: the room fades to night over you in bed (App.tsx SLEEP_SCENE_MS) */
+.sleep-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 18vh;
+  pointer-events: none;
+  background-color: rgb(5 7 15 / 0);
+  animation: sleep-shade ease-in forwards;
+}
+.sleep-shade p {
+  margin: 0;
+  color: #e8dcc4;
+  font-size: 0.95rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+@keyframes sleep-shade {
+  0%, 30% { background-color: rgb(5 7 15 / 0); }
+  85%, 100% { background-color: rgb(5 7 15 / 0.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sleep-shade { animation: none; background-color: rgb(5 7 15 / 0.6); }
+}

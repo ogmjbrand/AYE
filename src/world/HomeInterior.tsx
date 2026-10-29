@@ -30,9 +30,10 @@ interface ShellProps {
 /**
  * An interior: your home, or a public venue.
  *
- * Homes are a dolls' house: the walls face inwards only and there is no
- * ceiling, so from the camera (often behind the front wall) you look straight
- * into the room.
+ * Homes are a dolls' house with a roof: the walls face inwards only and the
+ * front wall is left out, so from the camera (in front, kept under the
+ * ceiling by App.tsx's CameraFollow) you look straight into the room, with
+ * the ceiling overhead.
  *
  * Venues (office, restaurant, boutique, dealership, campus, hospital) are an
  * enclosed shell: a ceiling that hides when the camera is above the room,
@@ -135,6 +136,21 @@ function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }
         {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
       </LightsOn.Provider>
 
+      {/* The ceiling: a plaster slab over the whole room with a cornice along the back and side walls, and a flush light in the middle */}
+      <mesh position={[0, H + 0.08, 0]} receiveShadow>
+        <boxGeometry args={[w + 0.24, 0.16, d + 0.24]} />
+        <meshStandardMaterial color="#f1ece3" roughness={0.9} />
+      </mesh>
+      {[[0, d / 2 - 0.04, w, 0], [-w / 2 + 0.04, 0, d, Math.PI / 2], [w / 2 - 0.04, 0, d, Math.PI / 2]].map(([x, z, length, turn], i) => (
+        <mesh key={i} position={[x, H - 0.05, z]} rotation={[0, turn, 0]}>
+          <boxGeometry args={[length, 0.1, 0.08]} />
+          <meshStandardMaterial color="#e9e2d6" roughness={0.85} />
+        </mesh>
+      ))}
+      <mesh position={[0, H - 0.015, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.22, 32]} />
+        <meshStandardMaterial color="#fff6e4" emissive="#ffd9a8" emissiveIntensity={lightsOn ? 1.2 : 0} roughness={0.4} side={DoubleSide} />
+      </mesh>
       {/* Ceiling light: warm, brighter after dark; switched off, only a little spill from outside */}
       <pointLight position={[0, H - 0.2, 0]} intensity={lightsOn ? 4 + night * 14 : 0.6} distance={Math.max(w, d) * 1.6} decay={1.6} color="#ffd9a8" />
       <LightSwitch spot={lightSwitchSpot(interior)} halfWidth={w / 2} on={lightsOn} />

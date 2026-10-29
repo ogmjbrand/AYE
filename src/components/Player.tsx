@@ -10,6 +10,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
 import { LOOKS } from '../lib/looks';
 import { residentById, residentPosition } from '../lib/people';
+import type { SleepPose } from '../lib/bedSleep';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
 interface PlayerProps {
@@ -23,6 +24,8 @@ interface PlayerProps {
   hugSession?: HugSession | null;
   onHugComplete?: (residentId: string) => void;
   eating?: boolean;
+  /** Asleep in bed: lying on your back there, under the duvet, instead of standing where you are. */
+  lying?: SleepPose | null;
 }
 
 /** If your own look can't be loaded: the first built-in person, so you're still a real person on screen. */
@@ -45,8 +48,10 @@ export function Player({
   hugSession = null,
   onHugComplete,
   eating = false,
+  lying = null,
 }: PlayerProps) {
   const groupRef = useRef<Group>(null);
+  const bodyRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
   const completedHug = useRef<string | null>(null);
@@ -59,6 +64,15 @@ export function Player({
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
+    if (lying) {
+      // In bed: feet towards the foot end, head on the pillow, face up (turned to face -z, then laid back)
+      controller.velocity.set(0, 0, 0);
+      groupRef.current?.position.set(...lying.feet);
+      groupRef.current?.rotation.set(0, lying.heading, 0);
+      bodyRef.current?.rotation.set(Math.PI / 2, Math.PI, 0);
+      return;
+    }
+    bodyRef.current?.rotation.set(0, 0, 0);
     if (hugSession) {
       const elapsed = Date.now() - hugSession.startedAt;
       const blend = hugPositionBlend(elapsed, hugSession.approachMs);
@@ -120,25 +134,27 @@ export function Player({
   // Nothing stands in for you while you load: a real person or no one
   return (
     <group ref={groupRef}>
-      <ErrorBoundary fallback={<DefaultPerson controller={controller} />}>
-        <Suspense fallback={null}>
-          <Avatar
-            controller={controller}
-            lookId={character?.lookId}
-            heightCm={character?.heightCm}
-            styles={styles}
-            shape={character?.shape}
-            skinTone={character?.skinTone}
-            skinToneId={character?.skinToneId}
-            skinColor={character?.skinColor}
-            conversing={conversing}
-            hugSession={hugSession}
-            eating={eating}
-            shoeItemId={visibleShoeId}
-            hairstyleItemId={visibleHairstyleId}
-          />
-        </Suspense>
-      </ErrorBoundary>
+      <group ref={bodyRef}>
+        <ErrorBoundary fallback={<DefaultPerson controller={controller} />}>
+          <Suspense fallback={null}>
+            <Avatar
+              controller={controller}
+              lookId={character?.lookId}
+              heightCm={character?.heightCm}
+              styles={styles}
+              shape={character?.shape}
+              skinTone={character?.skinTone}
+              skinToneId={character?.skinToneId}
+              skinColor={character?.skinColor}
+              conversing={conversing}
+              hugSession={hugSession}
+              eating={eating}
+              shoeItemId={visibleShoeId}
+              hairstyleItemId={visibleHairstyleId}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      </group>
     </group>
   );
 }

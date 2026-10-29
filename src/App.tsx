@@ -35,6 +35,8 @@ import { QualityContext, initialAutoQuality, settingsFor, useQuality, type Quali
 import { lightingAt } from './world/timeOfDay';
 import { FpsMeter } from './world/FpsMeter';
 import { Player } from './components/Player';
+import { sleepPose, type SleepPose } from './lib/bedSleep';
+import { SleepingDuvet } from './world/SleepingDuvet';
 import { HUD, type NavItem, type PlacePlate } from './components/HUD';
 import type { IconName } from './components/os/icons';
 import type { Character } from './components/CharacterCreation';
@@ -71,10 +73,12 @@ import { AssistantPanel, BoutiquePanel } from './components/BoutiquePanel';
 import { BoutiqueInterior } from './world/BoutiqueInterior';
 import {
   DESK_SPOT, DOOR_SPOT as BOUTIQUE_DOOR, FITTING_SPOT, SALON_SPOT, STAFF as BOUTIQUE_STAFF, boutiqueLayout, type BoutiqueSection,
+  ROOM_HEIGHT as BOUTIQUE_HEIGHT,
 } from './lib/boutique';
 import {
   DOOR_SPOT as PALMS_DOOR, FREE_SEATS, HOST_SPOT as PALMS_HOST_SPOT, OPEN_HOUR as PALMS_OPEN_HOUR, STAFF as PALMS_STAFF,
   hostSeat, isOpen as palmsOpen, restaurantLayout, suitsYou, type MenuItem,
+  ROOM_HEIGHT as PALMS_HEIGHT,
 } from './lib/palms';
 import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
@@ -97,16 +101,18 @@ import {
   DESK_SPOT as HOTEL_DESK_SPOT, DOOR_SPOT as HOTEL_DOOR, GUEST_ROOM, HOTEL_NAME, NIGHT_PRICE, RECEPTIONIST, ROOMS as HOTEL_ROOMS,
   ROOM_SERVICE_MENU, VENDING_MENU, VENDING_SPOT, WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, hotelLayout, roomById as hotelRoom,
   roomDoorSpot, roomServiceSpot, stayIsValid,
+  STOREY as HOTEL_STOREY,
 } from './lib/hotel';
 import {
   BAR_SPOT as CANTINA_BAR_SPOT, CANTINA_MENU, CANTINA_NAME, DOOR_SPOT as CANTINA_DOOR, FREE_SEATS as CANTINA_SEATS, OPEN_HOUR as CANTINA_OPEN_HOUR,
   STAFF as CANTINA_STAFF, STOOLS as CANTINA_STOOLS, cantinaLayout, isOpen as cantinaOpen,
+  ROOM_HEIGHT as CANTINA_HEIGHT,
 } from './lib/cantina';
 import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import {
-  CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
+  CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
 import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
@@ -142,6 +148,7 @@ import { SpaJobPanel, SpaMenu, SpaSession } from './components/SpaPanel';
 import {
   DESK_SPOT as SPA_DESK_SPOT, DOOR_SPOT as SPA_DOOR, MANAGER_SPOT as SPA_MANAGER_SPOT, ROOMS as SPA_ROOMS, WAITING_SEATS as SPA_WAITING,
   clientsFor, isOpen as spaIsOpen, roomFor, rollSpaDay, serviceById as spaService, spaLayout, tableSpot, type Client as SpaClient, type ServiceId,
+  STOREY as SPA_STOREY,
 } from './lib/spa';
 // Main's walk-in workplaces: the office, AYE Global University, AYE General Hospital, the car showroom and the restaurant service
 import { canPlaceDecor, decorItemById, furnitureForHome, type HomeDecorPlacement } from './lib/homeDecor';
@@ -185,6 +192,8 @@ interface CityProps {
 interface CameraFollowProps {
   controller: ReturnType<typeof usePlayerController>;
   controlsRef: React.RefObject<OrbitControls | null>;
+  /** Indoors: the room's ceiling height. The camera stays just under it, so the room is always roofed over. */
+  ceiling?: number | null;
 }
 
 const followTarget = new Vector3();
@@ -199,6 +208,8 @@ const followShift = new Vector3();
  * behind and 1.5 m above, so the player fills a good part of the frame.
  */
 const CAMERA_TARGET_HEIGHT = 1.25;
+/** How long you see yourself asleep in bed before the night passes. */
+const SLEEP_SCENE_MS = 5000;
 
 /** The Palms' room as a collision layout (the same for every visit). */
 const PALMS_LAYOUT = restaurantLayout();
@@ -227,7 +238,7 @@ const PLATE_RADIUS = 9;
 const PLATE_SUBTITLE: Record<PlaceKind, string> = { food: 'Food & drinks', shop: 'Shopping', workplace: 'Workplace', home: 'Homes', public: 'Travel', nightlife: 'Lounge & nightlife', park: 'Park', dealership: 'Cars' };
 const PLATE_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm', dealership: 'car' };
 
-function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
+function CameraFollow({ controller, controlsRef, ceiling = null }: CameraFollowProps) {
   useFrame(({ camera }) => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -254,10 +265,16 @@ function CameraFollow({ controller, controlsRef }: CameraFollowProps) {
       camera.position.set(controls.target.x + dx * dist, controls.target.y + up, controls.target.z + dz * dist);
     }
     controls.update();
+    if (ceiling !== null && camera.position.y > ceiling - CEILING_CLEARANCE) {
+      camera.position.y = ceiling - CEILING_CLEARANCE;
+      camera.lookAt(controls.target);
+    }
   });
   return null;
 }
 const followOffset = new Vector3();
+/** How far under an indoor ceiling the camera stays. */
+const CEILING_CLEARANCE = 0.25;
 /** Chase-camera distance and height above the look-at point while driving. */
 const DRIVE_CAMERA_DISTANCE = 9;
 const DRIVE_CAMERA_HEIGHT = 3.2;
@@ -515,6 +532,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const inBoutique = !indoors && venue === BOUTIQUE_ID;
   /** Inside anywhere (your home, a venue or a workplace): not on the street. */
   const offStreet = indoors || inWorkplace || inPalms || inCantina || inHotel || inSpa || inBoutique;
+  /** The ceiling over you indoors (the camera stays under it, so every room is roofed over); null on the street. */
+  const ceilingHeight = indoors || (inWorkplace && venueInterior) ? WALL_HEIGHT
+    : inPalms ? PALMS_HEIGHT : inCantina ? CANTINA_HEIGHT : inHotel ? HOTEL_STOREY : inSpa ? SPA_STOREY : inBoutique ? BOUTIQUE_HEIGHT : null;
   /** Something happening in this district (an accident, a missing person…), if anything. */
   const liveEvent = state.world.active && state.world.active.districtId === district.id ? state.world.active : null;
   // Open for one event: it closes by itself when that event ends
@@ -805,6 +825,33 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [lightsOn, setLightsOn] = useState(true);
   const atLightSwitch = () => !!interior && nearSpot(lightSwitchSpot(interior), SWITCH_RADIUS);
   const flipLights = () => setLightsOn((on) => !on);
+  // Going to bed at home: you lie down under the duvet while the room fades to night, then wake up beside the bed
+  const [asleep, setAsleep] = useState<{ bed: Furniture; pose: SleepPose } | null>(null);
+  const finishSleep = useRef<() => void>(() => {});
+  useEffect(() => {
+    finishSleep.current = () => {
+      rest(true);
+      setAsleep(null);
+      setMovementBlocked(false);
+      if (interior) {
+        const [x, z] = bedSpot(interior);
+        placePlayer([x, 0, z], Math.PI / 2);
+      }
+    };
+  });
+  useEffect(() => {
+    if (!asleep) return;
+    const id = window.setTimeout(() => finishSleep.current(), SLEEP_SCENE_MS);
+    return () => window.clearTimeout(id);
+  }, [asleep]);
+  const goToBed = () => {
+    const bed = interior?.furniture.find((x) => x.kind === 'bed');
+    if (!indoors || !bed) { rest(atHome()); return; }
+    if (asleep) return;
+    placePlayer([controller.position.x, 0, controller.position.z], controller.direction);
+    setMovementBlocked(true);
+    setAsleep({ bed, pose: sleepPose(bed, character.heightCm) });
+  };
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
@@ -1550,7 +1597,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       if (indoors && interior) {
         // The switch first: you only reach it standing right at it
         if (atLightSwitch()) flipLights();
-        else if (nearSpot(bedSpot(interior))) rest(true);
+        else if (nearSpot(bedSpot(interior))) goToBed();
         else if (usableHere()) operateHere();
         else if (nearSpot(doorSpot(interior))) goOutside();
         return;
@@ -2313,7 +2360,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           balance={state.balance}
           onMoveIn={() => moveIn(homePanel.id)}
           onMoveOut={moveOut}
-          onSleep={() => { setHomePanel(null); rest(true); }}
+          onSleep={() => { setHomePanel(null); if (indoors) goToBed(); else rest(true); }}
           onGoInside={goInside}
           onClose={() => setHomePanel(null)}
         />
@@ -2425,7 +2472,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <WarmUp sceneKey={sceneKey} maxTextureSize={settings.quality === 'low' ? 1024 : 2048} skip={warmSkip} onReady={setSceneReady} onProgress={setWarmProgress} />
           <FpsMeter />
-          <CameraFollow controller={controller} controlsRef={controlsRef} />
+          <CameraFollow controller={controller} controlsRef={controlsRef} ceiling={ceilingHeight} />
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {inWorkplace && venueInterior ? (
@@ -2452,7 +2499,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
             ) : indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} lying={asleep?.pose} />
+                {asleep && <SleepingDuvet bed={asleep.bed} pose={asleep.pose} />}
                 {decorPlacement && decorPlacementItem && (
                   <DecorPlacementPreview controller={controller} item={decorPlacementItem} rotation={decorPlacement.rotation} />
                 )}
@@ -2494,13 +2542,18 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
             enableDamping
             maxPolarAngle={Math.PI / 2 - 0.08}
             minDistance={2.5}
-            maxDistance={40}
+            maxDistance={ceilingHeight === null ? 40 : 12}
           />
           <TransformAura player={controller} active={state.supernatural.form === 'transformed'} />
           {medicCall && medicCall.scene === sceneKey && <MedicResponder at={medicCall} arrived={medicCall.arrived} />}
           <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
+      {asleep && (
+        <div className="sleep-shade" role="status" aria-live="polite" style={{ animationDuration: `${SLEEP_SCENE_MS}ms` }}>
+          <p>Sleeping…</p>
+        </div>
+      )}
       {!sceneReady && (
         <div className="scene-preparing" role="status" aria-live="polite">
           <div className="flex w-[min(80vw,22rem)] flex-col items-center gap-3 text-center">
@@ -2712,7 +2765,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onReturnToHuman={returnToHuman}
           onHeal={() => sanctuaryHeal(atHome())}
           onGoHome={() => { setDivineOpen(false); onGo({ to: 'home' }); }}
-          onRest={() => { setDivineOpen(false); rest(atHome()); }}
+          onRest={() => { setDivineOpen(false); if (indoors) goToBed(); else rest(atHome()); }}
           onClose={() => setDivineOpen(false)}
         />
       )}
@@ -2767,7 +2820,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onEditLook={() => { if (offStreet) goOutside(); onEditLook(); }}
           settings={{
             quality: qualityMode === 'auto' ? `Auto (${autoQuality})` : qualityMode, onCycleQuality: () => onQualityChange(nextQualityMode(qualityMode)), showRoute, onShowRouteChange, sound, onSoundChange,
-            onRest: () => { setOsOpen(false); rest(atHome()); },
+            onRest: () => { setOsOpen(false); if (indoors) goToBed(); else rest(atHome()); },
             restWhere: () => atHome() ? `In your bed at ${home!.name}.` : state.home ? 'Away from home: you\u2019ll sleep rough and wake less rested. Your bed is better.' : 'You have no home, so you\u2019ll sleep rough and wake less rested.',
             onExitToMenu,
             events: FREQUENCY_LABEL[state.world.frequency],
@@ -2866,9 +2919,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {
+            if (asleep) return null;
             const use = usableHere();
             if (atLightSwitch()) return { verb: lightsOn ? 'Switch off the lights in' : 'Switch on the lights in', place: home!.name, onOpen: flipLights };
-            if (nearSpot(bedSpot(interior))) return { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) };
+            if (nearSpot(bedSpot(interior))) return { verb: 'Sleep in your bed at', place: home!.name, onOpen: goToBed };
             if (use) return { verb: use.verb, place: use.cost ? `${use.cost} GHAI` : 'at home', onOpen: operateHere };
             return nearSpot(doorSpot(interior)) ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside } : null;
           },
