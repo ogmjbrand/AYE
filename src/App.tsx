@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { enterVehicle, exitVehicle, getTrip, placePlayer, setMovementBlocked, setMoveTarget, setPace, usePlayerController } from './hooks/usePlayerController';
+import { enterVehicle, exitVehicle, forceExitVehicle, getTrip, onVehicleCrash, placePlayer, setMovementBlocked, setMoveTarget, setPace, usePlayerController } from './hooks/usePlayerController';
 import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
@@ -17,6 +17,9 @@ import { QuestsScreen } from './components/QuestsScreen';
 import { DivinePanel } from './components/DivinePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { TransformAura } from './world/TransformAura';
+import { MedicResponder } from './world/MedicResponder';
+import { CriticalWarning, EmergencyTransition, HealthPanel, MedicalKit, MedicalShop, MedicComing, RecoveryPanel } from './components/Survival';
+import { crashDamage, healthStatus } from './lib/health';
 import { LevelUp } from './components/LevelUp';
 import { levelProgress, totalXp } from './lib/lifeState';
 import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
@@ -127,6 +130,8 @@ import { signTexture } from './world/textures';
 import { HOME_RADIUS, distanceToDoor, homeAtDoor, homeById, type Home } from './lib/homes';
 import { loadCharacter, saveCharacter } from './lib/save';
 import { EntryScreen } from './components/EntryScreen';
+import { RotateHint } from './components/RotateHint';
+import { enterLandscape } from './lib/orientation';
 import { loadSettings, nextQualityMode, saveSettings, type QualityMode, type Settings } from './lib/settings';
 import { getCareerLocation, isAtWorkplace } from './lib/careers';
 import { AgencyFront } from './world/AgencyFront';
@@ -393,7 +398,7 @@ export default function App() {
   if (screen === 'create') {
     return (
       <CharacterCreation
-        onCharacterCreate={(c) => { setCharacter(c); setScreen('play'); }}
+        onCharacterCreate={(c) => { setCharacter(c); setScreen('play'); void enterLandscape(); }}
         onBack={() => setScreen('entry')}
       />
     );
@@ -413,7 +418,7 @@ export default function App() {
         saved={character}
         quality={quality}
         onQualityChange={changeQuality}
-        onContinue={() => setScreen('play')}
+        onContinue={() => { setScreen('play'); void enterLandscape(); }}
         onNewLife={() => setScreen('create')}
         onEditLook={() => { setEditFrom('entry'); setScreen('edit'); }}
       />
@@ -422,6 +427,8 @@ export default function App() {
 
   // Keyed by id so a new character starts with a fresh clock and ledger
   return (
+    <>
+    <RotateHint />
     <Game
       key={character.id}
       character={character}
@@ -435,6 +442,7 @@ export default function App() {
       onCharacterUpdate={handleCharacterUpdate}
       onEditLook={() => { setEditFrom('play'); setScreen('edit'); }}
     />
+    </>
   );
 }
 
@@ -475,6 +483,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
     buyGear, equipGear, unequipGear, repairGear, sellGear,
+    hurt, buyMedical, useMedical, callMedic, restToRecover,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -580,6 +589,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const [questsOpen, setQuestsOpen] = useState(false);
   const [divineOpen, setDivineOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
+  /** Where you called a paramedic from, and whether they've reached you yet. */
+  const [medicCall, setMedicCall] = useState<{ x: number; z: number; facing: number; scene: string; arrived: boolean; visits: number } | null>(null);
+  const recovery = state.health.recovery;
+  /** The emergency-recovery card for a recovery that has just started (not one resumed from a save). */
+  const [emergencyCard, setEmergencyCard] = useState<number | null>(null);
   /** Your rank in your career: what gear you're qualified for. */
   const careerRank = levelIndex(character.career, state.workMinutes);
   // Level-ups already shown (any from before this session count as shown)
@@ -1617,9 +1632,63 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen || inventoryOpen);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen || inventoryOpen || healthOpen || !!recovery);
     return () => setMovementBlocked(false);
-  }, [eventPanelOpen, divineOpen, questsOpen, inventoryOpen, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+  }, [eventPanelOpen, divineOpen, questsOpen, inventoryOpen, healthOpen, recovery, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+
+  // ── Survival (lib/health.ts): nobody dies ─────────────────────────────────
+  // A crash in the car you're driving hurts, by how fast you hit
+  useEffect(() => onVehicleCrash((impact) => {
+    const harm = crashDamage(impact);
+    if (harm <= 0) return;
+    hurt(harm, 'crashed the car');
+    setArrival(`Crash! You hit something at ${Math.round(impact * 3.6)} km/h and lost ${harm} health.`);
+  }), [hurt]);
+  /** Calls a paramedic to where you're standing. */
+  const requestMedic = () => {
+    if (state.health.medicAt !== null || state.health.recovery) return;
+    callMedic();
+    setMedicCall({ x: controller.position.x, z: controller.position.z, facing: controller.direction, scene: sceneKey, arrived: false, visits: state.health.medicVisits });
+  };
+  // The paramedic reaches you when their treatment is recorded; they stay a moment, then go
+  if (medicCall && !medicCall.arrived && state.health.medicVisits > medicCall.visits) setMedicCall({ ...medicCall, arrived: true });
+  if (medicCall && recovery) setMedicCall(null);
+  useEffect(() => {
+    if (!medicCall?.arrived) return;
+    const id = setTimeout(() => setMedicCall(null), 9000);
+    return () => clearTimeout(id);
+  }, [medicCall?.arrived]);
+  // A recovery that starts while you play shows the emergency card first (one resumed from a save doesn't)
+  const [seenRecovery, setSeenRecovery] = useState<number | null>(recovery?.startedAt ?? null);
+  if (recovery && recovery.startedAt !== seenRecovery) {
+    setSeenRecovery(recovery.startedAt);
+    if (state.time.totalMinutes - recovery.startedAt <= 2) setEmergencyCard(recovery.startedAt);
+  }
+  const dismissEmergencyCard = useCallback(() => setEmergencyCard(null), []);
+  // Taken to where you'll recover: a ward at General Hospital, or your home's healing chamber
+  const placedRecovery = useRef<number | null>(null);
+  const takeToRecovery = useRef<() => void>(() => {});
+  takeToRecovery.current = () => {
+    if (!recovery || placedRecovery.current === recovery.startedAt) return;
+    placedRecovery.current = recovery.startedAt;
+    if (controller.drivingVehicleId) { forceExitVehicle(); setDrivingVehicleId(null); }
+    sit.cancel();
+    setOsOpen(false); setPhoneOpen(false); setInventoryOpen(false); setDivineOpen(false); setQuestsOpen(false); setHealthOpen(false);
+    setHospitalPanel(null); setTravelOpen(false); setStore(null); setVendor(null); setGadgets(false); setTask(null); setTalking(null); setTrackedId(null);
+    if (recovery.place === 'sanctuary' && home && interior && home.district === district.id) {
+      goInside();
+    } else if (district.id === HOSPITAL.districtId) {
+      setHomePanel(null);
+      setInside(false);
+      setVenue(null);
+      clearWorkplaces();
+      setInsideHospital(true);
+      // Beside a ward bed
+      placePlayer([-9.5, 0, 4.6], 0);
+      snapIndoorCamera();
+    }
+  };
+  useEffect(() => { takeToRecovery.current(); }, [recovery?.startedAt, district.id]);
 
   // The ⋯ directory: real places in this district; Go walks there with the route finder
   const destinations = useMemo(() => cityDirectory(district, character.career, state.home), [district, character.career, state.home]);
@@ -2225,6 +2294,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           gear={state.gear}
           rankIndex={careerRank}
           onBuyGear={buyGear}
+          medical={<MedicalShop health={state.health} balance={state.balance} supernatural={state.supernatural.unlockedAt !== null} onBuy={buyMedical} />}
           onClose={() => setGadgets(false)}
         />
       )}
@@ -2358,6 +2428,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onClockOut={doClockOut}
           onBrief={doBrief}
           onAnswer={doTreat}
+          pharmacy={<MedicalShop health={state.health} balance={state.balance} supernatural={state.supernatural.unlockedAt !== null} onBuy={buyMedical} />}
           onClose={() => setHospitalPanel(null)}
         />
       )}
@@ -2469,6 +2540,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             maxDistance={40}
           />
           <TransformAura player={controller} active={state.supernatural.form === 'transformed'} />
+          {medicCall && medicCall.scene === sceneKey && <MedicResponder at={medicCall} arrived={medicCall.arrived} />}
           <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
@@ -2649,8 +2721,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onRepair={repairGear}
           onSell={sellGear}
           onOpenWardrobe={() => { setInventoryOpen(false); setStore('wardrobe'); }}
+          medicalKit={<MedicalKit health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUse={useMedical} />}
           onClose={() => setInventoryOpen(false)}
         />
+      )}
+      <CriticalWarning health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUseItem={useMedical} onCallMedic={requestMedic} onOpen={() => setHealthOpen(true)} />
+      <MedicComing health={state.health} now={state.time.totalMinutes} />
+      {recovery && emergencyCard !== recovery.startedAt && !state.summary && <RecoveryPanel health={state.health} now={state.time.totalMinutes} onRest={restToRecover} />}
+      {recovery && emergencyCard === recovery.startedAt && (
+        <EmergencyTransition place={recovery.place} reason={recovery.reason} onDone={dismissEmergencyCard} />
+      )}
+      {healthOpen && (
+        <HealthPanel health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUse={useMedical} onCallMedic={requestMedic} onClose={() => setHealthOpen(false)} />
       )}
       {divineOpen && (
         <DivinePanel
@@ -2804,6 +2886,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onStopTracking={() => (liveEvent?.responding ? eventDismiss() : setTrackedId(null))}
         eventPrompt={eventPrompt}
         level={levelProgress(totalXp(state.life.skills))}
+        health={{ value: state.health.value, critical: healthStatus(state.health) === 'critical', recovering: !!recovery }}
+        onOpenHealth={() => setHealthOpen(true)}
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {

@@ -44,7 +44,12 @@ import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
 import { CLIENTS_PER_DAY, clientById, emptySpaJob, isOpen as spaOpen, onShiftHours, rollSpaDay, satisfaction, serviceById, sessionPay, stars, type SpaJob } from './spa';
 import { canResidentAcceptHug } from './hug';
-import { canHeal, emptySupernatural, heal, HEALING_MINUTES, passMinute, returnToHuman, sleepRecovery, transform, unlock, type Supernatural } from './supernatural';
+import { canHeal, emptySupernatural, heal, HEALING_MINUTES, isUnlocked, passMinute, returnToHuman, sleepRecovery, transform, unlock, type Supernatural } from './supernatural';
+import {
+  MAX_HEALTH, addToKit, callMedic, canBuyMedical, canCallMedic, canUseItem, damage, emptyHealth, healBy, medicalItem, passHealthMinute, sleepHeal, applyItem,
+  type Health, type RecoveryContext,
+} from './health';
+import { HOSPITAL } from './hospitalSite';
 import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
@@ -183,6 +188,8 @@ export interface GameState {
   supernatural: Supernatural;
   /** Work gear you own: equipped or spare, and its condition (lib/careerGear.ts). */
   gear: OwnedGear[];
+  /** Health, emergency recovery and your medical kit: nobody ever dies (lib/health.ts). */
+  health: Health;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -229,6 +236,12 @@ export type GameAction =
   | { type: 'transform' }
   | { type: 'returnToHuman' }
   | { type: 'sanctuaryHeal'; atHome: boolean }
+  /** Health (lib/health.ts): harm from the world, healing items, a medic, resting through a recovery. */
+  | { type: 'hurt'; amount: number; reason: string }
+  | { type: 'buyMedical'; itemId: string }
+  | { type: 'useMedical'; itemId: string }
+  | { type: 'callMedic' }
+  | { type: 'restToRecover' }
   /** Work gear (lib/careerGear.ts): buy, equip or put away, repair, sell. */
   | { type: 'buyGear'; itemId: string }
   | { type: 'equipGear'; uid: string }
@@ -368,6 +381,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     world: emptyLiveWorld(),
     supernatural: emptySupernatural(),
     gear: [],
+    health: emptyHealth(),
   };
 }
 
@@ -895,12 +909,64 @@ export function gameReducer(
 ): GameState {
   if (action.type === 'tick') {
     if (state.summary) return state;
-    const next = tick(state, career, lifestyle, action.atWorkplace);
-    const world = directWorld(next.world, next.districtId, next.time.totalMinutes, career);
-    const supernatural = passMinute(next.supernatural);
-    return world === next.world && supernatural === next.supernatural ? next : { ...next, world, supernatural };
+    return liveMinute(state, career, lifestyle, action.atWorkplace && !state.health.recovery);
   }
+  // While you're being looked after you stay put: no trips, shifts, workouts or nights out
+  if (state.health.recovery && RESTING_BLOCKS.has(action.type)) return state;
   return baseReducer(state, action, career, lifestyle);
+}
+
+/** What can't be done during an emergency recovery stay. */
+const RESTING_BLOCKS: ReadonlySet<GameAction['type']> = new Set<GameAction['type']>([
+  'travel', 'socialise', 'nightOut', 'ride', 'transform', 'sanctuaryHeal', 'spaClockIn', 'spaSession', 'spaTreat', 'workTask', 'exercise', 'hug',
+  'fashionShowcase', 'officeClockIn', 'officeTask', 'campusClass', 'campusAssignment', 'campusStudy', 'hospitalClockIn', 'hospitalBrief', 'hospitalPatient',
+  'eventRespond', 'eventAct', 'bookHotel', 'moveIn', 'moveOut', 'wait',
+]);
+
+/** Where emergency recovery would take you right now. */
+export function recoveryContext(state: Pick<GameState, 'supernatural' | 'home'>): RecoveryContext {
+  return { supernatural: isUnlocked(state.supernatural), hasSanctuary: !!state.home };
+}
+
+/** Fed and rested at least this much when a recovery stay ends (meals and rest are part of the care). */
+export const DISCHARGE_FULLNESS = 70;
+export const DISCHARGE_ENERGY = 60;
+
+/** Pushing a supernatural form past exhaustion hurts, a little each minute. */
+export const OVEREXERTION_PER_MINUTE = 0.3;
+
+/**
+ * Applies a change of health and, when it starts an emergency recovery, takes
+ * you there at no cost: hospital in its district, or the sanctuary in your
+ * home. A supernatural form ends when recovery begins.
+ */
+function withHealth(state: GameState, health: Health): GameState {
+  if (health === state.health) return state;
+  const started = health.recovery && !state.health.recovery ? health.recovery : null;
+  if (!started) {
+    // A sanctuary stay restores supernatural energy as it ends
+    const ended = state.health.recovery && !health.recovery ? state.health.recovery : null;
+    if (!ended) return { ...state, health };
+    // You leave fed and rested enough to carry on: a stay never sends you straight back
+    const cared = { ...state, health, fullness: Math.max(state.fullness, DISCHARGE_FULLNESS), needs: { ...state.needs, energy: Math.max(state.needs.energy, DISCHARGE_ENERGY) } };
+    return ended.place === 'sanctuary' ? { ...cared, supernatural: heal(state.supernatural) } : cared;
+  }
+  const home = started.place === 'sanctuary' && state.home ? homeById(state.home) : undefined;
+  const districtId = home ? home.district : started.place === 'hospital' ? HOSPITAL.districtId : state.districtId;
+  return { ...state, health, districtId, supernatural: returnToHuman(state.supernatural) };
+}
+
+/** One game minute of life: the clock, the world, supernatural energy and health. */
+function liveMinute(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean): GameState {
+  const next = tick(state, career, lifestyle, atWorkplace);
+  const world = directWorld(next.world, next.districtId, next.time.totalMinutes, career);
+  const supernatural = passMinute(next.supernatural);
+  const now = next.time.totalMinutes;
+  const ctx = recoveryContext(next);
+  let health = passHealthMinute(next.health, now, { ...ctx, starving: next.fullness <= 0, exhausted: next.needs.energy <= 0, resting: false });
+  if (supernatural.form === 'transformed' && supernatural.exhaustion >= 100) health = damage(health, OVEREXERTION_PER_MINUTE, 'pushed your supernatural form too far', now, ctx);
+  const moved = world === next.world && supernatural === next.supernatural ? next : { ...next, world, supernatural };
+  return withHealth(moved, health);
 }
 
 function baseReducer(
@@ -913,9 +979,44 @@ function baseReducer(
     case 'tick':
       return state;
     case 'sleep': {
-      if (state.summary) return state;
+      if (state.summary || state.health.recovery) return state;
       const slept = sleep(state, career, lifestyle, action.atHome, action.atFriend);
-      return slept === state ? state : { ...slept, supernatural: sleepRecovery(slept.supernatural, action.atHome) };
+      return slept === state ? state : { ...slept, supernatural: sleepRecovery(slept.supernatural, action.atHome), health: sleepHeal(slept.health, action.atHome) };
+    }
+    case 'hurt': {
+      if (state.summary) return state;
+      return withHealth(state, damage(state.health, action.amount, String(action.reason).slice(0, 80), state.time.totalMinutes, recoveryContext(state)));
+    }
+    case 'buyMedical': {
+      const item = medicalItem(action.itemId);
+      if (!item || state.summary || !canBuyMedical(state.health, item, state.balance, isUnlocked(state.supernatural)).ok) return state;
+      return {
+        ...state,
+        balance: state.balance - item.price,
+        today: { ...state.today, expenses: state.today.expenses + item.price },
+        health: addToKit(state.health, item.id),
+      };
+    }
+    case 'useMedical': {
+      const item = medicalItem(action.itemId);
+      const now = state.time.totalMinutes;
+      if (!item || state.summary || !canUseItem(state.health, item, now, isUnlocked(state.supernatural)).ok) return state;
+      let next = state;
+      for (let i = 0; i < item.minutes; i++) next = liveMinute(next, career, lifestyle, false);
+      if (next.health.recovery) return next;
+      const supernatural = item.spirit ? { ...next.supernatural, energy: Math.min(next.supernatural.maxEnergy, next.supernatural.energy + item.spirit) } : next.supernatural;
+      return { ...next, supernatural, health: applyItem(next.health, item, next.time.totalMinutes) };
+    }
+    case 'callMedic': {
+      if (state.summary || !canCallMedic(state.health).ok) return state;
+      return { ...state, health: callMedic(state.health, state.time.totalMinutes) };
+    }
+    case 'restToRecover': {
+      // Rest through the rest of a recovery stay: the clock runs until you're discharged
+      if (state.summary || !state.health.recovery) return state;
+      let next = state;
+      for (let i = 0; i < 24 * 60 && next.health.recovery && !next.summary; i++) next = liveMinute(next, career, lifestyle, false);
+      return next;
     }
     case 'ascendUnlock': {
       const supernatural = unlock(state.supernatural, state.balance, state.time.totalMinutes);
@@ -933,7 +1034,7 @@ function baseReducer(
       if (state.summary || !canHeal(state.supernatural, action.atHome).ok) return state;
       let next = state;
       for (let i = 0; i < HEALING_MINUTES; i++) next = tick(next, career, lifestyle, false);
-      return { ...next, supernatural: heal(next.supernatural) };
+      return { ...next, supernatural: heal(next.supernatural), health: next.health.recovery ? next.health : healBy(next.health, MAX_HEALTH) };
     }
     case 'moveIn':
       return moveIn(state, action.homeId);

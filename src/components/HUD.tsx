@@ -2,7 +2,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useRef, useState } from 'react';
-import { CarFront, Check, ChevronDown, ChevronRight, MapPin, TriangleAlert } from 'lucide-react';
+import { CarFront, Check, ChevronDown, ChevronRight, Droplet, Heart, MapPin, TriangleAlert, Utensils, Zap } from 'lucide-react';
 import { assetUrl } from '../lib/assetManifest';
 import { HOURLY_WAGE, HUNGRY_THRESHOLD, WORK_END_HOUR, WORK_START_HOUR, isWorkingHours, type DayLedger, type GameTime } from '../lib/gameState';
 import { nearestVendor, type FoodVendor } from '../lib/food';
@@ -93,6 +93,9 @@ interface HUDProps {
   insideHome?: { name: string; prompt: () => { verb: string; place: string; onOpen: () => void } | null };
   /** Player level and progress through it (lib/lifeState.ts levelProgress). */
   level?: { level: number; into: number; span: number };
+  /** Health (lib/health.ts): shown with energy, hunger and hygiene; tapping opens the health panel. */
+  health?: { value: number; critical: boolean; recovering: boolean };
+  onOpenHealth?: () => void;
   /** Help at something happening in the city (lib/liveEvents.ts): comes before every other street prompt. */
   eventPrompt?: () => { verb: string; place: string; onOpen: () => void } | null;
   /** Opens the gadget shop when standing at it. */
@@ -349,6 +352,8 @@ export function HUD({
   tracked = null,
   eventPrompt,
   level,
+  health,
+  onOpenHealth,
   onStopTracking,
   insideHome,
   onOpenGadgets,
@@ -484,6 +489,15 @@ export function HUD({
             )}
           </div>
         </div>
+        {health && (
+          <button type="button" onClick={onOpenHealth} disabled={!onOpenHealth} aria-label={`Health ${Math.round(health.value)}. Open your health`}
+            className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-full px-3 py-1 text-xs font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${health.critical ? 'animate-pulse ring-2 ring-[#e5484d]' : ''}`}>
+            <span className="flex items-center gap-1" title="Health"><Heart size={14} aria-hidden="true" className="fill-[#e5484d] text-[#e5484d]" />{Math.round(health.value)}</span>
+            {needs && <span className="flex items-center gap-1" title="Energy"><Zap size={14} aria-hidden="true" className="fill-[#4eae42] text-[#4eae42]" />{Math.round(needs.energy)}</span>}
+            <span className="flex items-center gap-1" title="Hunger (how full you are)"><Utensils size={13} aria-hidden="true" className="text-[#e8b452]" />{Math.round(fullness)}</span>
+            {needs && <span className="flex items-center gap-1" title="Hygiene"><Droplet size={13} aria-hidden="true" className="fill-[#3b9ae8] text-[#3b9ae8]" />{Math.round(needs.hygiene)}</span>}
+          </button>
+        )}
         {warnings.length > 0 && (
           <div className="flex max-w-[16rem] flex-wrap gap-1">
             {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}

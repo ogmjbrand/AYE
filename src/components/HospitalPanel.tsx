@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import {
   BRIEFING_MINUTES,
@@ -24,6 +24,8 @@ interface HospitalPanelProps {
   onClockOut: () => void;
   onBrief: () => void;
   onAnswer: (choice: number) => void;
+  /** The pharmacy's medical supplies for sale (components/Survival.tsx MedicalShop). */
+  pharmacy?: ReactNode;
   onClose: () => void;
 }
 
@@ -48,7 +50,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function HospitalPanel({ mode, hospital, time, day, hourlyPay, todayIncome, onClockIn, onClockOut, onBrief, onAnswer, onClose }: HospitalPanelProps) {
+export function HospitalPanel({ mode, hospital, time, day, hourlyPay, todayIncome, onClockIn, onClockOut, onBrief, onAnswer, pharmacy, onClose }: HospitalPanelProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -146,9 +148,12 @@ export function HospitalPanel({ mode, hospital, time, day, hourlyPay, todayIncom
         )}
 
         {mode === 'pharmacy' && (
-          <p className="m-0 text-sm text-ui-muted">
-            The ward pharmacy is stocked by the hospital. You do not pay for supplies; treatments are covered by your shift.
-          </p>
+          <div className="space-y-3">
+            <p className="m-0 text-sm text-ui-muted">
+              The ward pharmacy is stocked by the hospital: supplies for treating patients on shift are free. First-aid supplies for yourself are sold at the counter.
+            </p>
+            {pharmacy}
+          </div>
         )}
       </section>
     </div>

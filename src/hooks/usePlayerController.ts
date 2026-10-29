@@ -197,6 +197,13 @@ function applyVehicleMovement(delta: number) {
     { forward: intent.forward, turn: intent.turn, delta },
   );
   vehicleSpeed = next.speed;
+  if (next.impact && next.impact >= CRASH_SPEED) {
+    const now = performance.now();
+    if (now - lastCrashAt > 1500) {
+      lastCrashAt = now;
+      for (const cb of crashListeners) cb(next.impact);
+    }
+  }
   playerHandle.position.set(next.x, playerHandle.position.y, next.z);
   playerHandle.direction = next.direction;
   playerHandle.velocity.set(
@@ -217,6 +224,16 @@ function releaseAllKeys() {
 
 let inputBlocked = false;
 /** Stops movement keys while a menu is open, so the player doesn't walk off mid-order. */
+/** Hitting something at this speed (metres a second, about 22 km/h) or faster is a crash that hurts. */
+export const CRASH_SPEED = 6;
+let lastCrashAt = -Infinity;
+const crashListeners = new Set<(impact: number) => void>();
+/** Called with the impact speed whenever the car you're driving crashes. Returns an unsubscribe. */
+export function onVehicleCrash(cb: (impact: number) => void): () => void {
+  crashListeners.add(cb);
+  return () => void crashListeners.delete(cb);
+}
+
 export function setMovementBlocked(blocked: boolean) {
   inputBlocked = blocked;
   if (blocked) releaseAllKeys();
@@ -261,6 +278,15 @@ export function exitVehicle() {
   playerHandle.drivingVehicleId = null;
   playerHandle.direction = direction;
   return true;
+}
+
+/** Out of the car wherever you are (an emergency transfer moves you straight after). */
+export function forceExitVehicle() {
+  if (!playerHandle.drivingVehicleId) return;
+  playerHandle.velocity.set(0, 0, 0);
+  vehicleSpeed = 0;
+  playerHandle.vehicleSpeed = 0;
+  playerHandle.drivingVehicleId = null;
 }
 
 function planRoute(target: MoveTarget, obstacles: readonly Obstacle[] = activeLayout().obstacles): Point[] | null {

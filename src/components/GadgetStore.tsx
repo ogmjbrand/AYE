@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Career } from './CharacterCreation';
 import { EQUIPMENT, type EquipmentItem } from '../lib/equipment';
 import type { Counter } from '../lib/geography';
@@ -15,12 +15,14 @@ interface GadgetStoreProps {
   gear: readonly OwnedGear[];
   rankIndex: number;
   onBuyGear: (itemId: string) => void;
+  /** First-aid supplies (components/Survival.tsx MedicalShop). */
+  medical?: ReactNode;
   onClose: () => void;
 }
 
 /** The Gadget Hub: one-off purchases that change how you live and work. */
-export function GadgetStore({ shop, owned, balance, career, onBuy, gear, rankIndex, onBuyGear, onClose }: GadgetStoreProps) {
-  const [tab, setTab] = useState<'gear' | 'gadgets'>(career === 'none' ? 'gadgets' : 'gear');
+export function GadgetStore({ shop, owned, balance, career, onBuy, gear, rankIndex, onBuyGear, medical, onClose }: GadgetStoreProps) {
+  const [tab, setTab] = useState<'gear' | 'gadgets' | 'medical'>(career === 'none' ? 'gadgets' : 'gear');
   const [confirming, setConfirming] = useState<string | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -49,12 +51,14 @@ export function GadgetStore({ shop, owned, balance, career, onBuy, gear, rankInd
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
         </header>
         <div role="tablist" aria-label="Departments" className="mx-4 mt-3 flex gap-1 rounded-xl bg-[#1a1815] p-1">
-          {([['gear', 'Work gear'], ['gadgets', 'Gadgets & kits']] as const).map(([id, label]) => (
+          {([['gear', 'Work gear'], ['gadgets', 'Gadgets & kits'], ...(medical ? [['medical', 'First aid']] as const : [])] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${tab === id ? 'bg-gradient-to-b from-[#f0c67e] to-[#d9a24a] text-black' : 'text-ui-ink/80 hover:text-ui-ink'}`}>{label}</button>
           ))}
         </div>
-        {tab === 'gear' ? (
+        {tab === 'medical' ? (
+          <div className="overflow-y-auto p-4">{medical}</div>
+        ) : tab === 'gear' ? (
           <div className="overflow-y-auto"><WorkGearShop career={career} rankIndex={rankIndex} balance={balance} owned={gear} onBuy={onBuyGear} /></div>
         ) : (
         <ul className="m-0 grid list-none gap-2 overflow-y-auto p-4">

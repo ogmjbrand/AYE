@@ -26,7 +26,7 @@ function List({ items, empty }: { items: string[]; empty: string }) {
  * sell), gadgets, vehicles, furniture and clothes. Nothing here is ever taken
  * away except by selling it yourself.
  */
-export function InventoryPanel({ state, character, career, rankIndex, onEquip, onUnequip, onRepair, onSell, onOpenWardrobe, onClose }: {
+export function InventoryPanel({ state, character, career, rankIndex, onEquip, onUnequip, onRepair, onSell, onOpenWardrobe, medicalKit, onClose }: {
   state: GameState;
   character: Character;
   career: Career;
@@ -36,6 +36,8 @@ export function InventoryPanel({ state, character, career, rankIndex, onEquip, o
   onRepair: (uid: string) => void;
   onSell: (uid: string) => void;
   onOpenWardrobe: () => void;
+  /** Your medical kit (components/Survival.tsx MedicalKit). */
+  medicalKit?: ReactNode;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -64,6 +66,7 @@ export function InventoryPanel({ state, character, career, rankIndex, onEquip, o
               <button type="button" onClick={onOpenWardrobe} className="shrink-0 rounded-lg border border-ui-gold/40 px-3 py-1.5 text-xs font-semibold hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Change outfit</button>
             </div>
           </Section>
+          {medicalKit && <Section title="Medical kit">{medicalKit}</Section>}
           <Section title="Gadgets and kits"><List items={gadgets} empty="None yet: the Gadget Hub sells phones and work kits." /></Section>
           <Section title="Vehicles"><List items={vehicles} empty="No vehicles yet: Marina Motors sells them." /></Section>
           <Section title="Furniture"><List items={furniture} empty="Only what your home came with." /></Section>

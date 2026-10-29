@@ -5,6 +5,8 @@ export interface VehicleMotion {
   z: number;
   direction: number;
   speed: number;
+  /** Speed the vehicle was doing when it hit something this step (0 if it didn't). */
+  impact?: number;
 }
 
 export function isVehicleSpawnClear(
@@ -36,6 +38,10 @@ export function advanceVehicleMotion(
   const intendedX = state.x + Math.sin(direction) * speed * delta;
   const intendedZ = state.z + Math.cos(direction) * speed * delta;
   const resolved = resolveCollisions(intendedX, intendedZ, 1.2, obstacles);
-  if (Math.hypot(resolved.x - intendedX, resolved.z - intendedZ) > 0.05) speed = 0;
-  return { x: resolved.x, z: resolved.z, direction, speed };
+  let impact = 0;
+  if (Math.hypot(resolved.x - intendedX, resolved.z - intendedZ) > 0.05) {
+    impact = Math.abs(speed);
+    speed = 0;
+  }
+  return { x: resolved.x, z: resolved.z, direction, speed, impact };
 }

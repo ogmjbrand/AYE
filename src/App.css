@@ -45,3 +45,44 @@
 @media (prefers-reduced-motion: reduce) {
   .scene-preparing__spinner { animation: none; }
 }
+
+/* Survival: a red edge that beats like a heart at critical health, softer when low */
+.survival-vignette-critical {
+  box-shadow: inset 0 0 18vmin 4vmin rgba(200, 20, 30, 0.55);
+  animation: survival-pulse 1.1s ease-in-out infinite;
+}
+.survival-vignette-low {
+  box-shadow: inset 0 0 14vmin 2vmin rgba(200, 60, 30, 0.28);
+}
+.survival-heartbeat {
+  animation: survival-beat 1.1s ease-in-out infinite;
+}
+@keyframes survival-pulse {
+  0%, 100% { opacity: 0.55; }
+  15% { opacity: 1; }
+  30% { opacity: 0.7; }
+  45% { opacity: 0.95; }
+}
+@keyframes survival-beat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.12); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .survival-vignette-critical, .survival-heartbeat { animation: none; }
+}
+
+/* Landscape play: upright phones and tablets see the rotate card, nothing else */
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 1024px) {
+  .rotate-hint { display: flex; }
+}
+.rotate-hint-phone { animation: rotate-hint-turn 2.4s ease-in-out infinite; }
+@keyframes rotate-hint-turn {
+  0%, 25% { transform: rotate(0deg); }
+  55%, 100% { transform: rotate(-90deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate-hint-phone { animation: none; transform: rotate(-90deg); }
+}
