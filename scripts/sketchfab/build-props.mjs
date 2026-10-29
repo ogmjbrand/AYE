@@ -8,6 +8,9 @@
  *   bento-box.glb        "FREE Japanese Bento Box – 3D Food Model" by Halabalo067
  *   vending-machine.glb  "Vending Machine" by gabyyu
  *   motorhome.glb        "FREE GMC Motorhome reimagined low poly" by Karol Miklas
+ *   fridge-retro.glb     "A Realistic Metallic Fridge" by TheBoss009SS
+ *
+ * Name props to build only those (node scripts/sketchfab/build-props.mjs fridge-retro).
  *
  * The vending machine's own textures are photographs full of real drinks
  * brands, so every one of those is replaced here with original artwork (made
@@ -192,7 +195,9 @@ await MeshoptEncoder.ready;
 await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
-for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024]]) {
+const only = process.argv.slice(2);
+for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512]]) {
+  if (only.length && !only.includes(name)) continue;
   const doc = await io.read(`${SRC}/${name}.glb`);
   if (name === 'vending-machine') await replaceVendingArt(doc);
   if (name === 'motorhome') await debadgeMotorhome(doc);

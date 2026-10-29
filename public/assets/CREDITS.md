@@ -45,6 +45,7 @@ From Sketchfab, rebuilt by `scripts/sketchfab/build-props.mjs` (WebP textures, m
 | `bento-box.glb` | "FREE Japanese Bento Box – 3D Food Model" (sketchfab.com/3d-models/free-japanese-bento-box-3d-food-model-519e3aeef157483bb9c4cc1652d6b70d) | Halabalo067 | CC BY 4.0 |
 | `vending-machine.glb` | "Vending Machine" (sketchfab.com/3d-models/vending-machine-3397acf75bf54f0e9bb0fff991be0989) | gabyyu | CC BY 4.0 |
 | `motorhome.glb` | "FREE GMC Motorhome reimagined low poly" (sketchfab.com/karolmiklas) | Karol Miklas | CC BY 4.0 |
+| `fridge-retro.glb` | "A Realistic Metallic Fridge" (sketchfab.com/3d-models/a-realistic-metallic-fridge-b76711ec4d0940bb937b04091d7da1d4) | TheBoss009SS | CC BY 4.0 |
 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ — changes made: animations removed, textures resized and converted to WebP, meshes compressed. On the vending machine, every texture that showed real drinks brands (the front, the drinks on the shelves, the instructions panel) was replaced with original artwork made for this game, so no brand names or logos remain. On the motorhome, the maker's badge, the tyre lettering, two round badges, the modeller's stickers and the fuel-company window stickers were painted out, and the wheels use the plain yellow paint sheet.
 

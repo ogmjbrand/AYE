@@ -1,3 +1,4 @@
+import { RealModel } from './RealModel';
 import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DoubleSide, type Group, type MeshStandardMaterial } from 'three';
@@ -749,8 +750,12 @@ export function Piece({ f }: { f: Furniture }) {
         </>
       );
       break;
+    case 'fridge':
+      // A real retro fridge (Sketchfab, CC-BY 4.0), fitted to the unit's space; the plain unit shows while it loads
+      parts = <RealModel name="fridge-retro" fit={[w, h, d]} fallback={box(w, h, d, h / 2, f.color)} />;
+      break;
     default:
-      // Wardrobe, counter, fridge: a solid unit
+      // Wardrobe, counter: a solid unit
       parts = box(w, h, d, h / 2, f.color);
   }
   return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}>{parts}</group>;
