@@ -25,7 +25,7 @@ import { levelProgress, totalXp } from './lib/lifeState';
 import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
 import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, templateFor, type ActiveEvent } from './lib/liveEvents';
 import PostEffects from './world/PostEffects';
-import { WarmUp } from './world/WarmUp';
+import { WarmUp, type WarmProgress } from './world/WarmUp';
 import { Streets } from './world/Streets';
 import { QualityContext, initialAutoQuality, settingsFor, useQuality, type Quality } from './world/quality';
 import { lightingAt } from './world/timeOfDay';
@@ -627,6 +627,15 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   /** Which place the canvas is showing; a new one is prepared (shaders and textures) before it is drawn. */
   const sceneKey = venueLayout ? venueLayout.id : indoors ? `home.${home!.id}` : venue !== null ? `venue.${venue}` : `city.${district.id}`;
   const [sceneReady, setSceneReady] = useState(false);
+  // The getting-ready card: what it's doing, and after a few seconds a way to start straight away
+  const [warmProgress, setWarmProgress] = useState<WarmProgress | null>(null);
+  const [warmSkip, setWarmSkip] = useState(0);
+  const [warmSlow, setWarmSlow] = useState(false);
+  useEffect(() => {
+    if (sceneReady) return;
+    const id = setTimeout(() => setWarmSlow(true), 6000);
+    return () => { clearTimeout(id); setWarmSlow(false); setWarmProgress(null); };
+  }, [sceneReady, sceneKey]);
   // The phone in your pocket: it charges while you're at home
   const phoneCharging = indoors && !!home && home.id === state.home;
   const myPhone = usePhone(character.id, state, phoneCharging);
@@ -2466,7 +2475,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         >
           {/* Drop to the low tier (no AO or contact shadows, smaller shadow map, 1x DPR) if frame rate sags */}
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
-          <WarmUp sceneKey={sceneKey} onReady={setSceneReady} />
+          <WarmUp sceneKey={sceneKey} maxTextureSize={settings.quality === 'low' ? 1024 : 2048} skip={warmSkip} onReady={setSceneReady} onProgress={setWarmProgress} />
           <FpsMeter />
           <CameraFollow controller={controller} controlsRef={controlsRef} />
           <ClickToMove player={controller} showRoute={showRoute} />
@@ -2546,8 +2555,18 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       </QualityContext.Provider>
       {!sceneReady && (
         <div className="scene-preparing" role="status" aria-live="polite">
-          <span className="scene-preparing__spinner" aria-hidden="true" />
-          Getting {offStreet ? 'inside' : district.name} ready…
+          <div className="flex w-[min(80vw,22rem)] flex-col items-center gap-3 text-center">
+            <span className="flex items-center gap-3"><span className="scene-preparing__spinner" aria-hidden="true" /> Getting {offStreet ? 'inside' : district.name} ready…</span>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Getting ready" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((warmProgress?.share ?? 0) * 100)}>
+              <div className="h-full rounded-full bg-gradient-to-r from-[#c88a2c] to-[#f0c67e] transition-[width] duration-300" style={{ width: `${Math.round((warmProgress?.share ?? 0) * 100)}%` }} />
+            </div>
+            <p className="m-0 text-xs text-[#f4efe6]/70">{warmProgress?.detail ?? 'Starting'}</p>
+            {warmSlow && (
+              <button type="button" onClick={() => setWarmSkip((n) => n + 1)} className="rounded-xl border border-[#f0c67e]/60 px-4 py-2 text-sm font-semibold text-[#f0c67e] hover:bg-[#f0c67e]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0c67e]">
+                Start now (the rest loads as you play)
+              </button>
+            )}
+          </div>
         </div>
       )}
 
