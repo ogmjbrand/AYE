@@ -450,25 +450,25 @@ export function interiorFor(home: Home): Interior {
 /** Where you stand just inside the front door. */
 export const doorSpot = (i: Interior) => [0, -i.depth / 2 + 0.7] as const;
 /**
- * The light switch: on the front wall beside the door, at the nearest stretch
- * of wall with floor clear in front of it (homes put a shower or a counter by
- * the door), returned as where you stand to reach it.
+ * The light switch: on a side wall near the front of the room (the front
+ * wall isn't drawn, so the camera can see in), at the first spot with clear
+ * floor in front of it, returned as where you stand to reach it. The switch
+ * itself is on the wall beside that spot (x = ±width / 2).
  */
 const switchSpots = new WeakMap<Interior, readonly [number, number]>();
 export function lightSwitchSpot(i: Interior): readonly [number, number] {
   const hit = switchSpots.get(i);
   if (hit) return hit;
-  const z = -i.depth / 2 + 0.45;
   // Clear means you can stand there: nothing in the home's walls, furniture or decor pushes you off it
   const { obstacles } = interiorLayout(i);
-  const clear = (x: number) => {
+  const clear = (x: number, z: number) => {
     const r = resolveCollisions(x, z, PLAYER_RADIUS + 0.05, obstacles);
     return Math.hypot(r.x - x, r.z - z) < 0.01;
   };
-  let spot: readonly [number, number] = [-Math.min(1.3, i.width / 2 - 0.4), z];
-  for (let off = 1.1; off <= i.width / 2 - 0.4; off += 0.2) {
-    const x = [-off, off].find(clear);
-    if (x !== undefined) { spot = [x, z]; break; }
+  const inset = i.width / 2 - 0.45;
+  let spot: readonly [number, number] = [-inset, -i.depth / 2 + 0.6];
+  search: for (let z = -i.depth / 2 + 0.6; z < 0; z += 0.25) {
+    for (const x of [-inset, inset]) if (clear(x, z)) { spot = [x, z]; break search; }
   }
   switchSpots.set(i, spot);
   return spot;

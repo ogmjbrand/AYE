@@ -31,7 +31,7 @@ function Cloth({ color, fabric }: { color: string; fabric: Fabric }) {
   return <meshStandardMaterial color={color} roughness={0.95} normalMap={pbr('fabric-007', [4, 4]).normalMap} />;
 }
 
-function Pad({ p, s, color, fabric = 'linen', radius = 0.05 }: { p: [number, number, number]; s: [number, number, number]; color: string; fabric?: Fabric; radius?: number }) {
+export function Pad({ p, s, color, fabric = 'linen', radius = 0.05 }: { p: [number, number, number]; s: [number, number, number]; color: string; fabric?: Fabric; radius?: number }) {
   return (
     <RoundedBox args={s} radius={Math.min(radius, ...s.map((v) => v / 2 - 0.001))} smoothness={4} position={p} castShadow receiveShadow>
       <Cloth color={color} fabric={fabric} />

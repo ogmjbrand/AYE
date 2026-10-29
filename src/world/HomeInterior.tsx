@@ -13,6 +13,7 @@ import { pbr } from './pbr';
 import type { GameTime } from '../lib/gameState';
 import { interiorFloorMaterial } from './interiorMaterials';
 import { LightsOn, useLightsOn } from './lights';
+import { PlainBed, PlainWardrobe } from './PlainBedroom';
 
 interface ShellProps {
   interior: Interior;
@@ -136,7 +137,7 @@ function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }
 
       {/* Ceiling light: warm, brighter after dark; switched off, only a little spill from outside */}
       <pointLight position={[0, H - 0.2, 0]} intensity={lightsOn ? 4 + night * 14 : 0.6} distance={Math.max(w, d) * 1.6} decay={1.6} color="#ffd9a8" />
-      <LightSwitch at={lightSwitchSpot(interior)[0]} z={-d / 2} on={lightsOn} />
+      <LightSwitch spot={lightSwitchSpot(interior)} halfWidth={w / 2} on={lightsOn} />
       {children}
     </group>
   );
@@ -412,10 +413,11 @@ function PlainLamp({ w, h, color }: { w: number; h: number; color: string }) {
   );
 }
 
-/** The switch plate beside the front door, its rocker up when on. */
-function LightSwitch({ at, z, on }: { at: number; z: number; on: boolean }) {
+/** The switch plate on the side wall by where you stand, its rocker up when on. */
+function LightSwitch({ spot, halfWidth, on }: { spot: readonly [number, number]; halfWidth: number; on: boolean }) {
+  const side = spot[0] < 0 ? -1 : 1;
   return (
-    <group position={[at, 1.2, z + 0.012]}>
+    <group position={[side * (halfWidth - 0.012), 1.2, spot[1]]} rotation={[0, -side * Math.PI / 2, 0]}>
       <mesh><boxGeometry args={[0.09, 0.13, 0.012]} /><meshStandardMaterial color="#f1eee8" roughness={0.5} /></mesh>
       <mesh position={[0, on ? 0.015 : -0.015, 0.009]} rotation={[on ? -0.25 : 0.25, 0, 0]}>
         <boxGeometry args={[0.035, 0.05, 0.012]} />
@@ -434,16 +436,16 @@ export function Piece({ f }: { f: Furniture }) {
   let parts: ReactNode;
   switch (f.kind) {
     case 'bed':
-      parts = (
-        <>
-          {box(w, 0.3, d, 0.15, '#3b2c22')}
-          {box(w - 0.05, 0.22, d - 0.1, 0.41, '#f1ede6')}
-          {box(w - 0.05, 0.06, d * 0.6, 0.55, f.color, 0, -d * 0.18)}
-          {box(w * 0.8, 0.12, 0.35, 0.58, '#ffffff', 0, d / 2 - 0.3)}
-          {box(w, 0.9, 0.08, 0.45, '#3b2c22', 0, d / 2 - 0.04)}
-        </>
-      );
+      // Headboard on +z, duvet in the bed's colour
+      parts = <PlainBed w={w} d={d} color={f.color} />;
       break;
+    case 'wardrobe': {
+      // Against a wall, so its doors face into the room across its thin side
+      const alongX = d <= w;
+      const turn = alongX ? (z > 0 ? 0 : Math.PI) : (x > 0 ? Math.PI / 2 : -Math.PI / 2);
+      parts = <group rotation={[0, turn, 0]}><PlainWardrobe w={alongX ? w : d} h={h} d={alongX ? d : w} color={f.color} /></group>;
+      break;
+    }
     case 'sofa': {
       const long = w >= d;
       const blocks = (
