@@ -18,5 +18,8 @@ export function preloadRealModels(names: readonly RealModelName[]) {
   for (const n of names) useGLTF.preload(assetUrl(modelPath(n)), false, true);
 }
 
-/** What every home's kitchen and decor bring in: the fridge and the fruit bowl and bread board. */
-export const HOME_MODELS: readonly RealModelName[] = ['fridge-retro', 'apple', 'apple-red', 'pear', 'kiwi', 'bread-loaf'];
+/** What homes bring in: the fridge, the fruit bowl and bread board, and the sofa, armchair and plant. */
+export const HOME_MODELS: readonly RealModelName[] = [
+  'fridge-retro', 'apple', 'apple-red', 'pear', 'kiwi', 'bread-loaf',
+  'sofa-velvet-champagne', 'chair-velvet-peacock', 'plant-potted',
+];

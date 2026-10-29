@@ -2,7 +2,7 @@
  * Builds the photoreal furniture used in venues and the Luxe collection from
  * the Khronos glTF sample models (CC0 and CC-BY 4.0, see public/assets/CREDITS.md).
  *
- *   node scripts/khronos/build-furniture.mjs
+ *   node scripts/khronos/build-furniture.mjs [output names…]   (no names: build them all)
  *
  * Downloads go to assets-src/khronos/cache/ (git-ignored). For each model the
  * chosen colour (KHR_materials_variants) is baked in, lights and unused
@@ -29,6 +29,7 @@ const BUILDS = [
   ['GlassVaseFlowers', null, 'vase-flowers', 512],
   ['DiffuseTransmissionPlant', null, 'plant-potted', 512],
 ];
+const only = process.argv.slice(2);
 
 mkdirSync(CACHE, { recursive: true });
 mkdirSync(OUT, { recursive: true });
@@ -36,6 +37,7 @@ await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
 for (const [model, variant, out, size] of BUILDS) {
+  if (only.length && !only.includes(out)) continue;
   const file = `${CACHE}/${model}.glb`;
   if (!existsSync(file)) {
     const res = await fetch(`${SRC}/${model}/glTF-Binary/${model}.glb`);

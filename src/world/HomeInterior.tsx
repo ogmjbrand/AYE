@@ -413,11 +413,18 @@ export function Piece({ f }: { f: Furniture }) {
       break;
     case 'sofa': {
       const long = w >= d;
-      parts = (
+      const blocks = (
         <>
           {box(w, 0.42, d, 0.21, f.color)}
           {long ? box(w, 0.5, 0.25, 0.6, f.color, 0, d / 2 - 0.12) : box(0.25, 0.5, d, 0.6, f.color, w / 2 - 0.12, 0)}
         </>
+      );
+      // The real velvet sofa (Khronos sample, see CREDITS.md) dyed this sofa's colour, its back where the block sofa's is: +z, or +x when it stands turned
+      parts = (
+        <group rotation={[0, long ? 0 : Math.PI / 2, 0]}>
+          <RealModel name="sofa-velvet-champagne" fit={long ? [w, h, d] : [d, h, w]} rotationY={Math.PI} recolor={{ match: /fabric/i, color: f.color }}
+            fallback={<group rotation={[0, long ? 0 : -Math.PI / 2, 0]}>{blocks}</group>} />
+        </group>
       );
       break;
     }
@@ -448,13 +455,13 @@ export function Piece({ f }: { f: Furniture }) {
       break;
     case 'plant':
       parts = (
-        <>
+        <RealModel name="plant-potted" fit={[w, h, d]} fallback={<>
           {box(w * 0.7, 0.4, d * 0.7, 0.2, '#8a5a3c')}
           <mesh position={[0, 0.4 + (h - 0.4) / 2, 0]} castShadow>
             <sphereGeometry args={[Math.max(w, d) * 0.6, 12, 10]} />
             <meshStandardMaterial color={f.color} roughness={0.9} />
           </mesh>
-        </>
+        </>} />
       );
       break;
     case 'lamp':
@@ -469,13 +476,14 @@ export function Piece({ f }: { f: Furniture }) {
       );
       break;
     case 'armchair':
+      // The real velvet armchair (Khronos sample, see CREDITS.md) dyed this chair's colour, its back to +z like the block one
       parts = (
-        <>
+        <RealModel name="chair-velvet-peacock" fit={[w, h, d]} rotationY={Math.PI} recolor={{ match: /fabric|velvet/i, color: f.color }} fallback={<>
           {box(w, 0.4, d, 0.2, f.color)}
           {box(w, 0.5, 0.18, 0.6, f.color, 0, d / 2 - 0.09)}
           {box(0.14, 0.25, d, 0.52, f.color, -w / 2 + 0.07)}
           {box(0.14, 0.25, d, 0.52, f.color, w / 2 - 0.07)}
-        </>
+        </>} />
       );
       break;
     case 'shower':
