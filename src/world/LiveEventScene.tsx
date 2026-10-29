@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Mesh, MeshStandardMaterial } from 'three';
-import { templateFor, type ActiveEvent, type Point } from '../lib/liveEvents';
+import { buildingFaceBehind, templateFor, type ActiveEvent, type Point } from '../lib/liveEvents';
 import { carFootprint, groundHeightAt, parkedObstacles, type Obstacle } from '../lib/world';
 import { lookById } from '../lib/looks';
 import { Car } from './Props';
 import { WorldNPC } from './WorldNPC';
 import { nameTag } from './nameTag';
+import { Cordon, EmergencyVehicle, Fire, HoseAndWater } from './Emergency';
+import { useLayout } from './DistrictContext';
 
 /** Minutes after an emergency starts before the computer-controlled services arrive. */
 const POLICE_AFTER = 8;
 const PARAMEDICS_AFTER = 14;
+/** The fire service arrives, and starts spraying a few minutes later. */
+const FIRE_SERVICE_AFTER = 9;
+const SPRAY_AFTER = 12;
 
 const RING_COLOUR = { emergency: '#ff6a55', minor: '#f2c14e', opportunity: '#6fd3a4' } as const;
 
@@ -100,7 +105,9 @@ function Accident({ e, minute }: { e: ActiveEvent; minute: number }) {
       <Person name="Kunle" who={treated ? 'Driver, being treated' : 'Injured driver'} lookId="male-adult-04" at={{ x: x, z: z + 2.4 }} facing={Math.PI} sitting />
       <Person name="Amaka" who="Passenger" lookId="female-adult-06" at={{ x: x + 2.6, z: z + 2.6 }} facing={-Math.PI / 2} />
       {since >= POLICE_AFTER && <Person name="Officer Bello" who="Police" lookId="police-male-01" at={{ x: x - 4, z: z + 1.8 }} facing={Math.PI / 2} uniformed />}
+      {since >= POLICE_AFTER && <EmergencyVehicle kind="police" position={[x - 7.5, 0, z - 0.6]} heading={Math.PI / 2} />}
       {since >= PARAMEDICS_AFTER && <Person name="Ifeoma" who="Paramedic" lookId="medical-female-02" at={{ x: x + 0.9, z: z + 3.3 }} facing={Math.PI} uniformed />}
+      {since >= PARAMEDICS_AFTER && <EmergencyVehicle kind="ambulance" position={[x + 7.5, 0, z + 0.8]} heading={-Math.PI / 2} />}
     </group>
   );
 }
@@ -112,6 +119,7 @@ function Collapse({ e, minute }: { e: ActiveEvent; minute: number }) {
     <group>
       <Person name="Mrs Adeyemi" who={e.done.includes('recovery') || e.done.includes('treat') ? 'Recovering' : 'Collapsed'} lookId="female-adult-10" at={{ x, z }} facing={Math.PI / 2} sitting />
       {since >= PARAMEDICS_AFTER && <Person name="Chidi" who="Paramedic" lookId="medical-male-02" at={{ x: x + 1.2, z: z + 1 }} facing={-Math.PI / 2} uniformed />}
+      {since >= PARAMEDICS_AFTER && <CollapseAmbulance at={e.scene} />}
     </group>
   );
 }
@@ -166,6 +174,59 @@ function LunchRush({ e }: { e: ActiveEvent }) {
   );
 }
 
+/** An ambulance pulled up at the kerb beside someone on the pavement. */
+function CollapseAmbulance({ at }: { at: Point }) {
+  const { roadHalfWidth: R } = useLayout();
+  const side = Math.sign(at.x) || 1;
+  return <EmergencyVehicle kind="ambulance" position={[side * (R - 1.6), 0, at.z + 3]} heading={Math.PI} />;
+}
+
+/**
+ * A shopfront on fire. Smoke and flames from the door and the window above;
+ * neighbours in the doorway until someone moves them; after a few minutes the
+ * fire engine arrives, the crew run out a hose and the jet knocks the fire
+ * down. Whatever the player did shows: the crowd moved back, the extinguisher
+ * shrinking the fire early, the rescued resident sitting safe.
+ */
+function BuildingFire({ e, minute }: { e: ActiveEvent; minute: number }) {
+  const layout = useLayout();
+  const { roadHalfWidth: R, pavementWidth: P } = layout;
+  const { x, z } = e.scene;
+  const face = buildingFaceBehind(layout, x, z);
+  const side = face?.side ?? (Math.sign(x) || 1);
+  const since = minute - e.startedAt;
+  const span = Math.max(1, e.endsAt - e.startedAt - SPRAY_AFTER);
+  const sprayed = Math.max(0, since - SPRAY_AFTER) / span;
+  const strength = Math.max(0, (e.done.includes('extinguish') ? 0.6 : 1) - sprayed * 1.15);
+  const wall: readonly [number, number, number] = [(face ? face.faceX : side * (R + P)) - side * 0.08, 0, z];
+  const facing = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+  const engine: readonly [number, number, number] = [side * (R - 1.9), 0, z - 7];
+  const nozzle: readonly [number, number, number] = [side * (R + 0.6), 1.1, z - 1.2];
+  const evacuated = e.done.includes('evacuate');
+  const crowdX = evacuated ? -side * (R + P / 2) : side * (R + P * 0.35);
+  const crowd = [['Kemi', 'female-adult-03'], ['Uche', 'male-adult-10'], ['Bola', 'female-adult-06'], ['Ade', 'male-adult-04']] as const;
+  return (
+    <group>
+      <Fire at={wall} facing={facing} strength={strength} />
+      {crowd.map(([name, look], i) => (
+        <Person key={name} name={name} who={evacuated ? 'Neighbour, safe' : 'Neighbour'} lookId={look} at={{ x: crowdX + (i % 2) * 0.8 * -side, z: z + 2.5 + i * 0.9 }} facing={evacuated ? -facing : facing} />
+      ))}
+      {e.done.includes('rescue') && <Person name="Mama Ngozi" who="Rescued resident" lookId="female-adult-10" at={{ x: -side * (R + P / 2), z: z - 2 }} facing={facing} sitting />}
+      {e.done.includes('cordon') && <Cordon points={[[side * (R + 0.2), z - 4], [side * (R + 0.2), z + 4], [side * (R + P - 0.4), z + 4], [side * (R + P - 0.4), z - 4]]} />}
+      {since >= FIRE_SERVICE_AFTER && (
+        <>
+          <EmergencyVehicle kind="fire" position={engine} heading={0} />
+          <HoseAndWater from={[engine[0] + side * -1.3, 0.8, engine[2] + 0.4]} nozzle={nozzle} target={[wall[0], 2.2, wall[2]]} spraying={since >= SPRAY_AFTER && strength > 0} />
+          <Person name="Officer Eze" who="Firefighter" lookId="construction-male-03" at={{ x: nozzle[0] - side * 0.3, z: nozzle[2] - 0.5 }} facing={facing + Math.PI} uniformed />
+          <Person name="Officer Musa" who="Firefighter" lookId="construction-male-03" at={{ x: nozzle[0] - side * 0.9, z: nozzle[2] - 1.6 }} facing={facing + Math.PI} uniformed />
+          <EmergencyVehicle kind="police" position={[side * (R - 1.6), 0, z + 9]} heading={Math.PI} />
+        </>
+      )}
+      {since >= PARAMEDICS_AFTER && <EmergencyVehicle kind="ambulance" position={[-side * (R - 1.7), 0, z - 4]} heading={0} />}
+    </group>
+  );
+}
+
 /**
  * The event happening in this district, drawn where it happens. Everyone in
  * it is computer-controlled and says so.
@@ -180,6 +241,7 @@ export function LiveEventScene({ event, minute }: { event: ActiveEvent; minute: 
       {event.kind === 'missing-person' && <MissingPerson e={event} />}
       {event.kind === 'breakdown' && <Breakdown e={event} />}
       {event.kind === 'lunch-rush' && <LunchRush e={event} />}
+      {event.kind === 'building-fire' && <BuildingFire e={event} minute={minute} />}
     </group>
   );
 }

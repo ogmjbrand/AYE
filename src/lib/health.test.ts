@@ -194,3 +194,24 @@ describe('saves and interruptions', () => {
     expect(edited.kit).toEqual({ 'med-first-aid': medicalItem('med-first-aid')!.max });
   });
 });
+
+describe('the building fire', () => {
+  it('rescuing someone from the smoke hurts but never kills, and the rescue is paid', async () => {
+    const { districtById } = await import('./geography');
+    const { siteFor } = await import('./liveEvents');
+    const { seeded } = await import('./world');
+    const site = siteFor('building-fire', districtById('lagos.marina'), seeded(3))!;
+    expect(site).not.toBeNull();
+    let s = createGameState(1000, createTime(10, 0));
+    const now = s.time.totalMinutes;
+    s = { ...s, districtId: 'lagos.marina', health: { ...s.health, value: 20 }, world: { ...s.world, active: { id: `building-fire@${now}`, kind: 'building-fire', districtId: 'lagos.marina', startedAt: now, endsAt: now + 55, scene: site.scene, responding: true, dismissed: false, done: [], earned: 0, rep: {} } } };
+    s = act(s, { type: 'eventAct', objectiveId: 'evacuate', at: site.scene });
+    const before = s.balance;
+    s = act(s, { type: 'eventAct', objectiveId: 'rescue', at: site.scene });
+    expect(s.world.active?.done).toContain('rescue');
+    expect(s.balance).toBeGreaterThan(before);
+    // 20 health minus 30 of smoke: caught at the floor and taken to hospital, alive
+    expect(s.health.value).toBeGreaterThanOrEqual(SURVIVAL_FLOOR);
+    expect(s.health.recovery?.place).toBe('hospital');
+  });
+});

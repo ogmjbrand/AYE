@@ -27,7 +27,7 @@ import { districtById, type District } from './geography';
 import { seeded, type DistrictLayout } from './world';
 import { addReputation, emptyReputation, sanitiseReputation, type RepId, type Reputation } from './reputation';
 
-export type EventKind = 'road-accident' | 'collapse' | 'missing-person' | 'breakdown' | 'lunch-rush';
+export type EventKind = 'road-accident' | 'collapse' | 'missing-person' | 'breakdown' | 'lunch-rush' | 'building-fire';
 export type EventFrequency = 'off' | 'calm' | 'normal' | 'lively';
 export const EVENT_FREQUENCIES: readonly EventFrequency[] = ['off', 'calm', 'normal', 'lively'];
 export const FREQUENCY_LABEL: Record<EventFrequency, string> = { off: 'Off', calm: 'Calm', normal: 'Normal', lively: 'Lively' };
@@ -59,6 +59,10 @@ export interface Objective {
   atTarget?: boolean;
   /** Starting this commits you to these: leaving them undone when the event ends costs professional reputation. */
   commits?: readonly string[];
+  /** Health it costs (smoke, heat). Goes through the survival rules, so it can hurt but never kill (lib/health.ts). */
+  harm?: number;
+  /** Only possible before this many minutes into the event (before the fire service takes over). */
+  before?: number;
 }
 
 export interface EventTemplate {
@@ -152,6 +156,25 @@ export const EVENT_TEMPLATES: readonly EventTemplate[] = [
     objectives: [
       { id: 'serve', label: 'Help serve tables (paid shift)', detail: 'Take orders and carry plates for half an hour.', minutes: 30, reward: 60, rep: { business: 3, social: 2 } },
       { id: 'run-floor', label: 'Run the floor', detail: 'Seat the party, reorganise the kitchen queue and keep tables turning.', minutes: 15, reward: 90, rep: { business: 10 }, careers: ['entrepreneur'] },
+    ],
+  },
+  {
+    kind: 'building-fire',
+    severity: 'emergency',
+    title: 'Building fire',
+    summary: 'Smoke is pouring from a ground-floor shop. People are still inside the flats above.',
+    minutes: 55,
+    hours: [[0, 24]],
+    othersHandle: 'The fire service put the fire out and brought everyone down safely.',
+    objectives: [
+      PHONE_REPORT('the address, what is burning and who is still inside'),
+      { id: 'evacuate', label: 'Get people out of the way', detail: 'Wave the neighbours out of the doorway and well back across the street.', minutes: 5, reward: 40, rep: { community: 8 } },
+      { id: 'extinguish', label: 'Tackle it with an extinguisher', detail: 'Only while it’s still small: aim at the base of the flames from the doorway. The heat and smoke will hurt.', minutes: 4, reward: 70, rep: { community: 6 }, harm: 12, before: 15 },
+      { id: 'rescue', label: 'Bring out the trapped resident', detail: 'Go into the smoke and help Mama Ngozi down the stairs. Dangerous: you will be hurt, but no one dies in AYE.', minutes: 6, reward: 160, rep: { community: 15, social: 4 }, harm: 30, before: 25, after: ['evacuate'] },
+      { id: 'treat', label: 'Treat smoke inhalation', detail: 'Give oxygen, check airways and burns, and keep the casualties calm.', minutes: 10, reward: 110, rep: { professional: 12, community: 3 }, careers: ['doctor'], commits: ['handover'] },
+      { id: 'handover', label: 'Hand over to the paramedics', detail: 'Brief the crew on who breathed in the most smoke.', minutes: 3, reward: 35, rep: { professional: 5 }, careers: ['doctor'], after: ['treat'] },
+      { id: 'utilities', label: 'Shut off the gas and power', detail: 'Find the building’s isolation valves and switches before the crews go in.', minutes: 6, reward: 90, rep: { professional: 8, community: 3 }, careers: ['engineer'], harm: 6 },
+      { id: 'cordon', label: 'Keep onlookers back', detail: 'Hold the crowd behind the line so the fire engines can get through.', minutes: 6, reward: 25, rep: { community: 4 }, after: ['report'] },
     ],
   },
 ];
@@ -337,6 +360,7 @@ export function canDo(e: ActiveEvent, objectiveId: string, career: Career, equip
   if (e.done.includes(o.id)) return { ok: false, reason: 'Done.' };
   if (o.careers && !o.careers.includes(career)) return { ok: false, reason: `Needs ${o.careers.map((c) => withArticle(careerWord(c))).join(' or ')}.` };
   if (o.phone && !equipment.includes('smartphone')) return { ok: false, reason: 'Needs a phone.' };
+  if (o.before !== undefined && minute - e.startedAt >= o.before) return { ok: false, reason: 'Too late: the fire service has taken over.' };
   const missing = (o.after ?? []).filter((id) => !e.done.includes(id));
   if (missing.length) return { ok: false, reason: `First: ${missing.map((id) => templateFor(e.kind).objectives.find((x) => x.id === id)?.label.toLowerCase() ?? id).join(', ')}.` };
   return { ok: true };
@@ -405,6 +429,26 @@ function pavementSpots(layout: DistrictLayout, radius: number): Point[] {
   return out;
 }
 
+/**
+ * The street-facing wall of the building behind a pavement spot: its x, the
+ * building's height, and the side of the boulevard (+1 east, -1 west), or
+ * null if no building stands right behind it.
+ */
+export function buildingFaceBehind(layout: DistrictLayout, x: number, z: number): { faceX: number; height: number; side: number } | null {
+  const side = Math.sign(x) || 1;
+  let best: { faceX: number; height: number; side: number } | null = null;
+  for (const b of layout.buildings) {
+    const [bx, , bz] = b.position;
+    const [w, h, d] = b.size;
+    if (Math.sign(bx) !== side || Math.abs(z - bz) > d / 2 - 1.5) continue;
+    const faceX = bx - side * (w / 2);
+    const gap = side * (faceX - x);
+    if (gap < 0 || gap > 6) continue;
+    if (!best || side * (faceX - best.faceX) < 0) best = { faceX, height: h, side };
+  }
+  return best;
+}
+
 /** Where an event of this kind can happen in this district, or null if nowhere. */
 export function siteFor(kind: EventKind, district: District, rng: () => number): { scene: Point; target?: Point } | null {
   const layout = district.layout;
@@ -430,6 +474,11 @@ export function siteFor(kind: EventKind, district: District, rng: () => number):
         return d >= 15 && d <= 40;
       });
       return far.length ? { scene, target: far[Math.floor(rng() * far.length)] } : null;
+    }
+    case 'building-fire': {
+      // A shopfront on the boulevard: the scene is the pavement in front of a building
+      const spots = pavementSpots(layout, 1.2).filter((p) => buildingFaceBehind(layout, p.x, p.z) && Math.abs(p.z) < 48);
+      return spots.length ? { scene: spots[Math.floor(rng() * spots.length)] } : null;
     }
     case 'lunch-rush': {
       const r = district.restaurant;

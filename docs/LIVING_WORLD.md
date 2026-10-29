@@ -15,12 +15,13 @@ tests, not just show an interface.
   The player chooses the pace in Life OS → Settings → The living world:
   Off, Calm, Normal or Lively. With Off nothing happens, so peaceful play is
   always possible.
-- There are five events, each with roles and objectives:
+- There are six events, each with roles and objectives:
   - a road accident on the cross street;
   - someone collapsing on the pavement;
   - a missing elderly man who must be found and walked home;
   - a broken-down car;
-  - a restaurant rush, where a business owner can run the floor.
+  - a restaurant rush, where a business owner can run the floor;
+  - a building fire (see below).
 - Some objectives need a career, so first aid needs a doctor and making cars
   safe needs an engineer. Calling it in needs a phone. Steps unlock in order.
 - Rewards are paid only for objectives completed at the scene, once each, and
@@ -33,6 +34,37 @@ tests, not just show an interface.
   and paramedics, who arrive after a few minutes.
 - Saves keep the event, the history and reputation. Earnings are recomputed
   from the completed objectives on load, so an edited save can't claim more.
+
+**Building fires and emergency vehicles** (`src/world/Emergency.tsx`)
+
+- A sixth event is a fire in a shop. It only starts in front of a real
+  building on the boulevard.
+- Flames burn in the doorway and upstairs window, smoke rises, and soot
+  stains the wall.
+- After 9 minutes a fire engine arrives (ladder, lockers, chevrons). The
+  crew run out a hose and the water jet knocks the fire down over the rest of
+  the event.
+- A police car and an ambulance come too.
+- What the player does shows in the scene:
+  - neighbours moved across the street;
+  - an extinguisher shrinking the fire early;
+  - the rescued resident sitting safe;
+  - cordon tape.
+- Smoke and heat hurt through the survival rules (`lib/health.ts`):
+  - tackling the fire costs 12 health;
+  - the rescue costs 30;
+  - shutting off utilities, an engineer's job, costs 6.
+  It can never kill. At 5% you're taken to hospital.
+- The extinguisher and the rescue are only possible before the fire service
+  takes over.
+- The road accident now has a police car and an ambulance. Someone who has
+  collapsed gets an ambulance at the kerb.
+- Every emergency vehicle has a flashing red and blue light bar. The bars are
+  emissive and unlit, with no real lights, so no shaders recompile.
+- Every emergency vehicle is solid: traffic queues behind it and the player
+  walks round it.
+- The firefighters wear the high-vis worker look until a proper firefighter
+  model is added. They're labelled "Firefighter · computer-controlled".
 
 **Reputation** (`src/lib/reputation.ts`)
 

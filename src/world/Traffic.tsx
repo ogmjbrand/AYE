@@ -6,7 +6,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LOOKS } from '../lib/looks';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { clearTrafficSnapshot, initTraffic, setTrafficSnapshot, stepTraffic, type Car as MovingCar } from '../lib/traffic';
-import { DANFO_SIZE, movingObstacles } from '../lib/world';
+import { DANFO_SIZE, movingObstacles, roadBlockers } from '../lib/world';
 import { residentPositionsIn } from '../lib/people';
 import { BuiltInVehicle } from './Props';
 import { useDistrict, useLayout } from './DistrictContext';
@@ -54,7 +54,7 @@ export function Traffic({ player }: { player: PlayerHandle }) {
     cars.current = stepTraffic(
       cars.current,
       traffic,
-      [{ x: player.position.x, z: player.position.z }, ...residentPositionsIn(district.id)],
+      [{ x: player.position.x, z: player.position.z }, ...residentPositionsIn(district.id), ...roadBlockers],
       Math.min(dt, 0.1),
     );
     setTrafficSnapshot(cars.current, traffic);

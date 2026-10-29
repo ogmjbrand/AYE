@@ -211,6 +211,8 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
 
 // Moving vehicles add themselves here each frame so the player can't walk through them
 export const movingObstacles: Obstacle[] = [];
+/** Points on the road that traffic stops for, like a pedestrian: emergency vehicles parked in a lane (world/Emergency). */
+export const roadBlockers: { x: number; z: number }[] = [];
 // Your cars parked in this district (world/ParkedCars keeps it up to date)
 export const parkedObstacles: Obstacle[] = [];
 /** The district's own obstacles plus every vehicle on the street right now. */

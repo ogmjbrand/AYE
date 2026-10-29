@@ -893,12 +893,14 @@ function eventAct(state: GameState, objectiveId: string, at: { x: number; z: num
   if (!spot || Math.hypot(at.x - spot.x, at.z - spot.z) > (o.atTarget ? FIND_RADIUS : SCENE_RADIUS)) return state;
   let next = state;
   for (let i = 0; i < o.minutes; i++) next = tick(next, career, lifestyle, false);
-  return {
+  next = {
     ...next,
     balance: next.balance + o.reward,
     today: { ...next.today, income: next.today.income + o.reward },
     world: completeObjective(next.world, o.id),
   };
+  // Smoke and heat hurt, through the survival rules: never below the floor, and at 5% you're taken to recover
+  return o.harm ? withHealth(next, damage(next.health, o.harm, `got caught in the smoke at the ${templateFor(e.kind).title.toLowerCase()}`, next.time.totalMinutes, recoveryContext(next))) : next;
 }
 
 export function gameReducer(
