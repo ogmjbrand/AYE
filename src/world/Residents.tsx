@@ -6,7 +6,8 @@ import { nameTag } from './nameTag';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
-import { NOTICE_RADIUS, STROLL_SPEED, residentPose, residentsIn, setLivePosition, type Resident } from '../lib/people';
+import { NOTICE_RADIUS, STROLL_SPEED, clearLivePosition, residentPose, residentsIn, routineNow, setLivePosition, type Resident } from '../lib/people';
+import { MS_PER_GAME_MINUTE } from '../hooks/useGameState';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend } from '../lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from '../lib/traffic';
 import type { PlayerHandle } from '../hooks/usePlayerController';
@@ -23,11 +24,15 @@ import { OutfitStyler } from '../components/Avatar';
 import { GarmentLayer } from '../components/GarmentLoader';
 import { getGarmentModel } from '../lib/fashion';
 
-function ResidentFigure({ resident, player, talkingTo, hugSession }: {
+/** The game clock as residents need it: minutes into the day, and the day of the week (0 = Monday). */
+export interface DayClock { minuteOfDay: number; dayOfWeek: number }
+
+function ResidentFigure({ resident, player, talkingTo, hugSession, day }: {
   resident: Resident;
   player: PlayerHandle;
   talkingTo: string | null;
   hugSession: HugSession | null;
+  day: DayClock;
 }) {
   const look = lookById(resident.lookId);
   const appearance = useMemo(
@@ -95,12 +100,23 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
   const root = useRef<Group>(null);
   const clock = useRef((resident.id.charCodeAt(0) % 7) * 1.7);
   const heading = useRef(resident.facing);
+  // A routine follows the game clock, smoothed between its once-a-minute ticks so walks don't jump
+  const dayNow = useRef(day);
+  useEffect(() => { dayNow.current = day; }, [day]);
+  const tick = useRef({ minute: -1, at: 0 });
   useFrame((_, dt) => {
     const step = Math.min(dt, 0.1);
-    const here = residentPose(resident, clock.current);
+    if (tick.current.minute !== dayNow.current.minuteOfDay) tick.current = { minute: dayNow.current.minuteOfDay, at: performance.now() };
+    const routine = routineNow(resident, tick.current.minute + Math.min(1, (performance.now() - tick.current.at) / MS_PER_GAME_MINUTE), dayNow.current.dayOfWeek);
+    if (root.current) root.current.visible = !routine || routine.present;
+    if (routine && !routine.present) {
+      clearLivePosition(resident.id);
+      return;
+    }
+    const here = routine?.pose ?? residentPose(resident, clock.current);
     const activeHug = hugSession?.residentId === resident.id ? hugSession : null;
     const near = Math.hypot(player.position.x - here.x, player.position.z - here.z) < NOTICE_RADIUS;
-    const next = residentPose(resident, clock.current + step);
+    const next = routine?.pose ?? residentPose(resident, clock.current + step);
     const traffic = trafficSnapshot();
     const threatened = next.moving && pedestrianInTrafficPath({
       x: here.x,
@@ -124,8 +140,10 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
         ),
         moving: hugWalking,
       }
+      // Someone walking to work keeps walking; standing, they stop and turn to you
+      : routine?.pose ? (near && !routine.pose.moving ? { ...here, moving: false } : routine.pose)
       : near ? { ...here, moving: false } : residentPose(resident, clock.current);
-    const want = activeHug ? pose.facing : near ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
+    const want = activeHug ? pose.facing : near && !pose.moving ? Math.atan2(player.position.x - pose.x, player.position.z - pose.z) : pose.facing;
     // Turn smoothly along the shortest way round
     const diff = Math.atan2(Math.sin(want - heading.current), Math.cos(want - heading.current));
     heading.current += diff * Math.min(1, step * 6);
@@ -184,10 +202,11 @@ function ResidentFigure({ resident, player, talkingTo, hugSession }: {
 }
 
 /** The residents of the current district, strolling their usual routes. */
-export function Residents({ player, talkingTo = null, hugSession = null }: {
+export function Residents({ player, talkingTo = null, hugSession = null, day }: {
   player: PlayerHandle;
   talkingTo?: string | null;
   hugSession?: HugSession | null;
+  day: DayClock;
 }) {
   const district = useDistrict();
   const people = residentsIn(district.id);
@@ -196,7 +215,7 @@ export function Residents({ player, talkingTo = null, hugSession = null }: {
       {people.map((r) => (
         <ErrorBoundary key={r.id} fallback={null}>
           <Suspense fallback={null}>
-            <ResidentFigure resident={r} player={player} talkingTo={talkingTo} hugSession={hugSession} />
+            <ResidentFigure resident={r} player={player} talkingTo={talkingTo} hugSession={hugSession} day={day} />
           </Suspense>
         </ErrorBoundary>
       ))}

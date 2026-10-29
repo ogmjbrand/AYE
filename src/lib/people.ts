@@ -28,6 +28,51 @@ export interface Resident {
   route?: readonly (readonly [number, number])[];
   /** One line per friendship level (index matches FRIENDSHIP_LEVELS). */
   lines: readonly [string, string, string, string, string];
+  /** A day that follows the game clock (replaces `route`): weekdays, and optionally weekends. */
+  routine?: { weekday: readonly RoutineStep[]; weekend?: readonly RoutineStep[] };
+}
+
+/**
+ * One part of a resident's day, from its start until the next step starts.
+ * With `at` they stand there; with `walk` they walk that path over the step;
+ * with neither they're off the street (indoors, or at work).
+ */
+export interface RoutineStep {
+  /** Minute of the day it starts, 0 … 1439. */
+  from: number;
+  at?: readonly [number, number];
+  facing?: number;
+  walk?: readonly (readonly [number, number])[];
+  /** What they're doing, in a few words. */
+  doing: string;
+}
+
+export interface RoutineNow { present: boolean; doing: string; pose: Pose | null }
+
+/** Where a resident with a routine is, `minute` (may be fractional) into the day; `dayOfWeek` 0 = Monday. */
+export function routineNow(r: Resident, minute: number, dayOfWeek: number): RoutineNow | null {
+  if (!r.routine) return null;
+  const steps = (dayOfWeek >= 5 && r.routine.weekend) || r.routine.weekday;
+  const m = ((minute % 1440) + 1440) % 1440;
+  let i = steps.length - 1;
+  for (let k = 0; k < steps.length; k++) if (steps[k].from <= m) i = k;
+  const step = steps[i];
+  if (step.walk && step.walk.length > 1) {
+    const next = steps[(i + 1) % steps.length].from;
+    const span = ((next - step.from) + 1440) % 1440 || 1440;
+    const f = Math.min(1, (((m - step.from) + 1440) % 1440) / span);
+    const legs = step.walk.slice(1).map((b, j) => ({ a: step.walk![j], b, len: Math.hypot(b[0] - step.walk![j][0], b[1] - step.walk![j][1]) }));
+    let along = f * legs.reduce((sum, l) => sum + l.len, 0);
+    for (const { a, b, len } of legs) {
+      if (along <= len || b === legs[legs.length - 1].b) {
+        const t = len ? Math.min(1, along / len) : 1;
+        return { present: true, doing: step.doing, pose: { x: a[0] + (b[0] - a[0]) * t, z: a[1] + (b[1] - a[1]) * t, facing: Math.atan2(b[0] - a[0], b[1] - a[1]), moving: f < 1 } };
+      }
+      along -= len;
+    }
+  }
+  if (step.at) return { present: true, doing: step.doing, pose: { x: step.at[0], z: step.at[1], facing: step.facing ?? r.facing, moving: false } };
+  return { present: false, doing: step.doing, pose: null };
 }
 
 export const FRIENDSHIP_LEVELS = [
@@ -52,6 +97,28 @@ export const ACTIVITIES: Record<Activity, { label: string; points: number; cost:
 export const TALK_RADIUS = 2.2;
 
 /** The residents of the hand-built districts. */
+// Emeka's front step at Palm View, and the walk down the boulevard pavement to his office
+const EMEKA_STEP = [-6.2, 22] as const;
+// The lane between the café tables (x -6.9 … -5.5) and the lamp posts (x -4.5)
+const EMEKA_COMMUTE = [EMEKA_STEP, [-5.05, 21], [-5.05, -30]] as const;
+const at = (h: number, m = 0) => h * 60 + m;
+const EMEKA_WEEKDAY: readonly RoutineStep[] = [
+  { from: 0, doing: 'Asleep at home in Palm View' },
+  { from: at(6, 50), at: EMEKA_STEP, facing: Math.PI / 2, doing: 'Having his morning coffee on the front step' },
+  { from: at(7, 30), walk: EMEKA_COMMUTE, doing: 'Walking to the office' },
+  { from: at(7, 50), doing: 'At work at the office' },
+  { from: at(18), walk: [...EMEKA_COMMUTE].reverse(), doing: 'Walking home from work' },
+  { from: at(18, 20), at: EMEKA_STEP, facing: Math.PI / 2, doing: 'Chatting on the front step' },
+  { from: at(22), doing: 'Gone in for the night' },
+];
+const EMEKA_WEEKEND: readonly RoutineStep[] = [
+  { from: 0, doing: 'Asleep at home in Palm View' },
+  { from: at(9), at: EMEKA_STEP, facing: Math.PI / 2, doing: 'Taking it easy on the front step' },
+  { from: at(13), doing: 'Out for lunch with family' },
+  { from: at(16), at: EMEKA_STEP, facing: Math.PI / 2, doing: 'Chatting on the front step' },
+  { from: at(22, 30), doing: 'Gone in for the night' },
+];
+
 const HAND_BUILT: readonly Resident[] = [
   // Lagos, Marina Boulevard: people at work in their uniforms
   {
@@ -101,6 +168,8 @@ const HAND_BUILT: readonly Resident[] = [
   {
     id: 'emeka-exec', district: 'lagos.marina', name: 'Emeka Nwosu', role: 'Company director', lookId: 'business-male-05',
     position: [-6.2, 0, 22.0], facing: Math.PI / 2,
+    // Your neighbour at Palm View: coffee on the step, the walk to the office, home for the evening
+    routine: { weekday: EMEKA_WEEKDAY, weekend: EMEKA_WEEKEND },
     lines: [
       'Good afternoon.',
       'The new office on the boulevard opens next month.',
@@ -369,7 +438,15 @@ export function residentPose(r: Resident, t: number): Pose {
 const livePositions = new Map<string, { x: number; z: number; facing: number }>();
 export function setLivePosition(id: string, x: number, z: number, facing?: number) {
   const resident = residentById(id);
+  offStreet.delete(id);
   livePositions.set(id, { x, z, facing: facing ?? resident?.facing ?? 0 });
+}
+/** Residents keeping a routine who are off the street right now (indoors, or at work). */
+const offStreet = new Set<string>();
+/** The 3D world marks someone off the street while their routine has them away. */
+export function clearLivePosition(id: string) {
+  livePositions.delete(id);
+  offStreet.add(id);
 }
 export const residentPosition = (r: Resident) => livePositions.get(r.id) ?? { x: r.position[0], z: r.position[2] };
 export const residentFacing = (r: Resident) => livePositions.get(r.id)?.facing ?? r.facing;
@@ -383,6 +460,8 @@ export function residentPositionsIn(districtId: string): { x: number; z: number 
 /** The resident within talking distance in this district, if any. */
 export function residentNear(districtId: string, x: number, z: number): Resident | undefined {
   return residentsIn(districtId).find((r) => {
+    // Someone keeping a routine is only here while they're out on the street
+    if (offStreet.has(r.id)) return false;
     const p = residentPosition(r);
     return Math.hypot(p.x - x, p.z - z) <= TALK_RADIUS;
   });

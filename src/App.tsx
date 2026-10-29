@@ -371,7 +371,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       {character && character.career !== 'none' && <WorkplaceMarker position={getCareerLocation(district, character.career)!.position} />}
       {district.id === OFFICE_WORKPLACE.districtId && <OfficeExteriorEntrance player={controller} />}
       <HomeMarkers homeId={homeId} />
-      <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} />
+      <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} day={{ minuteOfDay: gameTime.hour * 60 + gameTime.minute, dayOfWeek: gameTime.dayOfWeek }} />
       <Traffic player={controller} />
       <Campers />
       {liveEvent && <LiveEventScene event={liveEvent} minute={gameTime.totalMinutes} />}

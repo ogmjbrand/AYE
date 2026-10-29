@@ -12,7 +12,7 @@ import {
 import { MAX_TRAITS, PERKS, PERK_LEVEL, SKILLS, TRAITS, perksOf, skillLevel, skillProgress, type DreamId, type Mission, type TraitId } from '../../lib/lifeState';
 import { REPUTATIONS, TIERS, tierOf } from '../../lib/reputation';
 import { NEED_LABEL, TIRED_THRESHOLD, moodLabel, type NeedKey } from '../../lib/needs';
-import { FRIENDSHIP_LEVELS, friendshipLevel, gameDay, HANGOUT_LEVEL } from '../../lib/people';
+import { FRIENDSHIP_LEVELS, friendshipLevel, gameDay, HANGOUT_LEVEL, routineNow } from '../../lib/people';
 import { careerLadder, careerLevel, hoursToNextLevel, levelIndex } from '../../lib/progression';
 import { equipmentById, equipmentPay } from '../../lib/equipment';
 import { homeById } from '../../lib/homes';
@@ -502,6 +502,11 @@ function People({ state, onGo }: LifeOSProps) {
                   <div className="min-w-0">
                     <p className="m-0 truncate text-sm font-semibold">{resident.name}</p>
                     <p className="m-0 truncate text-[11px] text-ui-muted">{resident.role} · <span className="text-ui-accent-strong">{FRIENDSHIP_LEVELS[level].name}</span></p>
+                    {(() => {
+                      // Neighbours who keep a routine: where they are right now
+                      const now = routineNow(resident, state.time.hour * 60 + state.time.minute, state.time.dayOfWeek);
+                      return now && <p className="m-0 truncate text-[11px] text-ui-faint">Now: {now.doing}</p>;
+                    })()}
                   </div>
                 </div>
                 <span className="shrink-0 rounded-full border border-ui-line px-2 py-0.5 text-[10px] text-ui-faint">Computer-controlled</span>
