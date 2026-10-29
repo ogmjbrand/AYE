@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { itemById } from './fashion';
-import { generateNpcAppearance } from './npcFashion';
+import { appearanceCount, generateNpcAppearance } from './npcFashion';
 
 describe('autonomous NPC fashion', () => {
   it('keeps an NPC appearance stable for the same identity and role', () => {
@@ -29,6 +29,30 @@ describe('autonomous NPC fashion', () => {
         expect(itemById(id)?.slot, id).toBe(slot);
       }
     }
+  });
+
+  it('every combination of a role\'s outfit pieces and hair colours can come up (choices are independent)', () => {
+    const ids = Array.from({ length: 20000 }, (_, i) => `resident-${i}`);
+    const outfits = new Set(ids.map((id) => {
+      const a = generateNpcAppearance(id, 'City resident', false).itemIds;
+      return `${a.top}|${a.bottom}|${a.shoes}|${a.hair}`;
+    }));
+    // The casual pool: 8 tops × 6 bottoms × 3 shoes × 5 hair colours
+    expect(appearanceCount('City resident', false).outfits).toBe(720);
+    expect(outfits.size).toBe(720);
+  });
+
+  it('gives residents only real skin tones, all six of them', () => {
+    const tones = new Set(Array.from({ length: 2000 }, (_, i) => generateNpcAppearance(`r-${i}`, 'City resident', true).skinTone));
+    expect(tones.has('custom')).toBe(false);
+    expect(tones.has('original')).toBe(false);
+    expect(tones.size).toBe(6);
+  });
+
+  it('counts the appearances a base model can take, and they multiply out', () => {
+    const c = appearanceCount('Nurse at General Hospital', true);
+    expect(c.total).toBe(c.outfits * c.tones * c.shapes * c.hairstyles);
+    expect(appearanceCount('Nurse', false).hairstyles).toBe(1);
   });
 
   it('fails loudly rather than returning an empty or unstable outfit for invalid identity', () => {

@@ -12,6 +12,9 @@ import type { BodyShape } from '../lib/bodyShape';
 import { DEFAULT_SKIN_TONE, type SkinToneId } from '../lib/skinTone';
 
 export type PreviewFocus = 'body' | 'face';
+/** Turn the person to show this side to the camera. */
+export type PreviewView = 'front' | 'side' | 'back';
+const VIEW_TURN: Record<PreviewView, number> = { front: 0, side: -Math.PI / 2, back: Math.PI };
 
 /** A standing-still controller so the avatar plays its idle animation. */
 function useStillController(): PlayerHandle {
@@ -37,15 +40,15 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
  * Turns slowly until the player takes over (drags); holds a three-quarter view instead when they prefer
  * reduced motion. In the face view it stops and turns the person to face the camera, so you see the face.
  */
-function Turntable({ children, spin, faceFront }: { children: ReactNode; spin: { current: boolean }; faceFront: boolean }) {
+function Turntable({ children, spin, faceFront, view }: { children: ReactNode; spin: { current: boolean }; faceFront: boolean; view?: PreviewView | null }) {
   const ref = useRef<Group>(null);
   const still = useMemo(() => reducedMotion(), []);
   useFrame(({ camera }, delta) => {
     const g = ref.current;
     if (!g) return;
-    if (faceFront) {
-      // The model faces +z at rotation 0: turn the shortest way round to the camera's side
-      const want = Math.atan2(camera.position.x, camera.position.z);
+    if (faceFront || view) {
+      // The model faces +z at rotation 0: turn the shortest way round to show the camera its front, side or back
+      const want = Math.atan2(camera.position.x, camera.position.z) + VIEW_TURN[view ?? 'front'];
       const diff = Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y));
       g.rotation.y += diff * Math.min(1, delta * 4);
     } else if (still) g.rotation.y = -0.6;
@@ -95,7 +98,7 @@ function PreviewError() {
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, hairstyleItemId, focus = 'body', interactive = false }: {
+export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, hairstyleItemId, focus = 'body', view = null, onViewReleased, interactive = false }: {
   shape?: BodyShape;
   skinTone?: number;
   lookId?: string;
@@ -106,6 +109,9 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
   skinColor?: string;
   hairstyleItemId?: string | null;
   focus?: PreviewFocus;
+  /** Hold the person turned to show this side; dragging the view lets go (onViewReleased). */
+  view?: PreviewView | null;
+  onViewReleased?: () => void;
   interactive?: boolean;
 }) {
   const still = useStillController();
@@ -128,7 +134,7 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
           <Environment files={assetUrl('hdri/venice_sunset_1k.hdr')} environmentIntensity={0.5} />
         </Suspense>
       </ErrorBoundary>
-      <Turntable spin={spin} faceFront={interactive && focus === 'face'}>
+      <Turntable spin={spin} faceFront={interactive && focus === 'face'} view={interactive ? view : null}>
         <ErrorBoundary fallback={<PreviewError />}>
           <Suspense fallback={null}>
             <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
@@ -147,7 +153,7 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
             maxDistance={6}
             minPolarAngle={0.35}
             maxPolarAngle={Math.PI / 2 + 0.05}
-            onStart={() => { spin.current = false; }}
+            onStart={() => { spin.current = false; onViewReleased?.(); }}
           />
           <FocusRig focus={focus} height={height} controls={controls} />
         </>

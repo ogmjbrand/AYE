@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { CharacterPreview, type PreviewFocus } from './CharacterPreview';
+import { CharacterPreview, type PreviewFocus, type PreviewView } from './CharacterPreview';
 import { BodyTypeChart } from './mh/BodyTypeChart';
 import { saveCharacter } from '../lib/save';
 import { MAX_TRAITS, TRAITS, type DreamId, type TraitId } from '../lib/lifeState';
@@ -13,6 +13,9 @@ import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, lookById, looksFor, type BodyType } from '../lib/looks';
 import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wardrobe } from '../lib/fashion';
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
+
+/** How many changes you can step back through. */
+const UNDO_STEPS = 50;
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetManifest, assetUrl } from '../lib/assetManifest';
 
@@ -106,7 +109,19 @@ const FOCUS: Record<StageId, PreviewFocus> = {
 
 /** "Create your life": seven stages with a live, rotatable 3D preview of the in-game model. */
 export function CharacterCreation({ onCharacterCreate, onBack, editing }: CharacterCreationProps) {
-  const [draft, setDraft] = useState<Draft>(() => (editing ? draftFrom(editing) : { ...newDraft(DEFAULT_COUNTRY), region: stateById(SONGHAI.capitalStateId)!.name }));
+  // The appearance you started from (your saved character when editing), and every change since, so you can undo or reset
+  const [start] = useState<Draft>(() => (editing ? draftFrom(editing) : { ...newDraft(DEFAULT_COUNTRY), region: stateById(SONGHAI.capitalStateId)!.name }));
+  const [{ draft, past }, setHistory] = useState<{ draft: Draft; past: readonly Draft[] }>({ draft: start, past: [] });
+  const setDraft = (change: (d: Draft) => Draft) => setHistory((h) => {
+    const next = change(h.draft);
+    if (next === h.draft) return h;
+    // Typing your name isn't an appearance change to step back through
+    const onlyName = (Object.keys(next) as (keyof Draft)[]).every((k) => k === 'name' || next[k] === h.draft[k]);
+    return { draft: next, past: onlyName ? h.past : [...h.past.slice(-(UNDO_STEPS - 1)), h.draft] };
+  });
+  const undo = () => setHistory((h) => (h.past.length ? { draft: h.past[h.past.length - 1], past: h.past.slice(0, -1) } : h));
+  // Back to how you started, keeping the name you've typed; undo brings the changes back
+  const reset = () => setHistory((h) => ({ draft: { ...start, name: h.draft.name }, past: [...h.past.slice(-(UNDO_STEPS - 1)), h.draft] }));
   const stageIds: readonly StageId[] = editing ? EDIT_STAGES : STAGES.map((s) => s.id);
   const [stageIndex, setStageIndex] = useState(0);
   const stage = STAGES.find((s) => s.id === stageIds[stageIndex])!;
@@ -157,6 +172,8 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
       kicker={editing ? 'Change your appearance' : 'Create your life'}
       onFocus={setFocusOverride}
       onRandomise={stage.id === 'identity' || stage.id === 'review' ? undefined : () => setDraft((d) => randomise(d))}
+      onUndo={past.length ? undo : undefined}
+      onReset={past.length ? reset : undefined}
       footer={(
         <div className="space-y-2">
           {stage.id === 'identity' && !canLeaveIdentity && <p className="m-0 text-center text-xs text-cc-muted">Enter a name to continue.</p>}
@@ -591,13 +608,17 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, skinToneId, skinColor, focus, onFocus, onRandomise }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, skinToneId, skinColor, focus, onFocus, onRandomise, onUndo, onReset }: {
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
   shape: BodyShape; skinTone: number; skinToneId: SkinToneId; skinColor: string; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
   onRandomise?: () => void;
+  /** Step back one change, or back to how you started; left out when there's nothing to undo. */
+  onUndo?: () => void;
+  onReset?: () => void;
 }) {
+  const [view, setView] = useState<PreviewView | null>(null);
   const tool = 'flex items-center gap-1.5 rounded-full border border-cc-line bg-cc-bg/70 px-3 py-1.5 text-xs font-semibold backdrop-blur transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold';
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-cc-bg text-cc-ink lg:overflow-hidden" style={{ backgroundImage: 'radial-gradient(1000px 700px at 50% 35%, rgba(201,164,92,0.10), transparent 60%)' }}>
@@ -621,7 +642,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} focus={focus} interactive />
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} focus={focus} view={view} onViewReleased={() => setView(null)} interactive />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>
@@ -637,9 +658,19 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
                 </button>
               ))}
             </div>
+            <div className="flex overflow-hidden rounded-full border border-cc-line bg-cc-bg/70 backdrop-blur" role="radiogroup" aria-label="Turn to">
+              {(['front', 'side', 'back'] as const).map((v) => (
+                <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)}
+                  className={`min-h-9 px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${view === v ? 'bg-cc-gold/20 text-cc-gold-strong' : 'text-cc-muted hover:text-cc-ink'}`}>
+                  {v}
+                </button>
+              ))}
+            </div>
             {onRandomise && (
               <button type="button" onClick={onRandomise} className={`${tool} border-cc-gold/60 text-cc-gold-strong hover:bg-cc-gold/15`}>Randomise</button>
             )}
+            <button type="button" onClick={onUndo} disabled={!onUndo} className={`${tool} disabled:opacity-40`} aria-label="Undo the last change">Undo</button>
+            <button type="button" onClick={onReset} disabled={!onReset} className={`${tool} disabled:opacity-40`} aria-label="Reset to how you started">Reset</button>
           </div>
         </section>
 

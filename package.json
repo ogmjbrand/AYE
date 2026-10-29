@@ -11,7 +11,8 @@
     "test": "vitest run",
     "assets:check": "node scripts/check-assets.mjs",
     "assets:optimize": "node scripts/optimize-glb.mjs",
-    "check:push": "node scripts/check-large-files.mjs"
+    "check:push": "node scripts/check-large-files.mjs",
+    "check:characters": "node scripts/check-characters.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

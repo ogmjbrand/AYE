@@ -1,5 +1,8 @@
 # AYE character pipeline proposal
 
+> **Historical.** The current reference is [CHARACTERS.md](CHARACTERS.md):
+> registry, CC5 import, asset storage policy, variety counts and QA results.
+
 Status: **incremental migration in progress.** Rocketbox remains the active,
 save-compatible character pipeline. A skin-only tint selector and four CC0
 head-attached hairstyles are integrated; a MakeHuman base character, facial

@@ -72,9 +72,25 @@ function hashText(text: string): number {
   return hash >>> 0;
 }
 
-function choose<T>(values: readonly T[], seed: number, salt: number): T {
-  return values[(seed + salt * 0x9e3779b9 >>> 0) % values.length];
+/**
+ * An independent number per choice: each salt is mixed into the seed and
+ * scrambled (the murmur3 finaliser). Adding the salt alone moved every choice
+ * in step, so tops, trousers, shoes and hair colour only ever came in a third
+ * of their combinations.
+ */
+function mix(seed: number, salt: number): number {
+  let h = (seed ^ Math.imul(salt + 1, 0x9e3779b9)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
 }
+
+function choose<T>(values: readonly T[], seed: number, salt: number): T {
+  return values[mix(seed, salt) % values.length];
+}
+
+/** The skin tones a resident can have: every real swatch (not 'original', which is the model's own, nor 'custom'). */
+const RESIDENT_TONES = SKIN_TONES.filter((t) => t.id !== 'original' && t.id !== 'custom');
 
 function outfitPool(role: string): OutfitPool {
   if (/doctor|nurse|medical|hospital|clinic/i.test(role)) return OUTFIT_POOLS.medical;
@@ -100,8 +116,8 @@ export function generateNpcAppearance(identity: string, role: string, feminine: 
   const bottom = choose(pool.bottoms, seed, 2);
   const shoes = choose(pool.shoes, seed, 3);
   const hair = choose(pool.hair, seed, 4);
-  const tone = SKIN_TONES[1 + (seed % (SKIN_TONES.length - 1))];
-  const shape = SHAPE_PRESETS[(seed >>> 8) % SHAPE_PRESETS.length].shape;
+  const tone = choose(RESIDENT_TONES, seed, 6);
+  const shape = choose(SHAPE_PRESETS, seed, 7).shape;
   const hairstyleItemId = feminine
     ? choose(['hairstyle-afro', 'hairstyle-braids', 'hairstyle-ponytail', 'hairstyle-long'] as const, seed, 5)
     : null;
@@ -113,4 +129,20 @@ export function generateNpcAppearance(identity: string, role: string, feminine: 
     skinTone: tone.id,
     shape,
   };
+}
+
+/** Feminine residents also get one of these 3D hairstyles. */
+const RESIDENT_HAIRSTYLES = 4;
+
+/**
+ * How many different appearances the generator can give one base model in
+ * this role: outfit pieces × hair colours × skin tones × body shapes (× 3D
+ * hairstyles for feminine looks). These are real recolours, refabrics and
+ * reshapes of the same person, not new people.
+ */
+export function appearanceCount(role: string, feminine: boolean): { outfits: number; tones: number; shapes: number; hairstyles: number; total: number } {
+  const p = outfitPool(role);
+  const outfits = p.tops.length * p.bottoms.length * p.shoes.length * p.hair.length;
+  const hairstyles = feminine ? RESIDENT_HAIRSTYLES : 1;
+  return { outfits, tones: RESIDENT_TONES.length, shapes: SHAPE_PRESETS.length, hairstyles, total: outfits * RESIDENT_TONES.length * SHAPE_PRESETS.length * hairstyles };
 }

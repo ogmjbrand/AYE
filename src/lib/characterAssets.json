@@ -1,0 +1,362 @@
+{
+  "business-female-02": {
+    "file": "models/characters/rocketbox/business-female-02.glb",
+    "mb": 3,
+    "triangles": 8640,
+    "materials": 4,
+    "textures": 8,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "business-male-05": {
+    "file": "models/characters/rocketbox/business-male-05.glb",
+    "mb": 0.8,
+    "triangles": 7164,
+    "materials": 2,
+    "textures": 6,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "construction-male-03": {
+    "file": "models/characters/rocketbox/construction-male-03.glb",
+    "mb": 0.9,
+    "triangles": 9376,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-03": {
+    "file": "models/characters/rocketbox/female-adult-03.glb",
+    "mb": 2,
+    "triangles": 9208,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-04": {
+    "file": "models/characters/rocketbox/female-adult-04.glb",
+    "mb": 1.6,
+    "triangles": 9284,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-06": {
+    "file": "models/characters/rocketbox/female-adult-06.glb",
+    "mb": 0.9,
+    "triangles": 6992,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-08": {
+    "file": "models/characters/rocketbox/female-adult-08.glb",
+    "mb": 1.8,
+    "triangles": 8276,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-10": {
+    "file": "models/characters/rocketbox/female-adult-10.glb",
+    "mb": 0.5,
+    "triangles": 6460,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "female-adult-11": {
+    "file": "models/characters/rocketbox/female-adult-11.glb",
+    "mb": 1.7,
+    "triangles": 8896,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-01": {
+    "file": "models/characters/rocketbox/male-adult-01.glb",
+    "mb": 1.7,
+    "triangles": 7440,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-04": {
+    "file": "models/characters/rocketbox/male-adult-04.glb",
+    "mb": 2,
+    "triangles": 8684,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-10": {
+    "file": "models/characters/rocketbox/male-adult-10.glb",
+    "mb": 1,
+    "triangles": 6732,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-12": {
+    "file": "models/characters/rocketbox/male-adult-12.glb",
+    "mb": 1.4,
+    "triangles": 6722,
+    "materials": 2,
+    "textures": 6,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-15": {
+    "file": "models/characters/rocketbox/male-adult-15.glb",
+    "mb": 0.8,
+    "triangles": 7292,
+    "materials": 2,
+    "textures": 6,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "male-adult-18": {
+    "file": "models/characters/rocketbox/male-adult-18.glb",
+    "mb": 0.8,
+    "triangles": 6434,
+    "materials": 2,
+    "textures": 6,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "medical-female-02": {
+    "file": "models/characters/rocketbox/medical-female-02.glb",
+    "mb": 0.8,
+    "triangles": 9264,
+    "materials": 4,
+    "textures": 8,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "medical-male-02": {
+    "file": "models/characters/rocketbox/medical-male-02.glb",
+    "mb": 2.1,
+    "triangles": 7514,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "pilot-female-01": {
+    "file": "models/characters/rocketbox/pilot-female-01.glb",
+    "mb": 0.7,
+    "triangles": 8288,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "pilot-male-01": {
+    "file": "models/characters/rocketbox/pilot-male-01.glb",
+    "mb": 0.6,
+    "triangles": 7664,
+    "materials": 2,
+    "textures": 6,
+    "maxTexture": 2048,
+    "bones": 81,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  },
+  "police-male-01": {
+    "file": "models/characters/rocketbox/police-male-01.glb",
+    "mb": 0.9,
+    "triangles": 8687,
+    "materials": 3,
+    "textures": 7,
+    "maxTexture": 2048,
+    "bones": 80,
+    "clips": [
+      "Idle",
+      "Walk",
+      "Run"
+    ],
+    "gestureFiles": [
+      "gestures-feminine",
+      "gestures-masculine"
+    ]
+  }
+}
