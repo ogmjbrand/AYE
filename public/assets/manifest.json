@@ -23,6 +23,6 @@
   },
   "avatar": null,
   "vehicles": {
-    "danfo": null
+    "danfo": { "url": "models/props/minibus.glb", "length": 5, "rotateY": 0 }
   }
 }

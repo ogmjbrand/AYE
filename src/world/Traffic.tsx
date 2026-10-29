@@ -8,7 +8,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { clearTrafficSnapshot, initTraffic, setTrafficSnapshot, stepTraffic, type Car as MovingCar } from '../lib/traffic';
 import { DANFO_SIZE, movingObstacles, roadBlockers } from '../lib/world';
 import { residentPositionsIn } from '../lib/people';
-import { BuiltInVehicle } from './Props';
+import { ParkedDanfo } from './Props';
 import { useDistrict, useLayout } from './DistrictContext';
 import { stillController } from '../hooks/usePlayerController';
 
@@ -69,7 +69,8 @@ export function Traffic({ player }: { player: PlayerHandle }) {
     <>
       {looks.map((l, i) => (
         <group key={i} ref={(g) => { groups.current[i] = g; }} position={[l.x, 0, l.z]}>
-          <BuiltInVehicle vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes, kind: l.kind }} />
+          {/* Minibuses use the real model when the asset list has one; everything else is built in */}
+          <ParkedDanfo vehicle={{ position: [0, 0, 0], heading: l.heading, color: l.color, stripes: l.stripes, kind: l.kind }} />
           {/* Open-sided kekes show their driver; the others have tinted glass */}
           {l.kind === 'tricycle' && <Rider index={i} heading={l.heading} />}
         </group>

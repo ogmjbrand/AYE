@@ -399,9 +399,19 @@ export function BuiltInVehicle({ vehicle }: { vehicle: Vehicle }) {
   return <Danfo vehicle={vehicle} />;
 }
 
+/** Yellow, as Lagos danfos are painted: a warm, strong hue. */
+function isDanfoYellow(hex: string) {
+  const c = new Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  return hsl.h > 0.06 && hsl.h < 0.16 && hsl.s > 0.6 && hsl.l > 0.25;
+}
+
 /** A listed danfo model if there is one; the built-in danfo while loading or if it fails. Other kinds are always built in. */
-function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
+export function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
   if (vehicle.kind && vehicle.kind !== 'minibus') return <BuiltInVehicle vehicle={vehicle} />;
+  // The model wears the yellow danfo livery, so other liveries (Accra's white trotros, a dark minibus) stay built in
+  if (!isDanfoYellow(vehicle.color)) return <Danfo vehicle={vehicle} />;
   const file = assetManifest().vehicles.danfo;
   if (!file) return <Danfo vehicle={vehicle} />;
   const fallback = <Danfo vehicle={vehicle} />;

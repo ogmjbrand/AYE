@@ -9,6 +9,7 @@
  *   vending-machine.glb  "Vending Machine" by gabyyu
  *   motorhome.glb        "FREE GMC Motorhome reimagined low poly" by Karol Miklas
  *   fridge-retro.glb     "A Realistic Metallic Fridge" by TheBoss009SS
+ *   minibus.glb          "Bohdan Bus" by Vishchun
  *
  * Name props to build only those (node scripts/sketchfab/build-props.mjs fridge-retro).
  *
@@ -23,12 +24,17 @@
  * and the wheels use the yellow sheet instead of the blue one with its decals.
  * Its mesh is simplified to about 40% of its triangles: it is street scenery.
  *
+ * The minibus keeps its yellow paint and photographed windows; the chassis
+ * maker's lettering and the bus maker's emblem on the front are painted out,
+ * and the route board in the window (a Ukrainian route) is replaced with one
+ * of our own for Lagoon Boulevard.
+ *
  * Output: public/assets/models/props/*.glb (meshopt, WebP textures).
  */
 import { mkdirSync, statSync } from 'node:fs';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { dedup, prune, simplify, textureCompress, meshopt, weld } from '@gltf-transform/functions';
+import { dedup, metalRough, prune, simplify, textureCompress, meshopt, weld } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
@@ -190,19 +196,52 @@ async function debadgeMotorhome(doc) {
   glass.setImage(await sharp(data, { raw: info }).png().toBuffer()).setMimeType('image/png');
 }
 
+// ---------------------------------------------------------------- the minibus: badges off, our own route board
+
+/** A route board for Lagoon Boulevard, sized to the one in the window (96 × 32 on the 1024 sheet). */
+function routeBoardSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="384" height="128">
+  <rect width="384" height="128" fill="#f3ead2"/>
+  <rect x="0" y="92" width="384" height="36" fill="#f2c230"/>
+  <rect x="150" y="10" width="84" height="76" rx="6" fill="#f2c230"/>
+  <text x="192" y="70" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="58" text-anchor="middle" fill="#141414">12</text>
+  <text x="74" y="42" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="20" text-anchor="middle" fill="#141414">MARINA</text>
+  <text x="74" y="70" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" text-anchor="middle" fill="#3a3a3a">CMS</text>
+  <text x="310" y="42" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="20" text-anchor="middle" fill="#141414">OBALENDE</text>
+  <text x="310" y="70" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" text-anchor="middle" fill="#3a3a3a">TBS</text>
+  <text x="192" y="120" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="24" text-anchor="middle" fill="#141414">LAGOON BOULEVARD</text>
+</svg>`;
+}
+
+async function debadgeMinibus(doc) {
+  const paint = doc.getRoot().listTextures()[0];
+  let img = await paintOut(paint.getImage(), [
+    [143, 160, 187, 174], // the chassis maker's lettering under the windscreen
+    [151, 191, 171, 211], // the bus maker's emblem on the front
+  ]);
+  const { width } = await sharp(img).metadata();
+  const s = width / 1024;
+  const board = await sharp(Buffer.from(routeBoardSvg())).resize(Math.round(96 * s), Math.round(32 * s)).png().toBuffer();
+  img = await sharp(img).composite([{ input: board, left: Math.round(641 * s), top: Math.round(460 * s) }]).png().toBuffer();
+  paint.setImage(img).setMimeType('image/png');
+}
+
 mkdirSync(OUT, { recursive: true });
 await MeshoptEncoder.ready;
 await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
 const only = process.argv.slice(2);
-for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512]]) {
+for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512], ['minibus', 1024]]) {
   if (only.length && !only.includes(name)) continue;
   const doc = await io.read(`${SRC}/${name}.glb`);
   if (name === 'vending-machine') await replaceVendingArt(doc);
   if (name === 'motorhome') await debadgeMotorhome(doc);
+  if (name === 'minibus') await debadgeMinibus(doc);
   for (const a of doc.getRoot().listAnimations()) a.dispose();
   await doc.transform(
+    // The minibus is in the old specular-glossiness format, which three.js no longer reads
+    metalRough(),
     prune(),
     dedup(),
     weld(),
@@ -211,6 +250,8 @@ for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vendi
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [size, size], quality: 82 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );
+  // The conversion leaves zero specular and an index of refraction of 1000, which make paint look flat; plain PBR it is
+  if (name === 'minibus') for (const ext of doc.getRoot().listExtensionsUsed()) if (ext.extensionName === 'KHR_materials_ior' || ext.extensionName === 'KHR_materials_specular') ext.dispose();
   doc.createExtension(EXTMeshoptCompression).setRequired(true);
   await io.write(`${OUT}/${name}.glb`, doc);
   console.log(name, `${statSync(`${OUT}/${name}.glb`).size >> 10} KB`);
