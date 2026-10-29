@@ -1,6 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Character } from './CharacterCreation';
-import { CharacterPreview } from './CharacterPreview';
+// The 3D preview (and three.js with it) loads separately, and only where it's shown: wide screens
+const CharacterPreview = lazy(() => import('./CharacterPreview').then((m) => ({ default: m.CharacterPreview })));
+const WIDE = '(min-width: 1024px)';
+function useWide() {
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(WIDE).matches);
+  useEffect(() => {
+    const q = window.matchMedia(WIDE);
+    const on = () => setWide(q.matches);
+    q.addEventListener('change', on);
+    return () => q.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
 import { resolveStyles } from '../lib/fashion';
 import { genderLabel } from '../lib/identity';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
@@ -64,6 +76,7 @@ const LINK =
 export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife, onEditLook }: EntryScreenProps) {
   const [panel, setPanel] = useState<Panel>('splash');
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const wide = useWide();
 
   // Move focus to each panel's heading so keyboard and screen-reader users follow the change
   useEffect(() => {
@@ -235,8 +248,9 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
             </section>
           </main>
 
-          {saved && (
+          {saved && wide && (
             <aside className="relative hidden h-[min(70dvh,40rem)] overflow-hidden rounded-2xl border border-cc-line bg-gradient-to-b from-cc-panel to-cc-bg lg:block" aria-label={`${saved.name}, your saved character`}>
+              <Suspense fallback={null}>
               <CharacterPreview
                 lookId={saved.lookId}
                 heightCm={saved.heightCm}
@@ -245,6 +259,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                 skinTone={saved.skinTone}
                 hairstyleItemId={saved.wardrobe.equipped.hairstyle}
               />
+              </Suspense>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cc-bg/95 to-transparent p-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-cc-gold">Welcome back</p>
                 <p className="mt-1 truncate font-display text-3xl font-bold">{saved.name}</p>
