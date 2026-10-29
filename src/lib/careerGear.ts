@@ -19,6 +19,7 @@
  *     and lasts longer. Both are useful.
  */
 import type { Career } from '../components/CharacterCreation';
+import { hasQualification, qualificationById, type Qualifications } from './qualifications';
 
 export type GearSlot = 'tool' | 'tech' | 'pro';
 export type GearTier = 'used' | 'standard' | 'professional';
@@ -41,6 +42,8 @@ export interface GearItem {
   payBonus: number;
   /** Working hours of use from new to worn out. */
   lifeHours: number;
+  /** A qualification needed to buy and use it (lib/qualifications.ts). */
+  qualification?: string;
 }
 
 const g = (career: WorkCareer, slot: GearSlot, tier: GearTier, id: string, name: string, price: number, rank: number, payBonus: number, lifeHours: number, description: string): GearItem =>
@@ -78,6 +81,10 @@ export const GEAR: readonly GearItem[] = [
   g('student', 'pro', 'professional', 'research-pass', 'Research database pass', 3000, 2, 0.1, 600, 'For final-year students: every journal you need.'),
 ];
 
+// Professional pieces that need a qualification as well as the rank
+const NEEDS: Record<string, string> = { 'gear-trauma-kit': 'doc-als', 'gear-workstation': 'eng-chartered', 'gear-sim-time': 'pil-ir', 'gear-lights': 'art-digital', 'gear-signage': 'ent-books', 'gear-recovery': 'ath-nutrition', 'gear-research-pass': 'stu-research' };
+for (const item of GEAR as GearItem[]) if (NEEDS[item.id]) item.qualification = NEEDS[item.id];
+
 export const gearById = (id: string) => GEAR.find((x) => x.id === id);
 export const gearFor = (career: Career) => GEAR.filter((x) => x.career === career);
 
@@ -96,9 +103,10 @@ export const RESALE_SHARE = 0.5;
 
 export type GearCheck = { ok: true } | { ok: false; reason: string };
 
-export function canBuy(item: GearItem, career: Career, rankIndex: number, balance: number, owned: readonly OwnedGear[]): GearCheck {
+export function canBuy(item: GearItem, career: Career, rankIndex: number, balance: number, owned: readonly OwnedGear[], quals?: Qualifications): GearCheck {
   if (item.career !== career) return { ok: false, reason: 'For another career.' };
   if (rankIndex < item.rank) return { ok: false, reason: `Needs rank ${item.rank + 1} in your career.` };
+  if (item.qualification && !(quals && hasQualification(quals, item.qualification))) return { ok: false, reason: `Needs the ${qualificationById(item.qualification)?.name ?? 'right qualification'}.` };
   if (owned.some((o) => o.itemId === item.id)) return { ok: false, reason: 'You own one.' };
   if (balance < item.price) return { ok: false, reason: 'Not enough GHAI.' };
   return { ok: true };
@@ -111,10 +119,11 @@ export function buy(owned: readonly OwnedGear[], item: GearItem, uid: string): O
 }
 
 /** Equips a piece (moving whatever was in its slot back to the inventory), if your rank allows it. */
-export function equip(owned: readonly OwnedGear[], uid: string, rankIndex: number): OwnedGear[] {
+export function equip(owned: readonly OwnedGear[], uid: string, rankIndex: number, quals?: Qualifications): OwnedGear[] {
   const target = owned.find((o) => o.uid === uid);
   const item = target && gearById(target.itemId);
   if (!target || !item || rankIndex < item.rank) return owned as OwnedGear[];
+  if (item.qualification && quals && !hasQualification(quals, item.qualification)) return owned as OwnedGear[];
   return owned.map((o) => (o.uid === uid ? { ...o, equipped: true } : gearById(o.itemId)?.slot === item.slot ? { ...o, equipped: false } : o));
 }
 

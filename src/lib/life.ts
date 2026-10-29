@@ -32,6 +32,7 @@ import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import { templateFor, type Severity } from './liveEvents';
 import { medicalItem } from './health';
+import { qualificationById } from './qualifications';
 import { gearById } from './careerGear';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
@@ -580,6 +581,7 @@ function labelFor(prev: GameState, action: GameAction): string {
   switch (action.type) {
     case 'eat': return 'Meal out';
     case 'buyGear': return `Work gear: ${gearById(action.itemId)?.name ?? 'equipment'}`;
+    case 'enrolCourse': return `Course fee: ${qualificationById(action.id)?.name ?? 'course'}`;
     case 'buyMedical': return `Pharmacy: ${medicalItem(action.itemId)?.name ?? 'medical supplies'}`;
     case 'repairGear': return `Repair: ${gearById(prev.gear.find((o) => o.uid === action.uid)?.itemId ?? '')?.name ?? 'equipment'}`;
     case 'sellGear': return `Sold: ${gearById(prev.gear.find((o) => o.uid === action.uid)?.itemId ?? '')?.name ?? 'equipment'}`;
@@ -802,6 +804,10 @@ export function lifeReducer(state: GameState, action: AnyAction, career: Career,
     next = gameReducer(state, action, career, lifestyle);
     events = eventsFor(state, action, next, career);
     next = recordMoney(state, action, next);
+    // A qualification earned is worth a moment
+    if (action.type === 'sitExam' && !(action.id in state.qualifications.earned) && action.id in next.qualifications.earned) {
+      next = pay(next, 0, '', 'Qualified', `You passed: ${qualificationById(action.id)?.name ?? 'your exam'}`, 8);
+    }
   }
   if (!next.life.cities.includes(next.districtId)) next = { ...next, life: { ...next.life, cities: [...next.life.cities, next.districtId] } };
   next = rollOver(next, career);

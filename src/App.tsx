@@ -490,7 +490,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
     buyGear, equipGear, unequipGear, repairGear, sellGear,
-    hurt, buyMedical, useMedical, callMedic, restToRecover,
+    hurt, buyMedical, useMedical, callMedic, restToRecover, enrolCourse, studyCourse, sitExam,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -2831,6 +2831,13 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
             onExitToMenu,
             events: FREQUENCY_LABEL[state.world.frequency],
             onCycleEvents: () => setEventFrequency(EVENT_FREQUENCIES[(EVENT_FREQUENCIES.indexOf(state.world.frequency) + 1) % EVENT_FREQUENCIES.length]),
+          }}
+          qualifications={{
+            // Your desk at home, the university's library and study rooms, or a workplace's training room
+            atStudyPlace: atHome() || (inWorkplace && (insideUniversity || insideHospital || insideOffice)),
+            onEnrol: enrolCourse,
+            onStudy: (id) => studyCourse(id, atHome() || (inWorkplace && (insideUniversity || insideHospital || insideOffice))),
+            onExam: sitExam,
           }}
           onClose={() => setOsOpen(false)}
         />

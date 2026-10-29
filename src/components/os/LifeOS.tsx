@@ -1,3 +1,6 @@
+import { QualificationsSection } from '../Qualifications';
+import { qualificationPay } from '../../lib/qualifications';
+import { gearPay } from '../../lib/careerGear';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Character } from '../CharacterCreation';
 import type { GameState } from '../../lib/gameState';
@@ -60,6 +63,8 @@ export interface LifeOSProps {
     /** How often unplanned events happen in the city (lib/liveEvents.ts). */
     events: string; onCycleEvents: () => void;
   };
+  /** Qualifications (components/Qualifications.tsx): where you can study, and the actions. */
+  qualifications?: { atStudyPlace: boolean; onEnrol: (id: string) => void; onStudy: (id: string) => void; onExam: (id: string, answers: number[]) => void };
   onClose: () => void;
 }
 
@@ -525,7 +530,7 @@ function People({ state, onGo }: LifeOSProps) {
 
 // ---------------------------------------------------------------- Career
 
-function CareerTab({ state, character, onGo }: LifeOSProps) {
+function CareerTab({ state, character, onGo, qualifications }: LifeOSProps) {
   const career = character.career;
   if (career === 'none') {
     return <Card><p className="m-0 text-sm">You chose a life without a career, so there&rsquo;s no workplace or wage. You live on your savings.</p></Card>;
@@ -533,7 +538,7 @@ function CareerTab({ state, character, onGo }: LifeOSProps) {
   const ladder = careerLadder(career);
   const idx = levelIndex(career, state.workMinutes);
   const left = hoursToNextLevel(career, state.workMinutes);
-  const pay = Math.round(HOURLY_WAGE[career] * ladder[idx].pay * equipmentPay(state.equipment, career));
+  const pay = Math.round(HOURLY_WAGE[career] * ladder[idx].pay * equipmentPay(state.equipment, career) * gearPay(state.gear, career) * qualificationPay(state.qualifications, career));
   const skill = SKILLS.find((s) => s.id === CAREER_SKILL[career])!;
   const next = ladder[idx + 1];
   const progress = next ? ((state.workMinutes - ladder[idx].hours * 60) / ((next.hours - ladder[idx].hours) * 60)) * 100 : 100;
@@ -563,6 +568,13 @@ function CareerTab({ state, character, onGo }: LifeOSProps) {
           </li>
         ))}
       </ol>
+      {qualifications && (
+        <>
+          <SectionTitle aside={qualifications.atStudyPlace ? 'You can study here' : 'Study at home, the library or work'}>Qualifications</SectionTitle>
+          <QualificationsSection career={career} quals={state.qualifications} rankIndex={idx} balance={state.balance} now={state.time.totalMinutes}
+            atStudyPlace={qualifications.atStudyPlace} onEnrol={qualifications.onEnrol} onStudy={qualifications.onStudy} onExam={qualifications.onExam} />
+        </>
+      )}
       <p className="m-0 mt-3 text-[11px] text-ui-muted">Every working hour at your workplace also offers one task: a real decision scored from data. Excellent calls pay a bonus (scaled by mood) and count towards promotion. Studying at a desk at home counts too.</p>
     </>
   );

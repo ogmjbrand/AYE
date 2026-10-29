@@ -50,6 +50,10 @@ import {
   type Health, type RecoveryContext,
 } from './health';
 import { HOSPITAL } from './hospitalSite';
+import {
+  STUDY_SESSION_MINUTES, canEnrol, canSitExam, canStudy, emptyQualifications, enrol as enrolQual, qualificationById, qualificationPay, sitExam,
+  study as studyQual, type Qualifications,
+} from './qualifications';
 import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
@@ -190,6 +194,8 @@ export interface GameState {
   gear: OwnedGear[];
   /** Health, emergency recovery and your medical kit: nobody ever dies (lib/health.ts). */
   health: Health;
+  /** Courses, study hours and earned qualifications (lib/qualifications.ts). */
+  qualifications: Qualifications;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -242,6 +248,10 @@ export type GameAction =
   | { type: 'useMedical'; itemId: string }
   | { type: 'callMedic' }
   | { type: 'restToRecover' }
+  /** Qualifications (lib/qualifications.ts): enrol, study an hour at a study place, sit the exam. */
+  | { type: 'enrolCourse'; id: string }
+  | { type: 'studyCourse'; id: string; atStudyPlace: boolean }
+  | { type: 'sitExam'; id: string; answers: number[] }
   /** Work gear (lib/careerGear.ts): buy, equip or put away, repair, sell. */
   | { type: 'buyGear'; itemId: string }
   | { type: 'equipGear'; uid: string }
@@ -382,6 +392,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     supernatural: emptySupernatural(),
     gear: [],
     health: emptyHealth(),
+    qualifications: emptyQualifications(),
   };
 }
 
@@ -430,7 +441,7 @@ function tick(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplac
   if (time.minute !== 0) return { ...state, time, today, minutesWorkedThisHour, fullness, needs, workMinutes, gear };
 
   // Paid at the rate of the level held when the hour ends
-  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(gear, career);
+  const wage = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(gear, career) * qualificationPay(state.qualifications, career);
   const income = Math.round((wage * minutesWorkedThisHour) / 60);
   const afterIncome = state.balance + income;
   const expenses = Math.min(Math.round(HOURLY_LIVING_COST[lifestyle] * mods.livingCost), afterIncome);
@@ -608,7 +619,7 @@ function workTask(state: GameState, taskId: string, choice: number, atWorkplace:
   const option = task.options[choice];
   if (!option) return state;
   const reward = TASK_REWARD[option.quality];
-  const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(state.gear, career);
+  const hourly = HOURLY_WAGE[career] * careerLevel(career, state.workMinutes).pay * equipmentPay(state.equipment, career) * gearPay(state.gear, career) * qualificationPay(state.qualifications, career);
   const bonus = Math.round(hourly * reward.payShare * MOOD_TASK_MULTIPLIER[moodLabel(currentMood(state))] * modifiers(state.life).taskBonus);
   const performanceKey = option.quality === 'best' ? 'excellent' : option.quality === 'ok' ? 'reasonable' : 'poor';
   return {
@@ -922,7 +933,7 @@ export function gameReducer(
 const RESTING_BLOCKS: ReadonlySet<GameAction['type']> = new Set<GameAction['type']>([
   'travel', 'socialise', 'nightOut', 'ride', 'transform', 'sanctuaryHeal', 'spaClockIn', 'spaSession', 'spaTreat', 'workTask', 'exercise', 'hug',
   'fashionShowcase', 'officeClockIn', 'officeTask', 'campusClass', 'campusAssignment', 'campusStudy', 'hospitalClockIn', 'hospitalBrief', 'hospitalPatient',
-  'eventRespond', 'eventAct', 'bookHotel', 'moveIn', 'moveOut', 'wait',
+  'eventRespond', 'eventAct', 'bookHotel', 'moveIn', 'moveOut', 'wait', 'studyCourse', 'sitExam',
 ]);
 
 /** Where emergency recovery would take you right now. */
@@ -984,6 +995,26 @@ function baseReducer(
       if (state.summary || state.health.recovery) return state;
       const slept = sleep(state, career, lifestyle, action.atHome, action.atFriend);
       return slept === state ? state : { ...slept, supernatural: sleepRecovery(slept.supernatural, action.atHome), health: sleepHeal(slept.health, action.atHome) };
+    }
+    case 'enrolCourse': {
+      const item = qualificationById(action.id);
+      if (!item || state.summary || item.career !== career || !canEnrol(state.qualifications, item, levelIndex(career, state.workMinutes), state.balance).ok) return state;
+      return { ...state, balance: state.balance - item.fee, today: { ...state.today, expenses: state.today.expenses + item.fee }, qualifications: enrolQual(state.qualifications, item.id) };
+    }
+    case 'studyCourse': {
+      const item = qualificationById(action.id);
+      if (!item || state.summary || !canStudy(state.qualifications, item, action.atStudyPlace).ok) return state;
+      let next = state;
+      for (let i = 0; i < STUDY_SESSION_MINUTES; i++) next = liveMinute(next, career, lifestyle, false);
+      return { ...next, qualifications: studyQual(next.qualifications, item.id, STUDY_SESSION_MINUTES) };
+    }
+    case 'sitExam': {
+      const item = qualificationById(action.id);
+      const now = state.time.totalMinutes;
+      if (!item || state.summary || !Array.isArray(action.answers) || !canSitExam(state.qualifications, item, now).ok) return state;
+      let next = state;
+      for (let i = 0; i < 30; i++) next = liveMinute(next, career, lifestyle, false);
+      return { ...next, qualifications: sitExam(next.qualifications, item, action.answers.slice(0, item.exam.length), now).q };
     }
     case 'hurt': {
       if (state.summary) return state;
@@ -1052,7 +1083,7 @@ function baseReducer(
     }
     case 'buyGear': {
       const item = gearById(action.itemId);
-      if (!item || state.summary || !canBuyGear(item, career, levelIndex(career, state.workMinutes), state.balance, state.gear).ok) return state;
+      if (!item || state.summary || !canBuyGear(item, career, levelIndex(career, state.workMinutes), state.balance, state.gear, state.qualifications).ok) return state;
       return {
         ...state,
         gear: buyGearPiece(state.gear, item, `${item.id}@${state.time.totalMinutes}`),
@@ -1061,7 +1092,7 @@ function baseReducer(
       };
     }
     case 'equipGear': {
-      const gear = equipGearPiece(state.gear, action.uid, levelIndex(career, state.workMinutes));
+      const gear = equipGearPiece(state.gear, action.uid, levelIndex(career, state.workMinutes), state.qualifications);
       return gear === state.gear ? state : { ...state, gear };
     }
     case 'unequipGear':
