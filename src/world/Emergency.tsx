@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { pbr } from './pbr';
 import { carFootprint, parkedObstacles, roadBlockers } from '../lib/world';
 import { AdditiveBlending, CanvasTexture, CatmullRomCurve3, Color, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Group, type Mesh } from 'three';
 
@@ -17,7 +18,8 @@ const mat = {
   fireRed: new MeshStandardMaterial({ color: '#b3121b', roughness: 0.35, metalness: 0.35 }),
   white: new MeshStandardMaterial({ color: '#f1f1ee', roughness: 0.35, metalness: 0.3 }),
   black: new MeshStandardMaterial({ color: '#16181b', roughness: 0.4, metalness: 0.4 }),
-  chrome: new MeshStandardMaterial({ color: '#c9ccd0', roughness: 0.2, metalness: 0.9 }),
+  // Brushed aluminium lockers and ladder (ambientCG Metal001's grain)
+  chrome: new MeshStandardMaterial({ color: '#c9ccd0', roughness: 0.28, metalness: 0.9, normalMap: pbr('metal-001', [2, 2]).normalMap }),
   glass: new MeshStandardMaterial({ color: '#10161b', roughness: 0.08, metalness: 0.9 }),
   tyre: new MeshStandardMaterial({ color: '#141414', roughness: 0.9 }),
   stripeYellow: new MeshStandardMaterial({ color: '#f2c200', roughness: 0.4, emissive: '#3a2e00', emissiveIntensity: 0.4 }),

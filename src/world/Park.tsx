@@ -4,6 +4,7 @@ import { useDistrict } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { seeded } from '../lib/world';
 import { parkPathSurface } from './materials';
+import { pbr, pbrOpacity } from './pbr';
 
 // Dry-season colours: a sun-faded lawn, laterite paths, olive shade trees (muted, never the brand colours)
 const LAWN = '#7f7c55';
@@ -22,6 +23,8 @@ export function Park() {
     canopy: new MeshStandardMaterial({ color: CANOPY, roughness: 0.9, flatShading: true }),
     trunk: new MeshStandardMaterial({ color: TRUNK, roughness: 0.95 }),
     wood: new MeshStandardMaterial({ color: WOOD, roughness: 0.8 }),
+    // Fallen leaves under each tree (ambientCG ScatteredLeaves007, with its cut-out so the lawn shows between them)
+    leaves: new MeshStandardMaterial({ ...pbr('leaves', [1.5, 1.5]), alphaMap: pbrOpacity('leaves', [1.5, 1.5]), alphaTest: 0.5, roughness: 1, color: '#d9cdb3' }),
   }), []);
   // Footpaths in real paving stones when the pavement texture is listed, tiled to each path's size
   const pathMats = useMemo(() => {
@@ -71,7 +74,8 @@ export function Park() {
         seats.push({ position: new Vector3(b.x + sx, 0.22, b.z + sz), scale: new Vector3(0.08, 0.44, 0.42), rotationY: b.facing });
       }
     }
-    return { trunks, canopies, seats, backs };
+    const litter: Placement[] = park.trees.map(([x, z]) => ({ position: new Vector3(x, 0.006, z), scale: new Vector3(1.6, 1.6, 1), rotation: new Euler(-Math.PI / 2, 0, rand() * Math.PI * 2) }));
+    return { trunks, canopies, seats, backs, litter };
   }, [park]);
   if (!park || !parts) return null;
   const { area } = park;
@@ -87,6 +91,8 @@ export function Park() {
           {!pathMats[i] && <meshStandardMaterial color={PATH} roughness={0.95} />}
         </mesh>
       ))}
+      {/* Round patches, just under the footpaths so the paving stays clear */}
+      <Instances items={parts.litter} material={mats.leaves} geometry={<circleGeometry args={[1, 24]} />} />
       <Instances items={parts.trunks} material={mats.trunk} geometry={<cylinderGeometry args={[0.14, 0.2, 1, 7]} />} />
       <Instances items={parts.canopies} material={mats.canopy} geometry={<icosahedronGeometry args={[1, 1]} />} />
       <Instances items={parts.seats} material={mats.wood} geometry={<boxGeometry args={[1, 1, 1]} />} />

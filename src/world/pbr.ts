@@ -7,9 +7,13 @@ import { assetUrl } from '../lib/assetManifest';
  * background (nothing suspends), so a material made with them shows its plain
  * colour for a moment and then the real surface.
  */
-export type PbrName = 'wood-floor' | 'bricks' | 'bamboo' | 'onyx' | 'fabric' | 'metal' | 'road' | 'ground' | 'leather' | 'wicker' | 'plaster' | 'tiles';
+export type PbrName = 'wood-floor' | 'bricks' | 'bamboo' | 'onyx' | 'fabric' | 'metal' | 'road' | 'ground' | 'leather' | 'wicker' | 'plaster' | 'tiles'
+  | 'leather-011' | 'leather-017' | 'leather-018' | 'leather-019' | 'leather-020' | 'fabric-007' | 'fabric-008' | 'metal-001' | 'leaves';
 
-const HAS_AO: ReadonlySet<PbrName> = new Set(['wood-floor', 'bricks', 'bamboo', 'ground', 'wicker']);
+/** The leather grains, from fine to pebbled: bags and upholstery pick one so they don't all look alike. */
+export const LEATHERS: readonly PbrName[] = ['leather', 'leather-011', 'leather-017', 'leather-018', 'leather-019', 'leather-020'];
+
+const HAS_AO: ReadonlySet<PbrName> = new Set(['wood-floor', 'bricks', 'bamboo', 'ground', 'wicker', 'leather-017', 'leather-018', 'leather-019', 'leather-020', 'fabric-007', 'fabric-008']);
 const loader = new TextureLoader();
 const cache = new Map<string, Texture>();
 
@@ -36,3 +40,6 @@ export function pbr(name: PbrName, repeat: readonly [number, number]) {
     ...(HAS_AO.has(name) ? { aoMap: load(name, 'ao', repeat, false) } : {}),
   };
 }
+
+/** The cut-out mask for surfaces with gaps (scattered leaves). */
+export const pbrOpacity = (name: PbrName, repeat: readonly [number, number]) => load(name, 'opacity', repeat, false);

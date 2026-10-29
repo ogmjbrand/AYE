@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { CanvasTexture, ExtrudeGeometry, Shape, SRGBColorSpace } from 'three';
 import { marbleTexture } from './venueTextures';
+import { pbr } from './pbr';
 
 /**
  * The Luxe bedroom: upholstered king beds with tall headboards (chevron,
@@ -24,9 +25,10 @@ function Gold({ p, s, r }: { p: [number, number, number]; s: [number, number, nu
 
 /** Upholstery in the right finish: matt linen, satin leather, or velvet with a soft sheen. */
 function Cloth({ color, fabric }: { color: string; fabric: Fabric }) {
-  if (fabric === 'leather') return <meshPhysicalMaterial color={color} roughness={0.42} clearcoat={0.35} clearcoatRoughness={0.4} />;
-  if (fabric === 'velvet') return <meshPhysicalMaterial color={color} roughness={0.9} sheen={1} sheenRoughness={0.45} sheenColor="#ffffff" />;
-  return <meshStandardMaterial color={color} roughness={0.95} />;
+  // Real grain and weave (ambientCG Leather017, Fabric008, Fabric007), in the piece's own colour
+  if (fabric === 'leather') return <meshPhysicalMaterial color={color} roughness={0.42} clearcoat={0.35} clearcoatRoughness={0.4} normalMap={pbr('leather-017', [3, 3]).normalMap} />;
+  if (fabric === 'velvet') return <meshPhysicalMaterial color={color} roughness={0.9} sheen={1} sheenRoughness={0.45} sheenColor="#ffffff" normalMap={pbr('fabric-008', [4, 4]).normalMap} />;
+  return <meshStandardMaterial color={color} roughness={0.95} normalMap={pbr('fabric-007', [4, 4]).normalMap} />;
 }
 
 function Pad({ p, s, color, fabric = 'linen', radius = 0.05 }: { p: [number, number, number]; s: [number, number, number]; color: string; fabric?: Fabric; radius?: number }) {

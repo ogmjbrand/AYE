@@ -27,8 +27,17 @@ const SURFACES = {
   wicker: 'Wicker005_1K-JPG',
   plaster: 'PaintedPlaster003_1K-JPG',
   tiles: 'Tiles035_1K-JPG',
+  'leather-011': 'Leather011_1K-JPG',
+  'leather-017': 'Leather017_1K-JPG',
+  'leather-018': 'Leather018_1K-JPG',
+  'leather-019': 'Leather019_1K-JPG',
+  'leather-020': 'Leather020_1K-JPG',
+  'fabric-007': 'Fabric007_1K-JPG',
+  'fabric-008': 'Fabric008_1K-JPG',
+  'metal-001': 'Metal001_1K-JPG',
+  leaves: 'ScatteredLeaves007_1K-JPG',
 };
-const MAPS = { color: 'Color', normal: 'NormalGL', roughness: 'Roughness', ao: 'AmbientOcclusion' };
+const MAPS = { color: 'Color', normal: 'NormalGL', roughness: 'Roughness', ao: 'AmbientOcclusion', opacity: 'Opacity' };
 
 for (const [name, dir] of Object.entries(SURFACES)) {
   mkdirSync(`${OUT}/textures/${name}`, { recursive: true });
@@ -50,6 +59,7 @@ const HDRIS = {
 mkdirSync(`${OUT}/hdri`, { recursive: true });
 for (const [name, dir] of Object.entries(HDRIS)) {
   const out = `${OUT}/hdri/${name}_1k.exr`;
+  if (!existsSync(`${SRC}/${dir}/${dir}_HDR.exr`)) continue;
   copyFileSync(`${SRC}/${dir}/${dir}_HDR.exr`, out);
   console.log(out, `${statSync(out).size >> 10} KB`);
 }
