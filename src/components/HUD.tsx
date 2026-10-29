@@ -96,6 +96,8 @@ interface HUDProps {
   /** Health (lib/health.ts): shown with energy, hunger and hygiene; tapping opens the health panel. */
   health?: { value: number; critical: boolean; recovering: boolean };
   onOpenHealth?: () => void;
+  /** The weather here, shown beside the clock outdoors ("Rain"). */
+  weather?: string;
   /** Help at something happening in the city (lib/liveEvents.ts): comes before every other street prompt. */
   eventPrompt?: () => { verb: string; place: string; onOpen: () => void } | null;
   /** Opens the gadget shop when standing at it. */
@@ -354,6 +356,7 @@ export function HUD({
   level,
   health,
   onOpenHealth,
+  weather,
   onStopTracking,
   insideHome,
   onOpenGadgets,
@@ -480,7 +483,7 @@ export function HUD({
               </div>
             )}
             <p className="m-0 text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
-              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}
+              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}{weather && <span className="font-medium text-ui-muted"> · {weather}</span>}
             </p>
             {status && (
               <p className={`m-0 flex items-center gap-1 text-[10px] font-medium leading-tight ${status.text}`}>

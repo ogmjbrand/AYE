@@ -18,6 +18,9 @@ import { DivinePanel } from './components/DivinePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { TransformAura } from './world/TransformAura';
 import { MedicResponder } from './world/MedicResponder';
+import { Rain } from './world/Rain';
+import { setWetness } from './world/materials';
+import { WEATHER_LABEL, weatherAt } from './lib/weather';
 import { CriticalWarning, EmergencyTransition, HealthPanel, MedicalKit, MedicalShop, MedicComing, RecoveryPanel } from './components/Survival';
 import { crashDamage, healthStatus } from './lib/health';
 import { LevelUp } from './components/LevelUp';
@@ -342,9 +345,13 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
   const model = owned && vehicleById(owned.modelId);
   const colour = owned && vehicleColourById(owned.colour);
+  // The weather here, minute by minute (lib/weather.ts): streets get wet, and dry out after the rain
+  const weather = useMemo(() => weatherAt(district.id, gameTime.totalMinutes), [district.id, gameTime.totalMinutes]);
+  useEffect(() => setWetness(weather.wetness), [weather.wetness]);
   return (
     <>
-      <SceneLighting gameTime={gameTime} player={controller} />
+      <SceneLighting gameTime={gameTime} player={controller} weather={weather} />
+      <Rain intensity={weather.rain} />
       <LampPool focus={controller} />
       <Streets />
       <Buildings />
@@ -2907,6 +2914,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         level={levelProgress(totalXp(state.life.skills))}
         health={{ value: state.health.value, critical: healthStatus(state.health) === 'critical', recovering: !!recovery }}
         onOpenHealth={() => setHealthOpen(true)}
+        weather={offStreet ? undefined : WEATHER_LABEL[weatherAt(district.id, state.time.totalMinutes).kind]}
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {

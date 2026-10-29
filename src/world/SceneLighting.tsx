@@ -11,6 +11,7 @@ import { setNightGlow } from './materials';
 import { useQuality } from './quality';
 import { SkyDome } from './SkyDome';
 import { lightingAt, type HdriKey } from './timeOfDay';
+import type { Weather } from '../lib/weather';
 
 /** Real city light for reflections and image-based lighting (ambientCG, CC0; the visible sky is SkyDome's). */
 const HDRI: Record<HdriKey, string> = {
@@ -42,15 +43,27 @@ function setBackground(scene: Scene, color: string) {
   scene.background = new Color(color);
 }
 
-export function SceneLighting({ gameTime, player, indoor: indoorProp }: {
+export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }: {
   gameTime: GameTime;
   player: PlayerHandle;
+  /** Outdoors: cloud dims the sun and rain closes the fog in (lib/weather.ts). */
+  weather?: Weather;
   /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. `true`: a bright, daylit work building. */
   indoor?: IndoorMood | boolean;
 }) {
   const indoor: IndoorMood | undefined = indoorProp === true ? 'campus' : indoorProp || undefined;
   const quality = useQuality();
-  const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
+  const clear = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
+  const overcast = weather ? Math.max(0, weather.cloud - 0.1) / 0.9 : 0;
+  const rain = weather?.rain ?? 0;
+  // Cloud takes most of the sun and some of the sky's reflections; rain greys the air and brings the haze closer
+  const l = useMemo(() => (overcast || rain ? {
+    ...clear,
+    sunIntensity: clear.sunIntensity * (1 - 0.75 * overcast),
+    envIntensity: clear.envIntensity * (1 - 0.35 * overcast),
+    hemiIntensity: clear.hemiIntensity * (1 - 0.15 * overcast),
+    fogColor: `#${new Color(clear.fogColor).lerp(new Color('#7d848c'), 0.5 * overcast).multiplyScalar(1 - 0.25 * rain).getHexString()}`,
+  } : clear), [clear, overcast, rain]);
   const sun = useRef<DirectionalLight>(null);
   const target = useMemo(() => new Object3D(), []);
   const fill = useRef<PointLight>(null);
@@ -110,7 +123,7 @@ export function SceneLighting({ gameTime, player, indoor: indoorProp }: {
 
   return (
     <>
-      <fog attach="fog" args={[l.fogColor, 45, 190]} />
+      <fog attach="fog" args={[l.fogColor, 45 - 25 * rain, 190 - 110 * rain]} />
       <SkyDome lighting={l} />
       {l.night > 0.3 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
 

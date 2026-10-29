@@ -133,8 +133,35 @@ export function materials() {
   return cache;
 }
 
+const dryLook = new WeakMap<MeshStandardMaterial, { color: Color; roughness: number; env: number }>();
+
+/**
+ * Rain on the ground, 0 (dry) to 1 (soaked): roads, pavements and kerbs go
+ * darker and glossy, so lamps, signs and emergency lights shine in them.
+ * Only colour, roughness and reflection strength change, never the shader,
+ * so the weather changing never recompiles anything.
+ */
+let wetNow = 0;
+let nightNow = 0;
+export function setWetness(wet: number) {
+  if (!cache) return;
+  const w = Math.max(0, Math.min(1, wet));
+  wetNow = w;
+  cache.lightPool.emissiveIntensity = nightNow * 0.42 * (1 + 1.3 * wetNow);
+  for (const m of [cache.road, cache.pavement, cache.ground, cache.kerb, cache.plainKerb, cache.concrete]) {
+    if (!(m instanceof MeshStandardMaterial)) continue;
+    let dry = dryLook.get(m);
+    if (!dry) { dry = { color: m.color.clone(), roughness: m.roughness, env: m.envMapIntensity }; dryLook.set(m, dry); }
+    m.color.copy(dry.color).multiplyScalar(1 - 0.4 * w);
+    m.roughness = dry.roughness * (1 - 0.72 * w);
+    m.envMapIntensity = dry.env * (1 + 1.4 * w);
+  }
+}
+
 /** Window and lamp glow, 0 by day to 1 at night. */
 export function setNightGlow(night: number) {
+  nightNow = night;
   for (const m of glowing) m.emissiveIntensity = m === cache?.lampHead ? night * 4 : night * 0.4;
-  if (cache) cache.lightPool.emissiveIntensity = night * 0.42;
+  // Lamp light spreads and shines on a wet street
+  if (cache) cache.lightPool.emissiveIntensity = night * 0.42 * (1 + 1.3 * wetNow);
 }
