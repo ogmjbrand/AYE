@@ -5,7 +5,7 @@
  * Every home has somewhere to wash. Furniture you buy (lib/furniture.ts)
  * stands alongside these pieces.
  */
-import { buildLayout, type Building, type DistrictLayout } from './world';
+import { PLAYER_RADIUS, buildLayout, resolveCollisions, type Building, type DistrictLayout } from './world';
 import type { Home } from './homes';
 import { VEHICLE_CATALOG } from './vehicleCatalog';
 
@@ -17,7 +17,7 @@ export type FurnitureKind =
   | 'dining-table' | 'dining-chair' | 'host-stand' | 'clothing-rack' | 'mannequin' | 'display-shelf' | 'checkout-counter'
   | 'wall-art';
 
-export type HomeAction = 'door' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
+export type HomeAction = 'door' | 'lights' | 'bed' | 'wardrobe' | 'mirror' | 'sofa' | 'tv' | 'kitchen' | 'bathroom';
 
 export interface InteriorWall {
   position: readonly [number, number, number];
@@ -449,6 +449,32 @@ export function interiorFor(home: Home): Interior {
 
 /** Where you stand just inside the front door. */
 export const doorSpot = (i: Interior) => [0, -i.depth / 2 + 0.7] as const;
+/**
+ * The light switch: on the front wall beside the door, at the nearest stretch
+ * of wall with floor clear in front of it (homes put a shower or a counter by
+ * the door), returned as where you stand to reach it.
+ */
+const switchSpots = new WeakMap<Interior, readonly [number, number]>();
+export function lightSwitchSpot(i: Interior): readonly [number, number] {
+  const hit = switchSpots.get(i);
+  if (hit) return hit;
+  const z = -i.depth / 2 + 0.45;
+  // Clear means you can stand there: nothing in the home's walls, furniture or decor pushes you off it
+  const { obstacles } = interiorLayout(i);
+  const clear = (x: number) => {
+    const r = resolveCollisions(x, z, PLAYER_RADIUS + 0.05, obstacles);
+    return Math.hypot(r.x - x, r.z - z) < 0.01;
+  };
+  let spot: readonly [number, number] = [-Math.min(1.3, i.width / 2 - 0.4), z];
+  for (let off = 1.1; off <= i.width / 2 - 0.4; off += 0.2) {
+    const x = [-off, off].find(clear);
+    if (x !== undefined) { spot = [x, z]; break; }
+  }
+  switchSpots.set(i, spot);
+  return spot;
+}
+/** How close you stand to reach the switch: tighter than the door, which is only a step away. */
+export const SWITCH_RADIUS = 0.55;
 /** Where you stand to get into bed: in the clear aisle beside it. */
 export function bedSpot(i: Interior): readonly [number, number] {
   const bed = i.furniture.find((x) => x.kind === 'bed')!;
@@ -471,6 +497,8 @@ const ACTION_FOR_FURNITURE: Partial<Record<FurnitureKind, HomeAction>> = {
 
 /** Contextual action for the nearest object, measured from its walkable edge. */
 export function homeInteractionAt(i: Interior, x: number, z: number): HomeAction | null {
+  const [switchX, switchZ] = lightSwitchSpot(i);
+  if (Math.hypot(x - switchX, z - switchZ) <= SWITCH_RADIUS) return 'lights';
   const [doorX, doorZ] = doorSpot(i);
   if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
 

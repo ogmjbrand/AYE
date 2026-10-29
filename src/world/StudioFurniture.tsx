@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { CanvasTexture, DoubleSide, SRGBColorSpace } from 'three';
+import { useLightsOn } from './lights';
 import type { Furniture } from '../lib/interiors';
 import { RealModel } from './RealModel';
 import { pbr } from './pbr';
@@ -56,14 +57,15 @@ function printTexture(seed: number) {
 }
 
 function TripodLamp({ h }: { h: number }) {
+  const lampOn = useLightsOn();
   return (
     <group>
       {[0, 1, 2].map((i) => {
         const a = (i / 3) * Math.PI * 2;
         return <mesh key={i} position={[Math.sin(a) * 0.14, (h - 0.35) / 2, Math.cos(a) * 0.14]} rotation={[Math.cos(a) * 0.17, 0, -Math.sin(a) * 0.17]} castShadow><cylinderGeometry args={[0.012, 0.016, h - 0.3, 8]} /><meshStandardMaterial color={WALNUT} roughness={0.5} /></mesh>;
       })}
-      <mesh position={[0, h - 0.2, 0]}><cylinderGeometry args={[0.17, 0.22, 0.28, 24, 1, true]} /><meshStandardMaterial color="#efe6d4" emissive="#ffd9a0" emissiveIntensity={0.5} side={DoubleSide} roughness={0.9} /></mesh>
-      <pointLight position={[0, h - 0.25, 0]} intensity={1.6} distance={4} decay={1.8} color="#ffd9a0" />
+      <mesh position={[0, h - 0.2, 0]}><cylinderGeometry args={[0.17, 0.22, 0.28, 24, 1, true]} /><meshStandardMaterial color="#efe6d4" emissive="#ffd9a0" emissiveIntensity={lampOn ? 0.5 : 0} side={DoubleSide} roughness={0.9} /></mesh>
+      <pointLight position={[0, h - 0.25, 0]} intensity={lampOn ? 1.6 : 0} distance={4} decay={1.8} color="#ffd9a0" />
     </group>
   );
 }

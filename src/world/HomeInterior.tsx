@@ -3,7 +3,7 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DoubleSide, type Group, type MeshStandardMaterial } from 'three';
 import type { Furniture, Interior } from '../lib/interiors';
-import { WALL_HEIGHT } from '../lib/interiors';
+import { WALL_HEIGHT, lightSwitchSpot } from '../lib/interiors';
 import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { LuxePiece } from './LuxeFurniture';
@@ -12,6 +12,7 @@ import { StudioPiece } from './StudioFurniture';
 import { pbr } from './pbr';
 import type { GameTime } from '../lib/gameState';
 import { interiorFloorMaterial } from './interiorMaterials';
+import { LightsOn, useLightsOn } from './lights';
 
 interface ShellProps {
   interior: Interior;
@@ -20,6 +21,8 @@ interface ShellProps {
   extra?: readonly Furniture[];
   /** The front door swung open (venues). */
   doorOpen?: boolean;
+  /** Homes: the lights are switched on (the ceiling light and the lamps). */
+  lightsOn?: boolean;
   children: ReactNode;
 }
 
@@ -38,7 +41,7 @@ export function HomeInterior(props: ShellProps) {
   return props.interior.architecture === 'residential' ? <HomeShell {...props} /> : <VenueShell {...props} />;
 }
 
-function HomeShell({ interior, gameTime, extra = [], children }: ShellProps) {
+function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }: ShellProps) {
   const { width: w, depth: d } = interior;
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const H = WALL_HEIGHT;
@@ -124,13 +127,16 @@ function HomeShell({ interior, gameTime, extra = [], children }: ShellProps) {
         </group>
       ))}
 
-      {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
-      <HomeDecor interior={interior} night={night} />
-      {/* Furniture you bought */}
-      {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
+      <LightsOn.Provider value={lightsOn}>
+        {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
+        <HomeDecor interior={interior} night={night} />
+        {/* Furniture you bought */}
+        {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
+      </LightsOn.Provider>
 
-      {/* Ceiling light: warm, brighter after dark */}
-      <pointLight position={[0, H - 0.2, 0]} intensity={4 + night * 14} distance={Math.max(w, d) * 1.6} decay={1.6} color="#ffd9a8" />
+      {/* Ceiling light: warm, brighter after dark; switched off, only a little spill from outside */}
+      <pointLight position={[0, H - 0.2, 0]} intensity={lightsOn ? 4 + night * 14 : 0.6} distance={Math.max(w, d) * 1.6} decay={1.6} color="#ffd9a8" />
+      <LightSwitch at={lightSwitchSpot(interior)[0]} z={-d / 2} on={lightsOn} />
       {children}
     </group>
   );
@@ -392,6 +398,33 @@ const box = (w: number, h: number, d: number, y: number, color: string, x = 0, z
   </mesh>
 );
 
+/** A plain floor lamp: its shade glows while the lights are on. */
+function PlainLamp({ w, h, color }: { w: number; h: number; color: string }) {
+  const on = useLightsOn();
+  return (
+    <>
+      {box(0.05, h - 0.3, 0.05, (h - 0.3) / 2, '#2b2b2d')}
+      <mesh position={[0, h - 0.15, 0]}>
+        <cylinderGeometry args={[w * 0.35, w * 0.5, 0.3, 16, 1, true]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={on ? 0.6 : 0} side={DoubleSide} />
+      </mesh>
+    </>
+  );
+}
+
+/** The switch plate beside the front door, its rocker up when on. */
+function LightSwitch({ at, z, on }: { at: number; z: number; on: boolean }) {
+  return (
+    <group position={[at, 1.2, z + 0.012]}>
+      <mesh><boxGeometry args={[0.09, 0.13, 0.012]} /><meshStandardMaterial color="#f1eee8" roughness={0.5} /></mesh>
+      <mesh position={[0, on ? 0.015 : -0.015, 0.009]} rotation={[on ? -0.25 : 0.25, 0, 0]}>
+        <boxGeometry args={[0.035, 0.05, 0.012]} />
+        <meshStandardMaterial color="#e6e1d8" roughness={0.45} />
+      </mesh>
+    </group>
+  );
+}
+
 /** One piece of furniture, built from simple shapes (also used for the catalogue's 3D preview). */
 export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
@@ -465,15 +498,7 @@ export function Piece({ f }: { f: Furniture }) {
       );
       break;
     case 'lamp':
-      parts = (
-        <>
-          {box(0.05, h - 0.3, 0.05, (h - 0.3) / 2, '#2b2b2d')}
-          <mesh position={[0, h - 0.15, 0]}>
-            <cylinderGeometry args={[w * 0.35, w * 0.5, 0.3, 16, 1, true]} />
-            <meshStandardMaterial color={f.color} emissive={f.color} emissiveIntensity={0.6} side={DoubleSide} />
-          </mesh>
-        </>
-      );
+      parts = <PlainLamp w={w} h={h} color={f.color} />;
       break;
     case 'armchair':
       // The real velvet armchair (Khronos sample, see CREDITS.md) dyed this chair's colour, its back to +z like the block one

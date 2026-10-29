@@ -106,7 +106,7 @@ import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import {
-  CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, RESTAURANT_TABLES, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout,
+  CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
 import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
@@ -874,8 +874,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return taskForHour(character.career, state.time.totalMinutes);
   };
   const hourlyPay = Math.round(HOURLY_WAGE[character.career] * careerLevel(character.career, state.workMinutes).pay * equipmentPay(state.equipment, character.career));
-  const nearSpot = (spot: readonly [number, number]) =>
-    Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= USE_RADIUS;
+  const nearSpot = (spot: readonly [number, number], radius = USE_RADIUS) =>
+    Math.hypot(controller.position.x - spot[0], controller.position.z - spot[1]) <= radius;
+  // The light switch by your front door: on when you move in, and as you left it after that
+  const [lightsOn, setLightsOn] = useState(true);
+  const atLightSwitch = () => !!interior && nearSpot(lightSwitchSpot(interior), SWITCH_RADIUS);
+  const flipLights = () => setLightsOn((on) => !on);
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
@@ -1619,7 +1623,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         return;
       }
       if (indoors && interior) {
-        if (nearSpot(bedSpot(interior))) rest(true);
+        // The switch first: you only reach it standing right at it
+        if (atLightSwitch()) flipLights();
+        else if (nearSpot(bedSpot(interior))) rest(true);
         else if (usableHere()) operateHere();
         else if (nearSpot(doorSpot(interior))) goOutside();
         return;
@@ -2519,7 +2525,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
               </HomeInterior>
             ) : indoors && interior ? (
-              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces}>
+              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
                 {decorPlacement && decorPlacementItem && (
@@ -2936,6 +2942,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           name: home!.name,
           prompt: () => {
             const use = usableHere();
+            if (atLightSwitch()) return { verb: lightsOn ? 'Switch off the lights in' : 'Switch on the lights in', place: home!.name, onOpen: flipLights };
             if (nearSpot(bedSpot(interior))) return { verb: 'Sleep in your bed at', place: home!.name, onOpen: () => rest(true) };
             if (use) return { verb: use.verb, place: use.cost ? `${use.cost} GHAI` : 'at home', onOpen: operateHere };
             return nearSpot(doorSpot(interior)) ? { verb: 'Go back outside to', place: district.name, onOpen: goOutside } : null;

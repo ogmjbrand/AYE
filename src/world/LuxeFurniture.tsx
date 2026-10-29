@@ -5,6 +5,7 @@ import type { Furniture } from '../lib/interiors';
 import { artTexture, marbleTexture, rugTexture } from './venueTextures';
 import { PottedPalm } from './PottedPalm';
 import { RealModel } from './RealModel';
+import { useLightsOn } from './lights';
 import { LuxeBed, LuxeNightstand, LuxeVanity, LuxeWardrobe } from './LuxeBedroom';
 
 /**
@@ -179,13 +180,14 @@ function Bookshelf({ w, d, h }: { w: number; d: number; h: number }) {
 }
 
 function FloorLamp({ w, h }: { w: number; h: number }) {
+  const on = useLightsOn();
   return (
     <>
       <Brass p={[0, 0.015, 0]} s={[w * 0.45, 0.03, 0]} round />
       <Brass p={[0, h / 2, 0]} s={[0.012, h - 0.1, 0]} round />
       <mesh position={[0, h - 0.17, 0]}>
         <cylinderGeometry args={[w * 0.42, w * 0.48, 0.32, 32, 1, true]} />
-        <meshStandardMaterial color="#efe3c8" emissive="#ffcf8a" emissiveIntensity={0.9} roughness={0.9} side={DoubleSide} />
+        <meshStandardMaterial color="#efe3c8" emissive="#ffcf8a" emissiveIntensity={on ? 0.9 : 0} roughness={0.9} side={DoubleSide} />
       </mesh>
     </>
   );

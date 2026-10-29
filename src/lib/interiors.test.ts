@@ -12,6 +12,7 @@ import {
   homeInteractionAt,
   interiorFor,
   interiorLayout,
+  lightSwitchSpot,
   restaurantInteractionAt,
 } from './interiors';
 import { allHomes, forSale } from './homes';
@@ -93,6 +94,11 @@ describe.each(Object.values(INTERIORS).map((i) => [i.tier, i] as const))('%s int
       if (!item) continue;
       expect(homeInteractionAt(room, ...item.at), kind).toBe(action);
     }
+    // The light switch by the door: you can stand there, and it isn't confused with the door
+    const sw = lightSwitchSpot(room);
+    expect(free(...sw), 'stand at the switch').toBe(true);
+    expect(homeInteractionAt(room, ...sw)).toBe('lights');
+    expect(Math.hypot(sw[0] - doorSpot(room)[0], sw[1] - doorSpot(room)[1])).toBeGreaterThan(1);
     // Every home has a bed and somewhere to wash
     expect(room.furniture.some((f) => f.kind === 'bed'), 'bed').toBe(true);
     expect(room.furniture.some((f) => f.kind === 'shower' || f.kind === 'bathtub'), 'wash').toBe(true);
