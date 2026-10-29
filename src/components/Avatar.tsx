@@ -174,12 +174,14 @@ function privateCopy(shared: Object3D): Object3D {
   return copy;
 }
 
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null }: {
   controller: PlayerHandle;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
   own?: boolean;
   /** Always seated on a seat this high (metres), e.g. at the wheel of a car. */
   sitHeight?: number;
+  /** Seated for now on something this high (metres), set frame by frame, e.g. on the edge of a bed; null when not. */
+  perch?: { readonly current: number | null };
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   hugSession?: HugSession | null;
@@ -318,7 +320,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       return gestures[state];
     };
     // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
-    const seat = sitHeight !== undefined ? { height: sitHeight } : getSeated();
+    const perched = perch?.current ?? null;
+    const seat = sitHeight !== undefined ? { height: sitHeight } : perched !== null ? { height: perched } : getSeated();
     const sitting = !!seat && !!gestures.Sit;
     updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, sitting);
     const g = group.current;

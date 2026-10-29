@@ -1,6 +1,6 @@
 import { Suspense, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group } from 'three';
+import { Group, Quaternion, Vector3 } from 'three';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import type { Seat } from '../lib/seating';
 import { groundHeightAt } from '../lib/world';
@@ -10,7 +10,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
 import { LOOKS } from '../lib/looks';
 import { residentById, residentPosition } from '../lib/people';
-import type { SleepPose } from '../lib/bedSleep';
+import { bedFrame, mattressTop, type Bedtime } from '../lib/bedSleep';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
 interface PlayerProps {
@@ -24,9 +24,13 @@ interface PlayerProps {
   hugSession?: HugSession | null;
   onHugComplete?: (residentId: string) => void;
   eating?: boolean;
-  /** Asleep in bed: lying on your back there, under the duvet, instead of standing where you are. */
-  lying?: SleepPose | null;
+  /** Going to bed or getting up (lib/bedSleep.ts): the body follows that timeline instead of the controls. */
+  bedtime?: Bedtime | null;
 }
+
+const UP = new Vector3(0, 1, 0);
+const yaw = new Quaternion();
+const rollAxis = new Vector3();
 
 /** If your own look can't be loaded: the first built-in person, so you're still a real person on screen. */
 function DefaultPerson({ controller, sitHeight }: { controller: PlayerHandle; sitHeight?: number }) {
@@ -48,10 +52,12 @@ export function Player({
   hugSession = null,
   onHugComplete,
   eating = false,
-  lying = null,
+  bedtime = null,
 }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
+  /** Seated on a bed's edge: its height, for the sitting clip (Avatar `perch`). */
+  const perch = useRef<number | null>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
   const completedHug = useRef<string | null>(null);
@@ -64,15 +70,24 @@ export function Player({
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
-    if (lying) {
-      // In bed: feet towards the foot end, head on the pillow, face up (turned to face -z, then laid back)
+    if (bedtime) {
+      // Turning about the pelvis: stepping to the bed, sitting on its edge, tipping over onto your side
+      const f = bedFrame(bedtime.pose, (performance.now() - bedtime.startedAt) / 1000, bedtime.up, bedtime.from);
+      const top = mattressTop(bedtime.bed);
       controller.velocity.set(0, 0, 0);
-      groupRef.current?.position.set(...lying.feet);
-      groupRef.current?.rotation.set(0, lying.heading, 0);
-      bodyRef.current?.rotation.set(Math.PI / 2, Math.PI, 0);
+      perch.current = f.perched ? top : null;
+      const g = groupRef.current;
+      if (g) {
+        g.position.set(...f.pivot);
+        yaw.setFromAxisAngle(UP, f.yaw);
+        rollAxis.set(Math.cos(bedtime.pose.heading), 0, -Math.sin(bedtime.pose.heading));
+        g.quaternion.setFromAxisAngle(rollAxis, f.roll).multiply(yaw);
+      }
+      bodyRef.current?.position.set(0, -(bedtime.pose.sitY - bedtime.pose.elevation), 0);
       return;
     }
-    bodyRef.current?.rotation.set(0, 0, 0);
+    perch.current = null;
+    bodyRef.current?.position.set(0, 0, 0);
     if (hugSession) {
       const elapsed = Date.now() - hugSession.startedAt;
       const blend = hugPositionBlend(elapsed, hugSession.approachMs);
@@ -123,10 +138,10 @@ export function Player({
         const k = Math.min(1, delta * 8);
         g.position.set(g.position.x + (x - g.position.x) * k, y, g.position.z + (z - g.position.z) * k);
         const turn = Math.atan2(Math.sin(controller.direction - g.rotation.y), Math.cos(controller.direction - g.rotation.y));
-        g.rotation.y += turn * k;
+        g.rotation.set(0, g.rotation.y + turn * k, 0);
       } else {
         g.position.set(x, y, z);
-        g.rotation.y = controller.direction;
+        g.rotation.set(0, controller.direction, 0);
       }
     }
   });
@@ -151,6 +166,7 @@ export function Player({
               eating={eating}
               shoeItemId={visibleShoeId}
               hairstyleItemId={visibleHairstyleId}
+              perch={perch}
             />
           </Suspense>
         </ErrorBoundary>

@@ -111,7 +111,7 @@ body {
   }
 }
 
-/* Going to sleep: the room fades to night over you in bed (App.tsx SLEEP_SCENE_MS) */
+/* Going to sleep: once you've lain down, the room fades to night over you (App.tsx SLEEP_SCENE_MS) */
 .sleep-shade {
   position: fixed;
   inset: 0;
@@ -133,8 +133,8 @@ body {
   opacity: 0.85;
 }
 @keyframes sleep-shade {
-  0%, 30% { background-color: rgb(5 7 15 / 0); }
-  85%, 100% { background-color: rgb(5 7 15 / 0.92); }
+  0%, 58% { background-color: rgb(5 7 15 / 0); }
+  92%, 100% { background-color: rgb(5 7 15 / 0.92); }
 }
 @media (prefers-reduced-motion: reduce) {
   .sleep-shade { animation: none; background-color: rgb(5 7 15 / 0.6); }

@@ -1,43 +1,61 @@
-import { useMemo } from 'react';
-import { DoubleSide, PlaneGeometry } from 'three';
-import { bedSurface, duvetHeight, type SleepPose } from '../lib/bedSleep';
-import type { Furniture } from '../lib/interiors';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { BufferAttribute, Color, DoubleSide, PlaneGeometry, type Group } from 'three';
+import { bedFrame, bedSurface, duvetHeight, duvetTop, type Bedtime } from '../lib/bedSleep';
+
+/** How much of the duvet's top edge shows the turned-back sheet. */
+const SHEET_FOLD = 0.14;
 
 /**
- * The duvet pulled up over someone asleep in a home bed: one soft sheet
- * shaped over the body (lib/bedSleep.ts), hanging over the sides and the
- * foot of the bed, with the top sheet turned back across the chest.
+ * The duvet over someone in a home bed: one soft sheet shaped over a body
+ * lying on its side (lib/bedSleep.ts), hanging over the sides and the foot,
+ * with the top sheet turned back along its top edge, below the shoulder. It
+ * is drawn up from the foot of the bed as you settle, and pushed back down as
+ * you get up.
  */
-export function SleepingDuvet({ bed, pose }: { bed: Furniture; pose: SleepPose }) {
+export function SleepingDuvet({ bedtime }: { bedtime: Bedtime }) {
+  const { bed, pose } = bedtime;
   const [w, , d] = bed.size;
   const surface = bedSurface(bed);
   const foot = -d / 2 - 0.12;
-  const length = pose.chestZ - foot;
+  const length = pose.coverTo - foot;
+  const color = bed.style === 'luxe' ? '#f2ede4' : bed.color;
   const geometry = useMemo(() => {
-    const width = w + 0.22;
-    const g = new PlaneGeometry(width, length, 36, 48);
+    const g = new PlaneGeometry(w + 0.22, length, 40, 52);
     g.rotateX(-Math.PI / 2);
     const p = g.attributes.position;
+    const colors = new Float32Array(p.count * 3);
+    const duvet = new Color(color);
+    const sheet = new Color('#f7f4ee');
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i);
-      const z = p.getZ(i) + foot + length / 2;
-      p.setXYZ(i, x, surface + duvetHeight(x, z, w, d, pose), z);
+      const z = p.getZ(i) + length / 2; // 0 at the foot end
+      p.setXYZ(i, x, surface + duvetHeight(x, foot + z, w, d, pose), z);
+      // The top sheet turned back over the duvet's top edge
+      (z > length - SHEET_FOLD ? sheet : duvet).toArray(colors, i * 3);
     }
+    g.setAttribute('color', new BufferAttribute(colors, 3));
     g.computeVertexNormals();
     return g;
-  }, [w, d, length, foot, surface, pose]);
-  // The turned-back top sheet: a soft roll across the chest, following the ridge
-  const fold = surface + duvetHeight(0, pose.chestZ, w, d, pose);
-  const color = bed.style === 'luxe' ? '#f2ede4' : bed.color;
+  }, [w, d, length, foot, surface, pose, color]);
+  const pull = useRef<Group>(null);
+
+  useFrame(() => {
+    const g = pull.current;
+    if (!g) return;
+    const { cover } = bedFrame(pose, (performance.now() - bedtime.startedAt) / 1000, bedtime.up, bedtime.from);
+    g.visible = cover > 0.01;
+    // Drawn up from the foot: the sheet stretches from the foot end to its current top edge
+    g.scale.z = Math.max(0.01, (duvetTop(pose, d, cover) - foot) / length);
+  });
+
   return (
     <group position={[bed.at[0], bed.elevation ?? 0, bed.at[1]]} rotation={[0, pose.heading, 0]}>
-      <mesh geometry={geometry} castShadow receiveShadow>
-        <meshStandardMaterial color={color} roughness={0.95} side={DoubleSide} />
-      </mesh>
-      <mesh position={[0, fold - 0.06, pose.chestZ]} rotation={[0, 0, Math.PI / 2]} scale={[0.6, 1, 1]} castShadow>
-        <capsuleGeometry args={[0.07, w - 0.2, 6, 16]} />
-        <meshStandardMaterial color="#f7f4ee" roughness={0.9} />
-      </mesh>
+      <group ref={pull} position={[0, 0, foot]} visible={false}>
+        <mesh geometry={geometry} castShadow receiveShadow>
+          <meshStandardMaterial vertexColors roughness={0.95} side={DoubleSide} />
+        </mesh>
+      </group>
     </group>
   );
 }

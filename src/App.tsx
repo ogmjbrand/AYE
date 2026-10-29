@@ -35,7 +35,7 @@ import { QualityContext, initialAutoQuality, settingsFor, useQuality, type Quali
 import { lightingAt } from './world/timeOfDay';
 import { FpsMeter } from './world/FpsMeter';
 import { Player } from './components/Player';
-import { sleepPose, type SleepPose } from './lib/bedSleep';
+import { BED_UP_SECONDS, bedToRoom, sideSleepPose, type Bedtime } from './lib/bedSleep';
 import { SleepingDuvet } from './world/SleepingDuvet';
 import { HUD, type NavItem, type PlacePlate } from './components/HUD';
 import type { IconName } from './components/os/icons';
@@ -208,8 +208,8 @@ const followShift = new Vector3();
  * behind and 1.5 m above, so the player fills a good part of the frame.
  */
 const CAMERA_TARGET_HEIGHT = 1.25;
-/** How long you see yourself asleep in bed before the night passes. */
-const SLEEP_SCENE_MS = 5000;
+/** Going to bed, from turning to the bed to the night passing: lying down (lib/bedSleep.ts BED_DOWN_SECONDS), then the room fades. */
+const SLEEP_SCENE_MS = 8000;
 
 /** The Palms' room as a collision layout (the same for every visit). */
 const PALMS_LAYOUT = restaurantLayout();
@@ -825,32 +825,41 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [lightsOn, setLightsOn] = useState(true);
   const atLightSwitch = () => !!interior && nearSpot(lightSwitchSpot(interior), SWITCH_RADIUS);
   const flipLights = () => setLightsOn((on) => !on);
-  // Going to bed at home: you lie down under the duvet while the room fades to night, then wake up beside the bed
-  const [asleep, setAsleep] = useState<{ bed: Furniture; pose: SleepPose } | null>(null);
-  const finishSleep = useRef<() => void>(() => {});
+  // Going to bed at home (lib/bedSleep.ts): you sit on the edge of your bed, lie down on your side and pull the
+  // duvet up while the room fades to night; in the morning you push it back, sit up and stand beside the bed
+  const [asleep, setAsleep] = useState<(Bedtime & { night: boolean }) | null>(null);
+  const finishBedtime = useRef<(a: Bedtime & { night: boolean }) => void>(() => {});
   useEffect(() => {
-    finishSleep.current = () => {
-      rest(true);
+    finishBedtime.current = (a) => {
+      if (!a.up) {
+        rest(true);
+        setAsleep({ ...a, night: true });
+        return;
+      }
       setAsleep(null);
       setMovementBlocked(false);
-      if (interior) {
-        const [x, z] = bedSpot(interior);
-        placePlayer([x, 0, z], Math.PI / 2);
-      }
+      const [x, z] = bedToRoom(a.pose, a.pose.standX, a.pose.pelvis[1]);
+      placePlayer([x, 0, z], a.pose.heading + Math.PI / 2);
     };
   });
   useEffect(() => {
-    if (!asleep) return;
-    const id = window.setTimeout(() => finishSleep.current(), SLEEP_SCENE_MS);
+    // Asleep through the night until the morning's summary is closed (then getting up starts there)
+    if (!asleep || asleep.night) return;
+    const id = window.setTimeout(() => finishBedtime.current(asleep), asleep.up ? BED_UP_SECONDS * 1000 : SLEEP_SCENE_MS);
     return () => window.clearTimeout(id);
   }, [asleep]);
   const goToBed = () => {
     const bed = interior?.furniture.find((x) => x.kind === 'bed');
     if (!indoors || !bed) { rest(atHome()); return; }
-    if (asleep) return;
-    placePlayer([controller.position.x, 0, controller.position.z], controller.direction);
+    // Already asleep, or sleep isn't possible now (a summary still open, recovering in care): nothing to lie down for
+    if (asleep || state.summary || state.health.recovery) return;
+    const pose = sideSleepPose(bed, character.heightCm);
+    // From where you stand if you're beside the bed; from the bedside if you went to bed from across the room
+    const [sx, sz] = bedToRoom(pose, pose.standX, pose.pelvis[1]);
+    const near = Math.hypot(controller.position.x - sx, controller.position.z - sz) < 1.2;
+    const from = near ? { x: controller.position.x, z: controller.position.z, direction: controller.direction } : { x: sx, z: sz, direction: pose.heading + Math.PI / 2 };
     setMovementBlocked(true);
-    setAsleep({ bed, pose: sleepPose(bed, character.heightCm) });
+    setAsleep({ bed, pose, up: false, startedAt: performance.now(), from, night: false });
   };
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
@@ -2451,9 +2460,14 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onContinue={() => {
             // Evicted in your sleep: you wake up back on the street
             if (inside && state.summary?.evicted) {
+              setAsleep(null);
+              setMovementBlocked(false);
               setInside(false);
               placePlayer(district.spawn);
               snapCamera();
+            } else if (asleep?.night) {
+              // Morning: push back the duvet, sit up and get out of bed
+              setAsleep({ ...asleep, night: false, up: true, startedAt: performance.now() });
             }
             dismissSummary();
           }}
@@ -2499,8 +2513,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
             ) : indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
-                <Player controller={controller} character={character} tryOn={tryOn} lying={asleep?.pose} />
-                {asleep && <SleepingDuvet bed={asleep.bed} pose={asleep.pose} />}
+                <Player controller={controller} character={character} tryOn={tryOn} bedtime={asleep} />
+                {asleep && <SleepingDuvet bedtime={asleep} />}
                 {decorPlacement && decorPlacementItem && (
                   <DecorPlacementPreview controller={controller} item={decorPlacementItem} rotation={decorPlacement.rotation} />
                 )}
@@ -2549,7 +2563,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           <PhotoCapture />
         </Canvas>
       </QualityContext.Provider>
-      {asleep && (
+      {asleep && !asleep.up && !asleep.night && (
         <div className="sleep-shade" role="status" aria-live="polite" style={{ animationDuration: `${SLEEP_SCENE_MS}ms` }}>
           <p>Sleeping…</p>
         </div>
