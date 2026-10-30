@@ -2,7 +2,7 @@ import { Suspense, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group, Quaternion, Vector3 } from 'three';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
-import type { Seat } from '../lib/seating';
+import { SEAT_MOVE_SECONDS, seatMoveFrame, type Seat, type SeatMove } from '../lib/seating';
 import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
@@ -60,7 +60,8 @@ export function Player({
   /** On a bed's edge: its height and the clip for the moment (Avatar `perch`). */
   const perch = useRef<Perch | null>(null);
   const lastSeat = useRef<Seat | null>(null);
-  const settle = useRef(0);
+  /** Sitting down on a seat or getting up from it, while it lasts. */
+  const seatMove = useRef<SeatMove | null>(null);
   const completedHug = useRef<string | null>(null);
 
   const equipped = character?.wardrobe.equipped;
@@ -126,24 +127,32 @@ export function Player({
     // Apply position and rotation to the visual group, standing on the pavement or road
     const g = groupRef.current;
     if (g) {
+      const now = performance.now() / 1000;
       const seat = getSeated();
       if (seat !== lastSeat.current) {
-        // Sitting down or getting up moves the origin a little: glide there for a moment instead of jumping
+        // Sitting down: turn your back to the seat, then lower yourself onto it. Getting up: rise and step forward
+        if (seat) seatMove.current = { seat, up: false, startedAt: now, fromYaw: g.rotation.y };
+        else if (lastSeat.current && Math.hypot(g.position.x - controller.position.x, g.position.z - controller.position.z) < 2) {
+          seatMove.current = { seat: lastSeat.current, up: true, startedAt: now, fromYaw: lastSeat.current.facing };
+        } else seatMove.current = null;
         lastSeat.current = seat;
-        settle.current = 0.8;
       }
+      const move = seatMove.current;
+      // Walking off while still getting up: the walk takes over
+      if (move?.up && Math.hypot(controller.velocity.x, controller.velocity.z) > 0.35) seatMove.current = null;
       const { x, z } = controller.position;
-      const y = groundHeightAt(x, z);
-      if (settle.current > 0 && Math.hypot(g.position.x - x, g.position.z - z) < 2) {
-        settle.current -= delta;
-        const k = Math.min(1, delta * 8);
-        g.position.set(g.position.x + (x - g.position.x) * k, y, g.position.z + (z - g.position.z) * k);
-        const turn = Math.atan2(Math.sin(controller.direction - g.rotation.y), Math.cos(controller.direction - g.rotation.y));
-        g.rotation.set(0, g.rotation.y + turn * k, 0);
-      } else {
-        g.position.set(x, y, z);
-        g.rotation.set(0, controller.direction, 0);
+      if (seatMove.current) {
+        const f = seatMoveFrame(seatMove.current, now - seatMove.current.startedAt);
+        if (f.done) seatMove.current = null;
+        else {
+          g.position.set(f.x, groundHeightAt(f.x, f.z), f.z);
+          g.rotation.set(0, f.yaw, 0);
+          perch.current = { height: seatMove.current.seat.height, clip: f.clip, seconds: SEAT_MOVE_SECONDS };
+          return;
+        }
       }
+      g.position.set(x, groundHeightAt(x, z), z);
+      g.rotation.set(0, controller.direction, 0);
     }
   });
 

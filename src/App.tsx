@@ -119,7 +119,7 @@ import {
   CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
-import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
+import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse } from './lib/furniture';
 import type { FurnitureKind, Interior } from './lib/interiors';
 import { currentMood, type FurnitureTarget } from './lib/gameState';
 import { FurnitureCatalogue } from './components/FurnitureCatalogue';
@@ -300,6 +300,8 @@ const followOffset = new Vector3();
 const CEILING_CLEARANCE = 0.25;
 /** How far inside a room's walls the camera stays (past the walls' own thickness). */
 const WALL_CLEARANCE = 0.4;
+/** How long you stay on the sofa or in the armchair after using it, in real seconds, before getting up. */
+const SOFA_SIT_SECONDS = 10;
 /** Chase-camera distance and height above the look-at point while driving. */
 const DRIVE_CAMERA_DISTANCE = 9;
 const DRIVE_CAMERA_HEIGHT = 3.2;
@@ -895,7 +897,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
   /** The piece of furniture you're standing at that does something (shower, sofa, cooker…), if any. */
-  const usableHere = (): { target: FurnitureTarget; verb: string; cost: number; minutes: number } | null => {
+  const usableHere = (): { target: FurnitureTarget; f: Furniture; verb: string; cost: number; minutes: number } | null => {
     if (!indoors || !interior) return null;
     const { x, z } = controller.position;
     const pieces: { target: FurnitureTarget; f: Furniture; quality: number }[] = [
@@ -904,7 +906,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     ];
     for (const p of pieces) {
       const use = furnitureUse(p.f.kind, p.quality);
-      if (use && nearPiece(p.f, x, z)) return { target: p.target, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
+      if (use && nearPiece(p.f, x, z)) return { target: p.target, f: p.f, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
     }
     return null;
   };
@@ -912,6 +914,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     const u = usableHere();
     if (!u || state.balance < u.cost) return;
     operateFurniture(u.target, true);
+    // On the sofa or in the armchair, you really sit down for a while, then get up again
+    const seat = furnitureSeat(u.f, `home-${'uid' in u.target ? u.target.uid : u.target.builtin}`);
+    if (seat) sit.start({ seat, place: u.f.kind === 'sofa' ? 'the sofa' : 'the armchair', minutes: 0, holdSeconds: SOFA_SIT_SECONDS });
     setArrival(`${u.verb}: ${u.minutes >= 60 ? `${u.minutes / 60} h` : `${u.minutes} min`} pass${u.cost ? `, ${u.cost} GHAI for ingredients` : ''}.`);
   };
   // At your own front door you sleep at home; anywhere else is sleeping rough

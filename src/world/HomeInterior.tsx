@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { DoubleSide, type Group, type MeshStandardMaterial } from 'three';
 import type { Furniture, Interior } from '../lib/interiors';
 import { WALL_HEIGHT, lightSwitchSpot } from '../lib/interiors';
+import { sofaFacing } from '../lib/furniture';
 import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
 import { LuxePiece } from './LuxeFurniture';
@@ -470,9 +471,9 @@ export function Piece({ f }: { f: Furniture }) {
           {long ? box(w, 0.5, 0.25, 0.6, f.color, 0, d / 2 - 0.12) : box(0.25, 0.5, d, 0.6, f.color, w / 2 - 0.12, 0)}
         </>
       );
-      // The real velvet sofa (Khronos sample, see CREDITS.md) dyed this sofa's colour, its back where the block sofa's is: +z, or +x when it stands turned
+      // The real velvet sofa (Khronos sample, see CREDITS.md) dyed this sofa's colour, facing into the room with its back to the nearer wall (lib/furniture.ts sofaFacing)
       parts = (
-        <group rotation={[0, long ? 0 : Math.PI / 2, 0]}>
+        <group rotation={[0, sofaFacing(f) + Math.PI, 0]}>
           <RealModel name="sofa-velvet-champagne" fit={long ? [w, h, d] : [d, h, w]} rotationY={Math.PI} recolor={{ match: /fabric/i, color: f.color }}
             fallback={<group rotation={[0, long ? 0 : -Math.PI / 2, 0]}>{blocks}</group>} />
         </group>

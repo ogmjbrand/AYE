@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide } from 'three';
 import type { Furniture } from '../lib/interiors';
+import { sofaFacing } from '../lib/furniture';
 import { artTexture, marbleTexture, rugTexture } from './venueTextures';
 import { PottedPalm } from './PottedPalm';
 import { RealModel } from './RealModel';
@@ -303,8 +304,8 @@ export function LuxePiece({ f }: { f: Furniture }) {
   const L = turned ? d : w;
   const D = turned ? w : d;
   switch (f.kind) {
-    // Real velvet sofa (faces +z as modelled: turned round so its back is to +z like ours)
-    case 'sofa': return <Turned turned={turned}><RealModel name={f.color.toLowerCase() === '#f2d6dc' ? 'sofa-velvet-blush' : 'sofa-velvet-champagne'} fit={[L, h, D]} rotationY={Math.PI} recolor={{ match: /fabric/i, color: f.color }} fallback={<Sofa w={L} d={D} color={f.color} />} /></Turned>;
+    // Real velvet sofa, facing into the room with its back to the nearer wall (lib/furniture.ts sofaFacing)
+    case 'sofa': return <group rotation={[0, sofaFacing(f) + Math.PI, 0]}><RealModel name={f.color.toLowerCase() === '#f2d6dc' ? 'sofa-velvet-blush' : 'sofa-velvet-champagne'} fit={[L, h, D]} rotationY={Math.PI} recolor={{ match: /fabric/i, color: f.color }} fallback={<Sofa w={L} d={D} color={f.color} />} /></group>;
     case 'table': return w * d > 2 ? <Turned turned={turned}><DiningTable w={L} d={D} h={h} /></Turned> : <CoffeeTable w={w} d={d} h={h} />;
     case 'armchair': return <RealModel name="chair-velvet-peacock" fit={[w, h, d]} rotationY={Math.PI} fallback={<AccentChair w={w} d={d} color={f.color} />} />;
     // A screen faces into the room, whichever wall it stands against

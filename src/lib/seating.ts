@@ -67,6 +67,45 @@ export function nearestSeat(seats: readonly Seat[], x: number, z: number): Seat 
   return best;
 }
 
+// ---------------------------------------------------------------- sitting down and getting up
+
+/** Turning your back to the seat before sitting down, in seconds. */
+export const SEAT_TURN_SECONDS = 0.5;
+/** Sitting down onto a seat, or standing up from it (the Rocketbox clips, stretched to fit), in seconds. */
+export const SEAT_MOVE_SECONDS = 1.8;
+
+/** Sitting down on a seat (or getting up from it), started at `startedAt` seconds, from a body turned `fromYaw`. */
+export interface SeatMove { seat: Seat; up: boolean; startedAt: number; fromYaw: number }
+
+/** Which clip the body plays at a moment of a seat move: still on its feet, sitting down or standing up. */
+export type SeatMoveClip = 'Stand' | 'SitDown' | 'StandUp';
+
+const easeInOut = (k: number) => {
+  const c = Math.min(1, Math.max(0, k));
+  return c * c * (3 - 2 * c);
+};
+const shortest = (from: number, to: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+
+/**
+ * Where the body is `t` seconds into a seat move, as people do it: sitting
+ * down, turn your back to the seat where you stand, then lower yourself onto
+ * it, stepping back as you go (the sit-down clip); getting up, the stand-up
+ * clip as you rise and step forward. `done` once it's over.
+ */
+export function seatMoveFrame(m: SeatMove, t: number): { x: number; z: number; yaw: number; clip: SeatMoveClip; done: boolean } {
+  const stand = standSpot(m.seat), sat = seatedSpot(m.seat);
+  const lerp = (k: number) => ({ x: stand.x + (sat.x - stand.x) * k, z: stand.z + (sat.z - stand.z) * k });
+  if (m.up) {
+    const k = easeInOut(t / SEAT_MOVE_SECONDS);
+    return { ...lerp(1 - k), yaw: m.seat.facing, clip: 'StandUp', done: t >= SEAT_MOVE_SECONDS };
+  }
+  if (t < SEAT_TURN_SECONDS) {
+    return { ...stand, yaw: m.fromYaw + shortest(m.fromYaw, m.seat.facing) * easeInOut(t / SEAT_TURN_SECONDS), clip: 'Stand', done: false };
+  }
+  const k = easeInOut((t - SEAT_TURN_SECONDS) / SEAT_MOVE_SECONDS);
+  return { ...lerp(k), yaw: m.seat.facing, clip: 'SitDown', done: t >= SEAT_TURN_SECONDS + SEAT_MOVE_SECONDS };
+}
+
 /** Game minutes that pass per real second while you sit and wait. */
 export const SIT_MINUTES_PER_SECOND = 15;
 

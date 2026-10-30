@@ -13,6 +13,7 @@
  */
 import { bedSpot, doorSpot, type Furniture, type FurnitureKind, type Interior } from './interiors';
 import { PLAYER_RADIUS } from './world';
+import { CHAIR_SEAT_HEIGHT, type Seat } from './seating';
 import { NEED_LABEL, type NeedKey, type Needs } from './needs';
 
 export type FurnitureCategory = 'seating' | 'beds' | 'tables' | 'kitchen' | 'bathroom' | 'electronics' | 'lighting' | 'decor' | 'storage';
@@ -358,6 +359,28 @@ export function spotToUse(f: Furniture): [number, number] {
 }
 
 /** Whether the player at (px, pz) is close enough to use a piece. */
+/**
+ * Which way a sofa faces: into the room, its back to the nearer wall along its
+ * short side (as the sofas are drawn, world/HomeInterior.tsx and
+ * world/LuxeFurniture.tsx). An armchair faces -z, as drawn.
+ */
+export function sofaFacing(f: Pick<Furniture, 'kind' | 'at' | 'size'>): number {
+  if (f.kind !== 'sofa') return Math.PI;
+  const [w, , d] = f.size;
+  return d > w ? (f.at[0] >= 0 ? -Math.PI / 2 : Math.PI / 2) : f.at[1] >= 0 ? Math.PI : 0;
+}
+
+/** Where you sit on a sofa or an armchair: the middle of its seat, a little forward of its centre, facing the way it does. */
+export function furnitureSeat(f: Furniture, id: string): Seat | null {
+  if (f.kind !== 'sofa' && f.kind !== 'armchair') return null;
+  const facing = sofaFacing(f);
+  const [w, , d] = f.size;
+  const depth = f.kind === 'sofa' ? Math.min(w, d) : d;
+  const ahead = (k: number) => ({ x: f.at[0] + Math.sin(facing) * k, z: f.at[1] + Math.cos(facing) * k });
+  const c = ahead(depth * 0.08);
+  return { id, x: c.x, z: c.z, facing, height: CHAIR_SEAT_HEIGHT, approach: ahead(depth / 2 + 0.5) };
+}
+
 export function nearPiece(f: Furniture, px: number, pz: number, reach = 0.75): boolean {
   const dx = Math.max(Math.abs(px - f.at[0]) - f.size[0] / 2, 0);
   const dz = Math.max(Math.abs(pz - f.at[1]) - f.size[2] / 2, 0);

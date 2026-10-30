@@ -89,7 +89,8 @@ type State = Clip | Gesture;
 /** Sitting on something for now (a bed's edge), set frame by frame: its height, and sitting down, seated or standing up. */
 export interface Perch {
   height: number;
-  clip: 'Sit' | SeatTransition;
+  /** Seated, sitting down, standing up, or still on your feet beside the seat (turning your back to it first). */
+  clip: 'Sit' | SeatTransition | 'Stand';
   /** How long sitting down or standing up takes here; the clip's movement is stretched to fit. */
   seconds: number;
 }
@@ -354,11 +355,11 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
     const perched = perch?.current ?? null;
     const seat = sitHeight !== undefined ? { height: sitHeight } : perched ? { height: perched.height } : getSeated();
-    const sitting = !!seat && !!gestures.Sit;
+    const sitting = !!seat && !!gestures.Sit && perched?.clip !== 'Stand';
     const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
     // Sitting down onto a bed's edge or standing up from it: the motion-captured transition, where this body has it
-    const clipWindow = perched && perched.clip !== 'Sit' && body && gestures[perched.clip] ? SEAT_TRANSITIONS[body][perched.clip] : null;
-    const seatClip = !sitting ? null : clipWindow && perched ? perched.clip : 'Sit';
+    const clipWindow = perched && perched.clip !== 'Sit' && perched.clip !== 'Stand' && body && gestures[perched.clip] ? SEAT_TRANSITIONS[body][perched.clip] : null;
+    const seatClip: 'Sit' | SeatTransition | null = !sitting ? null : clipWindow && perched && perched.clip !== 'Stand' ? perched.clip : 'Sit';
     const transition = clipWindow && perched ? { ...clipWindow, rate: (clipWindow.to - clipWindow.from) / perched.seconds, once: true } : null;
     // How fast the character is turning (radians a second, + to their left), smoothed over a few frames
     const turned = Math.atan2(Math.sin(controller.direction - lastDirection.current), Math.cos(controller.direction - lastDirection.current));
