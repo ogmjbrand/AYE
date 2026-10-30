@@ -133,7 +133,7 @@ body {
   opacity: 0.85;
 }
 @keyframes sleep-shade {
-  0%, 58% { background-color: rgb(5 7 15 / 0); }
+  0%, 60% { background-color: rgb(5 7 15 / 0); }
   92%, 100% { background-color: rgb(5 7 15 / 0.92); }
 }
 @media (prefers-reduced-motion: reduce) {

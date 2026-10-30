@@ -10,7 +10,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { resolveFashionItemId, resolveStyles, type Slot } from '../lib/fashion';
 import { LOOKS } from '../lib/looks';
 import { residentById, residentPosition } from '../lib/people';
-import { bedFrame, mattressTop, type Bedtime } from '../lib/bedSleep';
+import { SEAT_SECONDS, bedFrame, mattressTop, type Bedtime } from '../lib/bedSleep';
+import type { Perch } from './Avatar';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 
 interface PlayerProps {
@@ -56,8 +57,8 @@ export function Player({
 }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
-  /** Seated on a bed's edge: its height, for the sitting clip (Avatar `perch`). */
-  const perch = useRef<number | null>(null);
+  /** On a bed's edge: its height and the clip for the moment (Avatar `perch`). */
+  const perch = useRef<Perch | null>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
   const completedHug = useRef<string | null>(null);
@@ -75,7 +76,7 @@ export function Player({
       const f = bedFrame(bedtime.pose, (performance.now() - bedtime.startedAt) / 1000, bedtime.up, bedtime.from);
       const top = mattressTop(bedtime.bed);
       controller.velocity.set(0, 0, 0);
-      perch.current = f.perched ? top : null;
+      perch.current = f.seated ? { height: top, clip: f.seated, seconds: SEAT_SECONDS } : null;
       const g = groupRef.current;
       if (g) {
         g.position.set(...f.pivot);

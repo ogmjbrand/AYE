@@ -3,11 +3,27 @@
  * In a conversation the resident speaks first and the two take turns; a
  * resident who notices you coming over gives a wave (not too often).
  * The gesture clips are motion capture from Microsoft Rocketbox (MIT),
- * one file per body type (scripts/rocketbox/build-gestures.mjs).
+ * one file per body type (scripts/rocketbox/build-gestures.mjs and
+ * add-gestures.mjs).
  */
 import type { BodyType } from './looks';
 
-export type Gesture = 'Talk' | 'Listen' | 'Wave' | 'Sit' | 'Hug';
+export type Gesture = 'Talk' | 'Listen' | 'Wave' | 'Sit' | 'Hug' | SeatTransition;
+
+/** Sitting down onto a seat and standing up from it: Rocketbox *_sit_down_chair_01 and *_sit_stand_up_chair_01. */
+export type SeatTransition = 'SitDown' | 'StandUp';
+
+/**
+ * The part of each transition clip where the body actually lowers or rises,
+ * in clip seconds, measured from the height of the root over the clip: the
+ * women's sit-down stands still for its first 1.2 s and settles by 3.1 s;
+ * the men's drops between 0.3 and 1.3 s. The game plays just this part,
+ * stretched to the time the movement takes in the game.
+ */
+export const SEAT_TRANSITIONS: Record<BodyType, Record<SeatTransition, { from: number; to: number }>> = {
+  feminine: { SitDown: { from: 1.2, to: 3.1 }, StandUp: { from: 0.8, to: 2.7 } },
+  masculine: { SitDown: { from: 0, to: 1.6 }, StandUp: { from: 0.2, to: 1.8 } },
+};
 
 /** Seconds each person speaks before the other takes a turn. */
 export const TURN_SECONDS = 5;

@@ -48,6 +48,20 @@ change a gesture:
 3. `node scripts/rocketbox/build-gestures.mjs gestures-masculine.raw.glb Talk=m_gestic_talk_neutral_01.glb Listen=m_gestic_listen_neutral_01.glb Wave=m_wave_01.glb Sit=m_sit_chair_idle_neutral_01.glb`
 4. `npm run assets:optimize -- gestures-masculine.raw.glb public/assets/models/characters/rocketbox/gestures-masculine.glb`
 
-Clip names (`Talk`, `Listen`, `Wave`, `Sit`) are what `src/lib/bodyLanguage.ts` asks for.
+Clip names (`Talk`, `Listen`, `Wave`, `Sit`, `SitDown`, `StandUp`) are what `src/lib/bodyLanguage.ts` asks for.
+
+To add clips to an existing gesture file without FBX2glTF, straight from the
+Rocketbox FBX files (three.js's FBXLoader reads them; checked against the Sit
+clip, which comes out identical):
+
+```
+node scripts/rocketbox/add-gestures.mjs gestures-feminine.glb out.raw.glb SitDown=f_sit_down_chair_01.max.fbx StandUp=f_sit_stand_up_chair_01.max.fbx
+npm run assets:optimize -- out.raw.glb public/assets/models/characters/rocketbox/gestures-feminine.glb
+```
+
+`SitDown` and `StandUp` are `all_animations_max_motextr_xyz/*_sit_down_chair_01`
+and `*_sit_stand_up_chair_01`. The game plays only the part where the body
+lowers or rises (`SEAT_TRANSITIONS` in `src/lib/bodyLanguage.ts`, measured
+from the root's height over each clip).
 Clips that hold the fingers still get the idle clip's relaxed hand at load
 time (`src/components/handPose.ts`).

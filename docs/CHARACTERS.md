@@ -10,7 +10,7 @@ Every number below was measured from the files in the repository on
 | | Count | Where | Licence |
 |---|---|---|---|
 | Rocketbox base models (real, rigged, textured people) | **20** | `public/assets/models/characters/rocketbox/*.glb` | MIT, Microsoft (`ROCKETBOX-LICENSE.md`); can be published |
-| Shared gesture files (Talk, Listen, Wave, Sit) | 2 | `gestures-feminine.glb`, `gestures-masculine.glb` | MIT, Microsoft |
+| Shared gesture files (Talk, Listen, Wave, Sit, SitDown, StandUp) | 2 | `gestures-feminine.glb`, `gestures-masculine.glb` | MIT, Microsoft |
 | 3D hairstyles that can be worn on a model | 4 | head-bone attached GLBs | CC0 (MakeHuman), see `public/assets/CREDITS.md` |
 | Character Creator 5 player body | 1 | `public/assets/private/characters/cc5/` (git-ignored) | Your CC5 export; **never** committed or published |
 
@@ -274,7 +274,8 @@ estimated. A crowd can be reproduced from the URL:
 - 6–8 textures, with a largest texture of 2048 px;
 - 80 bones (81 on `pilot-male-01`);
 - Idle, Walk and Run clips;
-- both gesture files fit every skeleton.
+- both gesture files fit every skeleton, including the sit-down and
+  stand-up clips added for getting into and out of bed.
 
 The gesture clip lengths are:
 
@@ -289,7 +290,16 @@ The gesture clip lengths are:
 - the counts in section 5 multiply out.
 
 **Animation.** Locomotion runs on each model's own skeleton. Talk, Listen,
-Wave and Sit come from the shared gesture files. The CC5 body has its own
+Wave, Sit, SitDown and StandUp come from the shared gesture files.
+
+Going to bed (`src/lib/bedSleep.ts`) uses them in sequence:
+1. turn your back to the bed;
+2. sit down onto its edge (the motion-captured sit-down);
+3. tip over onto your side;
+4. pull the duvet up.
+
+Getting up plays the same movement in reverse, ending with the
+motion-captured stand-up. The CC5 body has its own
 retargeted copies of those clips, plus a hug built at run time.
 
 **Performance.** Each person is about 6.4k–9.4k triangles, and each material

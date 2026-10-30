@@ -209,7 +209,7 @@ const followShift = new Vector3();
  */
 const CAMERA_TARGET_HEIGHT = 1.25;
 /** Going to bed, from turning to the bed to the night passing: lying down (lib/bedSleep.ts BED_DOWN_SECONDS), then the room fades. */
-const SLEEP_SCENE_MS = 8000;
+const SLEEP_SCENE_MS = 9000;
 
 /** The Palms' room as a collision layout (the same for every visit). */
 const PALMS_LAYOUT = restaurantLayout();

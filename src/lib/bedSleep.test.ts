@@ -32,10 +32,12 @@ describe('going to bed', () => {
     const start = bedFrame(p, 0, false, from);
     expect(start.pivot[0]).toBeCloseTo(bx, 5);
     expect(start.pivot[2]).toBeCloseTo(bz, 5);
-    expect(start.perched).toBe(false);
+    expect(start.seated).toBeNull();
+    // Sitting down onto the edge with the sit-down clip, then seated
+    expect(bedFrame(p, 1.5, false, from).seated).toBe('SitDown');
     // Sitting on the edge, back to the bed, upright
-    const sitting = bedFrame(p, 2, false, from);
-    expect(sitting.perched).toBe(true);
+    const sitting = bedFrame(p, 2.8, false, from);
+    expect(sitting.seated).toBe('Sit');
     expect(sitting.roll).toBe(0);
     expect(sitting.yaw).toBeCloseTo(p.heading + Math.PI / 2, 5);
     expect(sitting.pivot[0]).toBeCloseTo(bedToRoom(p, p.edgeX, p.pelvis[1])[0], 5);
@@ -45,7 +47,7 @@ describe('going to bed', () => {
     expect(lying.cover).toBe(1);
     expect(lying.pivot[1]).toBeCloseTo(p.lieY, 5);
     // The tip is gradual: half way through it, the body is half over
-    const mid = bedFrame(p, 3.2, false, from);
+    const mid = bedFrame(p, 4, false, from);
     expect(mid.roll).toBeGreaterThan(0.3);
     expect(mid.roll).toBeLessThan(1.3);
   });
@@ -55,7 +57,10 @@ describe('going to bed', () => {
     const p = sideSleepPose(bed, 180);
     const from = { x: 0, z: 0, direction: 0 };
     expect(bedFrame(p, 0, true, from)).toEqual(bedFrame(p, BED_DOWN_SECONDS, false, from));
+    // Rising off the edge with the stand-up clip, and on your feet at the end
+    expect(bedFrame(p, BED_UP_SECONDS - 0.9, true, from).seated).toBe('StandUp');
     const end = bedFrame(p, BED_UP_SECONDS, true, from);
+    expect(end.seated).toBeNull();
     expect(end.roll).toBe(0);
     expect(end.cover).toBe(0);
     const [sx, sz] = bedToRoom(p, p.standX, p.pelvis[1]);

@@ -14,7 +14,7 @@ import { applyBodyShape } from './bodyShapeSkin';
 import { createRelaxedHands } from './relaxedHands';
 import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
-import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
+import { SEAT_TRANSITIONS, conversationGesture, type Gesture, type SeatTransition } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HeldBag } from '../world/HeldBag';
 import { Adornments } from '../world/Adornments';
@@ -84,6 +84,17 @@ export function OutfitStyler({ scene, lookId, styles, skinTone = 0, skinToneId =
 type Clip = 'Idle' | 'Walk' | 'Run';
 type State = Clip | Gesture;
 
+/** Sitting on something for now (a bed's edge), set frame by frame: its height, and sitting down, seated or standing up. */
+export interface Perch {
+  height: number;
+  clip: 'Sit' | SeatTransition;
+  /** How long sitting down or standing up takes here; the clip's movement is stretched to fit. */
+  seconds: number;
+}
+
+/** Playing part of a sit-down or stand-up clip: from where, at what rate. */
+interface Transition { from: number; to: number; rate: number }
+
 /** Cross-fades to the clip that matches the speed (or the gesture, when standing) and scales its playback rate. */
 function updateLocomotion(
   get: (state: State) => AnimationAction | null | undefined,
@@ -92,9 +103,11 @@ function updateLocomotion(
   avatar: AvatarFile,
   gesture: Gesture | null,
   mixerTime: number,
-  sitting = false,
+  seated: 'Sit' | SeatTransition | null = null,
+  transition: Transition | null = null,
 ) {
-  const next: State = sitting ? 'Sit' : gesture === 'Hug' && get('Hug') ? 'Hug' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run';
+  const next: State = seated ?? (gesture === 'Hug' && get('Hug') ? 'Hug' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run');
+  const seatedState = (s: State | null) => s === 'Sit' || s === 'SitDown' || s === 'StandUp';
   if (next !== current.current) {
     const prev = current.current ? get(current.current) : null;
     const action = get(next);
@@ -105,13 +118,21 @@ function updateLocomotion(
     if (next === 'Talk' || next === 'Listen') {
       // Long takes: join them part-way through so turns don't repeat the same opening
       action?.reset().startAt(mixerTime - ((mixerTime * 7.3) % 20)).fadeIn(0.4).play();
-    } else if (next === 'Sit' || current.current === 'Sit') {
+    } else if ((next === 'SitDown' || next === 'StandUp') && action && transition) {
+      // Just the part where the body lowers or rises, once, stretched to the time it takes here
+      action.reset();
+      action.setLoop(LoopOnce, 1);
+      action.clampWhenFinished = true;
+      action.time = transition.from;
+      action.setEffectiveTimeScale(transition.rate);
+      action.fadeIn(0.3).play();
+    } else if (seatedState(next) || seatedState(current.current)) {
       // Settling onto a seat or getting up: a slower blend, so the body lowers and rises rather than snapping
-      action?.reset().fadeIn(0.7).play();
+      action?.reset().fadeIn(seatedState(next) && seatedState(current.current) ? 0.35 : 0.7).play();
     } else {
       action?.reset().fadeIn(0.25).play();
     }
-    prev?.fadeOut(next === 'Sit' || current.current === 'Sit' ? 0.7 : next === 'Walk' || next === 'Run' ? 0.25 : 0.4);
+    prev?.fadeOut(seatedState(next) || seatedState(current.current) ? (seatedState(next) && seatedState(current.current) ? 0.35 : 0.7) : next === 'Walk' || next === 'Run' ? 0.25 : 0.4);
     current.current = next;
   }
   const action = get(next);
@@ -180,8 +201,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   own?: boolean;
   /** Always seated on a seat this high (metres), e.g. at the wheel of a car. */
   sitHeight?: number;
-  /** Seated for now on something this high (metres), set frame by frame, e.g. on the edge of a bed; null when not. */
-  perch?: { readonly current: number | null };
+  /** Seated for now on something, set frame by frame, e.g. on the edge of a bed; null when not. */
+  perch?: { readonly current: Perch | null };
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
   hugSession?: HugSession | null;
@@ -321,12 +342,20 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     };
     // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
     const perched = perch?.current ?? null;
-    const seat = sitHeight !== undefined ? { height: sitHeight } : perched !== null ? { height: perched } : getSeated();
+    const seat = sitHeight !== undefined ? { height: sitHeight } : perched ? { height: perched.height } : getSeated();
     const sitting = !!seat && !!gestures.Sit;
-    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, sitting);
+    // Sitting down onto a bed's edge or standing up from it: the motion-captured transition, where this body has it
+    const clipWindow = perched && perched.clip !== 'Sit' && body && gestures[perched.clip] ? SEAT_TRANSITIONS[body][perched.clip] : null;
+    const seatClip = !sitting ? null : clipWindow && perched ? perched.clip : 'Sit';
+    const transition = clipWindow && perched ? { ...clipWindow, rate: (clipWindow.to - clipWindow.from) / perched.seconds } : null;
+    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, seatClip, transition);
     const g = group.current;
     if (g) {
-      const drop = sitting && seat ? seatDrop(seat, targetHeight) : 0;
+      // Lowered onto the seat once down on it: during a transition, as far as its body has gone
+      const transitionAction = transition && seatClip ? gestures[seatClip as SeatTransition] : null;
+      const progress = transitionAction && transition ? Math.min(1, Math.max(0, (transitionAction.time - transition.from) / (transition.to - transition.from))) : 1;
+      const down = seatClip === 'StandUp' ? 1 - progress : progress;
+      const drop = sitting && seat ? seatDrop(seat, targetHeight) * down : 0;
       // At a wheel, wait for the sitting pose rather than stand up through the roof
       g.visible = sitHeight === undefined || sitting;
       g.position.y += (drop - g.position.y) * Math.min(1, delta * 5);

@@ -19,7 +19,10 @@
  * (lib/seating.ts), so the whole movement is the body turning about the
  * pelvis: the lying pose is the seated pose laid on its side.
  */
+import type { SeatTransition } from './bodyLanguage';
 import type { Furniture } from './interiors';
+
+export type SeatClip = SeatTransition | 'Sit';
 
 /** Top of the mattress for each bed style (matches the drawn beds). */
 export function mattressTop(bed: Pick<Furniture, 'style'>): number {
@@ -108,13 +111,16 @@ export function bedToRoom(pose: Pick<SidePose, 'centre' | 'heading'>, x: number,
   return [pose.centre[0] + x * c + z * s, pose.centre[1] - x * s + z * c];
 }
 
-// The timeline, in seconds. Down: turn, sit on the edge, settle, lie down, pull the duvet up.
+// The timeline, in seconds. Down: turn, sit down on the edge (the sit-down clip, stepping back onto the bed),
+// settle, lie down, pull the duvet up. Up runs it backwards, with the stand-up clip for rising off the edge.
 const TURN_END = 0.7;
-const SIT_END = 1.5;
-const SETTLE_END = 2.4;
-const LIE_END = 4.0;
-const COVER_START = 3.6;
-export const BED_DOWN_SECONDS = 4.6;
+const SIT_END = 2.5;
+/** How long sitting down onto the bed's edge, or standing up from it, takes. */
+export const SEAT_SECONDS = SIT_END - TURN_END;
+const SETTLE_END = 3.2;
+const LIE_END = 4.8;
+const COVER_START = 4.4;
+export const BED_DOWN_SECONDS = 5.4;
 /** Getting up: the same movement backwards, from under the duvet to standing beside the bed. */
 export const BED_UP_SECONDS = BED_DOWN_SECONDS - TURN_END;
 
@@ -130,8 +136,8 @@ export interface BedFrame {
   /** Facing (about the vertical, 0 = +z) and the tip onto the side (radians, about the bed's x axis). */
   yaw: number;
   roll: number;
-  /** Seated on the bed (the sitting clip plays). */
-  perched: boolean;
+  /** On the bed's edge, and which clip the body plays: sitting down onto it, seated, or standing up; null standing. */
+  seated: SeatClip | null;
   /** How far the duvet is pulled up, 0 to 1. */
   cover: number;
 }
@@ -165,7 +171,9 @@ export function bedFrame(pose: SidePose, t: number, up: boolean, from: { x: numb
     y = pose.sitY + (pose.lieY - pose.sitY) * lie + 0.06 * Math.sin(Math.PI * lie);
   }
   const yaw = time <= TURN_END ? from.direction + shortestTurn(from.direction, facing) * turn : facing;
-  return { pivot: [x, y, z], yaw, roll: (Math.PI / 2) * lie, perched: time > TURN_END, cover };
+  // (a hair of tolerance: getting up ends exactly on the turn's end, give or take rounding)
+  const seated: SeatClip | null = time <= TURN_END + 1e-6 ? null : time < SIT_END ? (up ? 'StandUp' : 'SitDown') : 'Sit';
+  return { pivot: [x, y, z], yaw, roll: (Math.PI / 2) * lie, seated, cover };
 }
 
 function shortestTurn(from: number, to: number) {
