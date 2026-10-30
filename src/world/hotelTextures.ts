@@ -73,6 +73,21 @@ export function hotelPlasterTexture(repeat: [number, number]): CanvasTexture {
   }, repeat);
 }
 
+/** Soft white plaster with a faint blush in its mottle, for Alafia Spa. */
+export function blushPlasterTexture(repeat: [number, number]): CanvasTexture {
+  return make('blush-plaster', 512, 512, (g, rand) => {
+    g.fillStyle = '#f5e8e4';
+    g.fillRect(0, 0, 512, 512);
+    for (let k = 0; k < 420; k++) {
+      const light = rand() < 0.6;
+      g.fillStyle = light ? `rgba(255,250,248,${0.08 + rand() * 0.18})` : `rgba(226,186,186,${0.04 + rand() * 0.08})`;
+      g.beginPath();
+      g.ellipse(rand() * 512, rand() * 512, 10 + rand() * 50, 6 + rand() * 30, rand() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, repeat);
+}
+
 /** Damask wallpaper: tone-on-tone ornaments on cream, for the feature wall in each entrance. */
 export function damaskTexture(repeat: [number, number]): CanvasTexture {
   return make('damask', 256, 320, (g) => {

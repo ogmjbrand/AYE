@@ -294,6 +294,12 @@ export const TABLE = { w: 0.75, l: 1.95, h: 0.78 } as const;
 export const roomDoorX = (r: TreatmentRoom) => (r.x0 + r.x1) / 2;
 /** Where you stand beside a table (on its −x side). */
 export const tableSpot = (t: { x: number; z: number }) => [t.x - TABLE.w / 2 - 0.55, t.z] as const;
+/** Where each bed's magnifier lamp stands: past the head, on the side you work from (the other side is the colleague's). */
+export const lampSpot = (t: { x: number; z: number }) => [t.x - 0.6, t.z + 1.05] as const;
+/** The waiting area's shell chair and side table, and the vanity on the far wall (its console, then its stool). */
+export const SHELL_CHAIR = [-3.85, -5.95] as const;
+export const SIDE_TABLE = [-4.75, -6.05] as const;
+export const VANITY_Z = -4.4;
 /** The room for a service: couples go to the suite, the rest to the first two rooms. */
 export const roomFor = (service: ServiceId, alt = 0) => (service === 'couples' ? ROOMS[2] : ROOMS[alt % 2]);
 
@@ -328,8 +334,17 @@ export function spaLayout(): DistrictLayout {
     // Waiting sofa and the product shelf
     solid(-6.2, -5.9, 2.2, 0.9, 0.8),
     solid(-8.6, -4.0, 0.5, 1.8, 1.8),
-    // Tables and their side cabinets
-    ...ROOMS.flatMap((r) => r.tables.flatMap((t) => [solid(t.x, t.z, TABLE.w, TABLE.l, TABLE.h), solid(t.x + 0.8, t.z + 0.9, 0.45, 0.45, 0.8)])),
+    // The shell chair, side table and vanity
+    solid(SHELL_CHAIR[0], SHELL_CHAIR[1], 0.75, 0.7, 0.9),
+    solid(SIDE_TABLE[0], SIDE_TABLE[1], 0.45, 0.45, 0.6),
+    solid(ROOM.x1 - 0.16 - 0.22, VANITY_Z, 0.45, 1.1, 0.8),
+    solid(ROOM.x1 - 0.16 - 0.72, VANITY_Z, 0.4, 0.4, 0.48),
+    // Beds, their trolleys and magnifier lamps
+    ...ROOMS.flatMap((r) => r.tables.flatMap((t) => [
+      solid(t.x, t.z, TABLE.w, TABLE.l, TABLE.h),
+      solid(t.x + 0.8, t.z + 0.9, 0.45, 0.45, 0.8),
+      solid(lampSpot(t)[0], lampSpot(t)[1], 0.4, 0.4, 1.4),
+    ])),
   ];
   return buildLayout({
     id: `venue.${SPA_ID}`,
