@@ -99,7 +99,16 @@ bpy.ops.import_scene.fbx(filepath=fbx_path, use_anim=False, automatic_bone_orien
 for a in list(bpy.data.actions):
     bpy.data.actions.remove(a)
 
-rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and o.name.startswith('HD_'))
+# CC names the rig after the character's HD body; ActorScan exports call it "Armature"
+armatures = [o for o in bpy.data.objects if o.type == 'ARMATURE']
+rig = next((o for o in armatures if o.name.startswith('HD_')), armatures[0])
+# An ActorScan rig arrives turned +90 deg about X (FBX's Y-up), lying on its back; its
+# bones and mesh data are Z-up already, so standing it upright is just dropping that turn
+loc, rot, sca = rig.matrix_world.decompose()
+report_upright = math.degrees(rot.angle) > 1
+if report_upright:
+    rig.matrix_world = Matrix.LocRotScale(loc, None, sca)
+    bpy.context.view_layer.update()
 for o in list(bpy.data.objects):
     skinned = any(m.type == 'ARMATURE' and m.object == rig for m in getattr(o, 'modifiers', []))
     if o is not rig and not skinned:
@@ -115,6 +124,7 @@ for o in meshes:
         o.matrix_world = rig.matrix_world.copy()
         realigned += 1
 report['meshes_realigned'] = realigned
+report['rig_stood_up'] = report_upright
 report['source'] = {
     'rig': rig.name, 'bones': len(rig.data.bones),
     'meshes': {o.name: sum(len(p.vertices) - 2 for p in o.data.polygons) for o in meshes},
@@ -122,7 +132,8 @@ report['source'] = {
 
 # --------------------------------------------------------------- materials ---
 cc = json.load(open(json_path, encoding='utf-8-sig'))
-cc_meshes = next(v for v in cc[next(iter(cc))]['Object'].values() if v.get('Type') == 'Avatar')['Meshes']
+# Built characters are "Avatar"; scanned, ready-dressed ones (one mesh, one texture) are "ActorScan"
+cc_meshes = next(v for v in cc[next(iter(cc))]['Object'].values() if v.get('Type') in ('Avatar', 'ActorScan'))['Meshes']
 
 
 def find_image(path, non_color):
@@ -239,7 +250,8 @@ def profile_ratio(name):
     if name in PROFILES:
         return PROFILES[name]
     keys = sorted((k for k in PROFILES if name.startswith(k + '.')), key=len, reverse=True)
-    return PROFILES[keys[0]] if keys else 1.0
+    # Anything else (an ActorScan's single, already light mesh) keeps its full detail up close
+    return PROFILES[keys[0]] if keys else (1.0 if profile == 'main' else 0.4)
 
 
 for o in list(meshes):
@@ -323,7 +335,15 @@ bpy.context.view_layer.update()
 report['turn_degrees'] = round(math.degrees(turn), 1)
 
 hip_cc = world_head(rig, 'CC_Base_Hip')
-zs = [(o.matrix_world @ Vector(c)).z for o in meshes for c in o.bound_box]
+# Measured on the skinned (evaluated) body: an ActorScan mesh is stored lying down and
+# only stands up through its skeleton, so its raw bounding box is the wrong way round
+bpy.context.view_layer.update()
+depsgraph = bpy.context.evaluated_depsgraph_get()
+zs = []
+for o in meshes:
+    ev = o.evaluated_get(depsgraph)
+    zs += [(ev.matrix_world @ v.co).z for v in ev.to_mesh().vertices]
+    ev.to_mesh_clear()
 report['height_m'] = round(max(zs) - min(zs), 3)
 report['hip_m'] = round(hip_cc.z, 3)
 report['source_hip_m'] = round(world_head(src, 'Bip01 Pelvis').z, 3)
@@ -474,5 +494,21 @@ bpy.ops.export_scene.gltf(
 )
 report['output'] = out_path
 report['output_bytes'] = os.path.getsize(out_path)
+
+# Height as the game will see it: the exported, skinned body in its rest pose. (Before
+# export an ActorScan mesh still evaluates lying down, so the earlier measure is only kept
+# for characters whose rig needed no turn.)
+if report_upright:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=out_path)
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    zs = []
+    for o in bpy.data.objects:
+        if o.type == 'MESH' and o.find_armature():
+            ev = o.evaluated_get(depsgraph)
+            zs += [(ev.matrix_world @ v.co).z for v in ev.to_mesh().vertices]
+            ev.to_mesh_clear()
+    report['height_m'] = round(max(zs) - min(zs), 3)
 json.dump(report, open(report_path, 'w'), indent=1)
 print('CC5_REPORT', json.dumps(report))

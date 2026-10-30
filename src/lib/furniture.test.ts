@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGUE, DECOR_ROOMS, FURNITURE_CATEGORIES, USES, asFurniture, catalogueItem, findSpot, fits, footprint, homeComfort, layerOf, replaceAll, resaleValue, sanitiseFurniture, furnitureUse, walkable, type OwnedFurniture } from './furniture';
+import { CATALOGUE, DECOR_ROOMS, FURNITURE_CATEGORIES, USES, asFurniture, catalogueItem, dragSpot, findSpot, fits, footprint, homeComfort, layerOf, pieceOnRay, replaceAll, resaleValue, sanitiseFurniture, furnitureUse, walkable, type OwnedFurniture } from './furniture';
 import { INTERIORS, bedSpot, doorSpot, interiorFor, interiorLayout } from './interiors';
 import { createGameState, gameReducer, type GameState } from './gameState';
 import { allHomes, homeById, moveInFee } from './homes';
@@ -48,6 +48,31 @@ describe('placing furniture', () => {
     expect(fits(room, [], sofa, [0, -room.depth / 2 + 0.6], 0)).toBe(false);
     // Not through a wall
     expect(fits(room, [], sofa, [room.width / 2, 0], 0)).toBe(false);
+  });
+
+  it('dragging picks up the piece under the pointer and only lets it go where it fits', () => {
+    const rug = CATALOGUE.find((c) => c.kind === 'rug')!;
+    const sofaSpot = findSpot(room, [], sofa)!;
+    const owned: OwnedFurniture[] = [{ uid: 'f#1', itemId: sofa.id, at: sofaSpot.at, rot: sofaSpot.rot }];
+    const rugSpot = findSpot(room, owned, rug)!;
+    owned.push({ uid: 'f#2', itemId: rug.id, at: rugSpot.at, rot: rugSpot.rot });
+    // Looking down at the sofa's top from above and in front: it's picked, not the floor behind it
+    const [sx, sz] = sofaSpot.at;
+    const eye = [sx, 3, sz - 3] as const;
+    const aim = (x: number, y: number, z: number) => [x - eye[0], y - eye[1], z - eye[2]] as const;
+    expect(pieceOnRay(owned, eye, aim(sx, sofa.size[1], sz))?.uid).toBe('f#1');
+    expect(pieceOnRay(owned, eye, aim(sx + 50, 0, sz))).toBeNull();
+    // A rug is picked on its own, but a piece standing on it comes first
+    expect(pieceOnRay([owned[1]], [rugSpot.at[0], 3, rugSpot.at[1]], [0, -1, 0])?.uid).toBe('f#2');
+    expect(pieceOnRay([owned[1], owned[0]], [sx, 3, sz], [0, -1, 0])?.uid).toBe('f#1');
+    // Into the doorway: not allowed; dragged through a wall: kept inside it
+    expect(dragSpot(room, owned, 'f#1', [0, -room.depth / 2 + 0.6]).ok).toBe(false);
+    expect(dragSpot(room, owned, 'f#1', [room.width, sofaSpot.at[1]]).at[0]).toBeLessThan(room.width / 2);
+    // Snapped to 5 cm, and ok exactly when fits() and walkable() agree
+    const moved = dragSpot(room, owned, 'f#1', [sofaSpot.at[0] + 0.013, sofaSpot.at[1]]);
+    expect(moved.at[0] * 20).toBeCloseTo(Math.round(moved.at[0] * 20), 6);
+    expect(moved.ok).toBe(fits(room, owned, sofa, moved.at, sofaSpot.rot, 'f#1') && walkable(room, owned.map((o) => (o.uid === 'f#1' ? { ...o, at: moved.at } : o))));
+    expect(dragSpot(room, owned, 'nope', [0, 0]).ok).toBe(false);
   });
 
   it('pieces never overlap, and a full room says so', () => {

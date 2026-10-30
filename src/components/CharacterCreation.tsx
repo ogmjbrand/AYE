@@ -14,13 +14,22 @@ import { HEIGHT_RANGE, bodyForGender, lookById, looksFor, type BodyType } from '
 import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wardrobe } from '../lib/fashion';
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
-import { assetManifest, assetUrl } from '../lib/assetManifest';
+import { assetUrl, isCc5Body } from '../lib/assetManifest';
 
-/** The player's body is the Character Creator 5 character (lib/assetManifest.ts), unless it isn't available. */
-const hasPlayerBody = () => assetManifest().avatar !== null;
-/** What the person looks like, for the stages' descriptions: the CC5 character (HUMAN.fbx: Classic_Slick_Back, Stubble) or the chosen look. */
-const describedLook = (lookId: string): { hair: string; facialHair?: string; covered?: boolean; outfit: string } =>
-  hasPlayerBody() ? { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers' } : lookById(lookId);
+/** The player's body is the Character Creator 5 character for their body type (lib/assetManifest.ts), unless it isn't available. */
+const hasPlayerBody = (lookId: string) => isCc5Body(lookById(lookId).body);
+/**
+ * What each CC5 body looks like, for the stages' descriptions. Aaron (HUMAN.fbx) has
+ * separate garments, so colours apply to each piece and skin tone to the skin; the
+ * woman (WOMAN.fbx, a ready-dressed scan) is one material, so neither can change yet.
+ */
+const CC5_LOOK = {
+  masculine: { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers', restyle: true },
+  feminine: { hair: 'Long, straight', outfit: 'Black blouse, cropped trousers and loafers', restyle: false },
+} as const;
+/** What the person looks like: their CC5 body's or the chosen look's. */
+const describedLook = (lookId: string): { hair: string; facialHair?: string; covered?: boolean; outfit: string; restyle?: boolean } =>
+  hasPlayerBody(lookId) ? CC5_LOOK[lookById(lookId).body] : lookById(lookId);
 import { STARTING_BALANCE } from '../lib/gameState';
 import {
   EDIT_STAGES, STAGES, STARTER_PRESETS, applyPreset, buildCharacter, draftFrom, newDraft, problems, randomise, starterItems, withBody,
@@ -139,9 +148,9 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
   return (
     <Shell
       lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={focus}
-      bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody()}
+      bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody(draft.lookId)}
       avatarName={draft.name.trim() || 'New avatar'}
-      previewSub={hasPlayerBody()
+      previewSub={hasPlayerBody(draft.lookId)
         ? `Character Creator 5 · ${draft.heightCm} cm`
         : `${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
       nav={nav}
@@ -261,7 +270,7 @@ function BodyStage({ draft, set, setDraft }: StageProps & { setDraft: (f: (d: Dr
         </div>
         <p className="mt-2 text-xs text-cc-muted">A starting point for person, figure, skin and clothes. Change anything afterwards, or press Randomise on the preview.</p>
       </div>
-      {hasPlayerBody() ? (
+      {hasPlayerBody(draft.lookId) ? (
         <div>
           <p className={SECTION_LABEL}>Person</p>
           <div className="rounded-lg border border-cc-gold bg-cc-gold/10 px-3 py-2.5 text-sm text-cc-ink">
@@ -335,7 +344,7 @@ function ProportionsStage({ draft, set }: StageProps) {
           <Slider key={s.key} id={`shape-${s.key}`} label={s.label} min={s.min} max={1} step={0.05} value={shape[s.key]} onChange={(v) => set({ shape: { ...shape, [s.key]: v } })} ends={s.ends} />
         ))}
       </div>
-      {hasPlayerBody()
+      {hasPlayerBody(draft.lookId)
         ? <p className="text-xs text-cc-muted">Your Character Creator body keeps the proportions it was modelled with; these settings are saved with your life.</p>
         : <p className="text-xs text-cc-muted">Shape changes the 3D model itself: each part of the body is filled out or slimmed down around the skeleton, so walking, running and sitting animations still fit. Every slider stays within natural limits.</p>}
     </>
@@ -357,12 +366,14 @@ function FaceStage({ draft, set }: StageProps) {
               style={{ background: t.color }} />
           ))}
         </div>
-        <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>
+        {hasPlayerBody(draft.lookId) && !look.restyle
+          ? <p className="text-xs text-cc-muted">Her skin and clothes share one texture in her Character Creator model, so skin tone is saved with your life but shows her own skin for now.</p>
+          : <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>}
       </div>
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
-        {hasPlayerBody()
+        {hasPlayerBody(draft.lookId)
           ? <p className="mt-1 text-xs text-cc-muted">Your face as you made it in Character Creator 5.</p>
           : <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person under Person for a different face.</p>}
       </div>
@@ -378,7 +389,7 @@ function HairStage({ draft, set, editing }: StageProps & { editing?: Character }
       <div>
         <p className={SECTION_LABEL}>Hairstyle</p>
         <p className="text-sm text-cc-ink">{look.hair}</p>
-        {hasPlayerBody()
+        {hasPlayerBody(draft.lookId)
           ? <p className="mt-1 text-xs text-cc-muted">The style you gave your character in Character Creator 5. Pick a colour below.</p>
           : <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>}
       </div>
@@ -415,7 +426,9 @@ function ClothesStage({ draft, set, editing }: StageProps & { editing?: Characte
   return (
     <>
       <p className="text-sm text-cc-muted">
-        {look.outfit}. {hasPlayerBody()
+        {look.outfit}. {hasPlayerBody(draft.lookId) && !look.restyle
+          ? 'Her outfit is part of her Character Creator model (one material), so colours you choose are saved with your life but don’t change her clothes yet; new 3D garments for her are on the way.'
+          : hasPlayerBody(draft.lookId)
           ? 'Choose the colour of each piece; it’s applied to the garment on the 3D model, keeping its folds (patterned fabrics show their main colour).'
           : 'Choose the fabric and colour of each piece; it’s applied to the garment on the 3D model, keeping its folds.'}
         {editing ? ' These are the clothes you own; buy more at the boutique.' : ' Starter pieces are free and yours to keep.'}

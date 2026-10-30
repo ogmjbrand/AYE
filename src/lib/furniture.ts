@@ -296,6 +296,54 @@ export function findSpot(interior: Interior, others: readonly OwnedFurniture[], 
 const clampTo = (v: number, max: number) => Math.max(-max, Math.min(max, v));
 const snap = (v: number) => Math.round(v * 20) / 20;
 
+/** Height band a piece takes up (wall art hangs at eye level), for picking it up. */
+const heightBand = (f: Furniture): readonly [number, number] => (f.kind === 'art' ? [0.9, 2.3] : [0, Math.max(f.size[1], 0.05)]);
+
+/**
+ * The placed piece a ray from the camera meets first, for picking one up to
+ * drag: you press on the sofa you see, not on the floor behind it. Rugs only
+ * count where nothing stands on them.
+ */
+export function pieceOnRay(owned: readonly OwnedFurniture[], origin: readonly [number, number, number], dir: readonly [number, number, number], margin = 0.05): OwnedFurniture | null {
+  let best: { o: OwnedFurniture; t: number; floor: boolean } | null = null;
+  for (const o of owned) {
+    const f = asFurniture(o);
+    if (!f) continue;
+    const [y0, y1] = heightBand(f);
+    const lo = [f.at[0] - f.size[0] / 2 - margin, y0, f.at[1] - f.size[2] / 2 - margin];
+    const hi = [f.at[0] + f.size[0] / 2 + margin, y1 + margin, f.at[1] + f.size[2] / 2 + margin];
+    // Slab test: where the ray enters and leaves the box on each axis
+    let near = 0, far = Infinity;
+    for (let k = 0; k < 3; k++) {
+      if (Math.abs(dir[k]) < 1e-9) {
+        if (origin[k] < lo[k] || origin[k] > hi[k]) { near = Infinity; break; }
+        continue;
+      }
+      const a = (lo[k] - origin[k]) / dir[k], b = (hi[k] - origin[k]) / dir[k];
+      near = Math.max(near, Math.min(a, b));
+      far = Math.min(far, Math.max(a, b));
+    }
+    if (near > far) continue;
+    const floor = layerOf(f.kind) === 'floor';
+    if (!best || (best.floor && !floor) || (best.floor === floor && near < best.t)) best = { o, t: near, floor };
+  }
+  return best?.o ?? null;
+}
+
+/**
+ * Where a piece being dragged would go: kept inside the walls and snapped to
+ * 5 cm, and whether it can stay there (free, and the room still walkable).
+ */
+export function dragSpot(interior: Interior, owned: readonly OwnedFurniture[], uid: string, at: readonly [number, number]): { at: [number, number]; ok: boolean } {
+  const o = owned.find((x) => x.uid === uid);
+  const piece = catalogueItem(o?.itemId);
+  if (!o || !piece) return { at: [at[0], at[1]], ok: false };
+  const [w, d] = footprint(piece, o.rot);
+  const spot: [number, number] = [snap(clampTo(at[0], interior.width / 2 - w / 2 - 0.05)), snap(clampTo(at[1], interior.depth / 2 - d / 2 - 0.05))];
+  const ok = fits(interior, owned, piece, spot, o.rot, uid) && walkable(interior, owned.map((x) => (x.uid === uid ? { ...x, at: spot } : x)));
+  return { at: spot, ok };
+}
+
 /** Re-places everything for a (new) home: what fits goes in, the rest into storage. */
 export function replaceAll(interior: Interior | null, owned: readonly OwnedFurniture[]): OwnedFurniture[] {
   const out: OwnedFurniture[] = [];

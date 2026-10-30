@@ -6,7 +6,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
 
-import { assetManifest, assetUrl, type AvatarFile } from '../lib/assetManifest';
+import { assetUrl, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
 import { applySkinTone, applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
@@ -164,8 +164,9 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   heightCm?: number;
 }) {
   const group = useRef<Group>(null);
-  // A character listed in public/assets/manifest.json replaces the built-in looks
-  const avatarFile: AvatarFile = assetManifest().avatar ?? lookById(lookId);
+  // The CC5 body for this body type (or one listed in public/assets/manifest.json) replaces the built-in looks
+  const bodyType = lookById(lookId).body;
+  const avatarFile: AvatarFile = useMemo(() => playerBodyFor(bodyType) ?? lookById(lookId), [bodyType, lookId]);
   const targetHeight = heightCm ? heightCm / 100 : avatarFile.height;
   const { scene: shared, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
   const scene = useMemo(() => (own ? privateCopy(shared) : shared), [shared, own]);
@@ -208,7 +209,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     applyBodyShape(scene, JSON.parse(shapeKey) as BodyShape);
   }, [scene, shapeKey]);
   // Garment maps exist only for the built-in looks; the player body (CC5) is styled by material
-  const playerBody = assetManifest().avatar !== null;
+  const playerBody = playerBodyFor(bodyType) !== null;
   const styledLook = playerBody ? null : lookById(lookId).id;
 
   // Built-in looks: gestures (talk, listen, wave, sit, hug) arrive in their own file after the person is on screen

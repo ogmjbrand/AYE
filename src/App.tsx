@@ -71,6 +71,7 @@ import { ParkedCars } from './world/ParkedCars';
 import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
+import { FurnitureDrag } from './world/FurnitureDrag';
 import { USE_RADIUS, bedSpot, doorSpot, interiorFor, interiorLayout, type Furniture } from './lib/interiors';
 import { asFurniture, catalogueItem, nearPiece, furnitureUse } from './lib/furniture';
 import type { FurnitureKind, Interior } from './lib/interiors';
@@ -387,6 +388,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   );
   const roomLayout = useMemo(() => (interior ? interiorLayout(interior, ownedPieces.map((p) => p.f)) : null), [interior, ownedPieces]);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+  // Dragging furniture across the floor (world/FurnitureDrag.tsx): the piece in hand, and a word when it can't go there
+  const [draggingUid, setDraggingUid] = useState<string | null>(null);
+  const [decorNote, setDecorNote] = useState<{ text: string; at: number } | null>(null);
   // Life OS: the character's dashboard; the world keeps running (and you can keep walking) while it's open
   const [osOpen, setOsOpen] = useState(false);
   const [osTab, setOsTab] = useState<OsTab>('today');
@@ -1372,6 +1376,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           onSell={sellFurniture}
           onPlace={placeFurniture}
           onStore={storeFurniture}
+          notice={decorNote}
           onClose={() => setCatalogueOpen(false)}
         />
       )}
@@ -1487,7 +1492,20 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {indoors && interior ? (
-              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.map((p) => p.f)}>
+              <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={ownedPieces.filter((p) => p.uid !== draggingUid).map((p) => p.f)}>
+                {catalogueOpen && (
+                  <FurnitureDrag
+                    interior={interior}
+                    owned={state.furniture}
+                    controlsRef={controlsRef}
+                    onPlace={placeFurniture}
+                    onDragging={setDraggingUid}
+                    onBlocked={(uid) => {
+                      const name = catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.name ?? 'That piece';
+                      setDecorNote({ text: `${name} doesn't fit there, so it's back where it was.`, at: Date.now() });
+                    }}
+                  />
+                )}
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </HomeInterior>
