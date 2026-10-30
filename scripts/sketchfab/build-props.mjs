@@ -12,6 +12,7 @@
  *   minibus.glb          "Bohdan Bus" by Vishchun
  *   trash-bin.glb        "Concrete trash bin" by matousekfoto
  *   coffee-cup.glb       "Coffee Cup - Realistic 3D Model" by ARTEL_3D
+ *   food-cart.glb        "Street Food Vendor Challenge - Kokoreç" by Berk Gedik
  *
  * Name props to build only those (node scripts/sketchfab/build-props.mjs fridge-retro).
  *
@@ -34,6 +35,11 @@
  * The trash bin is a photo scan of 351k triangles; it stands along the
  * boulevard several times over, so it is simplified to a few thousand, which
  * keeps its shape at street distance (its photographed texture carries the detail).
+ *
+ * The food cart becomes the suya grill on Lagoon Boulevard. It carries no
+ * lettering or logos; the only change is taking out the lit cigarette (and
+ * its smoke) left on the counter's edge. Halved in triangles: it is street
+ * furniture, seen from a few metres away.
  *
  * Output: public/assets/models/props/*.glb (meshopt, WebP textures).
  */
@@ -238,12 +244,14 @@ await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
 const only = process.argv.slice(2);
-for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512], ['minibus', 1024], ['trash-bin', 1024], ['coffee-cup', 512]]) {
+for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512], ['minibus', 1024], ['trash-bin', 1024], ['coffee-cup', 512], ['food-cart', 1024]]) {
   if (only.length && !only.includes(name)) continue;
   const doc = await io.read(`${SRC}/${name}.glb`);
   if (name === 'vending-machine') await replaceVendingArt(doc);
   if (name === 'motorhome') await debadgeMotorhome(doc);
   if (name === 'minibus') await debadgeMinibus(doc);
+  // No smoking at the food cart: the cigarette on the counter's edge and the plane of smoke above it
+  if (name === 'food-cart') for (const n of doc.getRoot().listNodes()) if (['Cylinder.349_Auto_Mid_Tex_0', 'Plane.027_Auto_Mid_Tex_0'].includes(n.getName())) n.dispose();
   for (const a of doc.getRoot().listAnimations()) a.dispose();
   await doc.transform(
     // The minibus is in the old specular-glossiness format, which three.js no longer reads
@@ -255,6 +263,7 @@ for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vendi
     ...(name === 'motorhome' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.25, error: 0.004 })] : []),
     // The scanned bin stands along the boulevard several times over: 351k triangles down to a few thousand
     ...(name === 'trash-bin' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.012, error: 0.1 })] : []),
+    ...(name === 'food-cart' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.5, error: 0.002 })] : []),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [size, size], quality: 82 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );

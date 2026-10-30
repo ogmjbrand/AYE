@@ -249,6 +249,9 @@ function layLayout(L: LayoutSpec, f: Frame, id: string): LayoutSpec {
     // Parked buses keep to the right-hand kerb: turn them round when they change side
     vehicles: L.vehicles.map((v): Vehicle => ({ ...v, position: pt(f, v.position), heading: f.sx > 0 ? v.heading : v.heading + Math.PI })),
     stalls: L.stalls.map((p) => pt(f, p)),
+    bins: L.bins?.map((p) => pt(f, p)),
+    // Mallam Sule's suya grill is on Lagoon Boulevard only
+    foodCarts: [],
     // Moving traffic stays as it is: both lanes are symmetric, and turning them would swap to driving on the left
     traffic: L.traffic,
     billboard: L.billboard && pt(f, L.billboard),
@@ -286,7 +289,8 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
   const at = (p: Spot) => pt(f, p);
 
   const vendorStyle = { kitchen: S.kitchen, snacks: S.snacks, second: S.second };
-  const vendors: FoodVendor[] = T.spec.vendors.map((v, i) => {
+  // One vendor for each of the template's roles (Lagos's own extras, such as the suya grill, stay in Lagos)
+  const vendors: FoodVendor[] = T.spec.vendors.slice(0, T.vendors.length).map((v, i) => {
     const role = T.vendors[i];
     const style = vendorStyle[role];
     const name = pick(style.names, `${seed.id}:${role}`).replace('{city}', seed.name);

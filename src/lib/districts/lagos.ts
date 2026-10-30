@@ -72,6 +72,8 @@ export const LAGOS_MARINA: DistrictSpec = {
     stalls: [[-6.2, 0, -10.5], [-6.2, 0, -7.5], [-6.2, 0, -1.5]],
     // Concrete bins on the pavement beside a lamp post: outside Marina Court, Gadget Hub, Lagoon Live and the hospital
     bins: [[-4.5, 0, 11.8], [-4.5, 0, 35.8], [4.5, 0, 23.8], [4.5, 0, -0.2]],
+    // The suya grill at the kerb outside the shops, its counter facing the pavement
+    foodCarts: [{ x: 5.0, z: 6, facing: Math.PI / 2 }],
     billboard: [-14, 0, -28.6],
     // Two chairs either side of Lagoon Live's door, facing the street
     terraceChairs: [{ x: 7.6, z: 18.75, facing: -Math.PI / 2 }, { x: 7.6, z: 21.25, facing: -Math.PI / 2 }],
@@ -111,6 +113,10 @@ export const LAGOS_MARINA: DistrictSpec = {
     {
       id: 'roadside-market', name: 'Roadside market', kind: 'Street food and snacks', position: [-5.0, 0, -9],
       menu: ['boli-epa', 'akara-pap', 'puff-puff', 'fruit', 'suya', 'chin-chin', 'roast-fish'],
+    },
+    {
+      id: 'suya-spot', name: 'Mallam Sule Suya', kind: 'Suya grill', position: [6.3, 0, 6],
+      menu: ['suya', 'kilishi', 'corn-ube', 'roast-yam-pepper', 'masa'],
     },
     {
       id: 'taste-of-africa', name: 'Taste of Africa', kind: 'Pan-African kitchen', position: [5.5, 0, 3],

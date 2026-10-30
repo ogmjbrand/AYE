@@ -82,6 +82,8 @@ export interface LayoutSpec {
   stalls: readonly Spot[];
   /** Concrete litter bins on the pavement (solid), where the district has them. */
   bins?: readonly Spot[];
+  /** Street-food carts on the pavement (solid): where they stand and which way their serving side faces (0 = +z). */
+  foodCarts?: readonly FoodCart[];
   /** Moving traffic, driving on the right. */
   traffic: readonly TrafficLane[];
   /** Roadside billboard with the AYE logo, if the district has one. */
@@ -110,6 +112,9 @@ export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
 export const CHAIR_SIZE = 0.62;
 /** A concrete litter bin's footprint (world/Props.tsx draws the scanned bin at its real size). */
 export const BIN_SIZE = [0.55, 1, 0.58] as const;
+/** A street-food cart: its length (along the counter) and depth, in metres (world/Props.tsx draws it at this size). */
+export const FOOD_CART_SIZE = { length: 2.3, depth: 1.55, height: 3.0 } as const;
+export interface FoodCart { x: number; z: number; facing: number }
 /** A parked motorhome: length, width and height in metres (world/Campers.tsx draws it at this size). */
 export const CAMPER_SIZE = { length: 7.8, width: 2.5, height: 2.7 } as const;
 
@@ -205,6 +210,8 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
     ...spec.terraceChairs.map((c) => ({ position: [c.x, 0, c.z] as const, size: [CHAIR_SIZE, 1, CHAIR_SIZE] as const })),
     ...(spec.campers ?? []).map((c) => carFootprint(c.x, c.z, c.heading, CAMPER_SIZE.length, CAMPER_SIZE.width)),
+    // A cart's counter runs across the way it faces
+    ...(spec.foodCarts ?? []).map((c) => carFootprint(c.x, c.z, c.facing + Math.PI / 2, FOOD_CART_SIZE.length, FOOD_CART_SIZE.depth)),
     ...(spec.park?.benches ?? []).map((b) => {
       // Benches face along an axis; their footprint swaps width and depth when turned sideways
       const sideways = Math.abs(Math.sin(b.facing)) > 0.5;

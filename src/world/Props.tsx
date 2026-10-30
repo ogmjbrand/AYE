@@ -3,7 +3,7 @@ import { useGLTF, useTexture } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Euler, Matrix4, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3, type Mesh,
 } from 'three';
-import { DANFO_SIZE, seeded, type Vehicle } from '../lib/world';
+import { DANFO_SIZE, FOOD_CART_SIZE, PAVEMENT_HEIGHT, seeded, type Vehicle } from '../lib/world';
 import { useLayout } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
@@ -11,6 +11,8 @@ import { VehicleModel } from './VehicleModel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { assetManifest, assetUrl } from '../lib/assetManifest';
 import { modelPath } from './realModels';
+import { RealModel } from './RealModel';
+import { VenueNpc } from './VenueNpc';
 import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
@@ -471,6 +473,34 @@ export function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
   );
 }
 
+/**
+ * Street-food carts (the suya grill on Lagoon Boulevard): the cart, a soft
+ * orange glow off its charcoal that grows after dark, and the seller
+ * (computer-controlled) behind the grill on the kerb side.
+ */
+function FoodCarts({ night }: { night: number }) {
+  const { foodCarts } = useLayout();
+  if (!foodCarts?.length) return null;
+  const { length, depth, height } = FOOD_CART_SIZE;
+  return (
+    <>
+      {foodCarts.map((c, i) => {
+        // The model's counter faces +z; behind the cart is -z in its own frame
+        const back = [c.x - Math.sin(c.facing) * (depth / 2 + 0.35), c.z - Math.cos(c.facing) * (depth / 2 + 0.35)] as const;
+        return (
+          <group key={i}>
+            <group position={[c.x, PAVEMENT_HEIGHT, c.z]} rotation={[0, c.facing, 0]}>
+              <RealModel name="food-cart" fit={[length, height, depth]} />
+              <pointLight position={[0, 1.15, 0]} intensity={0.6 + 2.4 * night} distance={3.5} decay={2} color="#ff8a3d" />
+            </group>
+            <VenueNpc lookId="male-adult-15" name="Mallam Sule" role="Suya seller" x={back[0]} z={back[1]} facing={c.facing} chatty />
+          </group>
+        );
+      })}
+    </>
+  );
+}
+
 export function Props({ night }: { night: number }) {
   const { vehicles, billboard, crossStreet } = useLayout();
   return (
@@ -485,6 +515,11 @@ export function Props({ night }: { night: number }) {
       <ErrorBoundary fallback={null}>
         <Suspense fallback={null}>
           <PavementBins />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <FoodCarts night={night} />
         </Suspense>
       </ErrorBoundary>
       {billboard && (
