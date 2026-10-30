@@ -27,6 +27,14 @@ export function run(along: 'x' | 'z', fixed: number, from: number, to: number, g
   return out;
 }
 
+/** A doorway left in a wall run: its centre, width, and whether the wall runs along x. */
+export interface Doorway { x: number; z: number; width: number; alongX: boolean }
+
+/** The doorways a run leaves (the same gaps as `run`), so each can be given a frame, a lintel and a door. */
+export function doorways(along: 'x' | 'z', fixed: number, gaps: readonly (readonly [number, number])[]): Doorway[] {
+  return gaps.map(([c, width]) => (along === 'x' ? { x: c, z: fixed, width, alongX: true } : { x: fixed, z: c, width, alongX: false }));
+}
+
 /** The wall's box: centre and size (x, z), WALL_T thick. */
 export function wallBox(w: WallSeg) {
   const alongX = w.z0 === w.z1;

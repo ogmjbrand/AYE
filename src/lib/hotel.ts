@@ -19,7 +19,7 @@
  * entrance in the middle, the corridor runs north with three rooms either side.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
-import { run, type WallSeg } from './buildingShell';
+import { doorways, run, type Doorway, type WallSeg } from './buildingShell';
 import type { Seat } from './seating';
 import type { MenuItem } from './palms';
 
@@ -189,6 +189,22 @@ export function hotelWalls(): WallSeg[] {
     // The guest room's bathroom: its wall to the entrance (with the door) and to the bedroom
     ...run('x', Math.min(bz0, bz1), Math.min(bx0, bx1), Math.max(bx0, bx1), [[bdx, ROOM_PLAN.bath.doorW]]),
     ...run('z', Math.max(bx0, bx1), Math.min(bz0, bz1), Math.max(bz0, bz1), []),
+  ];
+}
+
+/** Every doorway in the hotel's walls (the way in, each room's door, the guest room's bathroom), for their frames and lintels. */
+export function hotelDoorways(): Doorway[] {
+  const { z0 } = BUILDING;
+  const doorZ = (r: HotelRoom) => roomDoor(r)[1];
+  const guest = roomById(GUEST_ROOM)!;
+  const [, bz0] = roomPoint(guest, ROOM_PLAN.bath.u0, ROOM_PLAN.bath.v0);
+  const [, bz1] = roomPoint(guest, ROOM_PLAN.bath.u1, ROOM_PLAN.bath.v1);
+  const [bdx] = roomPoint(guest, ROOM_PLAN.bath.doorU, 0);
+  return [
+    ...doorways('x', z0, [[0, 1.8]]),
+    ...doorways('z', CORRIDOR.x1, ROOMS.filter((r) => r.side > 0).map((r) => [doorZ(r), DOOR_W] as const)),
+    ...doorways('z', CORRIDOR.x0, ROOMS.filter((r) => r.side < 0).map((r) => [doorZ(r), DOOR_W] as const)),
+    ...doorways('x', Math.min(bz0, bz1), [[bdx, ROOM_PLAN.bath.doorW]]),
   ];
 }
 

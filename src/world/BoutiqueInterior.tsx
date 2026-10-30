@@ -10,7 +10,7 @@ import { PottedPalm } from './PottedPalm';
 import { LuxePiece } from './LuxeFurniture';
 import { VenueNpc } from './VenueNpc';
 import { UNIFORMS } from '../lib/uniforms';
-import { Ceiling, Downlight, LedRing, PolishedFloor, TrackLight } from './VenueShell';
+import { Ceiling, Downlight, GlassDoors, LedRing, PolishedFloor, TrackLight } from './VenueShell';
 import { RealModel } from './RealModel';
 
 const GOLD = '#c9a052';
@@ -278,6 +278,8 @@ export function BoutiqueInterior({ gameTime, districtId, children }: { gameTime:
       <Wall position={[-(doorW / 2 + side / 2), H / 2, -d / 2]} rotationY={0} size={[side, H]} />
       <Wall position={[doorW / 2 + side / 2, H / 2, -d / 2]} rotationY={0} size={[side, H]} />
       <Wall position={[0, (H + 2.4) / 2, -d / 2]} rotationY={0} size={[doorW, H - 2.4]} />
+      {/* Glass doors onto the street, closed behind you */}
+      <GlassDoors door={{ x: 0, z: -d / 2 + 0.04, width: doorW, alongX: true }} height={2.4} metal="#b8975c" />
       {/* Gold skirting and a picture rail on the back and side walls */}
       {[[0, d / 2 - 0.01, w, Math.PI], [-w / 2 + 0.01, 0, d, Math.PI / 2], [w / 2 - 0.01, 0, d, -Math.PI / 2]].map(([x, z, len, ry], i) => (
         <group key={i} position={[x, 0, z]} rotation={[0, ry, 0]}>

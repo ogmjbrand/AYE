@@ -74,11 +74,13 @@ import { BoutiqueInterior } from './world/BoutiqueInterior';
 import {
   DESK_SPOT, DOOR_SPOT as BOUTIQUE_DOOR, FITTING_SPOT, SALON_SPOT, STAFF as BOUTIQUE_STAFF, boutiqueLayout, type BoutiqueSection,
   ROOM_HEIGHT as BOUTIQUE_HEIGHT,
+  ROOM as BOUTIQUE_ROOM,
 } from './lib/boutique';
 import {
   DOOR_SPOT as PALMS_DOOR, FREE_SEATS, HOST_SPOT as PALMS_HOST_SPOT, OPEN_HOUR as PALMS_OPEN_HOUR, STAFF as PALMS_STAFF,
   hostSeat, isOpen as palmsOpen, restaurantLayout, suitsYou, type MenuItem,
   ROOM_HEIGHT as PALMS_HEIGHT,
+  ROOM as PALMS_ROOM,
 } from './lib/palms';
 import { DistrictContext } from './world/DistrictContext';
 import { TravelPanel } from './components/TravelPanel';
@@ -102,11 +104,13 @@ import {
   ROOM_SERVICE_MENU, VENDING_MENU, VENDING_SPOT, WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, hotelLayout, roomById as hotelRoom,
   roomDoorSpot, roomServiceSpot, stayIsValid,
   STOREY as HOTEL_STOREY,
+  BUILDING as HOTEL_BUILDING,
 } from './lib/hotel';
 import {
   BAR_SPOT as CANTINA_BAR_SPOT, CANTINA_MENU, CANTINA_NAME, DOOR_SPOT as CANTINA_DOOR, FREE_SEATS as CANTINA_SEATS, OPEN_HOUR as CANTINA_OPEN_HOUR,
   STAFF as CANTINA_STAFF, STOOLS as CANTINA_STOOLS, cantinaLayout, isOpen as cantinaOpen,
   ROOM_HEIGHT as CANTINA_HEIGHT,
+  ROOM as CANTINA_ROOM,
 } from './lib/cantina';
 import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
@@ -149,6 +153,7 @@ import {
   DESK_SPOT as SPA_DESK_SPOT, DOOR_SPOT as SPA_DOOR, MANAGER_SPOT as SPA_MANAGER_SPOT, ROOMS as SPA_ROOMS, WAITING_SEATS as SPA_WAITING,
   clientsFor, isOpen as spaIsOpen, roomFor, rollSpaDay, serviceById as spaService, spaLayout, tableSpot, type Client as SpaClient, type ServiceId,
   STOREY as SPA_STOREY,
+  ROOM as SPA_ROOM,
 } from './lib/spa';
 // Main's walk-in workplaces: the office, AYE Global University, AYE General Hospital, the car showroom and the restaurant service
 import { canPlaceDecor, decorItemById, furnitureForHome, type HomeDecorPlacement } from './lib/homeDecor';
@@ -194,7 +199,13 @@ interface CameraFollowProps {
   controlsRef: React.RefObject<OrbitControls | null>;
   /** Indoors: the room's ceiling height. The camera stays just under it, so the room is always roofed over. */
   ceiling?: number | null;
+  /** Indoors: the room's walls (x0…x1 by z0…z1). The camera stays inside them, so you never see out through a wall. */
+  walls?: RoomWalls | null;
 }
+/** A room's walls, as the lines they stand on. */
+interface RoomWalls { x0: number; x1: number; z0: number; z1: number }
+/** A box of walls centred on the origin, width by depth. */
+const centredWalls = (r: { width: number; depth: number }): RoomWalls => ({ x0: -r.width / 2, x1: r.width / 2, z0: -r.depth / 2, z1: r.depth / 2 });
 
 const followTarget = new Vector3();
 const followShift = new Vector3();
@@ -238,7 +249,7 @@ const PLATE_RADIUS = 9;
 const PLATE_SUBTITLE: Record<PlaceKind, string> = { food: 'Food & drinks', shop: 'Shopping', workplace: 'Workplace', home: 'Homes', public: 'Travel', nightlife: 'Lounge & nightlife', park: 'Park', dealership: 'Cars' };
 const PLATE_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm', dealership: 'car' };
 
-function CameraFollow({ controller, controlsRef, ceiling = null }: CameraFollowProps) {
+function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }: CameraFollowProps) {
   useFrame(({ camera }) => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -265,16 +276,30 @@ function CameraFollow({ controller, controlsRef, ceiling = null }: CameraFollowP
       camera.position.set(controls.target.x + dx * dist, controls.target.y + up, controls.target.z + dz * dist);
     }
     controls.update();
+    let clamped = false;
     if (ceiling !== null && camera.position.y > ceiling - CEILING_CLEARANCE) {
       camera.position.y = ceiling - CEILING_CLEARANCE;
-      camera.lookAt(controls.target);
+      clamped = true;
     }
+    // Inside the room's walls: the room stays closed all round, however you turn the view
+    if (walls) {
+      const x = Math.min(walls.x1 - WALL_CLEARANCE, Math.max(walls.x0 + WALL_CLEARANCE, camera.position.x));
+      const z = Math.min(walls.z1 - WALL_CLEARANCE, Math.max(walls.z0 + WALL_CLEARANCE, camera.position.z));
+      if (x !== camera.position.x || z !== camera.position.z) {
+        camera.position.x = x;
+        camera.position.z = z;
+        clamped = true;
+      }
+    }
+    if (clamped) camera.lookAt(controls.target);
   });
   return null;
 }
 const followOffset = new Vector3();
 /** How far under an indoor ceiling the camera stays. */
 const CEILING_CLEARANCE = 0.25;
+/** How far inside a room's walls the camera stays (past the walls' own thickness). */
+const WALL_CLEARANCE = 0.4;
 /** Chase-camera distance and height above the look-at point while driving. */
 const DRIVE_CAMERA_DISTANCE = 9;
 const DRIVE_CAMERA_HEIGHT = 3.2;
@@ -535,6 +560,11 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   /** The ceiling over you indoors (the camera stays under it, so every room is roofed over); null on the street. */
   const ceilingHeight = indoors || (inWorkplace && venueInterior) ? WALL_HEIGHT
     : inPalms ? PALMS_HEIGHT : inCantina ? CANTINA_HEIGHT : inHotel ? HOTEL_STOREY : inSpa ? SPA_STOREY : inBoutique ? BOUTIQUE_HEIGHT : null;
+  /** The walls round you indoors (the camera stays inside them); null on the street. */
+  const roomWalls: RoomWalls | null = indoors && interior ? centredWalls(interior)
+    : inWorkplace && venueInterior ? centredWalls(venueInterior)
+    : inPalms ? centredWalls(PALMS_ROOM) : inCantina ? centredWalls(CANTINA_ROOM) : inHotel ? HOTEL_BUILDING
+    : inSpa ? SPA_ROOM : inBoutique ? centredWalls(BOUTIQUE_ROOM) : null;
   /** Something happening in this district (an accident, a missing person…), if anything. */
   const liveEvent = state.world.active && state.world.active.districtId === district.id ? state.world.active : null;
   // Open for one event: it closes by itself when that event ends
@@ -2486,7 +2516,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <WarmUp sceneKey={sceneKey} maxTextureSize={settings.quality === 'low' ? 1024 : 2048} skip={warmSkip} onReady={setSceneReady} onProgress={setWarmProgress} />
           <FpsMeter />
-          <CameraFollow controller={controller} controlsRef={controlsRef} ceiling={ceilingHeight} />
+          <CameraFollow controller={controller} controlsRef={controlsRef} ceiling={ceilingHeight} walls={roomWalls} />
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>
             {inWorkplace && venueInterior ? (

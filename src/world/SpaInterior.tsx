@@ -6,14 +6,14 @@ import type { GameTime } from '../lib/gameState';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { lightingAt } from './timeOfDay';
 import {
-  DESK, LOBBY_Z1, ROOM, ROOMS, SHELL_CHAIR, SIDE_TABLE, VANITY_Z, lampSpot, SPA_NAME, SPA_STAFF, STOREY, TABLE, WAITING_SEATS, roomDoorX, spaWalls, type Client, type TreatmentRoom,
+  DESK, ENTRANCE, LOBBY_Z1, ROOM, ROOMS, roomDoorways, SHELL_CHAIR, SIDE_TABLE, VANITY_Z, lampSpot, SPA_NAME, SPA_STAFF, STOREY, TABLE, WAITING_SEATS, roomDoorX, spaWalls, type Client, type TreatmentRoom,
 } from '../lib/spa';
 import { WALL_T } from '../lib/buildingShell';
 import { blushPlasterTexture } from './hotelTextures';
 import { HotelWalls } from './HotelInterior';
 import { VenueNpc } from './VenueNpc';
 import { UNIFORMS } from '../lib/uniforms';
-import { Ceiling, Downlight } from './VenueShell';
+import { Ceiling, DoorFrame, Downlight, GlassDoors, OpenDoors } from './VenueShell';
 import { PottedPalm } from './PottedPalm';
 import { RealModel } from './RealModel';
 import { pbr } from './pbr';
@@ -541,6 +541,15 @@ export function SpaInterior({ gameTime, player, busy, waiting, serving, children
         <meshStandardMaterial {...wood} />
       </mesh>
       <HotelWalls player={player} walls={walls} plaster={plaster} />
+      {/* Glass doors onto the street, and white double doors standing open into each treatment room */}
+      <DoorFrame door={ENTRANCE} wallHeight={H} wallMap={plaster} frame={WHITE} />
+      <GlassDoors door={ENTRANCE} metal="#b8975c" />
+      {roomDoorways().map((dw) => (
+        <group key={dw.x}>
+          <DoorFrame door={dw} wallHeight={H} wallMap={plaster} frame={WHITE} />
+          <OpenDoors door={dw} into={1} color={WHITE} />
+        </group>
+      ))}
 
       {/* Reception: the fluted desk, with flowers, a card stand and products on top */}
       <group position={[DESK.x, 0, DESK.z]}>

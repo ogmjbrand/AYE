@@ -20,7 +20,7 @@
  * middle of the near wall (−z), like the other venues.
  */
 import { buildLayout, type Building, type DistrictLayout } from './world';
-import { run, type WallSeg } from './buildingShell';
+import { doorways, run, type Doorway, type WallSeg } from './buildingShell';
 import type { Needs } from './needs';
 import type { Seat } from './seating';
 
@@ -303,10 +303,15 @@ export const VANITY_Z = -4.4;
 /** The room for a service: couples go to the suite, the rest to the first two rooms. */
 export const roomFor = (service: ServiceId, alt = 0) => (service === 'couples' ? ROOMS[2] : ROOMS[alt % 2]);
 
+/** The way in from the street. */
+export const ENTRANCE: Doorway = { x: 0, z: ROOM.z0, width: 1.8, alongX: true };
+/** The doorways from reception into the treatment rooms. */
+export const roomDoorways = (): Doorway[] => doorways('x', LOBBY_Z1, ROOMS.map((r) => [roomDoorX(r), ROOM_DOOR_W] as const));
+
 export function spaWalls(): WallSeg[] {
   const { x0, x1, z0, z1 } = ROOM;
   return [
-    ...run('x', z0, x0, x1, [[0, 1.8]], { outer: true }),
+    ...run('x', z0, x0, x1, [[ENTRANCE.x, ENTRANCE.width]], { outer: true }),
     ...run('x', z1, x0, x1, [], { outer: true }),
     ...run('z', x0, z0, z1, [], { outer: true }),
     ...run('z', x1, z0, z1, [], { outer: true }),
@@ -334,6 +339,8 @@ export function spaLayout(): DistrictLayout {
     // Waiting sofa and the product shelf
     solid(-6.2, -5.9, 2.2, 0.9, 0.8),
     solid(-8.6, -4.0, 0.5, 1.8, 1.8),
+    // The treatment rooms' doors, standing open against the room side of each doorway
+    ...roomDoorways().flatMap((dw) => [-1, 1].map((k) => solid(dw.x + k * (dw.width / 2 - 0.06), LOBBY_Z1 + 0.15 + 0.37, 0.08, 0.74, 2.2))),
     // The shell chair, side table and vanity
     solid(SHELL_CHAIR[0], SHELL_CHAIR[1], 0.75, 0.7, 0.9),
     solid(SIDE_TABLE[0], SIDE_TABLE[1], 0.45, 0.45, 0.6),

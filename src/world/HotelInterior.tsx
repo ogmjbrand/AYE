@@ -6,7 +6,7 @@ import type { GameTime } from '../lib/gameState';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { lightingAt } from './timeOfDay';
 import {
-  BUILDING, CORRIDOR, DESK, DOOR_W, GUEST_ROOM, HOTEL_NAME, LOBBY, RECEPTIONIST, ROOMS, ROOM_PLAN, STOREY, VENDING, hotelWalls, roomById, roomDoor, roomPoint, type HotelRoom,
+  BUILDING, CORRIDOR, DESK, DOOR_W, GUEST_ROOM, HOTEL_NAME, LOBBY, RECEPTIONIST, ROOMS, ROOM_PLAN, STOREY, VENDING, hotelDoorways, hotelWalls, roomById, roomDoor, roomPoint, type HotelRoom,
 } from '../lib/hotel';
 import { RealModel } from './RealModel';
 import { HotelDish } from './HotelDishes';
@@ -17,7 +17,7 @@ import {
 import { skyMoodAt, skylineTexture } from './venueTextures';
 import { VenueNpc } from './VenueNpc';
 import { UNIFORMS } from '../lib/uniforms';
-import { Ceiling, Downlight } from './VenueShell';
+import { Ceiling, DoorFrame, Downlight, GlassDoors, OpenDoors } from './VenueShell';
 
 const H = STOREY;
 const DARK_WOOD = '#4a3a30';
@@ -379,6 +379,7 @@ export function HotelInterior({ gameTime, player, hasKey, tray = [], children }:
   const w = BUILDING.x1 - BUILDING.x0, d = BUILDING.z1 - BUILDING.z0;
   const parquet = useMemo(() => parquetTexture([w / 1.6, d / 1.6]), [w, d]);
   const plaster = useMemo(() => hotelPlasterTexture([1, 1]), []);
+  const doors = useMemo(() => hotelDoorways(), []);
   const damask = useMemo(() => damaskTexture([5, 2.5]), []);
   const walls = useMemo(() => hotelWalls(), []);
   const guest = roomById(GUEST_ROOM)!;
@@ -407,6 +408,19 @@ export function HotelInterior({ gameTime, player, hasKey, tray = [], children }:
         <meshStandardMaterial map={parquet} roughness={0.45} />
       </mesh>
       <HotelWalls player={player} walls={walls} plaster={plaster} />
+      {/* Every doorway carries the wall over it up to the ceiling: glass doors at the way in, the rooms' own doors, and the guest bathroom's door open */}
+      {doors.map((dw, i) => {
+        const entrance = i === 0;
+        const bath = i === doors.length - 1;
+        if (bath && !hasKey) return null;
+        return (
+          <group key={`${dw.x},${dw.z}`}>
+            <DoorFrame door={dw} wallHeight={H} wallMap={plaster} frame={entrance ? '#2b2b2b' : DARK_WOOD} jambs={entrance || bath} height={entrance || bath ? 2.2 : 2.21} />
+            {entrance && <GlassDoors door={dw} />}
+            {bath && <OpenDoors door={dw} into={1} color="#f2efe8" />}
+          </group>
+        );
+      })}
 
       {/* Lobby: damask on the wall behind the desk with the hotel's name, the desk, sofas and a wall fire */}
       <group position={[BUILDING.x1 - FACE, 0, (LOBBY.z0 + LOBBY.z1) / 2]} rotation={[0, -Math.PI / 2, 0]}>
@@ -448,6 +462,11 @@ export function HotelInterior({ gameTime, player, hasKey, tray = [], children }:
         <Ceiling width={w} depth={LOBBY.z1 - LOBBY.z0} height={H} color="#f0ebe2">
           {[-5, -1.5, 1.5, 5].flatMap((x) => [-1.8, 1.8].map((z) => <Downlight key={`${x}${z}`} x={x} z={z} />))}
         </Ceiling>
+      </group>
+
+      {/* One plain ceiling over the whole building (every room, even the shut ones), just above the lobby's and corridor's */}
+      <group position={[(BUILDING.x0 + BUILDING.x1) / 2, 0.005, (BUILDING.z0 + BUILDING.z1) / 2]}>
+        <Ceiling width={BUILDING.x1 - BUILDING.x0} depth={BUILDING.z1 - BUILDING.z0} height={H} color="#f0ebe2" />
       </group>
 
       {/* Corridor: downlights, and a door into every room (yours open once you have the key) */}
