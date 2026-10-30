@@ -21,6 +21,7 @@
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import { doorways, run, type Doorway, type WallSeg } from './buildingShell';
 import type { Seat } from './seating';
+import type { Furniture } from './interiors';
 import type { MenuItem } from './palms';
 
 export const HOTEL_NAME = 'Grand Lagoon Hotel';
@@ -126,7 +127,22 @@ export const roomServiceSpot = (room: HotelRoom) => roomPoint(room, (ROOM_PLAN.d
 
 /** Where you lie down (beside the bed) and where you wash (in front of the basin). */
 export const bedSpot = (room: HotelRoom) => roomPoint(room, ROOM_PLAN.bed.u - ROOM_PLAN.bed.w / 2 - 0.45, 1.9);
+/** The bed's window side, where you get into it (lib/bedSleep.ts: the aisle beside the bed). */
+export const bedsideSpot = (room: HotelRoom) => roomPoint(room, ROOM_PLAN.bed.u + ROOM_PLAN.bed.w / 2 + 0.45, 1.9);
 export const basinSpot = (room: HotelRoom) => roomPoint(room, ROOM_PLAN.basin.u - 0.75, ROOM_PLAN.basin.v);
+
+/**
+ * The room's bed as a piece of furniture, for going to bed in it
+ * (lib/bedSleep.ts): headboard to +z, and you get in from its window side,
+ * which is +x in the east rooms (the guest room). West rooms are mirrored, so
+ * the bedtime frame doesn't fit them: null there. Its deep mattress and cover
+ * match the Luxe bed's heights; the duvet over you is a white hotel one.
+ */
+export function hotelBed(room: HotelRoom): Furniture | null {
+  if (room.side < 0) return null;
+  const { u, v0, v1, w } = ROOM_PLAN.bed;
+  return { kind: 'bed', at: roomPoint(room, u, (v0 + v1) / 2), size: [w, 0.6, v1 - v0], color: '#f4f2ee', style: 'luxe' };
+}
 
 /** Two armchairs by the window: seats you can sit in, facing into the room. */
 export const armchairSeats = (room: HotelRoom): Seat[] => ROOM_PLAN.armchairs.map((a, i) => {

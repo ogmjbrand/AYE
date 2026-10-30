@@ -101,7 +101,7 @@ import { HotelFront } from './world/HotelFront';
 import { HotelInterior } from './world/HotelInterior';
 import {
   DESK_SPOT as HOTEL_DESK_SPOT, DOOR_SPOT as HOTEL_DOOR, GUEST_ROOM, HOTEL_NAME, NIGHT_PRICE, RECEPTIONIST, ROOMS as HOTEL_ROOMS,
-  ROOM_SERVICE_MENU, VENDING_MENU, VENDING_SPOT, WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, hotelLayout, roomById as hotelRoom,
+  ROOM_SERVICE_MENU, VENDING_MENU, VENDING_SPOT, WASH_MINUTES, armchairSeats, basinSpot, bedSpot as hotelBedSpot, bedsideSpot as hotelBedside, hotelBed, hotelLayout, roomById as hotelRoom,
   roomDoorSpot, roomServiceSpot, stayIsValid,
   STOREY as HOTEL_STOREY,
   BUILDING as HOTEL_BUILDING,
@@ -881,8 +881,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     return () => window.clearTimeout(id);
   }, [asleep]);
   const goToBed = () => {
-    const bed = interior?.furniture.find((x) => x.kind === 'bed');
-    if (!indoors || !bed) { rest(atHome()); return; }
+    // Your own bed at home, or your hotel room's bed while you hold its key
+    const bed = indoors ? interior?.furniture.find((x) => x.kind === 'bed') : inHotel && hotelKey ? hotelBed(hotelRoom(GUEST_ROOM)!) : null;
+    if (!bed) { rest(indoors ? atHome() : true); return; }
     // Already asleep, or sleep isn't possible now (a summary still open, recovering in care): nothing to lie down for
     if (asleep || state.summary || state.health.recovery) return;
     const pose = sideSleepPose(bed, character.heightCm);
@@ -1047,6 +1048,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   };
   /** What E does where you stand inside the hotel. */
   const hotelPrompt = () => {
+    // In bed (going to sleep, asleep or getting up): nothing to do but sleep
+    if (asleep) return null;
     const { x, z } = controller.position;
     const near = (p: readonly [number, number], r = USE_RADIUS) => Math.hypot(x - p[0], z - p[1]) <= r;
     const guest = hotelRoom(GUEST_ROOM)!;
@@ -1069,7 +1072,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       if (!hotelKey) return { verb: 'Locked:', place: `room ${r.id} (book a night at the desk)`, onOpen: () => setArrival(`Room ${r.id} is locked. Book a night with ${RECEPTIONIST.name} at the front desk.`) };
     }
     if (hotelKey) {
-      if (near(hotelBedSpot(guest), 1.0)) return { verb: 'Sleep in', place: 'your hotel bed', onOpen: () => { setMovementBlocked(false); rest(true); } };
+      if (near(hotelBedSpot(guest), 1.0) || near(hotelBedside(guest), 1.0)) return { verb: 'Sleep in', place: 'your hotel bed', onOpen: () => { setMovementBlocked(false); goToBed(); } };
       if (near(roomServiceSpot(guest), 0.9)) return { verb: 'Order room service on', place: 'the telephone', onOpen: () => setHotelMenu('room') };
       if (near(basinSpot(guest), 0.9)) return { verb: 'Freshen up at', place: 'the basin', onOpen: () => { hotelWash(); setArrival(`You freshen up. ${WASH_MINUTES} minutes pass.`); } };
       const chair = armchairSeats(guest).find((c) => Math.hypot(x - c.x, z - c.z) <= 1.0 || Math.hypot(x - (c.approach?.x ?? c.x), z - (c.approach?.z ?? c.z)) <= 0.6);
@@ -2565,9 +2568,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </SpaInterior>
             ) : inHotel ? (
-              <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey} tray={trayHere}>
+              <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey} tray={trayHere} inBed={!!asleep}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} bedtime={asleep} />
+                {asleep && <SleepingDuvet bedtime={asleep} />}
               </HotelInterior>
             ) : inCantina ? (
               <CantinaInterior gameTime={state.time} served={served && cantinaSeat && served.seatId === cantinaSeat.id ? { seat: cantinaSeat, dishes: served.dishes } : null}>

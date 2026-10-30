@@ -178,7 +178,7 @@ function Armchair() {
 }
 
 /** The guest room, furnished: every room in the hotel is built from this same plan and these same materials. */
-function GuestRoom({ room, player, gameTime, lit, tray }: { room: HotelRoom; player: PlayerHandle; gameTime: GameTime; lit: number; tray: readonly string[] }) {
+function GuestRoom({ room, player, gameTime, lit, tray, inBed }: { room: HotelRoom; player: PlayerHandle; gameTime: GameTime; lit: number; tray: readonly string[]; inBed: boolean }) {
   const P = ROOM_PLAN;
   const at = (u: number, v: number, y = 0): [number, number, number] => { const [x, z] = roomPoint(room, u, v); return [x, y, z]; };
   // Facing the room's +u (towards the window) and +v (towards the bed wall), in the building's frame
@@ -262,8 +262,9 @@ function GuestRoom({ room, player, gameTime, lit, tray }: { room: HotelRoom; pla
       <group position={at(P.bed.u, (P.bed.v0 + P.bed.v1) / 2)} rotation={[0, Math.PI, 0]}>
         <RoundedBox args={[P.bed.w + 0.1, 0.32, 2.15]} radius={0.05} smoothness={3} position={[0, 0.2, 0]} castShadow><meshStandardMaterial color="#c9c3ba" roughness={0.95} /></RoundedBox>
         <RoundedBox args={[P.bed.w - 0.04, 0.22, 2.0]} radius={0.08} smoothness={3} position={[0, 0.47, 0.02]}><meshStandardMaterial color="#f4f2ee" roughness={0.9} /></RoundedBox>
-        <RoundedBox args={[P.bed.w + 0.02, 0.06, 1.25]} radius={0.03} smoothness={3} position={[0, 0.6, 0.38]}><meshStandardMaterial color="#8f8fcf" roughness={0.9} /></RoundedBox>
-        <RoundedBox args={[0.7, 0.07, 1.35]} radius={0.03} smoothness={2} position={[0.05, 0.64, 0.4]} rotation={[0, 0.08, 0]}><meshStandardMaterial color="#5f5aa8" roughness={0.9} /></RoundedBox>
+        {/* The cover and the throw, folded away while you sleep under the duvet (world/SleepingDuvet.tsx) */}
+        {!inBed && <RoundedBox args={[P.bed.w + 0.02, 0.06, 1.25]} radius={0.03} smoothness={3} position={[0, 0.6, 0.38]}><meshStandardMaterial color="#8f8fcf" roughness={0.9} /></RoundedBox>}
+        {!inBed && <RoundedBox args={[0.7, 0.07, 1.35]} radius={0.03} smoothness={2} position={[0.05, 0.64, 0.4]} rotation={[0, 0.08, 0]}><meshStandardMaterial color="#5f5aa8" roughness={0.9} /></RoundedBox>}
         {[-0.42, 0.42].flatMap((x) => [[-0.82, 0.62, 0.0], [-0.62, 0.68, 0.3]].map(([z, y, tilt]) => (
           <RoundedBox key={`${x}${z}`} args={[0.7, 0.16, 0.4]} radius={0.07} smoothness={3} position={[x, y, z]} rotation={[-tilt, 0, 0]}><meshStandardMaterial color="#f7f6f2" roughness={0.9} /></RoundedBox>
         )))}
@@ -368,8 +369,10 @@ function GuestRoom({ room, player, gameTime, lit, tray }: { room: HotelRoom; pla
  * with the same damask, doors and lights throughout. The receptionist is
  * computer-controlled.
  */
-export function HotelInterior({ gameTime, player, hasKey, tray = [], children }: {
+export function HotelInterior({ gameTime, player, hasKey, tray = [], inBed = false, children }: {
   gameTime: GameTime; player: PlayerHandle; hasKey: boolean;
+  /** You're going to bed, asleep or getting up in your room's bed. */
+  inBed?: boolean;
   /** Room service waiting in your room (menu ids, oldest first). */
   tray?: readonly string[];
   children: ReactNode;
@@ -477,7 +480,7 @@ export function HotelInterior({ gameTime, player, hasKey, tray = [], children }:
       </group>
       {ROOMS.map((r) => <RoomDoor key={r.id} room={r} open={hasKey && r.id === GUEST_ROOM} dnd={r.id === '104' || r.id === '106'} />)}
 
-      {hasKey && <GuestRoom room={guest} player={player} gameTime={gameTime} lit={lit} tray={tray} />}
+      {hasKey && <GuestRoom room={guest} player={player} gameTime={gameTime} lit={lit} tray={tray} inBed={inBed} />}
 
       <hemisphereLight args={['#fff4e2', '#6a5a48', 0.55]} />
       <pointLight position={[0, 2.6, -6.5]} intensity={6 * lit + 2} distance={14} decay={1.5} color="#ffe6c4" />
