@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, Color, Euler, LoopOnce, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
+import { Box3, Color, Euler, LoopOnce, LoopRepeat, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
@@ -14,7 +14,7 @@ import { applyBodyShape } from './bodyShapeSkin';
 import { createRelaxedHands } from './relaxedHands';
 import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
-import { SEAT_TRANSITIONS, conversationGesture, type Gesture, type SeatTransition } from '../lib/bodyLanguage';
+import { SEAT_TRANSITIONS, TURN_CLIP_SECONDS, WALK_STOP, conversationGesture, type Gesture, type SeatTransition } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import { HeldBag } from '../world/HeldBag';
 import { Adornments } from '../world/Adornments';
@@ -82,6 +82,8 @@ export function OutfitStyler({ scene, lookId, styles, skinTone = 0, skinToneId =
 
 
 type Clip = 'Idle' | 'Walk' | 'Run';
+/** Turning faster than this (radians a second) while standing steps round on the spot. */
+const TURN_ON_THE_SPOT = 0.7;
 type State = Clip | Gesture;
 
 /** Sitting on something for now (a bed's edge), set frame by frame: its height, and sitting down, seated or standing up. */
@@ -92,8 +94,11 @@ export interface Perch {
   seconds: number;
 }
 
-/** Playing part of a sit-down or stand-up clip: from where, at what rate. */
-interface Transition { from: number; to: number; rate: number }
+/** Playing part of a clip (sitting down, standing up, a turn on the spot, a stop): from where to where, at what rate, once or round and round. */
+interface Play { from: number; to: number; rate: number; once: boolean }
+
+const PARTIAL: ReadonlySet<State> = new Set<State>(['SitDown', 'StandUp', 'TurnLeft', 'TurnRight', 'WalkStop']);
+const isTurn = (s: State | null) => s === 'TurnLeft' || s === 'TurnRight';
 
 /** Cross-fades to the clip that matches the speed (or the gesture, when standing) and scales its playback rate. */
 function updateLocomotion(
@@ -103,10 +108,10 @@ function updateLocomotion(
   avatar: AvatarFile,
   gesture: Gesture | null,
   mixerTime: number,
-  seated: 'Sit' | SeatTransition | null = null,
-  transition: Transition | null = null,
+  forced: State | null = null,
+  play: Play | null = null,
 ) {
-  const next: State = seated ?? (gesture === 'Hug' && get('Hug') ? 'Hug' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run');
+  const next: State = forced ?? (gesture === 'Hug' && get('Hug') ? 'Hug' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run');
   const seatedState = (s: State | null) => s === 'Sit' || s === 'SitDown' || s === 'StandUp';
   if (next !== current.current) {
     const prev = current.current ? get(current.current) : null;
@@ -118,24 +123,26 @@ function updateLocomotion(
     if (next === 'Talk' || next === 'Listen') {
       // Long takes: join them part-way through so turns don't repeat the same opening
       action?.reset().startAt(mixerTime - ((mixerTime * 7.3) % 20)).fadeIn(0.4).play();
-    } else if ((next === 'SitDown' || next === 'StandUp') && action && transition) {
-      // Just the part where the body lowers or rises, once, stretched to the time it takes here
+    } else if (PARTIAL.has(next) && action && play) {
+      // Just the part that matters (the body lowering or rising, the feet stepping round or coming together), at the rate it happens here
       action.reset();
-      action.setLoop(LoopOnce, 1);
-      action.clampWhenFinished = true;
-      action.time = transition.from;
-      action.setEffectiveTimeScale(transition.rate);
-      action.fadeIn(0.3).play();
+      action.setLoop(play.once ? LoopOnce : LoopRepeat, Infinity);
+      action.clampWhenFinished = play.once;
+      action.time = play.from;
+      action.setEffectiveTimeScale(play.rate);
+      action.fadeIn(isTurn(next) ? 0.2 : 0.3).play();
     } else if (seatedState(next) || seatedState(current.current)) {
       // Settling onto a seat or getting up: a slower blend, so the body lowers and rises rather than snapping
       action?.reset().fadeIn(seatedState(next) && seatedState(current.current) ? 0.35 : 0.7).play();
     } else {
       action?.reset().fadeIn(0.25).play();
     }
-    prev?.fadeOut(seatedState(next) || seatedState(current.current) ? (seatedState(next) && seatedState(current.current) ? 0.35 : 0.7) : next === 'Walk' || next === 'Run' ? 0.25 : 0.4);
+    prev?.fadeOut(seatedState(next) || seatedState(current.current) ? (seatedState(next) && seatedState(current.current) ? 0.35 : 0.7) : next === 'Walk' || next === 'Run' || isTurn(next) || isTurn(current.current) ? 0.25 : 0.4);
     current.current = next;
   }
   const action = get(next);
+  // A turn on the spot keeps stepping at the rate the character is turning
+  if (action && play && isTurn(next)) action.setEffectiveTimeScale(play.rate);
   if (action && (next === 'Walk' || next === 'Run')) {
     // Play the stride at the rate that matches ground speed, so feet don't slide
     const clipSpeed = next === 'Walk' ? avatar.walkSpeed : avatar.runSpeed;
@@ -322,6 +329,10 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   const gestures = ownGestures ?? loadedGestures;
   const idleClip = useMemo(() => clipsWithHands.find((c) => c.name === clips.Idle), [clipsWithHands, clips]);
   const conversationStart = useRef<number | null>(null);
+  // Footwork: which way and how fast the character is turning, and when a stop from a walk began
+  const lastDirection = useRef(controller.direction);
+  const turnRate = useRef(0);
+  const stopping = useRef<number | null>(null);
 
   useFrame((_, delta) => {
     if (conversing && conversationStart.current === null) conversationStart.current = mixer.time;
@@ -344,11 +355,34 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     const perched = perch?.current ?? null;
     const seat = sitHeight !== undefined ? { height: sitHeight } : perched ? { height: perched.height } : getSeated();
     const sitting = !!seat && !!gestures.Sit;
+    const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
     // Sitting down onto a bed's edge or standing up from it: the motion-captured transition, where this body has it
     const clipWindow = perched && perched.clip !== 'Sit' && body && gestures[perched.clip] ? SEAT_TRANSITIONS[body][perched.clip] : null;
     const seatClip = !sitting ? null : clipWindow && perched ? perched.clip : 'Sit';
-    const transition = clipWindow && perched ? { ...clipWindow, rate: (clipWindow.to - clipWindow.from) / perched.seconds } : null;
-    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, seatClip, transition);
+    const transition = clipWindow && perched ? { ...clipWindow, rate: (clipWindow.to - clipWindow.from) / perched.seconds, once: true } : null;
+    // How fast the character is turning (radians a second, + to their left), smoothed over a few frames
+    const turned = Math.atan2(Math.sin(controller.direction - lastDirection.current), Math.cos(controller.direction - lastDirection.current));
+    lastDirection.current = controller.direction;
+    turnRate.current += ((delta > 0 ? turned / delta : 0) - turnRate.current) * Math.min(1, delta * 12);
+    const free = !sitting && !gesture && body !== null && speed < 0.35;
+    let forced: State | null = seatClip;
+    let play: Play | null = transition;
+    if (free && Math.abs(turnRate.current) > TURN_ON_THE_SPOT && gestures.TurnLeft && gestures.TurnRight) {
+      // Turning on the spot: step round rather than spin on planted feet
+      forced = turnRate.current > 0 ? 'TurnLeft' : 'TurnRight';
+      const rate = Math.abs(turnRate.current) / ((Math.PI / 2) / TURN_CLIP_SECONDS[body]);
+      play = { from: 0, to: Infinity, rate: Math.min(2.2, Math.max(0.6, rate)), once: false };
+      stopping.current = null;
+    } else if (free && gestures.WalkStop) {
+      // Coming to a stop from a walk or a run: the feet come together instead of sliding from mid-stride into standing
+      const stop = WALK_STOP[body];
+      if (current.current === 'Walk' || current.current === 'Run') stopping.current = mixer.time;
+      if (stopping.current !== null && mixer.time - stopping.current < stop.to - stop.from) {
+        forced = 'WalkStop';
+        play = { ...stop, rate: 1, once: true };
+      } else stopping.current = null;
+    } else stopping.current = null;
+    updateLocomotion(get, current, speed, avatarFile, gesture, mixer.time, forced, play);
     const g = group.current;
     if (g) {
       // Lowered onto the seat once down on it: during a transition, as far as its body has gone

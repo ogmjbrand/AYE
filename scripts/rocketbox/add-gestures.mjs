@@ -2,18 +2,39 @@
 // type's gesture file, keeping the clips already in it. Needs no converter:
 // three.js's FBXLoader reads the animation, which matches FBX2glTF's output
 // (checked against the Sit clip: same rotations, positions in centimetres).
-//   node scripts/rocketbox/add-gestures.mjs <gestures.glb> <out.glb> <Name>=<clip.fbx> ...
+//   node scripts/rocketbox/add-gestures.mjs <gestures.glb> <out.glb> <Name>=<clip.fbx>[@in-place] ...
 // Then shrink the result: npm run assets:optimize -- <out.glb> <gestures.glb>
 //
 // As in build-gestures.mjs, the 3ds Max "Footsteps" helper is dropped and the
 // root's travel over the ground is held at its first frame, so a clip plays
 // on the spot (sitting down ends with the pelvis over the character's origin,
 // as the seated clip has it) and the game moves the character itself.
+// "@in-place" also takes out the clip's own turn about the vertical (a turn on
+// the spot keeps its footwork, and the game turns the character).
 import { readFileSync } from 'node:fs';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
+import { Quaternion, Vector3 } from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+
+const UP = new Vector3(0, 1, 0);
+/** Turns each frame of the root's rotation back by however far it has turned about the vertical since the first frame. */
+function holdHeading(values) {
+  const first = new Quaternion().fromArray(values, 0);
+  // Measure the heading on whichever of the root's axes lies most level at the start
+  const axis = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
+    .reduce((best, a) => (Math.abs(a.clone().applyQuaternion(first).y) < Math.abs(best.clone().applyQuaternion(first).y) ? a : best));
+  const heading = (q) => { const v = axis.clone().applyQuaternion(q); return Math.atan2(v.x, v.z); };
+  const start = heading(first);
+  const q = new Quaternion();
+  const back = new Quaternion();
+  for (let i = 0; i < values.length; i += 4) {
+    q.fromArray(values, i);
+    back.setFromAxisAngle(UP, start - heading(q));
+    q.premultiply(back).toArray(values, i);
+  }
+}
 
 const [inPath, outPath, ...pairs] = process.argv.slice(2);
 if (!inPath || !outPath || pairs.length === 0 || pairs.some((p) => !p.includes('='))) {
@@ -40,7 +61,9 @@ const PATHS = { position: 'translation', quaternion: 'rotation' };
 const CM = 0.01;
 
 for (const pair of pairs) {
-  const [name, path] = pair.split('=');
+  const [name, spec] = pair.split('=');
+  const [path, flag] = spec.split('@');
+  const inPlace = flag === 'in-place';
   if (root.listAnimations().some((a) => a.getName() === name)) throw new Error(`${inPath} already has a clip called ${name}`);
   const bytes = readFileSync(path);
   const clip = new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '').animations[0];
@@ -53,6 +76,7 @@ for (const pair of pairs) {
     const target = PATHS[track.name.slice(dot + 1)];
     if (!target || bone === 'Bip01 Footsteps') continue;
     const out = Float32Array.from(track.values);
+    if (inPlace && bone === 'Bip01' && target === 'rotation') holdHeading(out);
     if (target === 'translation') {
       for (let i = 0; i < out.length; i++) out[i] *= CM;
       if (bone === 'Bip01') {

@@ -10,7 +10,7 @@ Every number below was measured from the files in the repository on
 | | Count | Where | Licence |
 |---|---|---|---|
 | Rocketbox base models (real, rigged, textured people) | **20** | `public/assets/models/characters/rocketbox/*.glb` | MIT, Microsoft (`ROCKETBOX-LICENSE.md`); can be published |
-| Shared gesture files (Talk, Listen, Wave, Sit, SitDown, StandUp) | 2 | `gestures-feminine.glb`, `gestures-masculine.glb` | MIT, Microsoft |
+| Shared gesture files (Talk, Listen, Wave, Sit, SitDown, StandUp, TurnLeft, TurnRight, WalkStop) | 2 | `gestures-feminine.glb`, `gestures-masculine.glb` | MIT, Microsoft |
 | 3D hairstyles that can be worn on a model | 4 | head-bone attached GLBs | CC0 (MakeHuman), see `public/assets/CREDITS.md` |
 | Character Creator 5 player body | 1 | `public/assets/private/characters/cc5/` (git-ignored) | Your CC5 export; **never** committed or published |
 
@@ -290,7 +290,14 @@ The gesture clip lengths are:
 - the counts in section 5 multiply out.
 
 **Animation.** Locomotion runs on each model's own skeleton. Talk, Listen,
-Wave, Sit, SitDown and StandUp come from the shared gesture files.
+Wave, Sit, SitDown, StandUp, TurnLeft, TurnRight and WalkStop come from the
+shared gesture files.
+
+The footwork clips mean that:
+- turning while standing steps round on the spot, at the rate you're turning,
+  instead of spinning on planted feet;
+- coming to a stop from a walk or a run brings the feet together instead of
+  sliding from mid-stride into standing.
 
 Going to bed (`src/lib/bedSleep.ts`) uses them in sequence:
 1. turn your back to the bed;
