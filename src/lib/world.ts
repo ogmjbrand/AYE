@@ -80,6 +80,8 @@ export interface LayoutSpec {
   /** Parked minibuses (danfos in Lagos, tro-tros in Accra). */
   vehicles: readonly Vehicle[];
   stalls: readonly Spot[];
+  /** Concrete litter bins on the pavement (solid), where the district has them. */
+  bins?: readonly Spot[];
   /** Moving traffic, driving on the right. */
   traffic: readonly TrafficLane[];
   /** Roadside billboard with the AYE logo, if the district has one. */
@@ -106,6 +108,8 @@ export interface ParkLayout {
 }
 export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
 export const CHAIR_SIZE = 0.62;
+/** A concrete litter bin's footprint (world/Props.tsx draws the scanned bin at its real size). */
+export const BIN_SIZE = [0.55, 1, 0.58] as const;
 /** A parked motorhome: length, width and height in metres (world/Campers.tsx draws it at this size). */
 export const CAMPER_SIZE = { length: 7.8, width: 2.5, height: 2.7 } as const;
 
@@ -194,6 +198,7 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...spec.buildings,
     ...spec.vehicles.map((v) => ({ position: v.position, size: DANFO_SIZE })),
     ...spec.stalls.map((p) => ({ position: p, size: STALL_SIZE })),
+    ...(spec.bins ?? []).map((p) => ({ position: p, size: BIN_SIZE })),
     ...palmSpots.map((p) => ({ position: p, size: [0.5, 1, 0.5] as const })),
     ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),

@@ -81,7 +81,7 @@ function Certificates({ x, z }: { x: number; z: number }) {
   );
 }
 
-/** On the kitchen counter: a bowl of real fruit and a loaf on a bread board (ambientCG scans, CC0). */
+/** On the kitchen counter: a bowl of real fruit and a loaf on a bread board (ambientCG scans, CC0), and a cup and saucer (CC-BY 4.0). */
 function KitchenFood({ x, y, z, along }: { x: number; y: number; z: number; along: boolean }) {
   return (
     <group position={[x, y, z]} rotation={[0, along ? 0 : Math.PI / 2, 0]}>
@@ -96,6 +96,7 @@ function KitchenFood({ x, y, z, along }: { x: number; y: number; z: number; alon
         <mesh position={[0, 0.01, 0]} castShadow receiveShadow><boxGeometry args={[0.36, 0.02, 0.24]} /><meshStandardMaterial color="#9a6a3c" roughness={0.6} /></mesh>
         <group position={[0, 0.02, 0]}><RealModel name="bread-loaf" /></group>
       </group>
+      <group position={[0, 0, 0.08]} rotation={[0, 0.6, 0]}><RealModel name="coffee-cup" /></group>
     </group>
   );
 }

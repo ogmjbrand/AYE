@@ -10,6 +10,8 @@
  *   motorhome.glb        "FREE GMC Motorhome reimagined low poly" by Karol Miklas
  *   fridge-retro.glb     "A Realistic Metallic Fridge" by TheBoss009SS
  *   minibus.glb          "Bohdan Bus" by Vishchun
+ *   trash-bin.glb        "Concrete trash bin" by matousekfoto
+ *   coffee-cup.glb       "Coffee Cup - Realistic 3D Model" by ARTEL_3D
  *
  * Name props to build only those (node scripts/sketchfab/build-props.mjs fridge-retro).
  *
@@ -28,6 +30,10 @@
  * maker's lettering and the bus maker's emblem on the front are painted out,
  * and the route board in the window (a Ukrainian route) is replaced with one
  * of our own for Lagoon Boulevard.
+ *
+ * The trash bin is a photo scan of 351k triangles; it stands along the
+ * boulevard several times over, so it is simplified to a few thousand, which
+ * keeps its shape at street distance (its photographed texture carries the detail).
  *
  * Output: public/assets/models/props/*.glb (meshopt, WebP textures).
  */
@@ -232,7 +238,7 @@ await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 
 const only = process.argv.slice(2);
-for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512], ['minibus', 1024]]) {
+for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vending-machine', 1024], ['motorhome', 1024], ['fridge-retro', 512], ['minibus', 1024], ['trash-bin', 1024], ['coffee-cup', 512]]) {
   if (only.length && !only.includes(name)) continue;
   const doc = await io.read(`${SRC}/${name}.glb`);
   if (name === 'vending-machine') await replaceVendingArt(doc);
@@ -247,6 +253,8 @@ for (const [name, size] of [['sub-sandwich', 1024], ['bento-box', 1024], ['vendi
     weld(),
     // The motorhome is parked in the street, never seen up close: 43k triangles down to about 17k
     ...(name === 'motorhome' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.25, error: 0.004 })] : []),
+    // The scanned bin stands along the boulevard several times over: 351k triangles down to a few thousand
+    ...(name === 'trash-bin' ? [simplify({ simplifier: MeshoptSimplifier, ratio: 0.012, error: 0.1 })] : []),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [size, size], quality: 82 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );

@@ -1,7 +1,7 @@
 import { Suspense, useMemo } from 'react';
-import { useTexture } from '@react-three/drei';
+import { useGLTF, useTexture } from '@react-three/drei';
 import {
-  Color, DoubleSide, Euler, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3,
+  Box3, Color, DoubleSide, Euler, Matrix4, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3, type Mesh,
 } from 'three';
 import { DANFO_SIZE, seeded, type Vehicle } from '../lib/world';
 import { useLayout } from './DistrictContext';
@@ -9,7 +9,8 @@ import { Instances, type Placement } from './Instances';
 import { materials } from './materials';
 import { VehicleModel } from './VehicleModel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { assetManifest } from '../lib/assetManifest';
+import { assetManifest, assetUrl } from '../lib/assetManifest';
+import { modelPath } from './realModels';
 import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
@@ -99,6 +100,52 @@ function StreetLamps({ night }: { night: number }) {
       <Instances items={arms} material={m.darkMetal} geometry={<boxGeometry args={[1, 1, 1]} />} />
       <Instances items={heads} material={m.lampHead} geometry={<boxGeometry args={[1, 1, 1]} />} castShadow={false} />
       <Instances items={pools} castShadow={false} material={m.lightPool} geometry={<planeGeometry args={[1, 1]} />} visible={night > 0.05} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- litter bins
+
+/**
+ * Concrete litter bins on the pavement: a photo-scanned bin ("Concrete trash
+ * bin" by matousekfoto, CC-BY 4.0) at its real size, drawn once per material
+ * for every bin in the district.
+ */
+function PavementBins() {
+  const { bins } = useLayout();
+  const { scene } = useGLTF(assetUrl(modelPath('trash-bin')), false, true);
+  const parts = useMemo(() => {
+    scene.updateMatrixWorld(true);
+    const lift = -new Box3().setFromObject(scene).min.y;
+    const out: { mesh: Mesh; matrices: Matrix4[] }[] = [];
+    scene.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      out.push({
+        mesh,
+        // Each bin stands on the pavement, turned a little differently so they don't look stamped
+        matrices: (bins ?? []).map(([x, , z], i) => new Matrix4().makeRotationY(i * 1.7).setPosition(x, lift, z).multiply(mesh.matrixWorld)),
+      });
+    });
+    return out;
+  }, [scene, bins]);
+  if (!bins?.length) return null;
+  return (
+    <>
+      {parts.map(({ mesh, matrices }, i) => (
+        <instancedMesh
+          key={i}
+          args={[mesh.geometry, mesh.material, matrices.length]}
+          castShadow
+          receiveShadow
+          ref={(im) => {
+            if (!im) return;
+            matrices.forEach((m, j) => im.setMatrixAt(j, m));
+            im.instanceMatrix.needsUpdate = true;
+            im.computeBoundingSphere();
+          }}
+        />
+      ))}
     </>
   );
 }
@@ -435,6 +482,11 @@ export function Props({ night }: { night: number }) {
         <ParkedDanfo key={i} vehicle={v} />
       ))}
       <MarketStalls />
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <PavementBins />
+        </Suspense>
+      </ErrorBoundary>
       {billboard && (
         <Suspense fallback={null}>
           {/* Faces the cross street, whichever side of it it stands */}
