@@ -161,7 +161,7 @@ export function LifeOS(props: LifeOSProps) {
   return (
     <aside
       aria-label="Life OS"
-      className="os-glass os-rise pointer-events-auto fixed inset-x-0 bottom-0 z-40 flex max-h-[82vh] flex-col overflow-hidden rounded-t-3xl border border-ui-line/70 text-ui-ink sm:inset-x-auto sm:bottom-4 sm:left-4 sm:top-24 sm:max-h-none sm:w-[26rem] sm:rounded-3xl"
+      className="os-glass os-rise pointer-events-auto fixed inset-x-0 bottom-0 z-40 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-3xl border border-ui-line/70 text-ui-ink sm:inset-x-auto sm:bottom-4 sm:left-4 sm:top-24 sm:max-h-none sm:w-[26rem] sm:rounded-3xl short:top-2 short:bottom-2 short:max-h-none short:z-50"
     >
       {/* Who you are, how you feel, where you are */}
       <header className="relative border-b border-ui-line/60 px-4 pb-3 pt-4">

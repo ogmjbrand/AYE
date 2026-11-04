@@ -83,7 +83,7 @@ export function MapPanel({ district, controller, homePlaceId, car = null, onGo, 
         aria-modal="true"
         aria-labelledby="map-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[94vh] w-full flex-col rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-4xl sm:flex-row sm:rounded-2xl"
+        className="flex max-h-[94dvh] short:max-h-[96dvh] w-full flex-col rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-4xl sm:flex-row sm:rounded-2xl"
       >
         <div className="relative shrink-0 overflow-y-auto p-4 sm:w-[32rem]">
           <div className="mb-2 flex items-center justify-between gap-2">

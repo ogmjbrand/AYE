@@ -51,7 +51,7 @@ export function InventoryPanel({ state, character, career, rankIndex, onEquip, o
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="inventory-title" onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full flex-col rounded-t-[2rem] border border-ui-gold/40 bg-[#050505] text-ui-ink sm:max-w-lg sm:rounded-[2rem]">
+        className="flex max-h-[90dvh] short:max-h-[96dvh] w-full flex-col rounded-t-[2rem] border border-ui-gold/40 bg-[#050505] text-ui-ink sm:max-w-lg sm:rounded-[2rem]">
         <header className="flex items-center justify-between border-b border-white/5 px-6 py-5">
           <h2 id="inventory-title" className="m-0 font-display text-2xl font-semibold text-ui-cream">Inventory</h2>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Close</button>

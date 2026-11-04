@@ -62,7 +62,7 @@ export function RestaurantMenu({ menu = PALMS_MENU, title = 'Menu', diet, balanc
     <aside
       role="dialog"
       aria-label="Menu"
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[25rem] sm:rounded-3xl"
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78dvh] short:max-h-[96dvh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100dvh-11rem)] short:top-2 short:bottom-2 short:max-h-none short:z-50 sm:w-[25rem] sm:rounded-3xl"
     >
       <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
         <button type="button" onClick={() => (open ? setOpen(null) : onClose())} aria-label={open ? 'Back to the menu' : 'Close the menu'}

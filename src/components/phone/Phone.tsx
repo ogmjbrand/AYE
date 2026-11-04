@@ -141,8 +141,8 @@ export function Phone(props: PhoneProps) {
   const frame: CSSProperties = { background: WALLPAPER_CSS[phone.wallpaper] };
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:inset-auto sm:bottom-24 sm:right-6 sm:top-6 sm:bg-transparent" role="dialog" aria-label="Your phone" aria-modal="true">
-      <div className="phone-rise relative flex h-full w-full flex-col overflow-hidden text-white sm:h-auto sm:max-h-[780px] sm:w-[370px] sm:rounded-[44px] sm:border-[10px] sm:border-[#0b0c0e] sm:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.08)]" style={frame}>
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:inset-auto sm:bottom-24 sm:right-6 sm:top-6 sm:bg-transparent short:inset-y-2 short:right-2 short:left-auto" role="dialog" aria-label="Your phone" aria-modal="true">
+      <div className="phone-rise relative flex h-full w-full flex-col overflow-hidden text-white sm:h-auto sm:max-h-[780px] sm:w-[370px] sm:rounded-[44px] sm:border-[10px] short:h-full short:max-h-none short:w-[min(34rem,68vw)] short:rounded-[26px] short:border-[6px] sm:border-[#0b0c0e] sm:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.08)]" style={frame}>
         {/* Status bar */}
         <button type="button" onClick={() => { click(); setShade((s) => !s); }} aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} className="relative z-20 flex shrink-0 items-center justify-between px-6 pb-1 pt-3 text-[12px] font-semibold">
           <span className="tabular-nums">{formatGameTime(t)}</span>
@@ -166,14 +166,14 @@ export function Phone(props: PhoneProps) {
             {/* Home screen */}
             {!app && (
               <div className="flex min-h-0 flex-1 flex-col" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                <div className="px-5 pb-2 pt-1 text-center">
-                  <p className="m-0 font-display text-[36px] font-light leading-none tabular-nums">{formatGameTime(t)}</p>
-                  <p className="m-0 mt-1 text-[12px] text-white/80">{DAY_NAMES[t.dayOfWeek]} · {props.district.city.name}</p>
-                  <button type="button" onClick={() => openApp('wallet')} className="mx-auto mt-2 flex items-center gap-2 rounded-full bg-black/35 px-4 py-1 text-[13px] font-semibold backdrop-blur">
+                <div className="px-5 pb-2 pt-1 text-center short:flex short:items-center short:justify-center short:gap-3 short:pb-1 short:pt-0">
+                  <p className="m-0 font-display text-[36px] font-light leading-none tabular-nums short:text-[20px]">{formatGameTime(t)}</p>
+                  <p className="m-0 mt-1 text-[12px] text-white/80 short:mt-0">{DAY_NAMES[t.dayOfWeek]} · {props.district.city.name}</p>
+                  <button type="button" onClick={() => openApp('wallet')} className="mx-auto mt-2 flex items-center gap-2 rounded-full bg-black/35 px-4 py-1 text-[13px] font-semibold backdrop-blur short:mx-0 short:mt-0">
                     <Glyph name="coin" className="h-4 w-4 text-ui-gold-strong" />{ghai(state.balance)}
                   </button>
                 </div>
-                <label className="mx-5 mb-2 flex items-center gap-2 rounded-xl bg-black/30 px-3 py-2 backdrop-blur">
+                <label className="mx-5 mb-2 flex items-center gap-2 rounded-xl bg-black/30 px-3 py-2 backdrop-blur short:mb-1 short:py-1">
                   <Glyph name="search" className="h-4 w-4 text-white/70" />
                   <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search apps" aria-label="Search apps" className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/55" />
                   {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search"><Glyph name="close" className="h-4 w-4" /></button>}
@@ -192,7 +192,7 @@ export function Phone(props: PhoneProps) {
                   <div className="min-h-0 flex-1 overflow-hidden">
                     <div className="flex h-full transition-transform duration-300 ease-out" style={{ transform: `translateX(-${page * 100}%)` }}>
                       {pages.map((ids, i) => (
-                        <div key={i} className="grid h-full w-full shrink-0 grid-cols-4 content-start gap-x-2 gap-y-3 overflow-y-auto px-5 pt-1" aria-hidden={i !== page}>
+                        <div key={i} className="grid h-full w-full shrink-0 grid-cols-4 content-start gap-x-2 gap-y-3 overflow-y-auto px-5 pt-1 short:grid-cols-6 short:gap-y-2" aria-hidden={i !== page}>
                           {ids.map((id) => (
                             <button key={id} type="button" onClick={() => openApp(id)} tabIndex={i === page ? 0 : -1} className="flex flex-col items-center gap-1 transition active:scale-90">
                               <AppIcon id={id} badge={phone.notifications ? badgeFor(id) : 0} />
@@ -229,7 +229,7 @@ export function Phone(props: PhoneProps) {
                   </div>
                 )}
                 {/* Dock */}
-                <div className="mx-3 mb-2 flex justify-around rounded-[28px] bg-white/15 px-2 py-2 backdrop-blur-md">
+                <div className="mx-3 mb-2 flex justify-around rounded-[28px] bg-white/15 px-2 py-2 backdrop-blur-md short:mb-1 short:py-1">
                   {phone.dock.map((id) => (
                     <button key={id} type="button" onClick={() => openApp(id)} aria-label={appById(id)!.name} className="transition active:scale-90"><AppIcon id={id} badge={phone.notifications ? badgeFor(id) : 0} /></button>
                   ))}

@@ -48,7 +48,7 @@ export function DivinePanel({ s, balance, atHome, hasHome, onUnlock, onTransform
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="divine-title" onClick={(e) => e.stopPropagation()}
-        className="max-h-[94vh] w-full overflow-y-auto rounded-t-[2rem] border border-ui-gold/40 bg-[#050505] p-6 text-ui-ink sm:max-w-md sm:rounded-[2rem]">
+        className="max-h-[94dvh] short:max-h-[96dvh] w-full overflow-y-auto rounded-t-[2rem] border border-ui-gold/40 bg-[#050505] p-6 text-ui-ink sm:max-w-md sm:rounded-[2rem]">
         <header className="flex items-start justify-between gap-3">
           <div>
             <Crown className="h-6 w-9" />

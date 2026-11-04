@@ -143,9 +143,9 @@ export function CityLocationsPanel({
         aria-modal="true"
         aria-labelledby="locations-title"
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[90vh] w-full flex-col rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl transition duration-200 ease-out motion-reduce:transition-none sm:max-w-2xl sm:rounded-2xl ${shown ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}
+        className={`flex max-h-[90dvh] w-full flex-col rounded-t-2xl short:max-h-[96dvh] short:overflow-y-auto border border-ui-line bg-ui-panel text-ui-ink shadow-2xl transition duration-200 ease-out motion-reduce:transition-none sm:max-w-2xl sm:rounded-2xl ${shown ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
+        <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5 short:p-3">
           <div className="min-w-0">
             <p className="m-0 text-xs uppercase tracking-[0.16em] text-ui-muted">{district.city.name} · {district.name}</p>
             <h2 id="locations-title" className="m-0 mt-1 flex items-center gap-2 font-display text-2xl font-bold"><MapPin size={23} className="text-ui-accent-strong" />City locations</h2>
@@ -160,7 +160,7 @@ export function CityLocationsPanel({
         </header>
 
         {selected ? (
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 short:flex-none short:overflow-visible short:p-3">
             <button
               type="button"
               onClick={() => setSelectedId(null)}

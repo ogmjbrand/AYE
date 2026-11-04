@@ -119,7 +119,7 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
         aria-modal="true"
         aria-labelledby="catalogue-title"
         onClick={(e) => e.stopPropagation()}
-        className="mt-auto flex max-h-[82vh] w-full flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:m-4 sm:mt-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[34rem] sm:rounded-3xl"
+        className="mt-auto flex max-h-[82dvh] short:max-h-[96dvh] w-full flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:m-4 sm:mt-[5.5rem] sm:max-h-[calc(100dvh-11rem)] short:top-2 short:bottom-2 short:max-h-none short:z-50 sm:w-[34rem] sm:rounded-3xl"
       >
         <header className="shrink-0 border-b border-ui-gold/20 px-4 pb-3 pt-3">
           <div className="flex items-center gap-3">

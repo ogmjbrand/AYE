@@ -78,7 +78,7 @@ export function EventPanel({ event, career, equipment, minute, atScene, atTarget
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="event-title" onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-lg sm:rounded-2xl">
+        className="max-h-[90dvh] short:max-h-[96dvh] w-full overflow-y-auto rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-lg sm:rounded-2xl">
         <header className="flex items-start justify-between gap-4 border-b border-ui-line p-5">
           <div>
             <p className={`m-0 text-xs font-semibold uppercase tracking-widest ${SEVERITY_TONE[t.severity]}`}>{SEVERITY_WORD[t.severity]} · {left} min left</p>

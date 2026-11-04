@@ -177,7 +177,7 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
 
   return (
     <aside role="dialog" aria-label={TITLE[section]}
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100vh-11rem)] sm:w-[26rem] sm:rounded-3xl">
+      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[78dvh] short:max-h-[96dvh] flex-col rounded-t-3xl border border-ui-gold/40 bg-[#0b0a09]/95 text-ui-ink shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-[5.5rem] sm:max-h-[calc(100dvh-11rem)] short:top-2 short:bottom-2 short:max-h-none short:z-50 sm:w-[26rem] sm:rounded-3xl">
       <header className="flex shrink-0 items-center gap-3 border-b border-ui-gold/20 px-4 py-3">
         <button type="button" onClick={onClose} aria-label={`Close ${TITLE[section]}`}
           className="grid h-9 w-9 place-items-center rounded-full border border-ui-gold/40 text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
@@ -273,7 +273,7 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
           <p className="m-0 text-[11px] text-ui-muted" aria-live="polite">{note ?? (section === 'accessories'
             ? 'Tap a piece to try it on. Bags are carried in your left hand, the watch goes on your left wrist and bangles on your right.'
             : section === 'hair' ? 'Tap a colour or a set of nails to try it on. The salon colours your own hair; nails are long sets on your own hands.'
-            : 'Tap a piece to try it on; plain pieces come in the colour you pick. Clothes restyle the fabric of what your character wears; new cuts are coming with new 3D clothes.')}</p>
+            : 'Tap a piece to try it on; plain pieces come in the colour you pick. Most clothes restyle the fabric of what your character wears; pieces badged 3D garment are real new cuts that move with you.')}</p>
         )}
       </footer>
     </aside>

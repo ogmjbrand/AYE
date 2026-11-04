@@ -71,7 +71,7 @@ export function TravelPanel({ from, balance, homeId, onTravel, onClose }: Travel
         aria-modal="true"
         aria-labelledby="travel-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-lg sm:rounded-2xl"
+        className="flex max-h-[85dvh] short:max-h-[96dvh] w-full flex-col rounded-t-2xl border border-ui-line bg-ui-panel text-ui-ink shadow-2xl sm:max-w-lg sm:rounded-2xl"
       >
         <header className="border-b border-ui-line p-5">
           <div className="flex items-start justify-between gap-4">
