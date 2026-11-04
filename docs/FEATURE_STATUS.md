@@ -171,10 +171,72 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 
 **Not changed:** other countries are still the real world (Ghana, Kenya, the UK and so on). Characters' self-described heritage and ethnic group are untouched. Food, music and clothes keep their cultural names (jollof, aso-oke, highlife).
 
+## Real world and gameplay phase (November 2026, verified in the browser)
+
+What is done, and what it does not do yet:
+
+**Real 3D garments** (`src/world/skinnedGarment.ts`, `src/lib/garmentMath.ts`, `src/world/SkinnedGarments.tsx`)
+- Two complete outfits are real geometry built on the Rocketbox body and skinned to its own `Bip01` skeleton. They move with idle, walk, run, sitting and gestures.
+  - **African:** OGM Atelier 3D aso-oke buba with bell sleeves, iro wrapper and pleated gele (wine and gold).
+  - **International:** OGM Atelier 3D tailored blazer and wide-leg trousers (charcoal).
+- **How they're built:**
+  - Fitted parts are cut from the body's surface by bone weight and pushed out by the fabric's thickness.
+  - Loose parts are measured round the body at each height and shared between hip, thigh and calf, so they swing with each stride.
+  - The gele is weighted to the head.
+- **In the game:** sold in the boutique (badged "3D garment"), tried on in the shop and in the wardrobe preview, equipped, saved in outfits, and listed in the server catalogue (`supabase/migrations/20261105120000_built_3d_garments.sql`).
+- **Limits:**
+  - Only these five pieces are real garments. Every other clothing item still restyles the fabric of the character's own clothes, and is labelled that way.
+  - There's no cloth simulation: the skirt follows the legs by skinning, not physics.
+  - The garments fit the built-in Rocketbox people only, not the CC5 player body.
+  - The cloth texture is drawn in code, not photographed fabric.
+  - The original clothes stay underneath, and can show at the wrists and ankles of the loose pieces.
+
+**Food businesses** (`src/lib/foodService.ts`, `src/components/StallMenu.tsx`, `EATERY_INTERIOR`)
+- **Street stalls** (suya, street food, snacks, tea, kiosks, food trucks; in every city): order at the window, pay, and eat standing at the stall with the eating animation. You face the cart or stall, and there's no interior.
+- **Local eateries** (buka, chop bar, waakye joint, tuwo house, soup kitchen): their own bright counter-service room with plastic chairs, pots on the counter, a drinks fridge and a menu board.
+- **Kitchens:** keep the dining room. The Palms and the cantina keep their own buildings.
+- **Limits:**
+  - There are no café or fast-food outlets in the districts yet.
+  - Eateries share the dining room's table plan.
+  - Stalls hand nothing over in 3D: you don't hold the food.
+
+**Responsive panels** (the `short:` variant, under 520 px tall)
+- **Phone:** sideways it's a wide handset with apps six across.
+- **Panels:** Life OS and every side panel (boutique, spa, OGM Homes, menus, furniture, travel, gadgets, map) use the full height on a sideways phone.
+- **City Locations:** scrolls as one panel.
+- **Heights:** set in `dvh`.
+- **Checked** at 360×800 and 844×390; the boutique also at both.
+- **Limit:** each panel's inner layout wasn't redesigned.
+
+**Interactions**
+- **Home:** Use walks to a free spot beside the furniture and does the activity on arrival. You walk into the shower and back out.
+- **Stalls:** you turn to the stall before ordering.
+- **NPC fix:** NPCs no longer freeze in the bind pose when a looping clip is stopped.
+- **Limit:** shops' and venues' counters still open their panels from where you stand, with no walk-up.
+
+**Performance** (measured in Chromium at 390×844, one frame of Lagoon Boulevard, `renderer.info`; not yet measured on a real phone)
+- **Draw calls:** low tier 476 → 165 (−65%); triangles 500k → 354k. The shadow pass was 81% of the calls.
+  - People are frustum-culled again.
+  - The low tier's shadow box is 18 m.
+  - Small props don't cast shadows on the low tier.
+- **Textures:** street and tile textures re-encoded from JPEG quality 100: 27.1 MB → 7.6 MB, 46.9 dB PSNR. This saves download and decode time, not GPU memory.
+- **Not done yet:**
+  - KTX2/Basis GPU texture compression.
+  - Mesh LODs for buildings and people.
+  - Measured frame times on phones (the test machine renders WebGL in software, so its frame rates mean nothing).
+  - The character GLBs: 1.9–3.1 MB each.
+
+**Saves:** no save format changed. Wardrobe purchases, GHAI balances, character progress and saved outfits load as before; the new items are only added to the catalogue. (There is no system named LINDA in the code; a character or save of that name loads like any other.)
+
 ## Next task (pick up here)
 
 
--0.5. **Fashion request (Oct 2026 references)**: evening gowns, heels, nails and wigs. Bags and your own colour choice are in. These need new 3D garments and hair (see 0). No brand logos; no faces taken from photos of real people.
+-0.5. **Fashion request (Oct 2026 references)**: evening gowns, heels, nails and wigs. Bags and your own colour choice are in. Gowns can now be built with the skinned-garment pipeline (see 0); heels and wigs still need models. No brand logos; no faces taken from photos of real people.
 
-0. **New garments**: dresses, jackets and accessories as real 3D clothes on the character (see `CHARACTER_PIPELINE.md`), so the boutique can sell them.
+0. **More real garments**: the pipeline exists (two outfits). Next:
+   - more cuts: a mermaid gown, a kaftan, an agbada, a skirt suit;
+   - garments for the CC5 player body;
+   - hiding the original clothes under loose pieces.
+1. **Food:** a café and a fast-food outlet with their own fronts and rooms; food handed over in 3D at stalls.
+2. **Performance on phones:** KTX2 textures, building and people LODs, and frame-time measurements on real hardware.
 4. **Accounts** (steps 1–2) as soon as the Supabase project is approved.

@@ -19,3 +19,12 @@ describe('food service', () => {
     }
   });
 });
+
+describe('ordering at a stall', () => {
+  it('turns you to the cart you are ordering from, and not to one across the street', async () => {
+    const { faceStall } = await import('./foodService');
+    // The suya cart stands at x 5 with its vendor's customers at x 6.3: face -x
+    expect(faceStall({ x: 6.3, z: 7.6 }, [{ x: 5, z: 6 }], [])).toBeCloseTo(Math.atan2(-1.3, -1.6));
+    expect(faceStall({ x: 6.3, z: 7.6 }, [{ x: -5, z: 6 }], [])).toBeNull();
+  });
+});

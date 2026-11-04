@@ -51,7 +51,7 @@ import { FashionStore } from './components/FashionStore';
 import { WardrobeStudio } from './components/WardrobeStudio';
 import { ShadowBudget } from './world/ShadowBudget';
 import { StallMenu } from './components/StallMenu';
-import { STALL_MINUTES, SERVICE_LABEL, serviceOf } from './lib/foodService';
+import { STALL_MINUTES, SERVICE_LABEL, faceStall, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
@@ -732,6 +732,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   /** A food vendor: a street stall serves you where you stand; eateries and kitchens have rooms. */
   const openVendor = (foodVendor: FoodVendor) => {
     if (serviceOf(foodVendor) !== 'street') { enterRestaurant(foodVendor); return; }
+    // Turn to the cart or stall you're ordering from, then stay put while you eat
+    const face = faceStall(controller.position, district.layout.foodCarts ?? [], district.layout.stalls ?? []);
+    if (face !== null) controller.direction = face;
     setStall(foodVendor);
     setMovementBlocked(true);
   };
