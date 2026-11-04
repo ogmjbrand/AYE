@@ -21,7 +21,6 @@ const HDRI: Record<HdriKey, string> = {
 };
 const INDOOR_HDRI = `${import.meta.env.BASE_URL}assets/environment/sky-indoor/IndoorEnvironmentHDRI020_1K_HDR.exr`;
 
-const SHADOW_EXTENT = 32;
 const sunOffset = new Vector3();
 const toCamera = new Vector3();
 
@@ -137,10 +136,10 @@ export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }:
         intensity={l.sunIntensity}
         castShadow
         shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-camera-left={-SHADOW_EXTENT}
-        shadow-camera-right={SHADOW_EXTENT}
-        shadow-camera-top={SHADOW_EXTENT}
-        shadow-camera-bottom={-SHADOW_EXTENT}
+        shadow-camera-left={-quality.shadowExtent}
+        shadow-camera-right={quality.shadowExtent}
+        shadow-camera-top={quality.shadowExtent}
+        shadow-camera-bottom={-quality.shadowExtent}
         shadow-camera-near={1}
         shadow-camera-far={160}
         shadow-bias={-0.0004}

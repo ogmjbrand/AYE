@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { cullAsPerson } from './cullPerson';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, Material, type Group, type Mesh } from 'three';
@@ -53,7 +54,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession, day }: {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
-      mesh.frustumCulled = false;
+      cullAsPerson(mesh);
       const fresh = (m: Material) => {
         const c = m.clone();
         // Original clothes: drop any restyling shader the shared material carries

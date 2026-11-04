@@ -1,4 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { cullAsPerson } from './cullPerson';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, LoopOnce, Material, type Group, type Mesh } from 'three';
@@ -127,7 +128,7 @@ function NPCModel({
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
+      cullAsPerson(mesh);
       const cloneMaterial = (material: Material) => {
         const copyMaterial = material.clone();
         copyMaterial.onBeforeCompile = Material.prototype.onBeforeCompile;

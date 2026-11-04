@@ -49,6 +49,7 @@ import { fashionShowcaseResult } from './lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
 import { FashionStore } from './components/FashionStore';
 import { WardrobeStudio } from './components/WardrobeStudio';
+import { ShadowBudget } from './world/ShadowBudget';
 import { StallMenu } from './components/StallMenu';
 import { STALL_MINUTES, SERVICE_LABEL, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
@@ -2613,6 +2614,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           <PerformanceMonitor onDecline={() => setAutoQuality('low')} flipflops={1} />
           <WarmUp sceneKey={sceneKey} maxTextureSize={settings.quality === 'low' ? 1024 : 2048} skip={warmSkip} onReady={setSceneReady} onProgress={setWarmProgress} />
           <FpsMeter />
+          <ShadowBudget />
           <CameraFollow controller={controller} controlsRef={controlsRef} ceiling={ceilingHeight} walls={roomWalls} />
           <ClickToMove player={controller} showRoute={showRoute} />
           <DistrictContext.Provider value={district}>

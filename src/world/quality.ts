@@ -13,12 +13,14 @@ export interface QualitySettings {
   maxDpr: number;
   /** Screen-space ambient occlusion (post-processing). */
   ambientOcclusion: boolean;
+  /** Half-width of the sun's shadow box round the player (metres): what casts shadows. */
+  shadowExtent: number;
 }
 
 export function settingsFor(quality: Quality): QualitySettings {
   return quality === 'high'
-    ? { quality, shadowMapSize: 2048, contactShadows: true, maxDpr: 1.5, ambientOcclusion: true }
-    : { quality, shadowMapSize: 1024, contactShadows: false, maxDpr: 1, ambientOcclusion: false };
+    ? { quality, shadowMapSize: 2048, contactShadows: true, maxDpr: 1.5, ambientOcclusion: true, shadowExtent: 32 }
+    : { quality, shadowMapSize: 1024, contactShadows: false, maxDpr: 1, ambientOcclusion: false, shadowExtent: 18 };
 }
 
 /**
