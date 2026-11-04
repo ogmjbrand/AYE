@@ -103,3 +103,60 @@ of play, before and after the change, at the same spot.
   upright is the next step.
 - **Food carts:** ordering at a street food cart takes you into the shared
   restaurant flow, as every food vendor does today.
+
+# Wardrobe studio
+
+The wardrobe (`src/components/WardrobeStudio.tsx`, logic in
+`src/lib/wardrobeStudio.ts`) follows the pattern of the reference video. Its
+look is our own.
+
+## How it's laid out
+
+- **The stage:** your character on a plain stage. When the phone is upright
+  the stage is on top; when it's sideways, or on a desktop, it's on the left.
+  - Drag to turn the character, or use the Front, Side and Back buttons.
+- **The sheet:** a panel of what you own, below the stage or to its right.
+  - **Tabs:** Tops, Bottoms, Dresses, Shoes, Accessories, Hairstyles and
+    Complete Outfits.
+  - **Thumbnails:** a grid with a gold border and a tick on whatever is on.
+    Tap to try something on and tap again to take it off.
+  - **Favourites:** a heart on each piece, and a Favourites filter. These are
+    the same favourites as the boutique's.
+- **Buttons:**
+  - **Confirm** wears the look and shows how many slots change. Nothing is
+    saved before you confirm.
+  - **Cancel** puts back what you had on.
+  - **Save Outfit** names the look; saved looks go to Complete Outfits (up to
+    6, with delete).
+  - The palette button opens the earlier wardrobe panel for skin, colours and
+    the fashion showcase, so nothing was lost.
+- **Live updates and loading:** the 3D character changes as you tap. A
+  "Dressing your character…" note shows while the model and hair load.
+
+## Where it opens and how dresses behave
+
+- **Entry points:** the Fitting Room in the Fashion House, the store
+  assistant, Inventory → Change outfit, Life OS → Wardrobe, and the HUD's
+  inventory button all open the studio.
+- **Dresses:** a dress puts on its skirt as well. A plain top then takes the
+  dress's skirt off.
+
+## What a thumbnail is
+
+With today's character models a top, bottom, dress or pair of shoes restyles
+the fabric, print and finish of what the character wears. So its thumbnail
+is a fabric swatch, labelled "Fabric for your top" (or bottom, or shoes). It
+is never shown as a separate 3D garment. Hairstyles are real 3D hair and show
+their own picture, labelled "3D hairstyle".
+
+## Tested
+
+- **Unit tests:** `src/lib/wardrobeStudio.test.ts`.
+- **In the browser:** at 390×844 and 844×390 the test did the following,
+  with no page errors:
+  1. Opened the studio from Inventory.
+  2. Tried on a dress, checked the character, turned it to the side and
+     saved the look as "Gold gala".
+  3. Confirmed.
+  4. Checked the save: the dress and its skirt were equipped, and the look
+     was stored.

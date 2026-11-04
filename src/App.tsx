@@ -48,6 +48,7 @@ import { COLOUR_CHOICES, recolourable, type FashionItem, type Slot } from './lib
 import { fashionShowcaseResult } from './lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
 import { FashionStore } from './components/FashionStore';
+import { WardrobeStudio } from './components/WardrobeStudio';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
@@ -681,6 +682,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [vendor, setVendor] = useState<FoodVendor | null>(null);
   const [store, setStore] = useState<'shop' | 'wardrobe' | 'decor' | null>(null);
   const [tryOn, setTryOn] = useState<Partial<Record<Slot, string | null>>>({});
+  // The wardrobe studio (components/WardrobeStudio.tsx); the older side panel stays for skin, colours and the showcase
+  const [studioOpen, setStudioOpen] = useState(false);
   const [homePanel, setHomePanel] = useState<Home | null>(null);
   /** Puts the camera straight behind the player after a jump (going in or out of a building). */
   const snapCamera = () => {
@@ -1461,7 +1464,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     const near = (p: readonly [number, number], r = USE_RADIUS) => Math.hypot(x - p[0], z - p[1]) <= r;
     if (near(BOUTIQUE_DOOR)) return { verb: 'Leave to', place: district.name, onOpen: goOutside };
     if (near(DESK_SPOT)) return { verb: 'Talk to', place: `${BOUTIQUE_STAFF.assistant.name}, the store assistant`, onOpen: () => { setSection(null); setAssistantOpen(true); } };
-    if (near(FITTING_SPOT)) return { verb: 'Try things on in', place: 'the fitting room', onOpen: () => { setSection(null); setStore('wardrobe'); } };
+    if (near(FITTING_SPOT)) return { verb: 'Try things on in', place: 'the fitting room', onOpen: () => { setSection(null); setStudioOpen(true); } };
     if (near(SALON_SPOT)) return { verb: 'Change your hair colour at', place: 'the salon', onOpen: () => openSection('hair') };
     return null;
   };
@@ -2048,7 +2051,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     { id: 'hair', label: 'Hair', icon: 'hair', onClick: () => openSection('hair'), active: section === 'hair' },
     { id: 'accessories', label: 'Accessories', icon: 'bag', onClick: () => openSection('accessories'), active: section === 'accessories' },
     { id: 'decor', label: 'Decor', icon: 'decor', onClick: () => { setSection(null); setStore(null); setCatalogueOpen((o) => !o); }, active: catalogueOpen, title: 'Home Decor: furniture delivered to your home' },
-    { id: 'fitting', label: 'Fitting Room', icon: 'hanger', onClick: () => { setSection(null); setCatalogueOpen(false); setStore((s) => (s === 'wardrobe' ? null : 'wardrobe')); }, active: store === 'wardrobe', title: 'Change into clothes you own' },
+    { id: 'fitting', label: 'Fitting Room', icon: 'hanger', onClick: () => { setSection(null); setCatalogueOpen(false); setStudioOpen((o) => !o); }, active: studioOpen || store === 'wardrobe', title: 'Change into clothes you own' },
     { id: 'catalogue', label: 'Catalogue', icon: 'spark', onClick: () => { setSection(null); setCatalogueOpen(false); setStore((s) => (s === 'shop' ? null : 'shop')); }, active: store === 'shop', title: '3D shoes and hairstyles, accessories and the daily style showcase' },
   ] : [
     indoors
@@ -2068,7 +2071,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     },
     drivingModel
       ? { id: 'drive', label: 'Get out', icon: 'car', onClick: leaveVehicle, active: true, title: `Get out of your ${drivingModel.name}` }
-      : { id: 'inventory', label: 'Inventory', short: 'Items', icon: 'bag', onClick: () => setInventoryOpen((o) => !o), active: inventoryOpen || store === 'wardrobe', title: 'Everything you own: work gear, clothes, gadgets, vehicles' },
+      : { id: 'inventory', label: 'Inventory', short: 'Items', icon: 'bag', onClick: () => setInventoryOpen((o) => !o), active: inventoryOpen || studioOpen || store === 'wardrobe', title: 'Everything you own: work gear, clothes, gadgets, vehicles' },
     inPalms || inCantina
       ? { id: 'restaurant', label: inCantina ? 'Menu' : 'Restaurant', icon: 'restaurant', onClick: () => setMenuOpen((o) => !o), active: menuOpen, title: 'The menu' }
       : inWorkplace && insideRestaurant && restaurantVendor
@@ -2307,6 +2310,16 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onEatMeal={eatRestaurantMeal}
           onLeave={leaveRestaurant}
           onClose={() => setVendor(null)}
+        />
+      )}
+      {studioOpen && (
+        <WardrobeStudio
+          character={character}
+          onConfirm={(draft) => { onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, equipped: { ...draft } } }); setTryOn({}); setStudioOpen(false); }}
+          onSaveOutfits={(outfits) => onCharacterUpdate({ ...character, wardrobe: { ...wardrobe, outfits } })}
+          onToggleFavourite={toggleFavourite}
+          onMore={() => { setStudioOpen(false); setStore('wardrobe'); }}
+          onClose={() => setStudioOpen(false)}
         />
       )}
       {store && (
@@ -2809,7 +2822,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           name={BOUTIQUE_STAFF.assistant.name}
           shop={district.fashionHouse.name}
           onSection={openSection}
-          onFitting={() => { setAssistantOpen(false); setStore('wardrobe'); }}
+          onFitting={() => { setAssistantOpen(false); setStudioOpen(true); }}
           onDecor={() => { setAssistantOpen(false); setCatalogueOpen(true); }}
           onClose={() => setAssistantOpen(false)}
         />
@@ -2834,7 +2847,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onUnequip={unequipGear}
           onRepair={repairGear}
           onSell={sellGear}
-          onOpenWardrobe={() => { setInventoryOpen(false); setStore('wardrobe'); }}
+          onOpenWardrobe={() => { setInventoryOpen(false); setStudioOpen(true); }}
           medicalKit={<MedicalKit health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUse={useMedical} />}
           onClose={() => setInventoryOpen(false)}
         />
@@ -2909,7 +2922,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onSetDream={setDream}
           onDismissWish={dismissWish}
           onSetSavingsGoal={setSavingsGoal}
-          onOpenWardrobe={() => { setOsOpen(false); setStore('wardrobe'); }}
+          onOpenWardrobe={() => { setOsOpen(false); setStudioOpen(true); }}
           // Step outside first, so you come back to the street (the room isn't restored after the creator)
           onEditLook={() => { if (offStreet) goOutside(); onEditLook(); }}
           settings={{
@@ -3030,7 +3043,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         nav={nav}
         mapPosition={doorNow ? { x: doorNow[0], z: doorNow[2] } : null}
         onOpenMoney={() => openOs('money')}
-        onOpenInventory={() => setStore('wardrobe')}
+        onOpenInventory={() => setStudioOpen(true)}
         onOpenProfile={() => openOs('profile')}
         onOpenSettings={() => openOs('settings')}
         onOpenNeeds={() => openOs('today')}
