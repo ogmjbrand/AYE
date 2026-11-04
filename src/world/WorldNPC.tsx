@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
-import { Box3, Material, type Group, type Mesh } from 'three';
+import { Box3, LoopOnce, Material, type Group, type Mesh } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Slot, Style } from '../lib/fashion';
@@ -233,13 +233,16 @@ function NPCModel({
             ? conversationGesture('resident', mixer.time - conversationStart.current)
             : 'idle';
 
+    const getAction = (animation: AnimationState | null) => {
+      if (!animation) return null;
+      if (animation === 'idle') return idleName ? actions[idleName] : null;
+      if (animation === 'walk') return walkName ? actions[walkName] : null;
+      return gestures[animation] ?? null;
+    };
+    // A looping clip that was stopped from outside (its actions rebuilt) would leave the person in the bind pose: start it again
+    const playing = getAction(state.current);
+    if (playing && !playing.isRunning() && playing.loop !== LoopOnce) playing.reset().fadeIn(0.2).play();
     if (nextState !== state.current) {
-      const getAction = (animation: AnimationState | null) => {
-        if (!animation) return null;
-        if (animation === 'idle') return idleName ? actions[idleName] : null;
-        if (animation === 'walk') return walkName ? actions[walkName] : null;
-        return gestures[animation] ?? null;
-      };
       const previous = getAction(state.current);
       const next = getAction(nextState);
       next?.reset().fadeIn(nextState === 'Sit' || state.current === 'Sit' ? 0.6 : 0.3).play();

@@ -343,6 +343,32 @@ export const RESTAURANT_INTERIOR: Interior = {
   ],
 };
 
+/**
+ * A local eatery (a buka, a chop bar, a waakye joint): the same seats as the
+ * dining room, so ordering works the same, but a bright, busy room with
+ * plastic chairs, a serving counter with the pots on it, a drinks fridge and
+ * the day's menu on the wall.
+ */
+export const EATERY_INTERIOR: Interior = {
+  ...RESTAURANT_INTERIOR,
+  wallColor: '#e8c76a',
+  floorColor: '#cfc7b8',
+  window: 'wide',
+  furniture: [
+    fx('host-stand', 0, -3, 2.2, 1.05, 0.75, '#2f6f9a'),
+    fx('counter', -5.4, 6.1, 6.4, 0.92, 0.9, '#d9d4c8'),
+    fx('stove', -7.2, 6.1, 1.4, 0.9, 0.8, '#3a3a3c'),
+    fx('stove', -5.4, 6.1, 1.4, 0.9, 0.8, '#3a3a3c'),
+    fx('fridge', 7.6, 6.2, 0.9, 1.9, 0.8, '#d8dde2'),
+    fx('wall-art', 0, 6.85, 3.2, 1.2, 0.06, '#1f4a32', 1.7),
+    ...RESTAURANT_TABLES.map(({ at }): Furniture => ({ kind: 'dining-table', at, size: [1.65, 0.76, 0.95], color: '#f2f0ea', rotation: 0 })),
+    ...RESTAURANT_TABLES.flatMap(({ seats }) => seats.map((seat, i): Furniture => ({
+      kind: 'dining-chair', at: [seat.x, seat.z], size: [0.6, 0.86, 0.6], color: i % 2 ? '#c0392b' : '#2f6f9a', rotation: seat.facing,
+    }))),
+    fx('plant', 7.4, -4.6, 0.6, 1.3, 0.6, '#3f7a3a'),
+  ],
+};
+
 export type RestaurantInteraction = 'door' | 'host';
 
 export const FASHION_HOUSE_INTERIOR: Interior = {

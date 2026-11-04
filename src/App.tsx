@@ -49,6 +49,8 @@ import { fashionShowcaseResult } from './lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
 import { FashionStore } from './components/FashionStore';
 import { WardrobeStudio } from './components/WardrobeStudio';
+import { StallMenu } from './components/StallMenu';
+import { STALL_MINUTES, SERVICE_LABEL, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
@@ -118,7 +120,7 @@ import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import {
-  CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
+  CAR_DEALERSHIP_INTERIOR, EATERY_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
 import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse, standSpotsFor } from './lib/furniture';
@@ -193,6 +195,8 @@ interface CityProps {
   onHugComplete: (residentId: string) => void;
   /** Something happening in this district right now (lib/liveEvents.ts). */
   liveEvent: ActiveEvent | null;
+  /** Eating at a street stall. */
+  eating?: boolean;
 }
 
 interface CameraFollowProps {
@@ -385,7 +389,7 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
@@ -423,7 +427,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour
         ? <DrivenVehicle controller={controller} colour={colour.hex} bodyStyle={model.bodyStyle} />
-        : <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} />}
+        : <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} eating={eating} />}
     </>
   );
 }
@@ -530,12 +534,15 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const restaurantOrderSequence = useRef(0);
   const restaurantAnimationTimer = useRef<number | null>(null);
   const [eating, setEating] = useState(false);
+  // A street stall you're ordering at (lib/foodService.ts): served on the pavement, no dining room
+  const [stall, setStall] = useState<FoodVendor | null>(null);
+  const [stallDish, setStallDish] = useState<Dish | null>(null);
   const completeRestaurantDelivery = useCallback(() => setRestaurantDeliveryReady(true), []);
   const venueInterior: Interior | null = insideDealership && district.carDealership ? CAR_DEALERSHIP_INTERIOR
     : insideUniversity && district.id === UNIVERSITY.districtId ? UNIVERSITY_INTERIOR
       : insideHospital && district.id === HOSPITAL.districtId ? HOSPITAL_INTERIOR
         : insideOffice && district.id === OFFICE_WORKPLACE.districtId ? OFFICE_INTERIOR
-          : insideRestaurant && restaurantVendor ? RESTAURANT_INTERIOR
+          : insideRestaurant && restaurantVendor ? (serviceOf(restaurantVendor) === 'eatery' ? EATERY_INTERIOR : RESTAURANT_INTERIOR)
             : null;
   const venueLayout = useMemo(() => {
     if (!venueInterior) return null;
@@ -720,6 +727,31 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
     snapCamera();
+  };
+  /** A food vendor: a street stall serves you where you stand; eateries and kitchens have rooms. */
+  const openVendor = (foodVendor: FoodVendor) => {
+    if (serviceOf(foodVendor) !== 'street') { enterRestaurant(foodVendor); return; }
+    setStall(foodVendor);
+    setMovementBlocked(true);
+  };
+  const closeStall = () => {
+    if (stallDish) return;
+    setStall(null);
+    setMovementBlocked(false);
+  };
+  const buyAtStall = (dish: Dish) => {
+    if (!stall || stallDish || stateRef.current.summary || stateRef.current.balance < dish.price || !suitsDiet(dish, character.diet)) return;
+    setStallDish(dish);
+    setEating(true);
+    window.setTimeout(() => {
+      setEating(false);
+      setStallDish(null);
+      // Paid when it's eaten, as at a table: a meal cut short (the day ended) costs nothing
+      if (stateRef.current.summary || stateRef.current.balance < dish.price) return;
+      eat(dish.price, dish.fullness);
+      wait(STALL_MINUTES);
+      setArrival(`You ate ${dish.name} at ${stall.name}.`);
+    }, 3200);
   };
   const enterRestaurant = (foodVendor: FoodVendor) => {
     if (restaurantAnimationTimer.current !== null) window.clearTimeout(restaurantAnimationTimer.current);
@@ -1976,7 +2008,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     if (inWorkplace && insideHospital) return { title: HOSPITAL.name, subtitle: `Hospital · ${district.city.name}`, icon: 'career' };
     if (inWorkplace && insideOffice) return { title: OFFICE_WORKPLACE.name, subtitle: `At work · ${district.city.name}`, icon: 'career' };
     if (inWorkplace && insideDealership) return { title: district.carDealership?.name ?? 'Car showroom', subtitle: `Showroom · ${district.city.name}`, icon: 'car' };
-    if (inWorkplace && insideRestaurant && restaurantVendor) return { title: restaurantVendor.name, subtitle: `Dining · ${district.city.name}`, icon: 'restaurant' };
+    if (inWorkplace && insideRestaurant && restaurantVendor) return { title: restaurantVendor.name, subtitle: `${SERVICE_LABEL[serviceOf(restaurantVendor)]} · ${district.city.name}`, icon: 'restaurant' };
     if (indoors && home) return { title: home.id === state.home && interior ? MY_HOME[interior.tier] : home.name, subtitle: areaName, icon: 'home' };
     const { x, z } = controller.position;
     const at = district.places.find((p) => Math.hypot(p.position[0] - x, p.position[2] - z) < PLATE_RADIUS);
@@ -2292,6 +2324,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
 
   return (
     <main className="game">
+      {stall && (
+        <StallMenu vendor={stall} diet={character.diet} balance={state.balance} eating={stallDish} onBuy={buyAtStall} onClose={closeStall} />
+      )}
       {vendor && (
         <FoodMenu
           key={vendor.id}
@@ -2638,7 +2673,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating && !!stall} />
             )}
           </DistrictContext.Provider>
           <PostEffects />
@@ -3037,7 +3072,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         onOpenGadgets={() => setGadgets(true)}
         fullness={state.fullness}
         needs={state.needs}
-        onOpenVendor={enterRestaurant}
+        onOpenVendor={openVendor}
         onOpenShop={enterBoutique}
         place={plate}
         nav={nav}
