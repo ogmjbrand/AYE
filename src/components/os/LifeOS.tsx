@@ -109,7 +109,7 @@ function GoButton({ link, onGo, small = false }: { link: LifeLink; onGo: (l: Lif
     <button
       type="button"
       onClick={() => onGo(link)}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-accent/60 bg-ui-accent/15 font-semibold text-ui-accent-strong transition hover:bg-ui-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${small ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-accent/60 bg-ui-accent/15 font-semibold text-ui-accent-strong transition hover:bg-ui-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent ${small ? 'min-h-8 px-2.5 py-1 text-[11px]' : 'min-h-9 px-3 py-1.5 text-xs'}`}
     >
       {linkLabel(link)} <Icon name="go" className="h-3 w-3" />
     </button>

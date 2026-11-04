@@ -271,3 +271,23 @@ fully clothed.
 The four current hairstyles are static meshes attached to the Rocketbox head
 bone: they follow head turns and locomotion, but do not have ponytail or braid
 secondary-motion simulation.
+
+## Status update: built 3D garments (November 2026)
+
+Real clothing cuts now exist for the Rocketbox people. They are built in
+code from the person's own body and skinned to their `Bip01` skeleton
+(`src/world/skinnedGarment.ts`, maths in `src/lib/garmentMath.ts`):
+
+- the aso-oke buba, iro and gele;
+- the tailored blazer, wide-leg trousers and shorts;
+- the mermaid gown.
+
+They need no downloaded or licensed assets, so there's nothing new to credit
+in `public/assets/CREDITS.md`.
+
+Each catalogue item carries `style.garment` (a kind and a fabric). The
+silhouette (geometry, cached per body) is separate from the material (cloth
+texture and colours). See `LIVING_WORLD_IMPLEMENTATION.md` for the limits:
+- no bare legs under the shorts;
+- no cloth simulation;
+- the CC5 body isn't supported.
