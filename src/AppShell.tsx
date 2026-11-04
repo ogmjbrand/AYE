@@ -1,9 +1,8 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import type { Character } from './components/CharacterCreation';
 import { EntryScreen } from './components/EntryScreen';
-import { RotateHint } from './components/RotateHint';
 import { loadCharacter, saveCharacter } from './lib/save';
-import { enterLandscape } from './lib/orientation';
+import { enterFullscreen } from './lib/orientation';
 import { loadSettings, saveSettings, type QualityMode, type Settings } from './lib/settings';
 
 /*
@@ -51,7 +50,7 @@ export default function AppShell() {
     return (
       <Suspense fallback={<Opening />}>
       <CharacterCreation
-        onCharacterCreate={(c) => { setCharacter(c); setScreen('play'); void enterLandscape(); }}
+        onCharacterCreate={(c) => { setCharacter(c); setScreen('play'); void enterFullscreen(); }}
         onBack={() => setScreen('entry')}
       />
       </Suspense>
@@ -74,7 +73,7 @@ export default function AppShell() {
         saved={character}
         quality={quality}
         onQualityChange={changeQuality}
-        onContinue={() => { setScreen('play'); void enterLandscape(); }}
+        onContinue={() => { setScreen('play'); void enterFullscreen(); }}
         onNewLife={() => setScreen('create')}
         onEditLook={() => { setEditFrom('entry'); setScreen('edit'); }}
       />
@@ -84,7 +83,6 @@ export default function AppShell() {
   // Keyed by id so a new character starts with a fresh clock and ledger
   return (
     <Suspense fallback={<Opening />}>
-    <RotateHint />
     <Game
       key={character.id}
       character={character}

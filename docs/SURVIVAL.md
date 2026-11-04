@@ -56,9 +56,8 @@
 - A save stuck at the floor starts its recovery when it loads.
 - Edited values are clamped, a stay can't be stretched out, and fake items are dropped.
 
-**Landscape**
-- Starting or continuing a game on a phone goes full screen and locks the screen sideways where the browser supports it (`src/lib/orientation.ts`).
-- Where it can't (iPhone Safari), a "Turn your phone sideways" card with the AYE logo covers the game while the phone is upright (`src/components/RotateHint.tsx`).
+**Phones, either way up**
+- Starting or continuing a game on a phone goes full screen where the browser supports it (`src/lib/orientation.ts`). Nothing locks the orientation: the game plays upright or sideways, and the HUD lays itself out for each (see `docs/MOBILE_HUD.md`).
 
 ## Honest limits
 

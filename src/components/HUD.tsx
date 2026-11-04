@@ -2,7 +2,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { Character } from './CharacterCreation';
 import type { Neighborhood } from '../lib/neighborhoods';
 import { useEffect, useRef, useState } from 'react';
-import { CarFront, Check, ChevronDown, ChevronRight, Droplet, Heart, MapPin, TriangleAlert, Utensils, Zap } from 'lucide-react';
+import { CarFront, Check, ChevronDown, ChevronRight, Droplet, Hand, Heart, ListChecks, Map as MapIcon, MapPin, TriangleAlert, Utensils, X, Zap } from 'lucide-react';
 import { assetUrl } from '../lib/assetManifest';
 import { HOURLY_WAGE, HUNGRY_THRESHOLD, WORK_END_HOUR, WORK_START_HOUR, isWorkingHours, type DayLedger, type GameTime } from '../lib/gameState';
 import { nearestVendor, type FoodVendor } from '../lib/food';
@@ -22,11 +22,14 @@ import { careerLevel } from '../lib/progression';
 import { CAREER_LABEL } from '../lib/labels';
 import { ARRIVE_RADIUS, compass } from '../lib/locations';
 import { dailyGoals, goalDay, parseFlags, updateFlags, type GoalFlags } from '../lib/dailyGoals';
+import { hudLayout } from '../lib/hudLayout';
 
 /** One button on the bottom bar. The bar changes with where you are (street, home, restaurant, boutique). */
 export interface NavItem {
   id: string;
   label: string;
+  /** A shorter word for the bar on phones. */
+  short?: string;
   icon: IconName;
   onClick: () => void;
   active?: boolean;
@@ -136,14 +139,16 @@ const ROUND =
 const twoDigits = (n: number) => String(n).padStart(2, '0');
 
 /** "E: do something here", for counters, doors, people and furniture. */
-function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onOpen: () => void }) {
+function PlacePrompt({ verb, place, onOpen, compact = false }: { verb: string; place: string; onOpen: () => void; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-sm hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:whitespace-nowrap`}
+      className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-2xl text-left hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${compact ? 'min-h-12 max-w-[min(15rem,58vw)] px-3 py-2 text-[13px]' : 'px-3.5 py-2 text-sm sm:whitespace-nowrap'}`}
     >
-      <kbd className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ui-gold/60 bg-ui-gold/15 font-mono text-xs font-bold text-ui-gold-strong">E</kbd>
+      {/* The E key on a keyboard; a tap target on a touch screen */}
+      <kbd className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ui-gold/60 bg-ui-gold/15 font-mono text-xs font-bold text-ui-gold-strong pointer-coarse:hidden">E</kbd>
+      <span aria-hidden="true" className="hidden h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#2a1c06] pointer-coarse:grid"><Hand size={16} /></span>
       <span className="leading-tight">
         {verb} <span className="font-semibold text-ui-gold-strong">{place}</span>
       </span>
@@ -152,11 +157,11 @@ function PlacePrompt({ verb, place, onOpen }: { verb: string; place: string; onO
 }
 
 /** Head-and-shoulders picture of your character (the same portrait as the Life OS). */
-function Portrait({ character }: { character?: Character }) {
+function Portrait({ character, compact = false }: { character?: Character; compact?: boolean }) {
   const [broken, setBroken] = useState<string | null>(null);
   const src = character ? assetUrl(`models/characters/rocketbox/thumbs/${character.lookId}.webp`) : null;
   return (
-    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a2418] to-[#100d0b] sm:h-12 sm:w-12">
+    <span className={`relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ui-gold/70 bg-gradient-to-b from-[#2a2418] to-[#100d0b] ${compact ? 'h-9 w-9' : 'h-11 w-11 sm:h-12 sm:w-12'}`}>
       {src && broken !== src
         ? <img src={src} alt="" onError={() => setBroken(src)} className="h-full w-full object-cover" draggable={false} />
         : <span className="font-display text-lg font-bold text-ui-gold-strong">{character?.name.slice(0, 1).toUpperCase() ?? '?'}</span>}
@@ -285,11 +290,20 @@ function Minimap({ district, at, direction, homePlaceId, workPlaceId, size }: { 
 const EMPTY_LEDGER: DayLedger = { income: 0, expenses: 0, minutesWorked: 0 };
 
 /** Today's goals (lib/dailyGoals.ts), folded away with a tap. */
-function GoalsPanel({ goals }: { goals: ReturnType<typeof dailyGoals> }) {
-  const [open, setOpen] = useState(true);
+function GoalsPanel({ goals, folded = false, maxHeight }: { goals: ReturnType<typeof dailyGoals>; folded?: boolean; maxHeight?: number }) {
+  const [open, setOpen] = useState(!folded);
   const firstOpen = goals.find((goal) => !goal.done)?.id;
+  const done = goals.filter((goal) => goal.done).length;
+  if (folded && !open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} aria-expanded={false} aria-label={`Today's goals: ${done} of ${goals.length} done. Show them`}
+        className={`${GLASS} pointer-events-auto flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold`}>
+        <ListChecks size={14} aria-hidden="true" className="text-ui-gold-strong" /> Goals <span className="tabular-nums text-ui-gold-strong">{done}/{goals.length}</span>
+      </button>
+    );
+  }
   return (
-    <section className={`${GLASS} pointer-events-auto w-56 rounded-2xl p-3`} aria-label="Today's goals">
+    <section className={`${GLASS} pointer-events-auto rounded-2xl ${folded ? 'w-52 overflow-y-auto overscroll-contain p-2.5' : 'w-56 p-3'}`} style={maxHeight ? { maxHeight } : undefined} aria-label="Today's goals">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full items-center justify-between text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
         Today&apos;s goals
@@ -381,12 +395,18 @@ export function HUD({
     const id = setInterval(() => setFrame((n) => n + 1), 100);
     return () => clearInterval(id);
   }, []);
-  const [small, setSmall] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  // Phone or desktop, upright or sideways: follows every resize and turn
+  const [screen, setScreen] = useState(() => (typeof window !== 'undefined' ? { w: window.innerWidth, h: window.innerHeight } : { w: 1280, h: 800 }));
   useEffect(() => {
-    const onResize = () => setSmall(window.innerWidth < 640);
+    const onResize = () => setScreen((s) => (s.w === window.innerWidth && s.h === window.innerHeight ? s : { w: window.innerWidth, h: window.innerHeight }));
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
   }, []);
+  const layout = hudLayout(screen.w, screen.h);
+  const small = layout.compact;
+  const [mapOpen, setMapOpen] = useState(() => { try { return window.localStorage.getItem('aye.hud.map') !== 'closed'; } catch { return true; } });
+  const toggleMap = () => setMapOpen((v) => { try { window.localStorage.setItem('aye.hud.map', v ? 'closed' : 'open'); } catch { /* storage unavailable */ } return !v; });
 
   const workplaceStatus = useWorkplaceStatus(character ?? null, controller, district);
   const { x: px, z: pz } = controller.position;
@@ -471,12 +491,14 @@ export function HUD({
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none font-sans text-ui-ink">
+      {/* Inside the screen's safe area: clear of notches, rounded corners and the home bar */}
+      <div className="absolute" style={{ top: 'env(safe-area-inset-top, 0px)', right: 'env(safe-area-inset-right, 0px)', bottom: 'env(safe-area-inset-bottom, 0px)', left: 'env(safe-area-inset-left, 0px)' }}>
       {/* Top-left: who and when */}
-      <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5 sm:left-5 sm:top-5">
-        <div className={`${GLASS} flex items-center gap-2.5 rounded-full py-1 pl-1 pr-4`}>
-          <Portrait character={character} />
+      <div className={`absolute flex flex-col items-start ${small ? 'left-2 top-2 gap-1' : 'left-3 top-3 gap-1.5 sm:left-5 sm:top-5'}`}>
+        <div className={`${GLASS} flex items-center rounded-full py-1 pl-1 ${small ? 'gap-2 pr-3' : 'gap-2.5 pr-4'}`}>
+          <Portrait character={character} compact={small} />
           <div className="min-w-0">
-            <p className="m-0 max-w-[9rem] truncate text-sm font-semibold leading-tight sm:max-w-[12rem]">{character?.name ?? 'You'}</p>
+            <p className={`m-0 truncate font-semibold leading-tight ${small ? 'max-w-[7.5rem] text-[13px]' : 'max-w-[9rem] text-sm sm:max-w-[12rem]'}`}>{character?.name ?? 'You'}</p>
             {level && (
               <div className="mt-0.5 flex items-center gap-1.5" title={`${level.into.toLocaleString()} / ${level.span.toLocaleString()} XP to level ${level.level + 1}`}>
                 <span className="text-[10px] font-bold leading-none text-ui-gold-strong">Lv {level.level}</span>
@@ -486,7 +508,7 @@ export function HUD({
               </div>
             )}
             <p className="m-0 text-xs font-semibold tabular-nums leading-tight text-ui-gold-strong">
-              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}{weather && <span className="font-medium text-ui-muted"> · {weather}</span>}
+              {DAY_SHORT[gameTime.dayOfWeek]} {twoDigits(gameTime.hour)}:{twoDigits(Math.floor(gameTime.minute))}{weather && !small && <span className="font-medium text-ui-muted"> · {weather}</span>}
             </p>
             {status && (
               <p className={`m-0 flex items-center gap-1 text-[10px] font-medium leading-tight ${status.text}`}>
@@ -497,7 +519,7 @@ export function HUD({
         </div>
         {health && (
           <button type="button" onClick={onOpenHealth} disabled={!onOpenHealth} aria-label={`Health ${Math.round(health.value)}. Open your health`}
-            className={`${GLASS} pointer-events-auto flex items-center gap-3 rounded-full px-3 py-1 text-xs font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${health.critical ? 'animate-pulse ring-2 ring-[#e5484d]' : ''}`}>
+            className={`${GLASS} pointer-events-auto flex items-center rounded-full font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${small ? 'min-h-8 gap-2 px-2.5 py-0.5 text-[11px]' : 'gap-3 px-3 py-1 text-xs'} ${health.critical ? 'animate-pulse ring-2 ring-[#e5484d]' : ''}`}>
             <span className="flex items-center gap-1" title="Health"><Heart size={14} aria-hidden="true" className="fill-[#e5484d] text-[#e5484d]" />{Math.round(health.value)}</span>
             {needs && <span className="flex items-center gap-1" title="Energy"><Zap size={14} aria-hidden="true" className="fill-[#4eae42] text-[#4eae42]" />{Math.round(needs.energy)}</span>}
             <span className="flex items-center gap-1" title="Hunger (how full you are)"><Utensils size={13} aria-hidden="true" className="text-[#e8b452]" />{Math.round(fullness)}</span>
@@ -509,7 +531,9 @@ export function HUD({
             {warnings.map((w) => <NeedChip key={w.text} icon={w.icon} text={w.text} onClick={onOpenNeeds} />)}
           </div>
         )}
-        {!small && <GoalsPanel goals={goals} />}
+        <GoalsPanel key={layout.goalsFolded ? 'folded' : 'open'} goals={goals} folded={layout.goalsFolded}
+          // On a phone the open list stops above the stick, scrolling if the screen is short
+          maxHeight={small ? Math.max(90, screen.h - (layout.portrait ? 330 : 280)) : undefined} />
         {tracked && (
           <div role="status" className={`${GLASS} pointer-events-auto flex items-center gap-2.5 rounded-2xl px-3 py-2 text-xs`}>
             <MapPin size={15} aria-hidden="true" className="shrink-0 text-ui-gold-strong" />
@@ -563,13 +587,13 @@ export function HUD({
       )}
 
       {controller.trafficWarning && (
-        <p role="status" className="absolute left-1/2 top-[8.5rem] m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 px-3 py-2 text-xs font-semibold text-ui-warn shadow-lg">
-          <TriangleAlert size={16} aria-hidden="true" />
-          Vehicle approaching: waiting for a safe gap.
+        <p role="status" className={`absolute left-1/2 m-0 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-ui-warn/50 bg-ui-panel/90 font-semibold text-ui-warn shadow-lg ${small ? `${layout.portrait ? 'bottom-[11.5rem]' : 'top-[3.25rem]'} max-w-[calc(100%-1rem)] px-2.5 py-1.5 text-[11px]` : 'top-[8.5rem] px-3 py-2 text-xs'}`}>
+          <TriangleAlert size={small ? 14 : 16} aria-hidden="true" className="shrink-0" />
+          {small ? 'Vehicle coming: waiting for a gap' : 'Vehicle approaching: waiting for a safe gap.'}
         </p>
       )}
       {controller.drivingVehicleId && (
-        <div className={`${GLASS} absolute left-1/2 top-[8.5rem] flex -translate-x-1/2 items-center gap-3 rounded-xl px-3 py-2 text-xs`}>
+        <div className={`${GLASS} absolute left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-xl ${small ? `${layout.portrait ? 'bottom-[11.5rem]' : 'top-[3.25rem]'} px-2.5 py-1.5 text-[11px]` : 'top-[8.5rem] px-3 py-2 text-xs'}`}>
           <span className="flex items-center gap-2 font-semibold"><CarFront size={16} className="text-ui-gold-strong" />Driving · {Math.round(Math.abs(controller.vehicleSpeed) * 3.6)} km/h</span>
           <span className="hidden text-ui-muted sm:inline">W/S drive · A/D steer · E get out</span>
         </div>
@@ -581,7 +605,7 @@ export function HUD({
       )}
 
       {/* Top-centre: the venue or area */}
-      {place && (
+      {place && !small && (
         <div className="absolute left-1/2 top-[4.6rem] -translate-x-1/2 sm:top-5">
           <div className={`${GLASS} flex items-center gap-3 rounded-2xl px-4 py-2 sm:px-5`}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-ui-gold/60 bg-ui-gold/10 text-ui-gold-strong sm:h-9 sm:w-9">
@@ -598,21 +622,23 @@ export function HUD({
       )}
 
       {/* Top-right: money and the system buttons */}
-      <div className="absolute right-3 top-3 flex items-center gap-1.5 sm:right-5 sm:top-5 sm:gap-2">
+      <div className={`absolute flex items-center ${small ? 'right-2 top-2 gap-1' : 'right-3 top-3 gap-1.5 sm:right-5 sm:top-5 sm:gap-2'}`}>
         <button
           type="button"
           onClick={onOpenMoney}
           title="Your money: income, spending and savings"
-          className={`${GLASS} pointer-events-auto flex h-10 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:h-11 sm:gap-2 sm:pr-3`}
+          aria-label={`${Math.round(balance).toLocaleString()} GHAI. Your money`}
+          className={`${GLASS} pointer-events-auto flex items-center rounded-full pl-1.5 hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${small ? 'h-10 gap-1 pr-2' : 'h-10 gap-1.5 pr-2.5 sm:h-11 sm:gap-2 sm:pr-3'}`}
         >
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#3a2606] sm:h-8 sm:w-8">
+          <span className={`grid place-items-center rounded-full bg-gradient-to-b from-[#f3d48f] to-[#b8862f] text-[#3a2606] ${small ? 'h-7 w-7' : 'h-7 w-7 sm:h-8 sm:w-8'}`}>
             <Icon name="coin" className="h-4 w-4 sm:h-5 sm:w-5" />
           </span>
-          <span className="font-display text-sm font-bold tabular-nums sm:text-base">{Math.round(balance).toLocaleString()}</span>
-          <span className="hidden text-[10px] font-semibold text-ui-gold-strong sm:inline">GHAI</span>
-          <Icon name="arrowRight" className="h-3.5 w-3.5 text-ui-gold-strong" />
+          <span className={`font-display font-bold tabular-nums ${small ? 'text-[13px]' : 'text-sm sm:text-base'}`}>{Math.round(balance).toLocaleString()}</span>
+          {!small && <span className="hidden text-[10px] font-semibold text-ui-gold-strong sm:inline">GHAI</span>}
+          {!small && <Icon name="arrowRight" className="h-3.5 w-3.5 text-ui-gold-strong" />}
         </button>
-        {onOpenInventory && (
+        {/* On phones the bar below has Inventory */}
+        {onOpenInventory && !small && (
           <button type="button" onClick={onOpenInventory} className={ROUND} title="Inventory: the clothes you own" aria-label="Inventory">
             <Icon name="bag" className="h-5 w-5" />
           </button>
@@ -630,34 +656,50 @@ export function HUD({
       </div>
 
       {/* Bottom-left: minimap and where you are */}
-      <div className="absolute bottom-[5.25rem] left-3 flex flex-col items-center gap-1.5 sm:bottom-5 sm:left-5 pointer-coarse:bottom-auto pointer-coarse:left-auto pointer-coarse:right-3 pointer-coarse:top-[4.6rem] sm:pointer-coarse:top-[4.75rem]">
-        <Minimap district={district} at={mapAt} direction={mapPosition ? Math.PI : controller.direction} homePlaceId={homePlaceId} workPlaceId={character && character.career !== 'none' ? `${district.id}.work.${character.career}` : null} size={small ? 92 : 148} />
-        <p className={`${GLASS} m-0 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold`}>
-          <Icon name="pin" className="h-3.5 w-3.5 text-ui-gold-strong" /> {location}
+      <div className={`absolute flex flex-col items-end gap-1.5 ${small ? 'right-2 top-[3.25rem]' : 'bottom-[5.25rem] left-3 items-center sm:bottom-5 sm:left-5 pointer-coarse:bottom-auto pointer-coarse:left-auto pointer-coarse:right-3 pointer-coarse:top-[4.6rem] sm:pointer-coarse:top-[4.75rem]'}`}>
+        {(!small || mapOpen) && (
+          <div className="relative">
+            <Minimap district={district} at={mapAt} direction={mapPosition ? Math.PI : controller.direction} homePlaceId={homePlaceId} workPlaceId={character && character.career !== 'none' ? `${district.id}.work.${character.career}` : null} size={layout.minimap} />
+            {small && (
+              <button type="button" onClick={toggleMap} aria-label="Hide the map" aria-expanded={true}
+                className="pointer-events-auto absolute -left-1 -top-1 grid h-7 w-7 place-items-center rounded-full border border-ui-line bg-ui-panel/90 text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+                <X size={13} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
+        {small && !mapOpen && (
+          <button type="button" onClick={toggleMap} aria-label="Show the map" aria-expanded={false} className={ROUND}>
+            <MapIcon size={18} aria-hidden="true" />
+          </button>
+        )}
+        <p className={`${GLASS} m-0 flex max-w-[11rem] items-center gap-1 rounded-full font-semibold ${small ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'}`}>
+          <Icon name={small && place ? place.icon : 'pin'} className="h-3.5 w-3.5 shrink-0 text-ui-gold-strong" /> <span className="truncate">{small && place ? place.title : location}</span>
         </p>
       </div>
 
       {/* Bottom: the prompt, then the bar */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-3 pb-3 sm:pb-5">
-        <div className="flex w-full items-end justify-between gap-2 sm:justify-center">
-          <TouchStick />
-          {placePrompt && <PlacePrompt {...placePrompt} />}
+      <div className={`absolute inset-x-0 bottom-0 flex flex-col items-center ${small ? 'gap-1.5 px-2 pb-2' : 'gap-2 px-3 pb-3 sm:pb-5'}`}>
+        <div className={`flex w-full items-end gap-2 ${small ? 'justify-between' : 'justify-between sm:justify-center'}`}>
+          <TouchStick size={layout.stick} />
+          {placePrompt && <PlacePrompt {...placePrompt} compact={small} />}
         </div>
-        <nav aria-label="Main" className={`${GLASS} pointer-events-auto flex max-w-full items-stretch gap-0.5 overflow-x-auto rounded-2xl p-1 sm:gap-1 sm:p-1.5`}>
+        <nav aria-label="Main" className={`${GLASS} pointer-events-auto flex max-w-full items-stretch overflow-x-auto rounded-2xl ${small ? `gap-0 p-0.5 ${layout.portrait ? 'w-full' : ''}` : 'gap-0.5 p-1 sm:gap-1 sm:p-1.5'}`}>
           {nav.map((n) => (
             <button
               key={n.id}
               type="button"
               onClick={n.onClick}
               title={n.title ?? n.label}
+              aria-label={layout.navLabels ? undefined : n.label}
               aria-pressed={n.active || undefined}
-              className={`flex min-w-[3.4rem] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold sm:min-w-[4.5rem] sm:px-2.5 sm:text-[11px] ${n.active ? 'bg-ui-gold/20 text-ui-gold-strong' : 'text-ui-ink/85 hover:bg-white/5 hover:text-ui-gold-strong'}`}
+              className={`flex flex-col items-center rounded-xl font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold ${small ? `min-h-11 min-w-0 flex-1 justify-center gap-0.5 px-1 py-1 text-[9px] ${layout.portrait ? '' : 'min-w-[2.9rem]'}` : 'min-w-[3.4rem] gap-0.5 px-1.5 py-1.5 text-[10px] sm:min-w-[4.5rem] sm:px-2.5 sm:text-[11px]'} ${n.active ? 'bg-ui-gold/20 text-ui-gold-strong' : 'text-ui-ink/85 hover:bg-white/5 hover:text-ui-gold-strong'}`}
             >
               <span className="relative">
-                <Icon name={n.icon} className="h-5 w-5" />
+                <Icon name={n.icon} className={small ? 'h-[18px] w-[18px]' : 'h-5 w-5'} />
                 {!!n.badge && <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#e5484d] px-1 text-[9px] font-bold leading-none text-white" aria-label={`${n.badge} unread`}>{n.badge > 9 ? '9+' : n.badge}</span>}
               </span>
-              <span className="whitespace-nowrap">{n.label}</span>
+              {layout.navLabels && <span className="max-w-full truncate whitespace-nowrap">{small ? n.short ?? n.label : n.label}</span>}
             </button>
           ))}
         </nav>
@@ -667,6 +709,7 @@ export function HUD({
       <div className="absolute bottom-5 right-5 hidden text-right text-[11px] uppercase tracking-[0.14em] text-ui-ink/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)] lg:block pointer-coarse:hidden">
         <p className="m-0"><span className="font-semibold">Click</span> or <span className="font-semibold">W A S D</span> move · <span className="font-semibold">Shift</span> walk</p>
         <p className="m-0 mt-1"><span className="font-semibold">Drag</span> orbit · <span className="font-semibold">Scroll</span> zoom · <span className="font-semibold">P</span> phone · <span className="font-semibold">L</span> Life OS</p>
+      </div>
       </div>
     </div>
   );

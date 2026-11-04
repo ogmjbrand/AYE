@@ -18,7 +18,7 @@ All game rules are pure functions in `src/lib`, driven through one reducer (`gam
 ## 2. Working features
 
 These are real, saved and tested:
-- **Movement:** third-person walking, running, driving and click-to-move, with collision. Touch stick on phones; landscape on game start.
+- **Movement:** third-person walking, running, driving and click-to-move, with collision. Touch stick on phones; plays upright or sideways with a compact phone HUD (`docs/MOBILE_HUD.md`).
 - **World:** cities and districts with travel between them, day and night, lamps, and weather (rain, wet roads, storms).
 - **Homes:** rent and buy, furniture placement, a wardrobe and dressing, sleeping.
 - **Needs:** food and needs, mood, and no-death survival (health, critical warning, hospital or sanctuary recovery, medical kit, paramedic, crash injuries).

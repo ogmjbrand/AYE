@@ -2068,7 +2068,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     },
     drivingModel
       ? { id: 'drive', label: 'Get out', icon: 'car', onClick: leaveVehicle, active: true, title: `Get out of your ${drivingModel.name}` }
-      : { id: 'inventory', label: 'Inventory', icon: 'bag', onClick: () => setInventoryOpen((o) => !o), active: inventoryOpen || store === 'wardrobe', title: 'Everything you own: work gear, clothes, gadgets, vehicles' },
+      : { id: 'inventory', label: 'Inventory', short: 'Items', icon: 'bag', onClick: () => setInventoryOpen((o) => !o), active: inventoryOpen || store === 'wardrobe', title: 'Everything you own: work gear, clothes, gadgets, vehicles' },
     inPalms || inCantina
       ? { id: 'restaurant', label: inCantina ? 'Menu' : 'Restaurant', icon: 'restaurant', onClick: () => setMenuOpen((o) => !o), active: menuOpen, title: 'The menu' }
       : inWorkplace && insideRestaurant && restaurantVendor

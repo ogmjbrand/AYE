@@ -2,16 +2,16 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { setStickInput } from '../hooks/usePlayerController';
 import { stickFromOffset } from '../lib/movementInput';
 
-/** Base diameter and how far the knob may travel from centre, in CSS pixels. */
+/** Default base diameter, in CSS pixels; the knob travels about a third of it from centre. */
 const SIZE = 128;
-const TRAVEL = 40;
 
 /**
  * Analog thumb-stick for touch screens: push up to jog forward (further =
  * faster), down to step back, left/right to turn. Only shown on devices
  * whose main pointer is coarse, via the `pointer-coarse:` variant.
  */
-export function TouchStick() {
+export function TouchStick({ size = SIZE }: { size?: number }) {
+  const travel = Math.round(size * 0.31);
   const baseRef = useRef<HTMLDivElement>(null);
   const pointerId = useRef<number | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -24,9 +24,9 @@ export function TouchStick() {
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = e.clientY - (rect.top + rect.height / 2);
     const len = Math.hypot(dx, dy);
-    const scale = len > TRAVEL ? TRAVEL / len : 1;
+    const scale = len > travel ? travel / len : 1;
     setKnob({ x: dx * scale, y: dy * scale });
-    setStickInput(stickFromOffset(dx, dy, TRAVEL));
+    setStickInput(stickFromOffset(dx, dy, travel));
   };
 
   const release = (e: PointerEvent<HTMLDivElement>) => {
@@ -42,7 +42,7 @@ export function TouchStick() {
       role="application"
       aria-label="Movement stick: drag up to move forward, left or right to turn"
       className="pointer-events-auto relative hidden touch-none select-none rounded-full border border-ui-line/80 bg-ui-panel/55 pointer-coarse:block"
-      style={{ width: SIZE, height: SIZE }}
+      style={{ width: size, height: size }}
       onPointerDown={(e) => {
         if (pointerId.current !== null) return;
         pointerId.current = e.pointerId;
