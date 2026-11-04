@@ -38,9 +38,9 @@ export function itemsForTab(wardrobe: Wardrobe, tab: StudioTab, favouritesOnly =
   const favs = new Set(wardrobe.favourites ?? []);
   const fits = (i: FashionItem) => {
     switch (tab) {
-      case 'tops': return i.slot === 'top' && !i.dress;
+      case 'tops': return i.slot === 'top' && !i.dress && i.style.garment?.kind !== 'gown';
       case 'bottoms': return i.slot === 'bottom' && !isDressBottom(i);
-      case 'dresses': return i.slot === 'top' && !!i.dress;
+      case 'dresses': return i.slot === 'top' && (!!i.dress || i.style.garment?.kind === 'gown');
       case 'shoes': return i.slot === 'shoes';
       case 'accessories': return ACCESSORY_SLOTS.includes(i.slot);
       case 'hairstyles': return i.slot === 'hairstyle' || i.slot === 'hair';

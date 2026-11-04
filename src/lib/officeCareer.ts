@@ -62,7 +62,7 @@ export const OFFICE_TASK_SEATS: Readonly<Partial<Record<OfficeTaskId, Seat>>> = 
 
 export type OfficeInteraction = 'door' | 'reception' | OfficeTaskId;
 
-const INTERACTION_FURNITURE: Partial<Record<Furniture['kind'], OfficeInteraction>> = {
+export const OFFICE_FURNITURE_ACTIONS: Partial<Record<Furniture['kind'], OfficeInteraction>> = {
   reception: 'reception',
   desk: 'computer',
   'file-cabinet': 'documents',
@@ -75,7 +75,7 @@ export function officeInteractionAt(interior: Interior, x: number, z: number): O
   if (Math.hypot(x - doorX, z - doorZ) <= USE_RADIUS) return 'door';
   let nearest: { action: OfficeInteraction; distance: number } | null = null;
   for (const item of interior.furniture) {
-    const action = INTERACTION_FURNITURE[item.kind];
+    const action = OFFICE_FURNITURE_ACTIONS[item.kind];
     if (!action) continue;
     const dx = Math.max(Math.abs(x - item.at[0]) - item.size[0] / 2, 0);
     const dz = Math.max(Math.abs(z - item.at[1]) - item.size[2] / 2, 0);

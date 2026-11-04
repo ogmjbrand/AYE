@@ -22,6 +22,8 @@
  *     and furniture at home (lib/furniture.ts) meets the rest. Exhausted
  *     work is paid at half rate, and mood scales a work task's bonus.
  */
+import { dishById } from './food';
+import { addToPantry, canStore, takeFromPantry, type Pantry } from './pantry';
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, forSale, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
@@ -196,12 +198,17 @@ export interface GameState {
   health: Health;
   /** Courses, study hours and earned qualifications (lib/qualifications.ts). */
   qualifications: Qualifications;
+  /** Food bought to take away and not eaten yet, by dish id (lib/pantry.ts). */
+  pantry: Pantry;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
 export type FurnitureTarget = { uid: string } | { builtin: number };
 
 export type GameAction =
+  /** Take-away food: paid once, kept in your pantry until you eat it. */
+  | { type: 'buyTakeaway'; dishId: string }
+  | { type: 'eatFromPantry'; dishId: string }
   | { type: 'tick'; atWorkplace: boolean }
   | { type: 'sleep'; atHome: boolean; atFriend?: boolean }
   | { type: 'moveIn'; homeId: string }
@@ -344,6 +351,30 @@ function eat(state: GameState, price: number, gain: number, lift: Partial<Needs>
   };
 }
 
+/** Buy a dish to take away: one payment, one dish in the pantry. Refused if you can't pay or it's full. */
+function buyTakeaway(state: GameState, dishId: string): GameState {
+  const dish = dishById(dishId);
+  if (!dish || state.summary || state.balance < dish.price || !canStore(state.pantry, dishId)) return state;
+  return {
+    ...state,
+    balance: state.balance - dish.price,
+    today: { ...state.today, expenses: state.today.expenses + dish.price },
+    pantry: addToPantry(state.pantry, dishId),
+  };
+}
+
+/** Eat a dish you bought earlier: it fills you like a meal and costs nothing more. */
+function eatFromPantry(state: GameState, dishId: string): GameState {
+  const dish = dishById(dishId);
+  if (!dish || state.summary || !(state.pantry[dishId] > 0)) return state;
+  return {
+    ...state,
+    fullness: Math.min(100, state.fullness + dish.fullness),
+    needs: addNeeds(state.needs, { fun: modifiers(state.life).mealFun }),
+    pantry: takeFromPantry(state.pantry, dishId),
+  };
+}
+
 /** Spends money on something that isn't food (clothes, hair). Refused if the player can't afford it. */
 function purchase(state: GameState, price: number): GameState {
   if (!(price > 0) || state.balance < price || state.summary) return state;
@@ -393,6 +424,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     gear: [],
     health: emptyHealth(),
     qualifications: emptyQualifications(),
+    pantry: {},
   };
 }
 
@@ -1309,6 +1341,10 @@ function baseReducer(
       return { ...state, summary: null };
     case 'eat':
       return eat(state, action.price, action.fullness, action.lift);
+    case 'buyTakeaway':
+      return buyTakeaway(state, action.dishId);
+    case 'eatFromPantry':
+      return eatFromPantry(state, action.dishId);
     case 'purchase':
       return purchase(state, action.price);
     case 'buyFurniture':

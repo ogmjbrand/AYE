@@ -329,6 +329,18 @@ function build(kind: GarmentKind, f: BodyFrame): BufferGeometry {
       c.rings(hem, (a, d) => skirtInfluences(skirtBones, sideOf(a), d, 9, 0.3));
       break;
     }
+    case 'gown': {
+      // A strapless bodice cut from the body, and a mermaid skirt: close to the knee, then flaring to the floor
+      c.shell([r.spine, r.spine1, r.spine2], 0.014, waist - 0.02, spine.y + 0.36);
+      const kneeY = (lCalf.y + rCalf.y) / 2;
+      const top = waist + 0.02, bottom = 0.01;
+      const kneeT = Math.min(0.9, Math.max(0.2, (top - kneeY) / (top - bottom)));
+      const rings = tube(c, f.pos, top, bottom, 22, () => ({ x: pelvis.x, z: pelvis.z }),
+        (t) => 0.02 + 0.03 * t + 0.2 * smoothstep(kneeT, 1, t), (t) => 0.11 + 0.22 * smoothstep(kneeT, 1, t), notArms);
+      c.rings(rings, (a, d) => skirtInfluences(skirtBones, sideOf(a), d, kneeT, 0.82));
+      break;
+    }
+    case 'shorts':
     case 'wide-trousers': {
       // The seat, then each leg falling wide from the thigh to the floor
       c.shell([r.pelvis], 0.016, pelvis.y - 0.12, waist + 0.03);
@@ -342,8 +354,12 @@ function build(kind: GarmentKind, f: BodyFrame): BufferGeometry {
           const from = k <= 1 ? T : C, to = k <= 1 ? C : F, t = k <= 1 ? k : k - 1;
           return { x: from.x + (to.x - from.x) * Math.min(1, t), z: from.z + (to.z - from.z) * Math.min(1, t) };
         };
-        const yTop = pelvis.y - 0.06, yBot = 0.02;
-        const rings = tube(c, f.pos, yTop, yBot, 14, centre, (t) => 0.02 + 0.09 * smoothstep(0.15, 1, t), (t) => 0.085 + 0.08 * smoothstep(0.2, 1, t), onLeg);
+        // Shorts stop a hand above the knee; trousers fall to the floor
+        const yTop = pelvis.y - 0.06, yBot = kind === 'shorts' ? C.y + 0.12 : 0.02;
+        const shorts = kind === 'shorts';
+        const rings = tube(c, f.pos, yTop, yBot, shorts ? 6 : 14, centre,
+          (t) => (shorts ? 0.02 + 0.02 * t : 0.02 + 0.09 * smoothstep(0.15, 1, t)),
+          (t) => (shorts ? 0.08 + 0.012 * t : 0.085 + 0.08 * smoothstep(0.2, 1, t)), onLeg);
         const kneeAt = (yTop - C.y) / (yTop - yBot);
         c.rings(rings, (_a, d) => limbInfluences(r.pelvis, thigh, calf, d, kneeAt, 0.12));
       }
@@ -375,6 +391,14 @@ function clothTexture(fabric: GarmentFabric, colors: readonly [string, string, s
     for (let y = 0; y < S; y += 3) g.fillRect(0, y, S, 1);
     g.globalAlpha = 0.5; g.fillStyle = cc;
     for (let y = 0; y < S; y += 16) for (let x = 0; x < S; x += 32) g.fillRect(x + (y % 32 ? 16 : 0), y, 12, 2);
+    g.globalAlpha = 1;
+  } else if (fabric === 'satin') {
+    // Satin: smooth, with soft lengthwise sheen where the weave catches the light
+    const grad = g.createLinearGradient(0, 0, S, 0);
+    grad.addColorStop(0, a); grad.addColorStop(0.3, b); grad.addColorStop(0.5, a); grad.addColorStop(0.75, cc); grad.addColorStop(1, a);
+    g.fillStyle = grad; g.fillRect(0, 0, S, S);
+    g.globalAlpha = 0.06; g.fillStyle = '#fff';
+    for (let x = 0; x < S; x += 2) g.fillRect(x, 0, 1, S);
     g.globalAlpha = 1;
   } else {
     // Suiting: a soft twill with a faint chalk stripe
@@ -420,11 +444,11 @@ export function makeGarment(scene: Object3D, kind: GarmentKind, fabric: GarmentF
     geometry = build(kind, f);
     byKind.set(kind, geometry);
   }
-  const loose = kind === 'iro' || kind === 'gele' || kind === 'wide-trousers' || kind === 'buba';
+  const loose = kind !== 'blazer';
   const material = new MeshStandardMaterial({
     map: clothTexture(fabric, colors),
-    roughness: fabric === 'aso-oke' ? 0.62 : 0.82,
-    metalness: fabric === 'aso-oke' ? 0.08 : 0,
+    roughness: fabric === 'aso-oke' ? 0.62 : fabric === 'satin' ? 0.3 : 0.82,
+    metalness: fabric === 'aso-oke' ? 0.08 : fabric === 'satin' ? 0.12 : 0,
     side: loose ? DoubleSide : FrontSide,
     name: `garment-${kind}`,
   });

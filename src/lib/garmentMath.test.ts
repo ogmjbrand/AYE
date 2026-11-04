@@ -44,7 +44,7 @@ describe('3D garment rigging', () => {
 
   it('sells one African and one international outfit as real 3D garments', () => {
     const real = FASHION_ITEMS.filter((i) => i.style.garment);
-    expect(real.map((i) => i.style.garment!.kind).sort()).toEqual(['blazer', 'buba', 'gele', 'iro', 'wide-trousers']);
+    expect(real.map((i) => i.style.garment!.kind).sort()).toEqual(['blazer', 'buba', 'gele', 'gown', 'iro', 'shorts', 'wide-trousers']);
     for (const i of real) { expect(i.price).toBeGreaterThan(0); expect(i.name).toMatch(/^OGM Atelier 3D /); }
   });
 });

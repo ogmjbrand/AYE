@@ -419,13 +419,16 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   const hairstyleModel = hairstyleItemId ? getGarmentModel(hairstyleItemId) : null;
   // Real 3D garments (a top, a bottom, a headwrap in the hairstyle slot), built on this person's own skeleton
   const headwear = itemById(hairstyleItemId ?? undefined)?.style;
-  const worn: WornGarment[] = [styles?.top, styles?.bottom, headwear]
+  // A gown covers the legs: what's underneath takes its fabric, so a stride never shows other clothes
+  const gownStyle = styles?.top?.garment?.kind === 'gown' ? styles.top : null;
+  const shownStyles = gownStyle && styles ? { ...styles, bottom: gownStyle } : styles;
+  const worn: WornGarment[] = [styles?.top, gownStyle ? undefined : styles?.bottom, headwear]
     .flatMap((st) => (st?.garment ? [{ kind: st.garment.kind, fabric: st.garment.fabric, colors: st.colors }] : []));
 
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
-      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} />}
+      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={shownStyles ?? NO_STYLES} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} />}
       {/* The CC5 body has no garment maps: its own clothes are recoloured, and a chosen swatch deepens or lightens its skin */}
       {playerBody && <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={Math.max(-1, Math.min(1, skinTone + skinToneDepth(skinToneId)))} />}
       {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}

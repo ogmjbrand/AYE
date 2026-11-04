@@ -43,7 +43,7 @@ import type { IconName } from './components/os/icons';
 import type { Character } from './components/CharacterCreation';
 import { DailyLogModal } from './components/DailyLogModal';
 import { FoodMenu } from './components/FoodMenu';
-import { nearestVendor, suitsDiet, type Dish, type FoodVendor } from './lib/food';
+import { dishById, nearestVendor, suitsDiet, type Dish, type FoodVendor } from './lib/food';
 import { COLOUR_CHOICES, recolourable, type FashionItem, type Slot } from './lib/fashion';
 import { fashionShowcaseResult } from './lib/fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './lib/fashionMission';
@@ -51,6 +51,9 @@ import { FashionStore } from './components/FashionStore';
 import { WardrobeStudio } from './components/WardrobeStudio';
 import { ShadowBudget } from './world/ShadowBudget';
 import { StallMenu } from './components/StallMenu';
+import { ActivityMenu } from './components/ActivityMenu';
+import { aroundFurniture, aroundPoint, furnitureActivities, type Activity } from './lib/venueActivities';
+import { canStore } from './lib/pantry';
 import { STALL_MINUTES, SERVICE_LABEL, faceStall, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
@@ -169,9 +172,9 @@ import { CampusPanel, type CampusPanelMode } from './components/CampusPanel';
 import { UniversityExterior, UniversityScene } from './world/UniversityScene';
 import { HospitalExterior, HospitalScene } from './world/HospitalScene';
 import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
-import { HOSPITAL, HOSPITAL_INTERIOR, hospitalInteractionAt, isInWard, isInSupervisorOffice, type HospitalInteraction } from './lib/hospitalSite';
+import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type HospitalInteraction } from './lib/hospitalSite';
 import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
-import { UNIVERSITY, UNIVERSITY_INTERIOR, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
+import { UNIVERSITY, UNIVERSITY_INTERIOR, UNIVERSITY_POINTS, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
 import { campusForDay, attendClass, submitAssignment, assignmentForDay, academicStanding, CLASS_SLOTS, type ClassSlot } from './lib/campus';
 import { DealershipPanel } from './components/DealershipPanel';
 import { VEHICLE_CATALOG, vehicleById, vehicleColourById, type OwnedVehicle } from './lib/vehicleCatalog';
@@ -471,6 +474,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
     buyGear, equipGear, unequipGear, repairGear, sellGear,
     hurt, buyMedical, useMedical, callMedic, restToRecover, enrolCourse, studyCourse, sitExam,
+    buyTakeaway, eatFromPantry,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -2325,11 +2329,73 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [autoQuality, setAutoQuality] = useState<Quality>(initialAutoQuality);
   const settings = settingsFor(qualityMode === 'auto' ? autoQuality : qualityMode);
   const decorPlacementItem = decorPlacement ? decorItemById(decorPlacement.itemId) : undefined;
+  /** What the E key does where you stand, in whichever venue you're in (null outdoors and at home). */
+  const venuePrompt = inWorkplace ? workplacePrompt : inBoutique ? boutiquePrompt : inPalms ? palmsPrompt : inCantina && district.bar ? cantinaPrompt : inHotel && district.hotel ? hotelPrompt : inSpa && district.spa ? spaPrompt : null;
+  /** Everything there is to do in this venue, each with places to stand (lib/venueActivities.ts). */
+  const venueActivities = (): Activity[] => {
+    if (asleep || sit.session) return [];
+    if (inWorkplace) {
+      if (insideHospital) {
+        const label = { reception: 'Reception', pharmacy: 'The pharmacy', supervisor: 'The supervisor', patient: 'The ward' } as const;
+        return HOSPITAL_POINTS.map((pt) => ({ label: label[pt.action as keyof typeof label] ?? pt.action, spots: aroundPoint(pt.at, pt.radius) }));
+      }
+      if (insideUniversity) {
+        const label = { info: 'University directory', services: 'Student services', lecture: 'Lecture Hall A', study: 'Library desk', assignment: 'Computer lab', cafeteria: 'Cafeteria', centre: 'Student centre' } as const;
+        return UNIVERSITY_POINTS.map((pt) => ({ label: label[pt.action as keyof typeof label] ?? pt.action, spots: aroundPoint(pt.at, pt.radius) }));
+      }
+      if (insideOffice) return furnitureActivities(OFFICE_INTERIOR, { reception: 'Reception', desk: 'Work at a desk', 'file-cabinet': 'File documents', 'conference-table': 'Join a meeting' });
+      if (insideDealership) return furnitureActivities(CAR_DEALERSHIP_INTERIOR, { reception: 'Talk to the salesperson' });
+      if (insideRestaurant && venueInterior) {
+        const host = venueInterior.furniture.find((f) => f.kind === 'host-stand');
+        return host && restaurantStage === 'host' ? [{ label: 'Check in with the host', spots: aroundFurniture(host) }] : [];
+      }
+      return [];
+    }
+    if (inBoutique) return [
+      { label: `Talk to ${BOUTIQUE_STAFF.assistant.name}`, spots: [DESK_SPOT] },
+      { label: 'The fitting room', spots: [FITTING_SPOT] },
+      { label: 'The salon', spots: [SALON_SPOT] },
+    ];
+    if (inHotel) {
+      const guest = hotelRoom(GUEST_ROOM)!;
+      return [
+        { label: hotelKey ? 'The front desk' : `Book a night (${NIGHT_PRICE} GHAI)`, spots: [HOTEL_DESK_SPOT] },
+        { label: 'The vending machine', spots: [VENDING_SPOT] },
+        ...(hotelKey ? [
+          { label: 'Your bed', spots: [hotelBedside(guest), hotelBedSpot(guest)] },
+          { label: 'Room service telephone', spots: [roomServiceSpot(guest)] },
+          { label: 'The basin', spots: [basinSpot(guest)] },
+        ] : []),
+      ];
+    }
+    if (inSpa) return [{ label: 'Spa reception', spots: [SPA_DESK_SPOT] }, { label: 'The manager', spots: [SPA_MANAGER_SPOT] }];
+    if (inCantina) return [{ label: `The bar (${CANTINA_STAFF.bartender.name})`, spots: [CANTINA_BAR_SPOT] }];
+    if (inPalms) return [{ label: `Check in with ${PALMS_STAFF.host.name}`, spots: [PALMS_HOST_SPOT] }];
+    return [];
+  };
+  /** Walk to an activity round whatever is in the way, then do what the E key does there. */
+  const goDoActivity = (a: Activity) => {
+    const ok = walkThen(a.spots, a.label, () => {
+      const here = venuePrompt?.();
+      if (here) here.onOpen();
+      else setArrival(`You're at ${a.label.toLowerCase()}, but there's nothing to do there right now.`);
+    });
+    setArrival(ok ? `On your way to ${a.label.replace(/^The /, 'the ')}.` : `There's no way to reach ${a.label.replace(/^The /, 'the ')} right now.`);
+  };
 
   return (
     <main className="game">
+      {venuePrompt && !stall && !vendor && !store && !studioOpen && (
+        <ActivityMenu activities={venueActivities()} onGo={goDoActivity} />
+      )}
       {stall && (
-        <StallMenu vendor={stall} diet={character.diet} balance={state.balance} eating={stallDish} onBuy={buyAtStall} onClose={closeStall} />
+        <StallMenu vendor={stall} diet={character.diet} balance={state.balance} eating={stallDish} onBuy={buyAtStall} onClose={closeStall}
+          canTakeaway={(d) => canStore(state.pantry, d.id)}
+          onTakeaway={(d) => {
+            if (stateRef.current.balance < d.price || !canStore(stateRef.current.pantry, d.id)) return;
+            buyTakeaway(d.id);
+            setArrival(`${d.name} wrapped to take away. It's in your inventory.`);
+          }} />
       )}
       {vendor && (
         <FoodMenu
@@ -2678,7 +2744,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating && !!stall} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} />
             )}
           </DistrictContext.Provider>
           <PostEffects />
@@ -2888,6 +2954,13 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onRepair={repairGear}
           onSell={sellGear}
           onOpenWardrobe={() => { setInventoryOpen(false); setStudioOpen(true); }}
+          onEatFood={(id) => {
+            const dish = dishById(id);
+            if (!dish || !(stateRef.current.pantry[id] > 0)) return;
+            setInventoryOpen(false);
+            setEating(true);
+            window.setTimeout(() => { setEating(false); eatFromPantry(id); wait(STALL_MINUTES); setArrival(`You ate the ${dish.name} you saved.`); }, 3200);
+          }}
           medicalKit={<MedicalKit health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUse={useMedical} />}
           onClose={() => setInventoryOpen(false)}
         />

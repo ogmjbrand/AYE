@@ -110,7 +110,7 @@ export const UNIVERSITY_INTERIOR: Interior = {
 export type UniversityInteraction = 'door' | 'info' | 'lecture' | 'study' | 'assignment' | 'cafeteria' | 'centre' | 'services';
 
 /** Where each campus activity can be started. Ordered so tighter spots win over zones. */
-const POINTS: readonly { action: UniversityInteraction; at: readonly [number, number]; radius: number }[] = [
+export const UNIVERSITY_POINTS: readonly { action: UniversityInteraction; at: readonly [number, number]; radius: number }[] = [
   { action: 'assignment', at: [13, 6.0], radius: 1.5 },
   { action: 'info', at: [0, -4.7], radius: 1.8 },
   { action: 'services', at: [-9.5, -4.7], radius: 1.8 },
@@ -122,7 +122,7 @@ const POINTS: readonly { action: UniversityInteraction; at: readonly [number, nu
 
 export function universityInteractionAt(interior: Interior, x: number, z: number): UniversityInteraction | null {
   if (Math.hypot(x, z - (-interior.depth / 2 + 0.7)) <= USE_RADIUS) return 'door';
-  for (const point of POINTS) {
+  for (const point of UNIVERSITY_POINTS) {
     if (Math.hypot(x - point.at[0], z - point.at[1]) <= point.radius) return point.action;
   }
   return null;

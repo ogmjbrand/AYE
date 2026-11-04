@@ -78,7 +78,7 @@ export const HOSPITAL_INTERIOR: Interior = {
 
 export type HospitalInteraction = 'door' | 'reception' | 'patient' | 'supervisor' | 'pharmacy';
 
-const POINTS: readonly { action: HospitalInteraction; at: readonly [number, number]; radius: number }[] = [
+export const HOSPITAL_POINTS: readonly { action: HospitalInteraction; at: readonly [number, number]; radius: number }[] = [
   { action: 'reception', at: [0, -4.7], radius: 1.9 },
   { action: 'pharmacy', at: [11, -5.0], radius: 1.6 },
   { action: 'supervisor', at: [11, 5.0], radius: 2.3 },
@@ -87,7 +87,7 @@ const POINTS: readonly { action: HospitalInteraction; at: readonly [number, numb
 
 export function hospitalInteractionAt(interior: Interior, x: number, z: number): HospitalInteraction | null {
   if (Math.hypot(x, z - (-interior.depth / 2 + 0.7)) <= USE_RADIUS) return 'door';
-  for (const point of POINTS) {
+  for (const point of HOSPITAL_POINTS) {
     if (Math.hypot(x - point.at[0], z - point.at[1]) <= point.radius) return point.action;
   }
   return null;

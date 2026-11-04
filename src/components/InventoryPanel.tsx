@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { dishById } from '../lib/food';
 import type { Career, Character } from './CharacterCreation';
 import type { GameState } from '../lib/gameState';
 import { equipmentById } from '../lib/equipment';
@@ -26,7 +27,7 @@ function List({ items, empty }: { items: string[]; empty: string }) {
  * sell), gadgets, vehicles, furniture and clothes. Nothing here is ever taken
  * away except by selling it yourself.
  */
-export function InventoryPanel({ state, character, career, rankIndex, onEquip, onUnequip, onRepair, onSell, onOpenWardrobe, medicalKit, onClose }: {
+export function InventoryPanel({ state, character, career, rankIndex, onEquip, onUnequip, onRepair, onSell, onOpenWardrobe, medicalKit, onEatFood, onClose }: {
   state: GameState;
   character: Character;
   career: Career;
@@ -36,6 +37,8 @@ export function InventoryPanel({ state, character, career, rankIndex, onEquip, o
   onRepair: (uid: string) => void;
   onSell: (uid: string) => void;
   onOpenWardrobe: () => void;
+  /** Eat a dish you bought to take away. */
+  onEatFood?: (dishId: string) => void;
   /** Your medical kit (components/Survival.tsx MedicalKit). */
   medicalKit?: ReactNode;
   onClose: () => void;
@@ -65,6 +68,24 @@ export function InventoryPanel({ state, character, career, rankIndex, onEquip, o
               <p className="m-0 text-xs text-ui-muted">{character.wardrobe.owned.length} pieces in your wardrobe.</p>
               <button type="button" onClick={onOpenWardrobe} className="shrink-0 rounded-lg border border-ui-gold/40 px-3 py-1.5 text-xs font-semibold hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Change outfit</button>
             </div>
+          </Section>
+          <Section title="Food to take away">
+            {Object.keys(state.pantry).length === 0
+              ? <p className="m-0 text-xs text-ui-muted">Nothing saved for later. Street stalls sell food to take away.</p>
+              : (
+                <ul className="m-0 list-none space-y-1.5 p-0">
+                  {Object.entries(state.pantry).map(([id, n]) => {
+                    const dish = dishById(id);
+                    if (!dish) return null;
+                    return (
+                      <li key={id} className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 text-sm"><span className="font-semibold">{dish.name}</span> <span className="text-ui-muted">× {n}</span></span>
+                        {onEatFood && <button type="button" onClick={() => onEatFood(id)} disabled={!!state.summary} className="min-h-9 shrink-0 rounded-lg border border-ui-gold/40 px-3 text-xs font-semibold hover:border-ui-gold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Eat now</button>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
           </Section>
           {medicalKit && <Section title="Medical kit">{medicalKit}</Section>}
           <Section title="Gadgets and kits"><List items={gadgets} empty="None yet: the Gadget Hub sells phones and work kits." /></Section>

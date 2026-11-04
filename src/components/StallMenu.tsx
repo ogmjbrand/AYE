@@ -6,13 +6,17 @@ import { STALL_MINUTES } from '../lib/foodService';
  * Ordering at a street stall: the menu at the window, paid on the spot, eaten
  * standing at the stall. No dining room; the street carries on round you.
  */
-export function StallMenu({ vendor, diet, balance, eating, onBuy, onClose }: {
+export function StallMenu({ vendor, diet, balance, eating, onBuy, onTakeaway, canTakeaway, onClose }: {
   vendor: FoodVendor;
   diet: Diet;
   balance: number;
   /** The dish being eaten now, if any. */
   eating: Dish | null;
   onBuy: (dish: Dish) => void;
+  /** Buy it to eat later (it goes in your inventory's pantry). */
+  onTakeaway?: (dish: Dish) => void;
+  /** Whether the pantry has room for this dish. */
+  canTakeaway?: (dish: Dish) => boolean;
   onClose: () => void;
 }) {
   const dishes = vendor.menu.map(dishById).filter((d): d is Dish => !!d);
@@ -24,7 +28,7 @@ export function StallMenu({ vendor, diet, balance, eating, onBuy, onClose }: {
         <div className="min-w-0">
           <p className="m-0 text-[10px] uppercase tracking-[0.18em] text-ui-gold-strong">{vendor.kind} · at the stall</p>
           <h2 id="stall-title" className="m-0 truncate text-lg font-semibold">{vendor.name}</h2>
-          <p className="m-0 text-[11px] text-ui-muted">Pay at the window and eat here on the pavement · about {STALL_MINUTES} minutes</p>
+          <p className="m-0 text-[11px] text-ui-muted">Pay at the window: eat here on the pavement (about {STALL_MINUTES} minutes) or take it away</p>
         </div>
         <button type="button" onClick={onClose} disabled={!!eating} aria-label="Leave the stall"
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/15 text-white/75 hover:text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
@@ -44,6 +48,12 @@ export function StallMenu({ vendor, diet, balance, eating, onBuy, onClose }: {
                   <p className="m-0 line-clamp-2 text-[11px] text-ui-muted">{d.description}</p>
                   {blocked && <p className="m-0 text-[11px] text-ui-warn">{blocked}</p>}
                 </div>
+                {onTakeaway && (
+                  <button type="button" disabled={!!blocked || (canTakeaway && !canTakeaway(d))} onClick={() => onTakeaway(d)} aria-label={`Buy ${d.name} to take away for ${d.price} GHAI`} title="Take away: keep it in your inventory"
+                    className="min-h-11 shrink-0 rounded-xl border border-ui-gold/50 px-2.5 text-[11px] font-semibold text-ui-gold-strong disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+                    Take away
+                  </button>
+                )}
                 <button type="button" disabled={!!blocked} onClick={() => onBuy(d)} aria-label={`Buy and eat ${d.name} for ${d.price} GHAI`}
                   className="min-h-11 shrink-0 rounded-xl bg-gradient-to-b from-[#f3d48f] to-[#b8862f] px-3 text-xs font-bold tabular-nums text-[#1d1406] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">
                   {d.price} GHAI
