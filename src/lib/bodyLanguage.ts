@@ -6,9 +6,10 @@
  * one file per body type (scripts/rocketbox/build-gestures.mjs and
  * add-gestures.mjs).
  */
+import type { ActivityClip } from './animationLibrary';
 import type { BodyType } from './looks';
 
-export type Gesture = 'Talk' | 'Listen' | 'Wave' | 'Sit' | 'Hug' | SeatTransition | StepClip;
+export type Gesture = 'Talk' | 'Listen' | 'Wave' | 'Sit' | 'Hug' | SeatTransition | StepClip | ActivityClip;
 
 /** Sitting down onto a seat and standing up from it: Rocketbox *_sit_down_chair_01 and *_sit_stand_up_chair_01. */
 export type SeatTransition = 'SitDown' | 'StandUp';

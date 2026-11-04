@@ -7,6 +7,7 @@ import type { BodyType } from '../lib/looks';
 import { ErrorBoundary } from './ErrorBoundary';
 import { withRelaxedHands } from './handPose';
 import { createHugClip } from '../lib/hugAnimation';
+import { ONE_SHOT, type ActivityClip } from '../lib/animationLibrary';
 
 export type GestureActions = Partial<Record<Gesture, AnimationAction>>;
 
@@ -29,7 +30,7 @@ function GestureClips({ body, mixer, root, idle, onLoad }: GesturesProps) {
     const actions: GestureActions = {};
     for (const clip of clips) {
       const action = mixer.clipAction(clip, target);
-      if (clip.name === 'Wave') {
+      if (clip.name === 'Wave' || ONE_SHOT.has(clip.name as ActivityClip)) {
         action.setLoop(LoopOnce, 1);
         action.clampWhenFinished = true;
       }

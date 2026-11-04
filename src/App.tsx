@@ -54,6 +54,7 @@ import { StallMenu } from './components/StallMenu';
 import { ActivityMenu } from './components/ActivityMenu';
 import { aroundFurniture, aroundPoint, furnitureActivities, type Activity } from './lib/venueActivities';
 import { canStore } from './lib/pantry';
+import type { ActivityClip } from './lib/animationLibrary';
 import { STALL_MINUTES, SERVICE_LABEL, faceStall, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
@@ -201,6 +202,8 @@ interface CityProps {
   liveEvent: ActiveEvent | null;
   /** Eating at a street stall. */
   eating?: boolean;
+  /** What you're doing with your hands (lib/animationLibrary.ts). */
+  activity?: { clip: ActivityClip; key: number } | null;
 }
 
 interface CameraFollowProps {
@@ -393,7 +396,7 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false, activity = null }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
@@ -431,7 +434,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour
         ? <DrivenVehicle controller={controller} colour={colour.hex} bodyStyle={model.bodyStyle} />
-        : <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} eating={eating} />}
+        : <Player controller={controller} character={character} tryOn={tryOn} activity={activity} conversing={talkingTo !== null} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} eating={eating} />}
     </>
   );
 }
@@ -563,6 +566,14 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [osTab, setOsTab] = useState<OsTab>('today');
   // The phone: open or in your pocket (it keeps its battery and notifications either way)
   const [phoneOpen, setPhoneOpen] = useState(false);
+  // A one-shot activity clip (a morning stretch, a drink); while the phone is open you text on it
+  const [oneShot, setOneShot] = useState<{ clip: ActivityClip; key: number } | null>(null);
+  const playOnce = (clip: ActivityClip, seconds: number) => {
+    const key = Date.now();
+    setOneShot({ clip, key });
+    window.setTimeout(() => setOneShot((o) => (o?.key === key ? null : o)), seconds * 1000);
+  };
+  const playerActivity = oneShot ?? (phoneOpen ? { clip: 'PhoneText' as const, key: 0 } : null);
   const [phoneStart, setPhoneStart] = useState<AppId | null>(null);
 
   const indoors = !inWorkplace && inside && !!home && home.district === district.id && !!roomLayout;
@@ -917,6 +928,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       }
       setAsleep(null);
       setMovementBlocked(false);
+      // Up and stretching the night out of your arms
+      playOnce('Stretch', 8);
       const [x, z] = bedToRoom(a.pose, a.pose.standX, a.pose.pelvis[1]);
       placePlayer([x, 0, z], a.pose.heading + Math.PI / 2);
     };
@@ -1178,6 +1191,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       setArrival(`Room service brings your ${item.name} up to room ${GUEST_ROOM}. ${item.minutes} minutes pass while it comes and you enjoy it.`);
     } else if (hotelMenu === 'vending') {
       eat(item.price, item.fullness, item.lift);
+      setHotelMenu(null);
+      playOnce('Drink', 12);
       wait(item.minutes);
       setArrival(`You tap your phone and the machine drops a cold ${item.name}. You drink it in the lobby.`);
     }
@@ -2706,12 +2721,12 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 />}
                 {insideOffice && <OfficeScene player={controller} />}
                 <InteriorLighting gameTime={state.time} player={controller} indoor={insideRestaurant ? 'restaurant' : true} />
-                <Player controller={controller} character={character} tryOn={tryOn} eating={eating} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} eating={eating} />
               </HomeInterior>
             ) : indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
-                <Player controller={controller} character={character} tryOn={tryOn} bedtime={asleep} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} bedtime={asleep} />
                 {asleep && <SleepingDuvet bedtime={asleep} />}
                 {decorPlacement && decorPlacementItem && (
                   <DecorPlacementPreview controller={controller} item={decorPlacementItem} rotation={decorPlacement.rotation} />
@@ -2720,31 +2735,31 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
             ) : inBoutique ? (
               <BoutiqueInterior gameTime={state.time} districtId={district.id}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="boutique" />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </BoutiqueInterior>
             ) : inSpa ? (
               <SpaInterior gameTime={state.time} player={controller} busy={spaIsOpen(state.time.hour)} waiting={spaWaiting} serving={spaServing}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </SpaInterior>
             ) : inHotel ? (
               <HotelInterior gameTime={state.time} player={controller} hasKey={hotelKey} tray={trayHere} inBed={!!asleep}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
-                <Player controller={controller} character={character} tryOn={tryOn} bedtime={asleep} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} bedtime={asleep} />
                 {asleep && <SleepingDuvet bedtime={asleep} />}
               </HotelInterior>
             ) : inCantina ? (
               <CantinaInterior gameTime={state.time} served={served && cantinaSeat && served.seatId === cantinaSeat.id ? { seat: cantinaSeat, dishes: served.dishes } : null}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </CantinaInterior>
             ) : inPalms ? (
               <RestaurantInterior gameTime={state.time} served={served && tableSeat && served.seatId === tableSeat.id ? { seat: tableSeat, dishes: served.dishes } : null}>
                 <InteriorLighting gameTime={state.time} player={controller} indoor="restaurant" />
-                <Player controller={controller} character={character} tryOn={tryOn} />
+                <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} activity={playerActivity} />
             )}
           </DistrictContext.Provider>
           <PostEffects />

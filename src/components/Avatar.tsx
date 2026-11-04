@@ -26,6 +26,7 @@ import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, skinToneDepth, type SkinT
 import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
 import { createReachHugClip } from '../lib/hugAnimation';
 import { findRigBone } from '../lib/characterRig';
+import { ONE_SHOT, type ActivityClip } from '../lib/animationLibrary';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
@@ -204,7 +205,7 @@ function privateCopy(shared: Object3D): Object3D {
   return copy;
 }
 
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null, activity = null }: {
   controller: PlayerHandle;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
   own?: boolean;
@@ -234,6 +235,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   shoeItemId?: string | null;
   /** Visible 3D hairstyle item (equipped or tried on). */
   hairstyleItemId?: string | null;
+  /** Something the person is doing with their hands while standing (lib/animationLibrary.ts); `key` restarts a one-shot. */
+  activity?: { clip: ActivityClip; key: number } | null;
 }) {
   const group = useRef<Group>(null);
   // A character listed in public/assets/manifest.json replaces the built-in looks
@@ -331,6 +334,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   const gestures = ownGestures ?? loadedGestures;
   const idleClip = useMemo(() => clipsWithHands.find((c) => c.name === clips.Idle), [clipsWithHands, clips]);
   const conversationStart = useRef<number | null>(null);
+  const activityKey = useRef<number | null>(null);
+  const activityStart = useRef(0);
   // Footwork: which way and how fast the character is turning, and when a stop from a walk began
   const lastDirection = useRef(controller.direction);
   const turnRate = useRef(0);
@@ -343,9 +348,16 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     const embracing = hugSession !== null
       && hugElapsed >= hugSession.approachMs
       && hugElapsed < hugSession.approachMs + HUG_DURATION_MS;
+    // An activity clip (phone, stretch, drink) while standing: a one-shot ends by itself, so the body never falls into its bind pose
+    if (activity && activityKey.current !== activity.key) { activityKey.current = activity.key; activityStart.current = mixer.time; }
+    if (!activity) activityKey.current = null;
+    const activityAction = activity ? gestures[activity.clip] : undefined;
+    const activityOn = !!activity && !!activityAction
+      && (!ONE_SHOT.has(activity.clip) || mixer.time - activityStart.current < activityAction.getClip().duration - 0.35);
     const gesture = embracing
       ? 'Hug'
-      : conversationStart.current === null ? null : conversationGesture('player', mixer.time - conversationStart.current);
+      : conversationStart.current !== null ? conversationGesture('player', mixer.time - conversationStart.current)
+      : activityOn ? activity!.clip : null;
     const get = (state: State) => {
       if (state === 'Idle' || state === 'Walk' || state === 'Run') {
         const name = clips[state];
@@ -387,6 +399,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     updateLocomotion(get, current, speed, avatarFile, gesture, mixer.time, forced, play);
     const g = group.current;
     if (g) {
+      // The clip playing now, readable from the scene (QA checks and debugging)
+      g.userData.clip = current.current;
       // Lowered onto the seat once down on it: during a transition, as far as its body has gone
       const transitionAction = transition && seatClip ? gestures[seatClip as SeatTransition] : null;
       const progress = transitionAction && transition ? Math.min(1, Math.max(0, (transitionAction.time - transition.from) / (transition.to - transition.from))) : 1;

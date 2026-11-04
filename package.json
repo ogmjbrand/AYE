@@ -12,7 +12,8 @@
     "assets:check": "node scripts/check-assets.mjs",
     "assets:optimize": "node scripts/optimize-glb.mjs",
     "check:push": "node scripts/check-large-files.mjs",
-    "check:characters": "node scripts/check-characters.mjs"
+    "check:characters": "node scripts/check-characters.mjs",
+    "anim:bvh": "node scripts/animation/bvh-to-rocketbox.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -1,4 +1,5 @@
 import { Suspense, useMemo, useRef } from 'react';
+import type { ActivityClip } from '../lib/animationLibrary';
 import { useFrame } from '@react-three/fiber';
 import { Group, Quaternion, Vector3 } from 'three';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
@@ -25,6 +26,8 @@ interface PlayerProps {
   hugSession?: HugSession | null;
   onHugComplete?: (residentId: string) => void;
   eating?: boolean;
+  /** Something you're doing with your hands while standing (phone, stretch, drink). */
+  activity?: { clip: ActivityClip; key: number } | null;
   /** Going to bed or getting up (lib/bedSleep.ts): the body follows that timeline instead of the controls. */
   bedtime?: Bedtime | null;
 }
@@ -54,6 +57,7 @@ export function Player({
   onHugComplete,
   eating = false,
   bedtime = null,
+  activity = null,
 }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
@@ -174,6 +178,7 @@ export function Player({
               conversing={conversing}
               hugSession={hugSession}
               eating={eating}
+              activity={activity}
               shoeItemId={visibleShoeId}
               hairstyleItemId={visibleHairstyleId}
               perch={perch}
