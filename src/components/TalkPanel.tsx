@@ -46,7 +46,6 @@ export function TalkPanel({ resident, relationship, today, balance, onActivity, 
           <div>
             <p className="m-0 text-xs uppercase tracking-widest text-ui-muted">{resident.role}</p>
             <h2 id="talk-title" className="m-0 mt-1 font-display text-2xl font-bold">{resident.name}</h2>
-            <p className="m-0 mt-1 text-xs text-ui-muted">Computer-controlled resident, not another player</p>
           </div>
           <button type="button" onClick={onClose} className="rounded px-2 py-1 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-accent">Close</button>
         </header>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
-import { activeLayout, obstaclesWithVehicles, resolveCollisions, type Obstacle } from '../lib/world';
+import { PLAYER_RADIUS, activeLayout, obstaclesWithVehicles, resolveCollisions, type Obstacle } from '../lib/world';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
@@ -74,6 +74,14 @@ function endTrip(status: Trip['status']) {
 
 // Sitting on a bench or chair: the body stays put on the seat until you get up
 let seated: Seat | null = null;
+/**
+ * A piece you may step into (the shower): collisions leave it out until
+ * you've been inside it and come out again. Set by walkStraight.
+ */
+let passThrough: { x: number; z: number; entered: boolean } | null = null;
+const insidePiece = (o: Obstacle, x: number, z: number) =>
+  Math.abs(x - o.position[0]) < o.size[0] / 2 + PLAYER_RADIUS && Math.abs(z - o.position[2]) < o.size[2] / 2 + PLAYER_RADIUS;
+const isPassThrough = (o: Obstacle) => !!passThrough && o.position[0] === passThrough.x && o.position[2] === passThrough.z;
 const seatListeners = new Set<() => void>();
 const notifySeat = () => seatListeners.forEach((l) => l());
 
@@ -160,10 +168,19 @@ const playerHandle: PlayerHandle = {
     // Move, then push out of buildings and keep inside the world bounds
     const prevX = playerHandle.position.x;
     const prevZ = playerHandle.position.z;
+    const piece = passThrough ? obstaclesWithVehicles().find(isPassThrough) : undefined;
     const resolved = resolveCollisions(
       prevX + playerHandle.velocity.x * delta,
       prevZ + playerHandle.velocity.z * delta,
+      undefined,
+      piece ? obstaclesWithVehicles().filter((o) => o !== piece) : undefined,
     );
+    // Stepped into the piece and out again: it's solid once more
+    if (passThrough) {
+      const inside = !!piece && insidePiece(piece, resolved.x, resolved.z);
+      if (inside) passThrough.entered = true;
+      else if (passThrough.entered || !piece) passThrough = null;
+    }
     playerHandle.position.x = resolved.x;
     playerHandle.position.z = resolved.z;
 
@@ -301,6 +318,8 @@ function planRoute(target: MoveTarget, obstacles: readonly Obstacle[] = activeLa
 export function setMoveTarget(target: MoveTarget | null, about?: { destinationId?: string; label?: string }): boolean {
   if (playerHandle.drivingVehicleId) return target === null;
   if (target && seated) standUp(); // clicking somewhere else gets you up first
+  // Headed elsewhere before stepping into the piece you were going to use: it's solid again
+  if (passThrough && !passThrough.entered) passThrough = null;
   stuckFor = 0;
   replanned = false;
   const path = target && !inputBlocked ? planRoute(target) : null;
@@ -314,6 +333,24 @@ export function setMoveTarget(target: MoveTarget | null, about?: { destinationId
   tripListeners.forEach((l) => l());
   // Nothing left to walk: you're already there
   if (route.length === 0) endTrip('arrived');
+  return true;
+}
+
+/**
+ * Walks straight to (x, z), not round things: into a piece you use from inside
+ * (stepping into the shower) and back out, `through` being that piece's
+ * centre. Starts a trip like setMoveTarget, so its end can be listened for.
+ */
+export function walkStraight(x: number, z: number, through: { x: number; z: number } | null, about?: { label?: string }): boolean {
+  if (playerHandle.drivingVehicleId || inputBlocked) return false;
+  if (seated) standUp();
+  if (through) passThrough = { ...through, entered: passThrough?.x === through.x && passThrough?.z === through.z ? passThrough.entered : false };
+  stuckFor = 0;
+  replanned = true;
+  moveTarget = { x, z, walk: true };
+  route = [{ x, z }];
+  trip = { seq: ++tripSeq, status: 'moving', ...about };
+  tripListeners.forEach((l) => l());
   return true;
 }
 
@@ -340,6 +377,8 @@ export function standUp() {
 }
 
 export const getSeated = (): Seat | null => seated;
+/** The player, outside React (tests, and code that runs between frames). */
+export const getPlayerHandle = (): PlayerHandle => playerHandle;
 export function subscribeSeated(listener: () => void) {
   seatListeners.add(listener);
   return () => { seatListeners.delete(listener); };

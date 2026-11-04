@@ -112,7 +112,7 @@ export function NightlifePanel({ venue, districtId, time, balance, relationships
             <span className="font-semibold">Sit on the terrace</span>
             <span className="block text-xs text-ui-muted">Free. Take one of the chairs outside and watch the street; get up whenever you like.</span>
           </button>
-          <p className="m-0 text-[11px] text-ui-muted">The people here are computer-controlled residents, not other players. Money is virtual (GHAI).</p>
+          <p className="m-0 text-[11px] text-ui-muted">Money is virtual (GHAI).</p>
         </div>
       </div>
     </div>

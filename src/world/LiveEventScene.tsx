@@ -50,7 +50,7 @@ function Person({ name, who, lookId, at, facing = 0, sitting = false, path, walk
   /** Keep the look's own uniform. */
   uniformed?: boolean;
 }) {
-  const tag = useMemo(() => nameTag(name, `${who} · computer-controlled`), [name, who]);
+  const tag = useMemo(() => nameTag(name, who), [name, who]);
   const y = groundHeightAt(at.x, at.z);
   const height = lookById(lookId).height;
   const seat = sitting ? { id: `${name}-seat`, x: at.x, z: at.z, facing, height: y + 0.28 } : undefined;

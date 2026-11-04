@@ -95,7 +95,7 @@ and in the notification centre (tap the status bar).
 
 ## What's simulated, and what isn't
 
-- **Residents** are computer-controlled and labelled as such. There are no other players, and nothing is sent anywhere.
+- **Residents** are computer-controlled; they are not labelled on screen. There are no other players, and nothing is sent anywhere.
 - **Taxi drivers** are computer-controlled.
 - **GHAI** is in-game money only. Nothing on the phone takes real payments, and there's no gambling or betting.
 - There's no server behind the phone. Messages, photos and settings stay in this browser.

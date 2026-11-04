@@ -25,7 +25,7 @@ These are real, saved and tested:
 - **Careers:** ranks, pay and work gear. Qualifications with real exams.
 - **Workplaces you can play:** hospital shifts with triage, university classes, office, spa and restaurant.
 - **Shops:** fashion, gadgets, car dealership.
-- **People:** computer-controlled residents you can talk to (always labelled as computer-controlled), relationships, nights out, the in-game phone, and Life OS.
+- **People:** computer-controlled residents you can talk to (computer-controlled; no on-screen label), relationships, nights out, the in-game phone, and Life OS.
 - **Living-world events:** a building fire with fire engine, police and ambulance; a road accident; a collapse; a missing person; a breakdown; a lunch rush. Reputation.
 - **Progress:** quests, player level, Divine Evolution stage 1.
 

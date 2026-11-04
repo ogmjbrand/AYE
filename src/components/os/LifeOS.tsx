@@ -488,7 +488,6 @@ function People({ state, onGo }: LifeOSProps) {
   return (
     <>
       <SectionTitle aside={city}>People you can meet here</SectionTitle>
-      <p className="m-0 mb-2 text-[11px] text-ui-muted">Everyone here is a computer-controlled resident, never another player. Playing with other people needs online accounts, which aren&rsquo;t available yet.</p>
       <div className="space-y-2">
         {people.map(({ resident, rel }) => {
           const level = friendshipLevel(rel.points);
@@ -509,7 +508,6 @@ function People({ state, onGo }: LifeOSProps) {
                     })()}
                   </div>
                 </div>
-                <span className="shrink-0 rounded-full border border-ui-line px-2 py-0.5 text-[10px] text-ui-faint">Computer-controlled</span>
               </div>
               {(() => {
                 const past = state.life.history.filter((h) => h.who === resident.id).slice(-3).reverse();

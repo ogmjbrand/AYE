@@ -141,7 +141,7 @@ export function HostPanel({ name, open, onTable, onMenu, onClose }: { name: stri
   }, [onClose]);
   return (
     <div role="dialog" aria-label={`${name}, the host`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-3xl border border-ui-gold/40 bg-[#0b0a09]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
-      <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Host · computer-controlled</p>
+      <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Host</p>
       <p className="m-0 mt-2 text-sm">
         {open ? '“Good evening, and welcome to The Palms. A table for one? Right this way.”' : '“I’m sorry, the kitchen is closed. We open again at 11:00.”'}
       </p>

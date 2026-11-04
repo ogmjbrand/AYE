@@ -104,9 +104,9 @@ export function EmergencyTransition({ place, reason, onDone }: { place: Recovery
 
 const STAFF: Record<RecoveryPlace, readonly string[]> = {
   hospital: [
-    'Nurse Bisi (computer-controlled): “Your observations are improving. Rest now.”',
-    'Dr Okafor (computer-controlled): “Nothing broken. You’ll be discharged once you’re back to full strength.”',
-    'Nurse Bisi (computer-controlled): “Drink some water, and eat properly when you leave.”',
+    'Nurse Bisi: “Your observations are improving. Rest now.”',
+    'Dr Okafor: “Nothing broken. You’ll be discharged once you’re back to full strength.”',
+    'Nurse Bisi: “Drink some water, and eat properly when you leave.”',
   ],
   sanctuary: [
     'The chamber’s light steadies as your strength returns.',

@@ -3,11 +3,12 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
 import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
-import { enterVehicle, exitVehicle, forceExitVehicle, getTrip, onVehicleCrash, placePlayer, setMovementBlocked, setMoveTarget, setPace, usePlayerController } from './hooks/usePlayerController';
+import { enterVehicle, exitVehicle, forceExitVehicle, getTrip, onVehicleCrash, placePlayer, setMovementBlocked, setMoveTarget, setPace, usePlayerController, walkStraight } from './hooks/usePlayerController';
+import { useWalkThen } from './hooks/useWalkThen';
 import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { activeLayout, groundHeightAt, movingObstacles, setActiveLayout } from './lib/world';
+import { activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -119,7 +120,7 @@ import {
   CAR_DEALERSHIP_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
-import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse } from './lib/furniture';
+import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse, standSpotsFor } from './lib/furniture';
 import type { FurnitureKind, Interior } from './lib/interiors';
 import { currentMood, type FurnitureTarget } from './lib/gameState';
 import { FurnitureCatalogue } from './components/FurnitureCatalogue';
@@ -131,7 +132,6 @@ import { unreadCount, type AppId } from './lib/phone';
 import { rideFare } from './lib/gameState';
 import { Celebrations } from './components/os/Celebrations';
 import type { LifeLink } from './lib/life';
-import { spotToUse } from './lib/furniture';
 import { ACHIEVEMENTS } from './lib/life';
 import { MOOD_PACE, moodLabel } from './lib/needs';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
@@ -302,6 +302,10 @@ const CEILING_CLEARANCE = 0.25;
 const WALL_CLEARANCE = 0.4;
 /** How long you stay on the sofa or in the armchair after using it, in real seconds, before getting up. */
 const SOFA_SIT_SECONDS = 10;
+/** How long you stand under the shower, in real seconds, before stepping out. */
+const SHOWER_SECONDS = 5;
+/** A piece of furniture at home you can use, and which one it is. */
+interface HomePiece { target: FurnitureTarget; f: Furniture; quality: number }
 /** Chase-camera distance and height above the look-at point while driving. */
 const DRIVE_CAMERA_DISTANCE = 9;
 const DRIVE_CAMERA_HEIGHT = 3.2;
@@ -897,28 +901,66 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [gadgets, setGadgets] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phone = hasMap(state.equipment);
+  /** Everything at home you can use: the pieces it came with and the ones you've bought. */
+  const homePieces = (): HomePiece[] => !indoors || !interior ? [] : [
+    ...interior.furniture.map((f, i) => ({ target: { builtin: i }, f, quality: 1 })),
+    ...ownedPieces.map(({ uid, f }) => ({ target: { uid }, f, quality: catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.quality ?? 1 })),
+  ];
   /** The piece of furniture you're standing at that does something (shower, sofa, cooker…), if any. */
-  const usableHere = (): { target: FurnitureTarget; f: Furniture; verb: string; cost: number; minutes: number } | null => {
-    if (!indoors || !interior) return null;
+  const usableHere = (): (HomePiece & { verb: string; cost: number; minutes: number }) | null => {
     const { x, z } = controller.position;
-    const pieces: { target: FurnitureTarget; f: Furniture; quality: number }[] = [
-      ...interior.furniture.map((f, i) => ({ target: { builtin: i }, f, quality: 1 })),
-      ...ownedPieces.map(({ uid, f }) => ({ target: { uid }, f, quality: catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.quality ?? 1 })),
-    ];
-    for (const p of pieces) {
+    for (const p of homePieces()) {
       const use = furnitureUse(p.f.kind, p.quality);
-      if (use && nearPiece(p.f, x, z)) return { target: p.target, f: p.f, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
+      if (use && nearPiece(p.f, x, z)) return { ...p, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
     }
     return null;
   };
+  /** A place to stand that nothing solid is in. */
+  const clearSpot = ([x, z]: readonly [number, number]) => {
+    const r = resolveCollisions(x, z, undefined, activeLayout().obstacles);
+    return Math.hypot(r.x - x, r.z - z) < 0.01;
+  };
+  /**
+   * Using a piece, once you're at it: the bed puts you to bed, the sofa and
+   * armchair sit you down, the shower has you step into it, wash and step
+   * back out; everything else passes its time where you stand.
+   */
+  const operatePiece = (p: HomePiece) => {
+    const use = furnitureUse(p.f.kind, p.quality);
+    if (!use) return;
+    if (p.f.kind === 'bed') { goToBed(); return; }
+    const cost = use.cost ?? 0;
+    if (state.balance < cost) { setArrival(`You need ${cost} GHAI for that.`); return; }
+    const done = () => {
+      operateFurniture(p.target, true);
+      setArrival(`${use.verb}: ${use.minutes >= 60 ? `${use.minutes / 60} h` : `${use.minutes} min`} pass${cost ? `, ${cost} GHAI for ingredients` : ''}.`);
+    };
+    if (p.f.kind === 'shower') {
+      const [cx, cz] = p.f.at;
+      const back = [controller.position.x, controller.position.z] as const;
+      const stepIn = () => walkStraight(cx, cz, { x: cx, z: cz }, { label: 'the shower' });
+      if (!thenOnArrival(stepIn, () => {
+        done();
+        // A few moments under the water, then out again (unless you've already walked off)
+        window.setTimeout(() => {
+          if (Math.hypot(controller.position.x - cx, controller.position.z - cz) < 0.6) walkStraight(back[0], back[1], { x: cx, z: cz }, { label: 'out of the shower' });
+        }, SHOWER_SECONDS * 1000);
+      })) done();
+      return;
+    }
+    done();
+    // On the sofa or in the armchair, you really sit down for a while, then get up again
+    const seat = furnitureSeat(p.f, `home-${'uid' in p.target ? p.target.uid : p.target.builtin}`);
+    if (seat) sit.start({ seat, place: p.f.kind === 'sofa' ? 'the sofa' : 'the armchair', minutes: 0, holdSeconds: SOFA_SIT_SECONDS });
+  };
   const operateHere = () => {
     const u = usableHere();
-    if (!u || state.balance < u.cost) return;
-    operateFurniture(u.target, true);
-    // On the sofa or in the armchair, you really sit down for a while, then get up again
-    const seat = furnitureSeat(u.f, `home-${'uid' in u.target ? u.target.uid : u.target.builtin}`);
-    if (seat) sit.start({ seat, place: u.f.kind === 'sofa' ? 'the sofa' : 'the armchair', minutes: 0, holdSeconds: SOFA_SIT_SECONDS });
-    setArrival(`${u.verb}: ${u.minutes >= 60 ? `${u.minutes / 60} h` : `${u.minutes} min`} pass${u.cost ? `, ${u.cost} GHAI for ingredients` : ''}.`);
+    if (u) operatePiece(u);
+  };
+  /** Go and use a piece from anywhere in the room: walk to it, round whatever's in the way, then use it. */
+  const goUsePiece = (p: HomePiece): boolean => {
+    const spots = p.f.kind === 'bed' && interior ? [bedSpot(interior), ...standSpotsFor(p.f)] : standSpotsFor(p.f);
+    return walkThen(spots.filter(clearSpot), p.f.kind, () => operatePiece(p));
   };
   // At your own front door you sleep at home; anywhere else is sleeping rough
   const atHome = () => indoors || (!!home && home.district === district.id && distanceToDoor(home, controller.position.x, controller.position.z) <= HOME_RADIUS);
@@ -955,6 +997,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     }
   }, [insideRestaurant, restaurantStage, insideOffice, officeSeatRequested]);
   const sit = useSitSession(controller, wait, onInteriorSeat, onInteriorSeatInterrupted);
+  const { walkThen, thenOnArrival } = useWalkThen(controller);
   // Getting in or out of a car re-renders the game (the controller itself isn't React state)
   const [, setDrivingVehicleId] = useState<string | null>(null);
   const [agencyOpen, setAgencyOpen] = useState(false);
@@ -1881,16 +1924,14 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           shower: ['shower', 'bathtub'], cook: ['stove', 'counter', 'fridge'], sleep: ['bed'], study: ['desk'],
           relax: ['tv', 'console', 'sofa', 'armchair', 'bookshelf', 'speaker'],
         };
-        const all = [...interior!.furniture, ...ownedPieces.map((p) => p.f)];
         const { x, z } = controller.position;
-        const piece = all.filter((f) => kinds[link.use].includes(f.kind)).sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - z) - Math.hypot(b.at[0] - x, b.at[1] - z))[0];
+        const piece = homePieces().filter((p) => kinds[link.use].includes(p.f.kind)).sort((a, b) => Math.hypot(a.f.at[0] - x, a.f.at[1] - z) - Math.hypot(b.f.at[0] - x, b.f.at[1] - z))[0];
         if (!piece) {
           setCatalogueOpen(true);
           return say(link.use === 'study' ? 'You don’t have a desk yet. Find one under Tables & desks.' : 'You don’t have anything for that yet.');
         }
-        const spot = link.use === 'sleep' ? bedSpot(interior!) : spotToUse(piece);
-        const ok = setMoveTarget(makeTarget(x, z, spot[0], spot[1], false), { label: piece.kind });
-        return say(ok ? 'Press E when you get there.' : 'Something is in the way.');
+        // Walk over (round anything in the way) and get on with it when you arrive
+        return say(goUsePiece(piece) ? `On your way to the ${piece.f.kind}.` : `There’s no way to reach the ${piece.f.kind} right now.`);
       }
     }
   };

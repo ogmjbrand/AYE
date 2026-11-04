@@ -31,7 +31,7 @@ function staffTag(name: string, role: string) {
   ctx.fillText(name, 256, 72);
   ctx.fillStyle = '#d9b66a';
   ctx.font = "500 32px 'DM Sans', sans-serif";
-  ctx.fillText(`${role} · computer-controlled`, 256, 122);
+  ctx.fillText(role, 256, 122);
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   return t;

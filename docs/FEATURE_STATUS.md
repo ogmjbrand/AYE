@@ -33,7 +33,7 @@ now shown under its official name).
 - Nothing else from the look boards: perfume is in too (6 fragrances under Accessories; wearing one gives +2 friendship and +5 social each time you spend time with someone). |
 | 11 | Business advertising platform | **Not started** | Needs accounts, a review/approval process, payments and legal review first. Billboards exist in the world but only show built-in art. |
 | 12a | Character Life OS, missions, wishes, dreams, perks, achievements | **Done (this milestone)** | See below. |
-| 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled and labelled so; there are no fake player counts. **Every person is a real 3D person:** residents, staff, students, patients, the body-type chart in the creator (your own person in each shape), you at the wheel of your car, and keke drivers in traffic. No grey stand-in figures while people load. |
+| 12 | Persistent progress, coherent economy, multiplayer roadmap | **Partial** | Everything saves (browser) and old saves load. Economy is one set of tested rules. Multiplayer is planned in `ARCHITECTURE.md` (authoritative server after accounts). Residents are computer-controlled (not labelled on screen) and never shown as players; there are no fake player counts. **Every person is a real 3D person:** residents, staff, students, patients, the body-type chart in the creator (your own person in each shape), you at the wheel of your car, and keke drivers in traffic. No grey stand-in figures while people load. |
 
 ## Venues milestone (verified)
 
@@ -135,7 +135,7 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 **Honest limits:**
 - Everything is built from shapes, canvas-painted signs and textures, the game's palms and the existing character models. It is not photographic.
 - Upper floors are façade only; every room is on the ground floor.
-- Campus NPCs walk set loops or sit; they're labelled computer-controlled.
+- Campus NPCs walk set loops or sit; they're computer-controlled (not labelled on screen).
 - The software renderer used for testing manages only about 1 fps here (the city is the same).
 
 ## Hospital milestone (verified in the browser)
@@ -148,7 +148,7 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 - Pay is the doctor's existing hourly rate for clocked-in minutes inside the hospital. There is no per-patient money, so nothing is paid twice.
 - Leaving the building, sleeping, travelling or the end of the day clock you out.
 
-**HUD:** Today's Goals (go, clock in, patients x/4, clock out) and an Active Status panel (level, on/off shift, room, pay per hour, earned today, waiting, patients today). Staff, patients and visitors are computer-controlled and labelled.
+**HUD:** Today's Goals (go, clock in, patients x/4, clock out) and an Active Status panel (level, on/off shift, room, pay per hour, earned today, waiting, patients today). Staff, patients and visitors are computer-controlled (not labelled on screen).
 
 **Change for doctors:** pay now comes only from shifts inside the hospital, no longer from standing at the street marker.
 

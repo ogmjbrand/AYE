@@ -30,7 +30,7 @@ tests, not just show an interface.
 - Leaving before finishing something you started costs a little
   professional standing, for example starting first aid and not handing over.
   It is proportionate and can be won back.
-- Everyone at an event is labelled computer-controlled, including the police
+- Everyone at an event is computer-controlled (not labelled on screen), including the police
   and paramedics, who arrive after a few minutes.
 - Saves keep the event, the history and reputation. Earnings are recomputed
   from the completed objectives on load, so an edited save can't claim more.
@@ -64,7 +64,7 @@ tests, not just show an interface.
 - Every emergency vehicle is solid: traffic queues behind it and the player
   walks round it.
 - The firefighters wear the high-vis worker look until a proper firefighter
-  model is added. They're labelled "Firefighter · computer-controlled".
+  model is added. Their name tag reads "Firefighter".
 
 **Reputation** (`src/lib/reputation.ts`)
 

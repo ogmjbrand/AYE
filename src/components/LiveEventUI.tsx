@@ -111,7 +111,7 @@ export function EventPanel({ event, career, equipment, minute, atScene, atTarget
             })}
           </ul>
           {event.done.length > 0 && <p className="m-0 text-xs text-ui-muted">So far: {money(event.earned)}{repLine(event.rep) ? `, ${repLine(event.rep)}` : ''}.</p>}
-          <p className="m-0 text-[11px] text-ui-muted">The emergency services and people around are computer-controlled; they deal with whatever you don&rsquo;t. You&rsquo;re paid only for what you do. The clock runs while you help, off the clock for work.</p>
+          <p className="m-0 text-[11px] text-ui-muted">The emergency services and people around deal with whatever you don&rsquo;t. You&rsquo;re paid only for what you do. The clock runs while you help, off the clock for work.</p>
         </div>
       </div>
     </div>

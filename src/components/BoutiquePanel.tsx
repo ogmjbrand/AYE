@@ -296,7 +296,7 @@ export function AssistantPanel({ name, shop, onSection, onFitting, onDecor, onCl
   const chip = 'rounded-full border border-ui-gold/40 px-3.5 py-2 text-sm font-semibold text-ui-gold-strong hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold';
   return (
     <div role="dialog" aria-label={`${name}, the store assistant`} className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-lg rounded-3xl border border-ui-gold/40 bg-[#0b0a09]/95 p-4 text-ui-ink shadow-2xl sm:bottom-28">
-      <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Store Assistant · computer-controlled</p>
+      <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-ui-gold-strong">{name} · Store Assistant</p>
       <p className="m-0 mt-2 text-sm">“Welcome to {shop}! Explore our new collections. Anything you like, try it on before you buy.”</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => onSection('clothes')} className="rounded-full bg-gradient-to-b from-[#e9c77e] to-[#b8862f] px-4 py-2 text-sm font-semibold text-[#2a1c06] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">Explore new collections</button>

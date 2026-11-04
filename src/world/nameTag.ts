@@ -2,7 +2,7 @@ import { CanvasTexture, SRGBColorSpace } from 'three';
 import { memoTexture } from './textureCache';
 
 /** Name tag above a person: their name and, underneath, who they are (always saying when they're computer-controlled). */
-export function nameTag(name: string, subtitle = 'Resident · computer-controlled') {
+export function nameTag(name: string, subtitle = 'Resident') {
   return memoTexture(`tag:${name}:${subtitle}`, () => drawTag(name, subtitle));
 }
 

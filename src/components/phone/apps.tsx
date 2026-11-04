@@ -269,7 +269,6 @@ function Messages({ ctx }: { ctx: AppCtx }) {
   if (open) return <Thread ctx={ctx} id={open} />;
   return (
     <>
-      <Note>Residents are computer-controlled people in AYE, not other players.</Note>
       {people.length === 0 && <Section><Row title="No contacts yet" sub="Chat to people around the city (press E next to them) and they’ll give you their number." /></Section>}
       {people.length > 0 && (
         <Section>
@@ -421,7 +420,6 @@ function Contacts({ ctx }: { ctx: AppCtx }) {
           </Section>
         );
       })}
-      {people.length > 0 && <Note>Everyone here is a computer-controlled resident of AYE.</Note>}
     </>
   );
 }
@@ -572,7 +570,7 @@ export function Booking({ ctx, id }: { ctx: AppCtx; id: string }) {
       </Section>
       {err && <p role="alert" className="mx-1 mb-3 mt-0 rounded-xl bg-ui-danger/20 px-3 py-2 text-[12px] text-white">{err}</p>}
       <Btn tone="gold" disabled={!ctx.canRide || ctx.state.balance < fare} onClick={() => setErr(ctx.act.ride(d))}>{ctx.state.balance < fare ? 'Not enough GHAI' : `Book for ${ghai(fare)}`}</Btn>
-      <Note>Your driver is computer-controlled. The fare is taken when you’re dropped off.</Note>
+      <Note>The fare is taken when you’re dropped off.</Note>
     </>
   );
 }
@@ -788,7 +786,7 @@ function Help() {
     ['Money', 'You earn GHAI at work (09:00–17:00 at your workplace) and on shifts. Living costs, rent and purchases come out of your account: see Bank.'],
     ['Homes', 'Everyone starts with a rented flat. Rent is paid each night you sleep there. Buy a home from OGM Homes and there’s no rent at all.'],
     ['Needs', 'Eat, sleep, wash, have fun and see people. Very hungry or exhausted, you’re paid half. Health shows what to do next.'],
-    ['People', 'Residents are computer-controlled, never other players. Chat to them in person, then text or call them once a day.'],
+    ['People', 'Chat to them in person, then text or call them once a day.'],
     ['Saving', 'The game saves on this device as you play.'],
   ];
   return <>{topics.map(([t, b]) => <Section key={t} title={t}><p className="m-0 p-3 text-[12px] leading-relaxed text-white/80">{b}</p></Section>)}</>;

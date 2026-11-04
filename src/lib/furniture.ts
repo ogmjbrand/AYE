@@ -358,7 +358,6 @@ export function spotToUse(f: Furniture): [number, number] {
   return [x, z + Math.sign(toCentreZ || 1) * (d / 2 + 0.45)];
 }
 
-/** Whether the player at (px, pz) is close enough to use a piece. */
 /**
  * Which way a sofa faces: into the room, its back to the nearer wall along its
  * short side (as the sofas are drawn, world/HomeInterior.tsx and
@@ -381,6 +380,25 @@ export function furnitureSeat(f: Furniture, id: string): Seat | null {
   return { id, x: c.x, z: c.z, facing, height: CHAIR_SEAT_HEIGHT, approach: ahead(depth / 2 + 0.5) };
 }
 
+/**
+ * Places to stand to use a piece, best first: the usual spot (the side facing
+ * the room's middle), then the middle of each other side, then the corners,
+ * all just clear of it. When one is blocked by something else, the next will do.
+ */
+export function standSpotsFor(f: Furniture): [number, number][] {
+  const [x, z] = f.at;
+  const [w, , d] = f.size;
+  const gap = 0.45;
+  const ex = w / 2 + gap, ez = d / 2 + gap;
+  const first = spotToUse(f);
+  const others: [number, number][] = [
+    [x + ex, z], [x - ex, z], [x, z + ez], [x, z - ez],
+    [x + ex, z + ez], [x - ex, z + ez], [x + ex, z - ez], [x - ex, z - ez],
+  ];
+  return [first, ...others.filter(([a, b]) => Math.hypot(a - first[0], b - first[1]) > 0.05)];
+}
+
+/** Whether the player at (px, pz) is close enough to use a piece. */
 export function nearPiece(f: Furniture, px: number, pz: number, reach = 0.75): boolean {
   const dx = Math.max(Math.abs(px - f.at[0]) - f.size[0] / 2, 0);
   const dz = Math.max(Math.abs(pz - f.at[1]) - f.size[2] / 2, 0);

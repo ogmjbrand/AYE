@@ -16,7 +16,7 @@ export function MedicResponder({ at, arrived }: { at: { x: number; z: number; fa
   const start = useMemo(() => [at.x + Math.sin(at.facing) * APPROACH, groundHeightAt(at.x, at.z), at.z + Math.cos(at.facing) * APPROACH] as const, [at]);
   const stop = useMemo(() => [at.x + Math.sin(at.facing + 0.5) * 0.95, groundHeightAt(at.x, at.z), at.z + Math.cos(at.facing + 0.5) * 0.95] as const, [at]);
   const path = useMemo(() => [start, stop] as const, [start, stop]);
-  const tag = useMemo(() => nameTag('Ifeoma', arrived ? 'Paramedic, treating you · computer-controlled' : 'Paramedic · computer-controlled'), [arrived]);
+  const tag = useMemo(() => nameTag('Ifeoma', arrived ? 'Paramedic, treating you' : 'Paramedic'), [arrived]);
   const height = lookById('medical-female-02').height;
   const facingYou = Math.atan2(at.x - stop[0], at.z - stop[2]);
   return (
