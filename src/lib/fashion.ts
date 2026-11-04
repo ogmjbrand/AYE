@@ -149,7 +149,7 @@ export interface FashionItem {
   slot: Slot;
   price: number;
   collection: 'Everyday' | 'African prints' | 'Tailored' | 'Luxury' | 'Salon' | 'Accessories' | 'Rewards' | 'Workout' | 'Joggers' | 'Office' | 'Evening' | 'Gala'
-    | 'Couture' | 'Jewellery' | 'Eyewear' | 'Nails' | 'Fragrance';
+    | 'Couture' | 'Aso-ebi' | 'Print sets' | 'Jewellery' | 'Eyewear' | 'Nails' | 'Fragrance';
   style: Style;
   /** Countries (ISO codes) whose boutiques stock it; everywhere if omitted. */
   stockedIn?: readonly string[];
@@ -178,6 +178,27 @@ const dress = (key: string, name: string, price: number, collection: FashionItem
   { ...item(`top-${key}`, 'top', `${name} · bodice`, Math.round(price * 0.55), collection, pattern, colors, scale), dress: true },
   item(`bottom-${key}`, 'bottom', `${name} · skirt`, Math.round(price * 0.45), collection, pattern, colors, scale),
 ];
+
+/**
+ * A two-piece look: a top and a bottom with matching ids ("top-x", "bottom-x"),
+ * so the boutique also sells them together as a set. Each keeps its own print.
+ */
+const look = (
+  key: string, collection: FashionItem['collection'],
+  top: [name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale?: number],
+  bottom: [name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale?: number],
+): FashionItem[] => [
+  item(`top-${key}`, 'top', top[0], top[1], collection, top[2], top[3], top[4]),
+  item(`bottom-${key}`, 'bottom', bottom[0], bottom[1], collection, bottom[2], bottom[3], bottom[4]),
+];
+
+/** Shoes in a print (the colours run over the whole shoe). */
+const printShoe = (id: string, name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale: number): FashionItem =>
+  item(id, 'shoes', name, price, 'Accessories', pattern, colors, scale);
+
+/** A ready-made aso-ebi gown: sold as a dress (bodice and skirt in one fabric). */
+const gown = (key: string, name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale = 18): FashionItem[] =>
+  dress(key, name, price, 'Aso-ebi', pattern, colors, scale);
 
 /** A fragrance: colours are [the scent's colour in the bottle, glass, cap]. Worn, it isn't seen: people warm to you a little more (lib/gameState.ts SCENT_BONUS). */
 const scent = (id: string, name: string, price: number, colors: [string, string, string]): FashionItem => {
@@ -660,6 +681,137 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   worn('nails-burgundy-flower-stiletto', 'nails', 'Burgundy flower stilettos', 450, 'stiletto', ['#f2c8c0', '#7a1424']),
   worn('nails-black-swirl-coffin', 'nails', 'Black swirl French coffins', 420, 'coffin', ['#3a2a2a', '#121214']),
   worn('nails-gold-chrome-almond', 'nails', 'Gold chrome almonds', 420, 'almond', ['#d8b048', '#d8b048']),
+  // ---------------------------------------------------------------- OGM Atelier: Aso-ebi & Print Sets
+  // Recreated from the user's reference looks under our own house label: no
+  // other label's name or logo. Fabrics come from the id (satin, lace, sequin,
+  // crystal, velvet, denim) and prints from the shader (lib/outfitShader).
+  // Aso-ebi gowns
+  ...gown('aso-satin-bronze-contour', 'OGM Atelier off-shoulder satin mermaid gown · Bronze & gold contour', 5200, 'swirl', ['#6e3f1a', '#c99a4a', '#4a2a12'], 6),
+  ...gown('aso-satin-rose-vine', 'OGM Atelier sweetheart column gown with beaded vine sash · Rose & wine', 4800, 'floral', ['#e3a2b4', '#7a1a30', '#f0c4d0'], 7),
+  ...gown('aso-lace-wine-drape', 'OGM Atelier bell-sleeve lace corset gown with draped skirt · Wine', 5400, 'lace', ['#5a1222', '#7a1e30'], 24),
+  ...gown('aso-sequin-pink-swirl', 'OGM Atelier sheer-sleeve sequin mermaid gown · Pink swirl', 5600, 'swirl', ['#e49ab0', '#a8405e', '#f2c2d0'], 7),
+  ...gown('aso-lace-ivory-gold', 'OGM Atelier brocade lace gown with gold appliqué · Ivory', 5800, 'lace', ['#efe6d2', '#c9a24f'], 22),
+  ...gown('aso-satin-marigold-peplum', 'OGM Atelier beaded peplum column gown · Marigold', 4600, 'solid', ['#d9a21e']),
+  ...gown('aso-sequin-emerald-stripe', 'OGM Atelier beaded stripe gown · Emerald', 5000, 'stripes', ['#1c4a34', '#5c8a6a', '#0f2a1e'], 50),
+  ...look('aso-lace-black-stripe', 'Aso-ebi',
+    ['OGM Atelier feather-shoulder beaded peplum bodice · Black', 2600, 'lace', ['#121214', '#2a2a30'], 26],
+    ['OGM Atelier striped mermaid skirt · Black & white', 2200, 'stripes', ['#f2f0ea', '#121214'], 30]),
+  ...gown('aso-sequin-emerald-rose', 'OGM Atelier pleated-halter sequin gown with sculpted roses · Emerald', 6000, 'floral', ['#0f4a2a', '#2a7a4a', '#c9a24f'], 9),
+  ...gown('aso-crystal-wine-ruffle', 'OGM Atelier crystal corset gown with cascade ruffle · Wine', 5600, 'polka', ['#6e1222', '#c84a5a'], 60),
+  ...gown('aso-sequin-chartreuse-pearl', 'OGM Atelier pearl-beaded corset gown · Chartreuse', 5200, 'polka', ['#c6c43a', '#f2f0d8'], 70),
+  ...look('aso-lace-ice-wine-sequin', 'Aso-ebi',
+    ['OGM Atelier lace-flower off-shoulder bodice · Ice blue', 2400, 'lace', ['#a9c4dc', '#e4eef6'], 26],
+    ['OGM Atelier sequin draped skirt · Wine', 2800, 'polka', ['#5a1222', '#c84a6a'], 70]),
+  ...gown('aso-crystal-noir-gold', 'OGM Atelier ruffled off-shoulder crystal gown · Black to gold', 5800, 'polka', ['#d4a21e', '#121214', '#f2d870'], 50),
+  ...gown('aso-lace-champagne-pearl', 'OGM Atelier pearl-studded draped lace gown · Champagne', 5400, 'lace', ['#dcc49a', '#f2e8d2'], 22),
+  ...gown('aso-lace-chocolate-brooch', 'OGM Atelier lace corset gown with gold brooch · Chocolate', 5000, 'lace', ['#3a2214', '#8a5a32'], 22),
+  ...gown('aso-sequin-mint-peplum', 'OGM Atelier sculpted-peplum sequin mermaid gown · Mint', 5600, 'floral', ['#8ec4a2', '#4a8a6a', '#d8ecdc'], 9),
+  ...gown('aso-ankara-fuchsia-paisley', 'OGM Atelier one-shoulder ankara column gown · Fuchsia paisley', 2800, 'ankara', ['#c8186e', '#e8962a', '#f2c84a'], 14),
+  ...gown('aso-lace-white-bishop', 'OGM Atelier bishop-sleeve lace corset gown · White', 5200, 'lace', ['#f6f4f0', '#e2ded6'], 24),
+  // Orange tailoring and day dresses
+  ...dress('crepe-orange-bell-crystal', 'OGM Atelier bell-cuff pencil dress with crystal studs · Orange', 1900, 'Print sets', 'polka', ['#e2661a', '#f2d8b0'], 40),
+  ...look('crepe-orange-vest-maxi', 'Print sets',
+    ['OGM Atelier tailored vest over a white shirt · Orange', 1100, 'solid', ['#d9641e']],
+    ['OGM Atelier pleated maxi skirt · Orange', 900, 'solid', ['#d9641e']]),
+  ...dress('crepe-orange-flutter-midi', 'OGM Atelier flutter-sleeve fit-and-flare midi dress · Orange', 1600, 'Print sets', 'solid', ['#e0661c']),
+  ...dress('crepe-orange-collar-maxi', 'OGM Atelier collared fit-and-flare maxi with pearl trim · Orange', 2100, 'Print sets', 'solid', ['#e8751e']),
+  ...dress('crepe-orange-cape-pearl', 'OGM Atelier cape-collar pencil dress with pearl trim · Orange', 2000, 'Print sets', 'solid', ['#ea731c']),
+  ...look('ankara-orange-corset-maxi', 'Print sets',
+    ['OGM Atelier pearl-trim ankara corset with bolero · Green & orange', 1300, 'floral', ['#1f3a2a', '#e8751e', '#4a8a5a'], 9],
+    ['OGM Atelier gathered maxi skirt · Orange', 900, 'solid', ['#e8751e']]),
+  // Adire, ankara and kente separates
+  ...look('adire-orange-ruffle-denim', 'Print sets',
+    ['OGM Atelier high-low ruffle adire blouse · Orange', 850, 'adire', ['#e8582a', '#f2c8a8', '#c8401c'], 18],
+    ['OGM Atelier wide-leg jeans · Mid blue denim', 520, 'solid', ['#3a5a86']]),
+  ...look('ankara-magenta-halter-black', 'Print sets',
+    ['OGM Atelier ankara halter peplum top · Magenta', 780, 'ankara', ['#b0186e', '#e05aa0', '#3a0a24'], 16],
+    ['OGM Atelier wide trousers · Black', 600, 'solid', ['#121214']]),
+  ...look('polka-marigold-vest-denim', 'Print sets',
+    ['OGM Atelier plunge halter waistcoat · Marigold spots', 720, 'polka', ['#e8a21e', '#f2dc8a'], 9],
+    ['OGM Atelier flared jeans · Mid blue denim', 520, 'solid', ['#4a6a94']]),
+  ...look('embroidered-black-geo-rust', 'Print sets',
+    ['OGM Atelier embroidered camp shirt · Black', 820, 'solid', ['#141416']],
+    ['OGM Atelier geometric palazzo trousers · Rust, black & white', 880, 'check', ['#f2ece0', '#2a1a14', '#b8501c'], 14]),
+  ...look('ankara-floral-halter-cream', 'Print sets',
+    ['OGM Atelier floral corset halter · Forest & orange', 760, 'floral', ['#1a2a1a', '#e8751e', '#5a8a3a'], 9],
+    ['OGM Atelier wide trousers · Cream', 620, 'solid', ['#ece4d2']]),
+  ...look('ankara-berry-ruffle-shorts', 'Print sets',
+    ['OGM Atelier cross-halter ruffle ankara top · Berry', 740, 'ankara', ['#b8123a', '#f0a0b4', '#5a0a1a'], 16],
+    ['OGM Atelier pleated shorts · White', 420, 'solid', ['#f4f2ee']]),
+  ...look('adire-pink-offshoulder-cream', 'Print sets',
+    ['OGM Atelier off-shoulder adire peplum top · Pink swirl', 760, 'swirl', ['#c84a7a', '#f2d2de', '#8a1a44'], 10],
+    ['OGM Atelier wide trousers · Cream', 620, 'solid', ['#ece4d2']]),
+  ...look('outline-white-swirl-black', 'Print sets',
+    ['OGM Atelier outline-print tunic · White & black', 640, 'check', ['#f6f4f0', '#141416'], 4],
+    ['OGM Atelier swirl palazzo trousers · Black & white', 780, 'swirl', ['#141416', '#f2f0ea'], 8]),
+  ...look('damask-chocolate-kimono', 'Print sets',
+    ['OGM Atelier striped-border damask kimono over a white wrap top · Chocolate', 1400, 'floral', ['#4a2216', '#e8d8c0', '#8a5a3a'], 12],
+    ['OGM Atelier damask palazzo trousers · Chocolate', 900, 'floral', ['#4a2216', '#e8d8c0', '#8a5a3a'], 12]),
+  ...look('stripe-olive-zip-set', 'Print sets',
+    ['OGM Atelier striped bell-sleeve zip jacket · Olive', 1200, 'stripes', ['#5a6a24', '#e0b020', '#b8201c'], 24],
+    ['OGM Atelier side-stripe trousers · Olive', 820, 'stripes', ['#5a6a24', '#5a6a24', '#e0b020'], 10]),
+  ...look('adire-brown-triangle-set', 'Print sets',
+    ['OGM Atelier geometric camp shirt with pockets · Brown', 880, 'check', ['#5a3420', '#2a1a12', '#a87a4a'], 18],
+    ['OGM Atelier triangle adire trousers · Black & white', 760, 'adire', ['#f2f0ea', '#121214', '#3a3a3e'], 14]),
+  ...look('adire-tiered-pink-mustard', 'Print sets',
+    ['OGM Atelier tiered adire ruffle cami · Fuchsia & yellow', 720, 'adire', ['#d81e7a', '#f2e04a', '#f6b8d4'], 16],
+    ['OGM Atelier wide trousers · Mustard', 620, 'solid', ['#d4b028']]),
+  ...look('bogolan-cowrie-kimono', 'Print sets',
+    ['OGM Atelier cowrie-print kimono jacket · White & black', 1300, 'bogolan', ['#f2f0ea', '#121214', '#3a3a3a'], 14],
+    ['OGM Atelier cowrie-print palazzo trousers · White & black', 860, 'bogolan', ['#f2f0ea', '#121214', '#3a3a3a'], 14]),
+  ...look('adire-wine-tiedye', 'Print sets',
+    ['OGM Atelier tie-dye wrap kaftan top · Wine', 900, 'adire', ['#7a1a2e', '#e8b8b8', '#a83a4a'], 20],
+    ['OGM Atelier tie-dye palazzo trousers · Wine', 800, 'adire', ['#7a1a2e', '#e8b8b8', '#a83a4a'], 20]),
+  ...dress('swirl-orange-peplum-jumpsuit', 'OGM Atelier swirl-print jumpsuit with asymmetric peplum · Orange', 1700, 'Print sets', 'swirl', ['#1a1210', '#e8a21e', '#e8641c'], 8),
+  ...look('ankara-blue-kimono-black', 'Print sets',
+    ['OGM Atelier belted ankara kimono jacket · Turquoise & gold', 1200, 'ankara', ['#1a8ac8', '#e8b020', '#121214'], 14],
+    ['OGM Atelier flared trousers · Black', 640, 'solid', ['#121214']]),
+  ...look('floral-orange-kimono', 'Print sets',
+    ['OGM Atelier floral kimono over a white wrap top · Burnt orange', 1350, 'floral', ['#f2e8d8', '#c8581c', '#5a2a1a'], 8],
+    ['OGM Atelier belted floral palazzo trousers · Burnt orange', 880, 'floral', ['#f2e8d8', '#c8581c', '#5a2a1a'], 8]),
+  ...look('stripe-white-kimono', 'Print sets',
+    ['OGM Atelier striped-trim duster kimono · White & berry', 1250, 'stripes', ['#f4f2ee', '#8a1a3a', '#4a2a2a'], 30],
+    ['OGM Atelier wide trousers · White', 620, 'solid', ['#f4f2ee']]),
+  ...look('eyelet-white-batik-blue', 'Print sets',
+    ['OGM Atelier broderie eyelet blouse · White', 780, 'lace', ['#f6f4f0', '#e4e0d8'], 30],
+    ['OGM Atelier circle batik palazzo trousers · Royal blue & green', 820, 'batik', ['#1a2a8a', '#e8eef6', '#2a9a4a'], 10]),
+  ...dress('polka-orange-jumpsuit', 'OGM Atelier sleeveless collared jumpsuit · Orange & black spots', 1500, 'Print sets', 'polka', ['#e2641a', '#121214'], 18),
+  ...look('adire-red-cross-tee', 'Print sets',
+    ['OGM Atelier appliqué tee · White & red', 520, 'solid', ['#f6f4f0']],
+    ['OGM Atelier cross-pattern adire palazzo trousers · Red', 780, 'adire', ['#d0121c', '#f6e8e4', '#a80e18'], 12]),
+  ...look('bogolan-black-lace-sun', 'Print sets',
+    ['OGM Atelier sheer-sleeve lace top · Black', 820, 'lace', ['#121214', '#2a2a30'], 26],
+    ['OGM Atelier sun-print palazzo trousers · Black & white', 820, 'bogolan', ['#121214', '#f2f0ea', '#2a2a2a'], 10]),
+  ...dress('batik-teal-cargo-jumpsuit', 'OGM Atelier halter cargo jumpsuit · Teal batik', 1600, 'Print sets', 'batik', ['#0f4a5a', '#2ab0a0', '#a8c83a'], 10),
+  ...look('eyelet-white-flower-red', 'Print sets',
+    ['OGM Atelier peplum eyelet shirt · White', 820, 'lace', ['#f6f4f0', '#e4e0d8'], 30],
+    ['OGM Atelier flower adire palazzo trousers · Red', 800, 'floral', ['#e0121c', '#f6f0ec', '#c00e18'], 7]),
+  ...look('adire-black-medallion', 'Print sets',
+    ['OGM Atelier lace overshirt with print pocket · Black', 860, 'lace', ['#121214', '#2a2a30'], 26],
+    ['OGM Atelier medallion adire trousers · Black & white', 800, 'adire', ['#121214', '#f2f0ea', '#3a3a3e'], 10]),
+  ...look('adire-orange-navy-tiedye', 'Print sets',
+    ['OGM Atelier tie-dye camp shirt · Orange & navy', 820, 'adire', ['#e8781c', '#1a1a3a', '#f2b04a'], 16],
+    ['OGM Atelier tie-dye palazzo trousers · Orange & navy', 800, 'adire', ['#e8781c', '#1a1a3a', '#f2b04a'], 16]),
+  ...look('chevron-orange-cargo', 'Print sets',
+    ['OGM Atelier panel tee · Orange & black', 520, 'solid', ['#e8641c']],
+    ['OGM Atelier chevron cargo trousers · Black & white', 760, 'houndstooth', ['#141416', '#f2f0ea'], 30]),
+  ...look('floral-wine-offshoulder', 'Print sets',
+    ['OGM Atelier off-shoulder floral peplum blouse · Cream & burgundy', 820, 'floral', ['#ece0cc', '#8a1a2a', '#c84a5a'], 8],
+    ['OGM Atelier flared trousers · Burgundy', 680, 'solid', ['#7a1424']]),
+  ...look('kente-asym-red', 'Print sets',
+    ['OGM Atelier asymmetric kente tunic · Gold, green & red', 1400, 'kente', ['#e8c020', '#1a7a3a', '#c0201c'], 10],
+    ['OGM Atelier wide trousers · Red', 680, 'solid', ['#d0161c']]),
+  ...dress('adire-fuchsia-flutter-jumpsuit', 'OGM Atelier flutter-sleeve tie-dye jumpsuit · Fuchsia', 1500, 'Print sets', 'adire', ['#c8146e', '#5a0a30', '#e85aa0'], 16),
+  ...look('lace-white-geo-green-shorts', 'Print sets',
+    ['OGM Atelier lace blouse with print pocket · White', 860, 'lace', ['#f6f4f0', '#e4e0d8'], 30],
+    ['OGM Atelier geometric cargo shorts · Green & white', 620, 'check', ['#1a7a3a', '#e8f0e4', '#2a9a4a'], 10]),
+  // Slides and clutches to match
+  printShoe('shoes-slide-polka-black', 'OGM Atelier square-toe wedge slides · Black polka', 650, 'polka', ['#141416', '#f4f2ee'], 26),
+  printShoe('shoes-slide-stripe-black', 'OGM Atelier square-toe wedge slides · Black & white stripe', 650, 'stripes', ['#f4f2ee', '#141416'], 30),
+  item('shoes-pump-patent-orange', 'shoes', 'OGM Atelier pointed pumps · Orange patent', 900, 'Print sets', 'solid', ['#e8641c']),
+  bagItem('bag-pouch-polka-black', 'OGM Atelier frame clutch · Black polka', 700, 'pouch', '#141416', '#f4f2ee'),
+  bagItem('bag-pouch-stripe-white', 'OGM Atelier frame clutch · White & black stripe', 700, 'pouch', '#f4f2ee', '#141416'),
+  bagItem('bag-top-handle-orange', 'OGM Atelier top-handle bag · Orange leather', 1700, 'top-handle', '#d9641e'),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
   item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),

@@ -13,7 +13,10 @@ describe('The Fashion House', () => {
     expect(sunset.top.id).toBe('top-ankara-sunset');
     expect(sunset.bottom.id).toBe('bottom-ankara-sunset');
     expect(sunset.price).toBe(sunset.top.price + sunset.bottom.price);
-    for (const s of sets) expect(s.top.style.colors).toEqual(s.bottom.style.colors);
+    // Same-fabric sets match exactly; the OGM Atelier looks pair a print with a plain piece
+    const coordinated = new Set(['Aso-ebi', 'Print sets']);
+    for (const s of sets.filter((x) => !coordinated.has(x.top.collection))) expect(s.top.style.colors).toEqual(s.bottom.style.colors);
+    expect(sets.some((s) => s.id === 'set-adire-orange-ruffle-denim')).toBe(true);
   });
 
   it('never sells the rewards you earn, and keeps sections to their slots', () => {
@@ -37,7 +40,7 @@ describe('The Fashion House', () => {
   it('sells bags under accessories, in every city', () => {
     for (const d of ['lagos.marina', 'accra.osu']) {
       const bags = rangeFor(d, 'accessories', 'bags');
-      expect(bags.length).toBe(67);
+      expect(bags.length).toBe(70);
       expect(bags.every((b) => b.slot === 'bag' && !!b.style.bag)).toBe(true);
       // Every accessory tab sells its own kind of piece
       for (const t of ACCESSORY_TABS) {
@@ -73,7 +76,7 @@ describe('The Fashion House', () => {
 describe('dress looks', () => {
   it('sell both halves of a dress together, never as separate pieces', () => {
     const dresses = setsIn('lagos.marina', true);
-    expect(dresses.length).toBe(33);
+    expect(dresses.length).toBe(57);
     for (const d of dresses) {
       expect(d.top.dress, d.id).toBe(true);
       expect(d.bottom.style.colors).toEqual(d.top.style.colors);

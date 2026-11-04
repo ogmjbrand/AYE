@@ -146,7 +146,7 @@ describe('choosing colours', () => {
 
   it('every bag has a shape and is sold in every country', () => {
     const bags = FASHION_ITEMS.filter((i) => i.slot === 'bag');
-    expect(bags.length).toBe(67);
+    expect(bags.length).toBe(70);
     for (const b of bags) {
       expect(b.style.bag).toBeTruthy();
       expect(b.stockedIn).toBeUndefined();
@@ -179,5 +179,25 @@ describe('jewellery, sunglasses and nails', () => {
   it('a saved wardrobe keeps worn pieces in their own slots', () => {
     const w = sanitiseWardrobe({ owned: ['neck-solitaire-gold', 'nails-red-stiletto'], equipped: { neck: 'neck-solitaire-gold', ears: 'nails-red-stiletto', nails: 'nails-red-stiletto' } });
     expect(w.equipped).toEqual({ neck: 'neck-solitaire-gold', nails: 'nails-red-stiletto' });
+  });
+});
+
+describe('OGM Atelier aso-ebi and print sets', () => {
+  const ours = FASHION_ITEMS.filter((i) => i.collection === 'Aso-ebi' || i.collection === 'Print sets' || /^shoes-slide-(polka|stripe)-black$/.test(i.id) || /^bag-(pouch-(polka-black|stripe-white)|top-handle-orange)$/.test(i.id));
+  it('are sold under our own label, never another brand', () => {
+    expect(ours.length).toBeGreaterThan(90);
+    for (const i of ours) {
+      expect(i.name).toMatch(/^OGM Atelier /);
+      expect(i.name).not.toMatch(/YSL|Saint Laurent|LADs|Bamboo|Dinma|Chanel|Gucci|Tom Ford/i);
+      expect(i.price).toBeGreaterThan(0);
+    }
+  });
+  it('take their material from the cloth: sequins glitter, lace is sheer, satin shines, denim is twill', () => {
+    const f = (id: string) => FASHION_ITEMS.find((i) => i.id === id)!.style.fabric!.name;
+    expect(f('top-aso-sequin-emerald-rose')).toBe('glitter');
+    expect(f('top-aso-lace-wine-drape')).toBe('mesh');
+    expect(f('top-aso-satin-marigold-peplum')).toBe('satin');
+    expect(f('top-aso-crystal-noir-gold')).toBe('rhinestone');
+    expect(f('top-ankara-magenta-halter-black')).toBe('wax print');
   });
 });
