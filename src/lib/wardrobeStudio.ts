@@ -3,10 +3,11 @@
  * own by tab, see it on your character, then confirm or cancel. A draft is
  * the equipped map you're trying; nothing is saved until you confirm.
  *
- * With today's character models a top, bottom, dress or shoe restyles the
- * fabric, print and finish of the clothes your character already wears, so
- * its thumbnail is a fabric swatch, never a picture of a separate garment.
- * Hairstyles are real 3D hair and show their own picture.
+ * Most tops, bottoms, dresses and shoes restyle the fabric, print and finish
+ * of the clothes your character already wears, so their thumbnail is a fabric
+ * swatch, labelled as such. The OGM Atelier 3D pieces (`style.garment`) are
+ * real garments built on the body (world/skinnedGarment.ts), labelled
+ * "3D garment". Hairstyles are real 3D hair and show their own picture.
  */
 import { ADORNMENT_SLOTS, FASHION_ITEMS, MAX_OUTFITS, itemById, type FashionItem, type Outfit, type Slot, type Wardrobe } from './fashion';
 
@@ -100,6 +101,7 @@ export function outfitDraft(outfit: Outfit, owned: readonly string[]): Draft {
 
 /** What a thumbnail stands for, said plainly (it is never a separate 3D garment). */
 export function thumbnailNote(item: FashionItem): string {
+  if (item.style.garment) return '3D garment';
   if (item.slot === 'hairstyle') return '3D hairstyle';
   if (item.slot === 'hair') return 'Hair colour';
   if (item.dress) return 'Fabric for your top and bottom';

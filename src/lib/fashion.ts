@@ -125,7 +125,13 @@ export interface Style {
   piece?: Piece;
   /** Bags only: a woven surface (real wicker relief) under the colour. */
   woven?: true;
+  /** A real 3D garment built on the body and skinned to its skeleton (world/skinnedGarment.ts). */
+  garment?: { kind: GarmentKind; fabric: GarmentFabric };
 }
+
+/** The built 3D garments: each is real geometry that moves with the person's skeleton. */
+export type GarmentKind = 'buba' | 'iro' | 'gele' | 'blazer' | 'wide-trousers';
+export type GarmentFabric = 'aso-oke' | 'suiting';
 
 /** Configuration for loading a 3D garment model. */
 export interface GarmentModel {
@@ -195,6 +201,12 @@ const look = (
 /** Shoes in a print (the colours run over the whole shoe). */
 const printShoe = (id: string, name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale: number): FashionItem =>
   item(id, 'shoes', name, price, 'Accessories', pattern, colors, scale);
+
+/** A real 3D garment (built and skinned on the body), in a fabric and colourway. */
+const garment3d = (id: string, slot: Slot, name: string, price: number, collection: FashionItem['collection'], kind: GarmentKind, fabric: GarmentFabric, colors: [string, string, string]): FashionItem => {
+  const base = item(id, slot, name, price, collection, fabric === 'aso-oke' ? 'kente' : 'pinstripe', colors, fabric === 'aso-oke' ? 10 : 60);
+  return { ...base, style: { ...base.style, fabric: slot === 'hairstyle' ? undefined : fabric === 'aso-oke' ? FABRICS.handwoven : FABRICS.wool, garment: { kind, fabric } } };
+};
 
 /** A ready-made aso-ebi gown: sold as a dress (bodice and skirt in one fabric). */
 const gown = (key: string, name: string, price: number, pattern: Pattern, colors: [string, string?, string?], scale = 18): FashionItem[] =>
@@ -812,6 +824,12 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   bagItem('bag-pouch-polka-black', 'OGM Atelier frame clutch · Black polka', 700, 'pouch', '#141416', '#f4f2ee'),
   bagItem('bag-pouch-stripe-white', 'OGM Atelier frame clutch · White & black stripe', 700, 'pouch', '#f4f2ee', '#141416'),
   bagItem('bag-top-handle-orange', 'OGM Atelier top-handle bag · Orange leather', 1700, 'top-handle', '#d9641e'),
+  // OGM Atelier 3D: real garments built on your body and moving with it (world/skinnedGarment.ts)
+  garment3d('top-asooke3d-wine', 'top', 'OGM Atelier 3D aso-oke buba with bell sleeves · Wine & gold', 2400, 'Aso-ebi', 'buba', 'aso-oke', ['#6a1428', '#c99a3a', '#f0dca0']),
+  garment3d('bottom-asooke3d-wine', 'bottom', 'OGM Atelier 3D aso-oke iro wrapper · Wine & gold', 2200, 'Aso-ebi', 'iro', 'aso-oke', ['#6a1428', '#c99a3a', '#f0dca0']),
+  garment3d('hairstyle-gele-wine', 'hairstyle', 'OGM Atelier 3D gele headwrap · Wine & gold', 1600, 'Aso-ebi', 'gele', 'aso-oke', ['#c99a3a', '#6a1428', '#f0dca0']),
+  garment3d('top-tailored-charcoal', 'top', 'OGM Atelier 3D tailored blazer · Charcoal', 2600, 'Tailored', 'blazer', 'suiting', ['#2c2e33', '#8a8d94', '#1c1d21']),
+  garment3d('bottom-tailored-charcoal', 'bottom', 'OGM Atelier 3D wide-leg trousers · Charcoal', 1800, 'Tailored', 'wide-trousers', 'suiting', ['#2c2e33', '#8a8d94', '#1c1d21']),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
   item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),

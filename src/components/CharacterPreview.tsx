@@ -137,7 +137,7 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
       <Turntable spin={spin} faceFront={interactive && focus === 'face'} view={interactive ? view : null}>
         <ErrorBoundary fallback={<PreviewError />}>
           <Suspense fallback={null}>
-            <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
+            <Avatar key={lookId} controller={still} own lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

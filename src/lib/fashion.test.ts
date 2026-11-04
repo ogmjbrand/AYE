@@ -83,7 +83,9 @@ describe('fashion catalogue', () => {
   });
 
   it('keeps model-backed hairstyles separate from hair colour and material styling', () => {
-    const hairstyles = FASHION_ITEMS.filter((item) => item.slot === 'hairstyle');
+    // Hair models; the gele headwrap in this slot is a built 3D garment instead
+    const hairstyles = FASHION_ITEMS.filter((item) => item.slot === 'hairstyle' && !item.style.garment);
+    expect(FASHION_ITEMS.find((i) => i.id === 'hairstyle-gele-wine')?.style.garment?.kind).toBe('gele');
     expect(SLOT_LABEL.hair).toBe('Hair colour');
     expect(SLOT_LABEL.hairstyle).toBe('Hairstyles');
     expect(hairstyles.map((item) => item.id)).toEqual([

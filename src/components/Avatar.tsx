@@ -20,7 +20,8 @@ import { HeldBag } from '../world/HeldBag';
 import { Adornments } from '../world/Adornments';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { GarmentLayer } from './GarmentLoader';
-import { getGarmentModel } from '../lib/fashion';
+import { getGarmentModel, itemById } from '../lib/fashion';
+import { SkinnedGarments, type WornGarment } from '../world/SkinnedGarments';
 import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, skinToneDepth, type SkinToneId } from '../lib/skinTone';
 import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
 import { createReachHugClip } from '../lib/hugAnimation';
@@ -416,6 +417,10 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
 
   const garmentModel = shoeItemId ? getGarmentModel(shoeItemId) : null;
   const hairstyleModel = hairstyleItemId ? getGarmentModel(hairstyleItemId) : null;
+  // Real 3D garments (a top, a bottom, a headwrap in the hairstyle slot), built on this person's own skeleton
+  const headwear = itemById(hairstyleItemId ?? undefined)?.style;
+  const worn: WornGarment[] = [styles?.top, styles?.bottom, headwear]
+    .flatMap((st) => (st?.garment ? [{ kind: st.garment.kind, fabric: st.garment.fabric, colors: st.colors }] : []));
 
   return (
     <group ref={group} dispose={null}>
@@ -428,6 +433,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
       {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped />}
       {hairstyleModel && <GarmentLayer groupRef={group} model={hairstyleModel} isEquipped avatarScale={scale} />}
+      {worn.length > 0 && !playerBody && <SkinnedGarments scene={scene} garments={worn} />}
     </group>
   );
 }
