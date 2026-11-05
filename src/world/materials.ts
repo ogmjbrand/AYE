@@ -138,3 +138,18 @@ export function setNightGlow(night: number) {
   for (const m of glowing) m.emissiveIntensity = m === cache?.lampHead ? night * 4 : night * 0.4;
   if (cache) cache.lightPool.emissiveIntensity = night * 0.42;
 }
+
+/** Dry roughness the road and pavement materials return to once wet is set back to 0. */
+let dryRoughness: { road: number; pavement: number } | null = null;
+
+/** Wet-look road and pavement, 0 (dry) to 1 (rain-soaked): lower roughness reads as a wet sheen. */
+export function setWet(wetness: number) {
+  if (!cache) return;
+  dryRoughness ??= { road: cache.road.roughness, pavement: cache.pavement.roughness };
+  cache.road.roughness = lerpNum(dryRoughness.road, 0.15, wetness);
+  cache.pavement.roughness = lerpNum(dryRoughness.pavement, 0.2, wetness);
+}
+
+function lerpNum(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}

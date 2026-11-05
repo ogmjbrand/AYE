@@ -6,9 +6,11 @@ import { INDOOR, type IndoorMood } from './indoorMoods';
 import { Color, Vector3, type DirectionalLight, Object3D, type PointLight, type Scene } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { GameTime } from '../lib/gameState';
+import type { WeatherCondition } from '../lib/weather';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { setNightGlow } from './materials';
+import { setNightGlow, setWet } from './materials';
 import { useQuality } from './quality';
+import { Rain } from './Rain';
 import { SkyDome } from './SkyDome';
 import { lightingAt, type HdriKey } from './timeOfDay';
 
@@ -41,19 +43,23 @@ function setBackground(scene: Scene, color: string) {
   scene.background = new Color(color);
 }
 
-export function SceneLighting({ gameTime, player, indoor }: {
+export function SceneLighting({ gameTime, player, indoor, weather = 'clear' }: {
   gameTime: GameTime;
   player: PlayerHandle;
   /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. */
   indoor?: IndoorMood;
+  /** Outdoors only; indoor scenes are unaffected by the weather outside. */
+  weather?: WeatherCondition;
 }) {
   const quality = useQuality();
-  const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
+  const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute, weather), [gameTime.hour, gameTime.minute, weather]);
   const sun = useRef<DirectionalLight>(null);
   const target = useMemo(() => new Object3D(), []);
   const fill = useRef<PointLight>(null);
+  const raining = !indoor && weather === 'rain';
 
   useEffect(() => setNightGlow(l.night), [l.night]);
+  useEffect(() => setWet(!indoor && weather !== 'clear' ? (weather === 'rain' ? 1 : 0.4) : 0), [indoor, weather]);
   // Set directly rather than by attaching a <color>, so moving between indoors and out never leaves the wrong one behind
   const { scene } = useThree();
   const background = indoor ? INDOOR[indoor].background : l.horizonColor;
@@ -110,7 +116,8 @@ export function SceneLighting({ gameTime, player, indoor }: {
     <>
       <fog attach="fog" args={[l.fogColor, 45, 190]} />
       <SkyDome lighting={l} />
-      {l.night > 0.3 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
+      {l.night > 0.3 && weather === 'clear' && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
+      {raining && <Rain player={player} />}
 
       <hemisphereLight args={[l.skyColor, l.groundColor, l.hemiIntensity]} />
       <pointLight ref={fill} color="#ffd9b0" intensity={characterLightFor(l.sunIntensity)} distance={7} decay={2} />
