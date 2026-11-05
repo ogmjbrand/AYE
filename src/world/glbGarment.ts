@@ -11,7 +11,7 @@
  * built garments in world/skinnedGarment.ts do.
  */
 import {
-  BufferAttribute, BufferGeometry, DoubleSide, Matrix4, Quaternion, Vector3, SkinnedMesh,
+  BufferAttribute, BufferGeometry, DoubleSide, Matrix3, Matrix4, Quaternion, Vector3, SkinnedMesh,
   type Material, type MeshStandardMaterial, type Object3D,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -162,4 +162,94 @@ export async function makeGlbGarment(scene: Object3D, path: string, color?: stri
   mesh.scale.copy(body.scale);
   mesh.bind(body.skeleton, body.bindMatrix);
   return mesh;
+}
+
+/**
+ * Which body vertices a garment covers: the cloth lies just outside them (or just inside, where
+ * the body pokes through it), within `reach` along the skin's normal and within `across` of straight out (so the skin below a hem, whose
+ * nearest cloth is above it, is not covered). Positions and normals in the same space; flat
+ * xyz arrays.
+ */
+export function coveredVertices(bodyPos: ArrayLike<number>, bodyNrm: ArrayLike<number>, cloth: ArrayLike<number>, reach = 0.07, across = 0.03): Uint8Array {
+  const cell = reach;
+  const grid = new Map<string, number[]>();
+  const key = (x: number, y: number, z: number) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  for (let i = 0; i < cloth.length / 3; i++) {
+    const k = key(cloth[i * 3], cloth[i * 3 + 1], cloth[i * 3 + 2]);
+    let list = grid.get(k);
+    if (!list) grid.set(k, (list = []));
+    list.push(i);
+  }
+  const n = bodyPos.length / 3;
+  const out = new Uint8Array(n);
+  for (let v = 0; v < n; v++) {
+    const px = bodyPos[v * 3], py = bodyPos[v * 3 + 1], pz = bodyPos[v * 3 + 2];
+    const nx = bodyNrm[v * 3], ny = bodyNrm[v * 3 + 1], nz = bodyNrm[v * 3 + 2];
+    const cx = Math.floor(px / cell), cy = Math.floor(py / cell), cz = Math.floor(pz / cell);
+    search: for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      const list = grid.get(`${cx + a},${cy + b},${cz + c}`);
+      if (!list) continue;
+      for (const i of list) {
+        const dx = cloth[i * 3] - px, dy = cloth[i * 3 + 1] - py, dz = cloth[i * 3 + 2] - pz;
+        const out_ = dx * nx + dy * ny + dz * nz;
+        // Cloth just outside the skin, or just inside it (where the body pokes through it)
+        if (out_ < -reach || out_ > reach) continue;
+        const sx = dx - nx * out_, sy = dy - ny * out_, sz = dz - nz * out_;
+        if (sx * sx + sy * sy + sz * sz < across * across) { out[v] = 1; break search; }
+      }
+    }
+  }
+  return out;
+}
+
+/** The triangles of `index` that aren't covered on all three corners. */
+export function uncoveredTriangles(index: ArrayLike<number>, covered: Uint8Array): number[] {
+  const keep: number[] = [];
+  for (let t = 0; t < index.length; t += 3) {
+    const a = index[t], b = index[t + 1], c = index[t + 2];
+    if (!(covered[a] && covered[b] && covered[c])) keep.push(a, b, c);
+  }
+  return keep;
+}
+
+const hidden = new WeakMap<BufferGeometry, WeakMap<BufferGeometry, BufferGeometry>>();
+
+/**
+ * Stop drawing the person's body where the garment covers it, so their own clothes can't show
+ * through it (in the bind pose or as they move). The body gets its own index over the same
+ * vertex data, for as long as the garment is worn; returns the undo.
+ */
+export function hideUnder(body: SkinnedMesh, garment: SkinnedMesh): () => void {
+  const original = body.geometry;
+  let perGarment = hidden.get(original);
+  if (!perGarment) { perGarment = new WeakMap(); hidden.set(original, perGarment); }
+  let trimmed = perGarment.get(garment.geometry);
+  if (!trimmed) {
+    const P = original.getAttribute('position'), N = original.getAttribute('normal'), I = original.getIndex();
+    if (!P || !N || !I) return () => {};
+    // The body in its bind space (the garment's vertices are already there)
+    const bm = body.bindMatrix, nm = new Matrix3().getNormalMatrix(bm);
+    const pos = new Float32Array(P.count * 3), nrm = new Float32Array(P.count * 3);
+    const v = new Vector3();
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(bm); pos.set([v.x, v.y, v.z], i * 3);
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nrm.set([v.x, v.y, v.z], i * 3);
+    }
+    const G = garment.geometry.getAttribute('position');
+    const cloth = new Float32Array(G.count * 3);
+    for (let i = 0; i < G.count; i++) { v.fromBufferAttribute(G, i).applyMatrix4(garment.bindMatrix); cloth.set([v.x, v.y, v.z], i * 3); }
+    // Bind-space units per metre: the body's tallest extent over a Rocketbox person's height
+    const ext = [0, 1, 2].map((k) => { let lo = Infinity, hi = -Infinity; for (let i = k; i < pos.length; i += 3) { lo = Math.min(lo, pos[i]); hi = Math.max(hi, pos[i]); } return hi - lo; });
+    const unit = Math.max(...ext) / 1.7;
+    const covered = coveredVertices(pos, nrm, cloth, 0.07 * unit, 0.03 * unit);
+    trimmed = new BufferGeometry();
+    for (const [name, attr] of Object.entries(original.attributes)) trimmed.setAttribute(name, attr);
+    trimmed.setIndex(uncoveredTriangles(I.array, covered));
+    for (const g of original.groups) trimmed.addGroup(g.start, g.count, g.materialIndex);
+    trimmed.boundingSphere = original.boundingSphere;
+    trimmed.boundingBox = original.boundingBox;
+    perGarment.set(garment.geometry, trimmed);
+  }
+  body.geometry = trimmed;
+  return () => { if (body.geometry === trimmed) body.geometry = original; };
 }

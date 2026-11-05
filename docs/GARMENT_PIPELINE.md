@@ -88,7 +88,7 @@ A drape takes about 45 s per person on 4 CPU cores.
 - **Not made:** the cape with pearl trim and the flap pockets. GarmentCode has no cape or
   pocket pieces, and drawing new ones is the next step for this garment.
 
-**Verified in the game** (female-adult-08, 900 × 900 screenshots at high quality):
+**Verified in the game, in full** (female-adult-08, 900 × 900 screenshots at high quality):
 - standing, walking and running: the skirt moves as one piece and doesn't split round the
   legs;
 - sitting down on a bench, seated, and standing up: the skirt follows the lap, with no body
@@ -97,20 +97,23 @@ A drape takes about 45 s per person on 4 CPU cores.
   hem 0.34 m above the feet;
 - no console errors.
 
-**Other people (batch run on all nine feminine people):**
+**Other people (batch run on all nine feminine people, then checked in the game):**
 
 | Result | People |
 |---|---|
-| Clean, and checked in the game | female-adult-08 (the only file shipped) |
-| Nearly clean: a few small spots of their own clothes show through | female-adult-03, female-adult-04 |
-| Their own clothes show through badly | business-female-02 (blazer), medical-female-02 (white coat), female-adult-11, female-adult-06 (long tunic), female-adult-10 (abaya and khimar) |
-| Preview not yet reviewed | pilot-female-01 |
+| Wear it (front and side checked in the game) | female-adult-08, female-adult-03, female-adult-04, female-adult-11, business-female-02, pilot-female-01 |
+| Not shipped: their own long or bulky clothes deform the drape | female-adult-06 (long tunic, hijab), female-adult-10 (abaya, khimar), medical-female-02 (white coat) |
 
-- **Why:** these people's own clothes are bulky or long, and the drape keeps clear of the
-  body's surface, not of clothes worn loose over it.
-- **Next step:** a larger clearance per person, or masking the body under the dress.
-- **Count misses it:** the "vertices inside the body" count is 0 for all of them, which is
-  why every preview has to be looked at.
+- **Hiding the body under the dress** (`world/glbGarment.ts` `hideUnder`): the person's own
+  clothes can't show through it.
+  - While the dress is worn, the body is drawn from its own triangle list without the
+    triangles the dress covers: cloth within 7 cm along the skin's normal, on either side, and
+    within 3 cm of straight out.
+  - So skin below the hem, whose nearest cloth is above it, stays.
+  - Taking the dress off restores the body.
+  - This turned the blazer, the fitted tops and female-adult-11's clothes from showing
+    through badly to clean.
+- **Lumps:** over bulky clothes the dress follows them and looks a little lumpy.
 - **Who wears it:** a person wears the dress only if their file is listed in the registry.
   Anyone else keeps the fabric restyle of their own top, as before.
 

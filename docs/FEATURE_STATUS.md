@@ -235,9 +235,9 @@ What is done, and what it does not do yet:
   skeleton (`docs/GARMENT_PIPELINE.md`, `lib/garmentRegistry.ts`, `world/glbGarment.ts`).
 - **First garment:** the OGM Atelier sewn pencil dress · Tangerine (Office collection,
   3,600 GHAI), taken from a supplied photo with no brand marks carried over.
-  - Checked on female-adult-08: standing, walking, running, sitting.
-  - **Partial:** no cape or pockets; one person so far (the batch results for the others are
-    in the doc).
+  - Worn by six of the nine feminine people (the body is hidden under it, so their own clothes
+    can't show through); female-adult-08 checked standing, walking, running and sitting.
+  - **Partial:** no cape or pockets; not yet for the three people in long or bulky clothes.
 
 ## Next task (pick up here)
 

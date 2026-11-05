@@ -58,7 +58,7 @@ export const SEWN_GARMENTS: readonly SewnGarment[] = [
       template: 'GarmentCode FittedShirt + PencilSkirt, body mean_female',
       params: { sleeveLength: 0.18, skirtLength: 0.62, collarDepth: 0.3, sleeveless: false, meshResolution: 2.5 },
     },
-    files: { 'female-adult-08': `${dir}/pencil-dress-tangerine/female-adult-08.glb` },
+    files: { 'female-adult-08': `${dir}/pencil-dress-tangerine/female-adult-08.glb`, 'female-adult-03': `${dir}/pencil-dress-tangerine/female-adult-03.glb`, 'female-adult-04': `${dir}/pencil-dress-tangerine/female-adult-04.glb`, 'female-adult-11': `${dir}/pencil-dress-tangerine/female-adult-11.glb`, 'business-female-02': `${dir}/pencil-dress-tangerine/business-female-02.glb`, 'pilot-female-01': `${dir}/pencil-dress-tangerine/pilot-female-01.glb` },
     body: 'feminine',
     rig: 'rocketbox-bip01',
     color: '#e8701e',
@@ -70,7 +70,8 @@ export const SEWN_GARMENTS: readonly SewnGarment[] = [
     limits: [
       'The cape with pearl trim and the flap pockets in the photo are not made: GarmentCode has no cape or pocket pieces yet',
       'Plain colour, no fabric texture',
-      'Fitted to one body so far (female-adult-08); other people cannot wear it until it is draped on them',
+      'Six of the nine feminine people wear it. Not female-adult-06 (long tunic and hijab), female-adult-10 (abaya and khimar) or medical-female-02 (white coat): their own long or bulky clothes deform the drape',
+      'Over bulky clothes the dress follows them and looks a little lumpy',
       'Skinned, not simulated: the skirt follows the legs rather than swinging',
     ],
   },

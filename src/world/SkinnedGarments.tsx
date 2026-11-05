@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import type { Object3D } from 'three';
 import type { GarmentFabric, GarmentKind } from '../lib/fashion';
-import { makeGarment, wear } from './skinnedGarment';
-import { makeGlbGarment } from './glbGarment';
+import { findBody, makeGarment, wear } from './skinnedGarment';
+import { hideUnder, makeGlbGarment } from './glbGarment';
 
 export interface WornGarment { kind: GarmentKind; fabric: GarmentFabric; colors: readonly [string, string, string] }
 /** A garment from the pattern pipeline: its skinned GLB for this person (lib/garmentRegistry.ts) and colour. */
@@ -34,7 +34,13 @@ export function SkinnedGarments({ scene, garments, sewn = NONE }: { scene: Objec
     }))).then((meshes) => {
       if (!live) return;
       undo = meshes.flatMap((m, i) => {
-        if (m) return [wear(scene, m)];
+        if (m) {
+          // The person's own clothes can't show through: their body isn't drawn under the garment
+          const body = findBody(scene)?.body;
+          const shown = body ? hideUnder(body, m) : () => {};
+          const off = wear(scene, m);
+          return [() => { off(); shown(); }];
+        }
         console.warn(`[AYE garments] ${list[i].path} doesn't fit this person's skeleton`);
         return [];
       });
