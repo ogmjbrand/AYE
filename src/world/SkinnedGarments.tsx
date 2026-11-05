@@ -2,11 +2,16 @@ import { useEffect } from 'react';
 import type { Object3D } from 'three';
 import type { GarmentFabric, GarmentKind } from '../lib/fashion';
 import { makeGarment, wear } from './skinnedGarment';
+import { makeGlbGarment } from './glbGarment';
 
 export interface WornGarment { kind: GarmentKind; fabric: GarmentFabric; colors: readonly [string, string, string] }
+/** A garment from the pattern pipeline: its skinned GLB for this person (lib/garmentRegistry.ts) and colour. */
+export interface SewnWorn { path: string; color: string }
 
-/** Puts each real 3D garment on the person (world/skinnedGarment.ts) and takes it off again when it changes. */
-export function SkinnedGarments({ scene, garments }: { scene: Object3D; garments: readonly WornGarment[] }) {
+const NONE: readonly SewnWorn[] = [];
+
+/** Puts each real 3D garment on the person (world/skinnedGarment.ts, world/glbGarment.ts) and takes it off again when it changes. */
+export function SkinnedGarments({ scene, garments, sewn = NONE }: { scene: Object3D; garments: readonly WornGarment[]; sewn?: readonly SewnWorn[] }) {
   const key = JSON.stringify(garments);
   useEffect(() => {
     const list = JSON.parse(key) as WornGarment[];
@@ -18,5 +23,23 @@ export function SkinnedGarments({ scene, garments }: { scene: Object3D; garments
     }
     return () => { for (const u of undo) u(); };
   }, [scene, key]);
+  const sewnKey = JSON.stringify(sewn);
+  useEffect(() => {
+    const list = JSON.parse(sewnKey) as SewnWorn[];
+    let undo: (() => void)[] = [];
+    let live = true;
+    void Promise.all(list.map((g) => makeGlbGarment(scene, g.path, g.color).catch((e: unknown) => {
+      console.warn(`[AYE garments] couldn't load ${g.path}`, e);
+      return null;
+    }))).then((meshes) => {
+      if (!live) return;
+      undo = meshes.flatMap((m, i) => {
+        if (m) return [wear(scene, m)];
+        console.warn(`[AYE garments] ${list[i].path} doesn't fit this person's skeleton`);
+        return [];
+      });
+    });
+    return () => { live = false; for (const u of undo) u(); };
+  }, [scene, sewnKey]);
   return null;
 }

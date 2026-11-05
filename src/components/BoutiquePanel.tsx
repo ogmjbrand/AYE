@@ -238,7 +238,7 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
                   <div className="flex flex-1 items-end justify-between gap-2 px-2.5 pb-2.5 pt-2">
                     <div className="min-w-0">
                       <p className="m-0 text-[13px] font-semibold leading-tight">{c.name}</p>
-                      {c.items.some((i) => i.style.garment) && <p className="m-0 mt-1 inline-block rounded-full border border-ui-gold/50 px-1.5 text-[10px] font-semibold uppercase tracking-wider text-ui-gold-strong">3D garment</p>}
+                      {c.items.some((i) => i.style.garment || i.style.sewn) && <p className="m-0 mt-1 inline-block rounded-full border border-ui-gold/50 px-1.5 text-[10px] font-semibold uppercase tracking-wider text-ui-gold-strong">3D garment</p>}
                       {have ? <p className="m-0 mt-1 text-[11px] font-semibold text-ui-accent-strong">{wearing ? 'Wearing' : 'Owned'}</p> : <span className="mt-1 block"><Coin amount={c.price} /></span>}
                     </div>
                     {have ? (

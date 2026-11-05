@@ -1,0 +1,11 @@
+{
+  "id": "pencil-dress-tangerine",
+  "boxmesh": "${GC_OUT}/pencil_dress/pencil_dress_boxmesh.obj",
+  "lens": "${GC_OUT}/pencil_dress/pencil_dress_orig_lens.pickle",
+  "gcBody": "${GARMENTCODE}/assets/bodies/mean_female.obj",
+  "python": "${BPY_PYTHON}",
+  "color": "#e8701e",
+  "fit": 0.86,
+  "frames": 120,
+  "looks": ["female-adult-08", "female-adult-03", "female-adult-06", "female-adult-11", "female-adult-10", "female-adult-04", "business-female-02", "medical-female-02", "pilot-female-01"]
+}

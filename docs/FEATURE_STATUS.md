@@ -228,6 +228,17 @@ What is done, and what it does not do yet:
 
 **Saves:** no save format changed. Wardrobe purchases, GHAI balances, character progress and saved outfits load as before; the new items are only added to the catalogue. (There is no system named LINDA in the code; a character or save of that name loads like any other.)
 
+## Garments from photos (November 2026, verified in the browser)
+
+- **The pipeline:** a GarmentCode sewing pattern is sewn and draped on each Rocketbox body
+  offline, weighted to its skeleton, and loaded as a skinned GLB bound to the person's own
+  skeleton (`docs/GARMENT_PIPELINE.md`, `lib/garmentRegistry.ts`, `world/glbGarment.ts`).
+- **First garment:** the OGM Atelier sewn pencil dress · Tangerine (Office collection,
+  3,600 GHAI), taken from a supplied photo with no brand marks carried over.
+  - Checked on female-adult-08: standing, walking, running, sitting.
+  - **Partial:** no cape or pockets; one person so far (the batch results for the others are
+    in the doc).
+
 ## Next task (pick up here)
 
 

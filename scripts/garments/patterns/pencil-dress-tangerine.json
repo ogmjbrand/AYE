@@ -1,0 +1,14 @@
+{
+  "name": "pencil_dress",
+  "body": "mean_female",
+  "reference": "Supplied photo: tangerine short-sleeved pencil dress, mid-calf, fitted waist. Not made: the cape with pearl trim, the flap pockets. Not used: the photo's watermark, the bag.",
+  "design": {
+    "meta.upper": "FittedShirt",
+    "meta.wb": null,
+    "meta.bottom": "PencilSkirt",
+    "sleeve.sleeveless": false,
+    "sleeve.length": 0.18,
+    "pencil-skirt.length": 0.62,
+    "collar.fc_depth": 0.3
+  }
+}

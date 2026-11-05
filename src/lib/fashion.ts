@@ -127,6 +127,8 @@ export interface Style {
   woven?: true;
   /** A real 3D garment built on the body and skinned to its skeleton (world/skinnedGarment.ts). */
   garment?: { kind: GarmentKind; fabric: GarmentFabric };
+  /** A garment sewn from a pattern offline and draped on each body (lib/garmentRegistry.ts, world/glbGarment.ts): its registry id. */
+  sewn?: string;
 }
 
 /** The built 3D garments: each is real geometry that moves with the person's skeleton. */
@@ -206,6 +208,12 @@ const printShoe = (id: string, name: string, price: number, pattern: Pattern, co
 const garment3d = (id: string, slot: Slot, name: string, price: number, collection: FashionItem['collection'], kind: GarmentKind, fabric: GarmentFabric, colors: [string, string, string]): FashionItem => {
   const base = item(id, slot, name, price, collection, fabric === 'aso-oke' ? 'kente' : fabric === 'satin' ? 'solid' : 'pinstripe', colors, fabric === 'aso-oke' ? 10 : 60);
   return { ...base, style: { ...base.style, fabric: slot === 'hairstyle' ? undefined : fabric === 'aso-oke' ? FABRICS.handwoven : fabric === 'satin' ? FABRICS.satin : FABRICS.wool, garment: { kind, fabric } } };
+};
+
+/** A garment from the pattern pipeline (lib/garmentRegistry.ts): a dress, sold in the top slot, covering the legs too. */
+const sewn3d = (id: string, sewnId: string, name: string, price: number, collection: FashionItem['collection'], colors: [string, string, string]): FashionItem => {
+  const base = item(id, 'top', name, price, collection, 'solid', colors, 60);
+  return { ...base, style: { ...base.style, fabric: FABRICS.cotton, sewn: sewnId } };
 };
 
 /** A ready-made aso-ebi gown: sold as a dress (bodice and skirt in one fabric). */
@@ -831,6 +839,7 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   garment3d('top-tailored-charcoal', 'top', 'OGM Atelier 3D tailored blazer · Charcoal', 2600, 'Tailored', 'blazer', 'suiting', ['#2c2e33', '#8a8d94', '#1c1d21']),
   garment3d('bottom-tailored-charcoal', 'bottom', 'OGM Atelier 3D wide-leg trousers · Charcoal', 1800, 'Tailored', 'wide-trousers', 'suiting', ['#2c2e33', '#8a8d94', '#1c1d21']),
   garment3d('top-mermaid3d-emerald', 'top', 'OGM Atelier 3D strapless mermaid gown · Emerald satin', 4800, 'Gala', 'gown', 'satin', ['#0f5a3e', '#1f8a5e', '#0a3a28']),
+  sewn3d('top-sewn-pencil-tangerine', 'pencil-dress-tangerine', 'OGM Atelier sewn pencil dress · Tangerine', 3600, 'Office', ['#e8701e', '#c95c12', '#f39a52']),
   garment3d('bottom-shorts3d-cream', 'bottom', 'OGM Atelier 3D tailored shorts · Cream', 900, 'Tailored', 'shorts', 'suiting', ['#e6dcc6', '#b8ad94', '#d2c6aa']),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),

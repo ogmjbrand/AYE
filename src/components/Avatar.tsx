@@ -20,8 +20,9 @@ import { HeldBag } from '../world/HeldBag';
 import { Adornments } from '../world/Adornments';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { GarmentLayer } from './GarmentLoader';
-import { getGarmentModel, itemById } from '../lib/fashion';
+import { FABRICS, getGarmentModel, itemById } from '../lib/fashion';
 import { SkinnedGarments, type WornGarment } from '../world/SkinnedGarments';
+import { sewnById, sewnFileFor } from '../lib/garmentRegistry';
 import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, skinToneDepth, type SkinToneId } from '../lib/skinTone';
 import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
 import { createReachHugClip } from '../lib/hugAnimation';
@@ -204,6 +205,9 @@ function privateCopy(shared: Object3D): Object3D {
   });
   return copy;
 }
+
+/** Dark opaque tights, worn under a sewn dress. */
+const TIGHTS: Style = { pattern: 'solid', colors: ['#2a2321', '#2a2321', '#3a302c'], scale: 1, fabric: FABRICS.jersey };
 
 export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null, activity = null }: {
   controller: PlayerHandle;
@@ -433,9 +437,15 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   const hairstyleModel = hairstyleItemId ? getGarmentModel(hairstyleItemId) : null;
   // Real 3D garments (a top, a bottom, a headwrap in the hairstyle slot), built on this person's own skeleton
   const headwear = itemById(hairstyleItemId ?? undefined)?.style;
-  // A gown covers the legs: what's underneath takes its fabric, so a stride never shows other clothes
-  const gownStyle = styles?.top?.garment?.kind === 'gown' ? styles.top : null;
-  const shownStyles = gownStyle && styles ? { ...styles, bottom: gownStyle } : styles;
+  // A sewn dress (lib/garmentRegistry.ts) on this person, if it has been draped on their body
+  const sewnTop = sewnById(styles?.top?.sewn);
+  const sewnPath = sewnTop && !playerBody ? sewnFileFor(sewnTop, styledLook ?? undefined) : undefined;
+  const sewn = sewnPath && sewnTop ? [{ path: sewnPath, color: sewnTop.color }] : [];
+  // A gown or a dress covers the legs: what's underneath takes its fabric, so a stride never shows other clothes
+  const gownStyle = styles?.top?.garment?.kind === 'gown' || (sewnPath && sewnTop?.layers.includes('bottom')) ? styles?.top ?? null : null;
+  // Under a sewn midi dress the legs below the hem are opaque dark tights (the Rocketbox people have
+  // no bare legs), not trousers in the dress's colour, which would read as a jumpsuit
+  const shownStyles = sewnPath && styles ? { ...styles, bottom: TIGHTS } : gownStyle && styles ? { ...styles, bottom: gownStyle } : styles;
   const worn: WornGarment[] = [styles?.top, gownStyle ? undefined : styles?.bottom, headwear]
     .flatMap((st) => (st?.garment ? [{ kind: st.garment.kind, fabric: st.garment.fabric, colors: st.colors }] : []));
 
@@ -450,7 +460,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
       {garmentModel && <GarmentLayer groupRef={group} model={garmentModel} isEquipped />}
       {hairstyleModel && <GarmentLayer groupRef={group} model={hairstyleModel} isEquipped avatarScale={scale} />}
-      {worn.length > 0 && !playerBody && <SkinnedGarments scene={scene} garments={worn} />}
+      {(worn.length > 0 || sewn.length > 0) && !playerBody && <SkinnedGarments scene={scene} garments={worn} sewn={sewn} />}
     </group>
   );
 }

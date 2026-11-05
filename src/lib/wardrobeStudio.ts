@@ -38,9 +38,9 @@ export function itemsForTab(wardrobe: Wardrobe, tab: StudioTab, favouritesOnly =
   const favs = new Set(wardrobe.favourites ?? []);
   const fits = (i: FashionItem) => {
     switch (tab) {
-      case 'tops': return i.slot === 'top' && !i.dress && i.style.garment?.kind !== 'gown';
+      case 'tops': return i.slot === 'top' && !i.dress && i.style.garment?.kind !== 'gown' && !i.style.sewn;
       case 'bottoms': return i.slot === 'bottom' && !isDressBottom(i);
-      case 'dresses': return i.slot === 'top' && (!!i.dress || i.style.garment?.kind === 'gown');
+      case 'dresses': return i.slot === 'top' && (!!i.dress || i.style.garment?.kind === 'gown' || !!i.style.sewn);
       case 'shoes': return i.slot === 'shoes';
       case 'accessories': return ACCESSORY_SLOTS.includes(i.slot);
       case 'hairstyles': return i.slot === 'hairstyle' || i.slot === 'hair';
@@ -101,7 +101,7 @@ export function outfitDraft(outfit: Outfit, owned: readonly string[]): Draft {
 
 /** What a thumbnail stands for, said plainly (it is never a separate 3D garment). */
 export function thumbnailNote(item: FashionItem): string {
-  if (item.style.garment) return '3D garment';
+  if (item.style.garment || item.style.sewn) return '3D garment';
   if (item.slot === 'hairstyle') return '3D hairstyle';
   if (item.slot === 'hair') return 'Hair colour';
   if (item.dress) return 'Fabric for your top and bottom';
