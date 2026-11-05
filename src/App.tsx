@@ -8,7 +8,7 @@ import { useWalkThen } from './hooks/useWalkThen';
 import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
+import { FOOD_CART_SIZE, activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -55,7 +55,7 @@ import { ActivityMenu } from './components/ActivityMenu';
 import { aroundFurniture, aroundPoint, furnitureActivities, type Activity } from './lib/venueActivities';
 import { canStore } from './lib/pantry';
 import type { ActivityClip } from './lib/animationLibrary';
-import { STALL_MINUTES, SERVICE_LABEL, faceStall, serviceOf } from './lib/foodService';
+import { STALL_MINUTES, SERVICE_LABEL, cartStations, faceStall, serviceOf } from './lib/foodService';
 import { HomePanel } from './components/HomePanel';
 import { GadgetStore } from './components/GadgetStore';
 import { MapPanel } from './components/MapPanel';
@@ -748,7 +748,12 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const openVendor = (foodVendor: FoodVendor) => {
     if (serviceOf(foodVendor) !== 'street') { enterRestaurant(foodVendor); return; }
     // Turn to the cart or stall you're ordering from, then stay put while you eat
-    const face = faceStall(controller.position, district.layout.foodCarts ?? [], district.layout.stalls ?? []);
+    // At a food cart you face its seller, who works the grill beside the counter (lib/foodService.ts cartStations)
+    const cartSeller = (district.layout.foodCarts ?? []).map((c) => cartStations(c, FOOD_CART_SIZE).seller)
+      .find((p) => Math.hypot(p.x - controller.position.x, p.z - controller.position.z) < 3);
+    const face = cartSeller
+      ? Math.atan2(cartSeller.x - controller.position.x, cartSeller.z - controller.position.z)
+      : faceStall(controller.position, district.layout.foodCarts ?? [], district.layout.stalls ?? []);
     if (face !== null) controller.direction = face;
     setStall(foodVendor);
     setMovementBlocked(true);
@@ -1758,7 +1763,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
       const door = homeAtDoor(district.id, x, z);
-      if (near) enterRestaurant(near);
+      // The same as the prompt's button: a street stall serves you where you stand, others have a room
+      if (near) openVendor(near);
       else if (atDealershipDoor()) enterDealership();
       else if (atOfficeDoor()) goIntoOffice();
       else if (atUniversityDoor()) goIntoUniversity();

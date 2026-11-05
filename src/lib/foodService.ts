@@ -37,3 +37,21 @@ export function faceStall(at: { x: number; z: number }, carts: readonly { x: num
   for (const p of points) { const d = Math.hypot(p.x - at.x, p.z - at.z); if (d < bestD && d > 0.05) { best = p; bestD = d; } }
   return best ? Math.atan2(best.x - at.x, best.z - at.z) : null;
 }
+
+/**
+ * Where the people at a street-food cart stand (the suya grill). The cart model's working side
+ * (grill, skewers, chopping board) is its front (+z in its own frame), the grill toward its -x end.
+ * The seller stands mid-counter on that side, facing it; a customer orders at the grill end,
+ * facing the seller. Headings as the player's (0 = +z).
+ */
+export function cartStations(cart: { x: number; z: number; facing: number }, size: { length: number; depth: number }) {
+  const front = [Math.sin(cart.facing), Math.cos(cart.facing)] as const;
+  const along = [Math.cos(cart.facing), -Math.sin(cart.facing)] as const;
+  const at = (out: number, side: number) => [cart.x + front[0] * out + along[0] * side, cart.z + front[1] * out + along[1] * side] as const;
+  const [sx, sz] = at(size.depth / 2 + 0.35, 0);
+  const [cx, cz] = at(size.depth / 2 + 0.45, -(size.length / 2 + 0.35));
+  return {
+    seller: { x: sx, z: sz, facing: cart.facing + Math.PI },
+    counter: { x: cx, z: cz, facing: Math.atan2(sx - cx, sz - cz) },
+  };
+}

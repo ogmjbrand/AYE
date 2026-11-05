@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useRef } from 'react';
 import { useGLTF, useTexture } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Euler, Matrix4, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3, type Mesh,
@@ -13,6 +13,7 @@ import { assetManifest, assetUrl } from '../lib/assetManifest';
 import { modelPath } from './realModels';
 import { RealModel } from './RealModel';
 import { VenueNpc } from './VenueNpc';
+import { cartStations } from '../lib/foodService';
 import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
@@ -474,9 +475,10 @@ export function ParkedDanfo({ vehicle }: { vehicle: Vehicle }) {
 }
 
 /**
- * Street-food carts (the suya grill on Lagoon Boulevard): the cart, a soft
- * orange glow off its charcoal that grows after dark, and the seller
- * (computer-controlled) behind the grill on the kerb side.
+ * Street-food carts (the suya grill on Lagoon Boulevard): the cart, a soft orange glow off its
+ * charcoal that grows after dark, the seller at the grill on its working side turning the
+ * skewers (lib/foodService.ts cartStations), and residents who come by, buy at the end of the
+ * counter while he turns to serve them, and walk on.
  */
 function FoodCarts({ night }: { night: number }) {
   const { foodCarts } = useLayout();
@@ -484,19 +486,56 @@ function FoodCarts({ night }: { night: number }) {
   const { length, depth, height } = FOOD_CART_SIZE;
   return (
     <>
-      {foodCarts.map((c, i) => {
-        // The model's counter faces +z; behind the cart is -z in its own frame
-        const back = [c.x - Math.sin(c.facing) * (depth / 2 + 0.35), c.z - Math.cos(c.facing) * (depth / 2 + 0.35)] as const;
-        return (
-          <group key={i}>
-            <group position={[c.x, PAVEMENT_HEIGHT, c.z]} rotation={[0, c.facing, 0]}>
-              <RealModel name="food-cart" fit={[length, height, depth]} />
-              <pointLight position={[0, 1.15, 0]} intensity={0.6 + 2.4 * night} distance={3.5} decay={2} color="#ff8a3d" />
-            </group>
-            <VenueNpc lookId="male-adult-15" name="Mallam Sule" role="Suya seller" x={back[0]} z={back[1]} facing={c.facing} chatty />
+      {foodCarts.map((c, i) => (
+        <group key={i}>
+          <group position={[c.x, PAVEMENT_HEIGHT, c.z]} rotation={[0, c.facing, 0]}>
+            <RealModel name="food-cart" fit={[length, height, depth]} />
+            <pointLight position={[0, 1.15, 0]} intensity={0.6 + 2.4 * night} distance={3.5} decay={2} color="#ff8a3d" />
           </group>
-        );
-      })}
+          <CartPeople cart={c} />
+        </group>
+      ))}
+    </>
+  );
+}
+
+/** Two residents who buy at the cart in turn: in along the pavement, a wait at the counter, and on. */
+const CART_CUSTOMERS = [
+  { lookId: 'female-adult-11', name: 'Kemi Adeyemi' },
+  { lookId: 'male-adult-04', name: 'Tobi Okafor' },
+] as const;
+const COUNTER_SECONDS = 9;
+
+function CartPeople({ cart }: { cart: { x: number; z: number; facing: number } }) {
+  const st = useMemo(() => cartStations(cart, FOOD_CART_SIZE), [cart]);
+  const atCounter = useRef<boolean[]>(CART_CUSTOMERS.map(() => false));
+  const routes = useMemo(() => {
+    // Out from the cart's working side (onto the pavement) and along it (- toward the counter end)
+    const f = [Math.sin(cart.facing), Math.cos(cart.facing)], al = [Math.cos(cart.facing), -Math.sin(cart.facing)];
+    const P = (out: number, side: number, pause = 0, facing?: number) => {
+      const x = cart.x + f[0] * out + al[0] * side, z = cart.z + f[1] * out + al[1] * side;
+      return (facing === undefined ? [x, z, pause] : [x, z, pause, facing]) as [number, number, number] | [number, number, number, number];
+    };
+    const loop = [
+      // Along the pavement between the palms and the shopfronts, in to the counter, and on
+      P(1.9, -9, 2),
+      P(1.6, -2.7, 0),
+      [st.counter.x, st.counter.z, COUNTER_SECONDS, st.counter.facing] as [number, number, number, number],
+      P(1.9, -0.6, 0),
+      P(1.9, 8, 3),
+    ];
+    // The second starts at the far end, half a loop behind, so they don't arrive together
+    return [loop, [...loop.slice(4), ...loop.slice(0, 4)]];
+  }, [cart, st]);
+  const counterStop = (r: number) => (r === 0 ? 2 : 3);
+  return (
+    <>
+      <VenueNpc lookId="male-adult-15" name="Mallam Sule" role="Suya seller" x={st.seller.x} z={st.seller.z} facing={st.seller.facing}
+        grill={{ serving: () => atCounter.current.some(Boolean), serveFacing: st.counter.facing + Math.PI }} />
+      {CART_CUSTOMERS.map((c, r) => (
+        <VenueNpc key={c.name} lookId={c.lookId} name={c.name} role="Buying suya" x={routes[r][0][0]} z={routes[r][0][1]} facing={0}
+          route={routes[r]} onStop={(stop) => { atCounter.current[r] = stop === counterStop(r); }} />
+      ))}
     </>
   );
 }

@@ -2,7 +2,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { cullAsPerson } from './cullPerson';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
-import { Box3, CanvasTexture, Material, SRGBColorSpace, type Group, type Mesh } from 'three';
+import { Box3, CanvasTexture, Euler, Material, Quaternion, SRGBColorSpace, type Group, type Mesh, type Object3D } from 'three';
+import { findRigBone } from '../lib/characterRig';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assetUrl } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
@@ -48,8 +49,13 @@ export interface NpcProps {
   facing: number;
   /** Sits on this seat instead of standing. */
   seat?: Seat;
-  /** Walks this loop (pausing at each point), e.g. a waiter's round. */
-  route?: readonly (readonly [number, number])[];
+  /** Walks this loop (pausing at each point), e.g. a waiter's round. A point may give its own
+   *  pause in seconds and a heading to turn to while there: [x, z, pause, facing]. */
+  route?: readonly (readonly [number, number] | readonly [number, number, number] | readonly [number, number, number, number])[];
+  /** Called each frame with where they are and whether they're standing still at a stop (a customer at a counter). */
+  onStop?: (stopIndex: number | null) => void;
+  /** Works a street-food grill: arms over the coals, turning the skewers; turns to serve while `serving()` says so. */
+  grill?: { serving: () => boolean; serveFacing: number };
   /** Talks with their hands now and then (diners chatting, a host greeting). */
   chatty?: boolean;
   /** A uniform: fabrics for their top, bottom and shoes (lib/fashion.ts styles). */
@@ -59,9 +65,20 @@ export interface NpcProps {
 }
 
 const WALK_SPEED = 1.0;
+
+// Grill work, as offsets on the clip's arm rotations (the Biped's arm bones; as Avatar's eating pose)
+const GRILL_UPPER_R = new Quaternion().setFromEuler(new Euler(-0.1, 0.15, -0.55));
+const GRILL_UPPER_L = new Quaternion().setFromEuler(new Euler(0.1, -0.15, -0.55));
+const GRILL_FORE_R = new Quaternion().setFromEuler(new Euler(0, 0, -0.95));
+const GRILL_FORE_L = new Quaternion().setFromEuler(new Euler(0, 0, -0.95));
+const GRILL_TURN = new Quaternion().setFromEuler(new Euler(0.7, 0, 0));
+const scratch = new Quaternion();
+const pose = (bone: Object3D | undefined, q: Quaternion, k: number) => {
+  if (bone) bone.quaternion.multiply(scratch.identity().slerp(q, Math.min(1, k)));
+};
 const PAUSE_SECONDS = 2.2;
 
-function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform, lying }: NpcProps) {
+function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform, lying, onStop, grill }: NpcProps) {
   const look = lookById(lookId);
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
@@ -102,6 +119,12 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
   const [gestures, setGestures] = useState<GestureActions>({});
   const tag = useMemo(() => staffTag(name, role), [name, role]);
   const current = useRef<string>('');
+  const work = useRef(1);
+  const arms = useMemo(() => ({
+    rUpper: findRigBone(figure, 'rightUpperArm'), lUpper: findRigBone(figure, 'leftUpperArm'),
+    rFore: findRigBone(figure, 'rightForearm'), lFore: findRigBone(figure, 'leftForearm'),
+    rHand: findRigBone(figure, 'rightHand'),
+  }), [figure]);
   const walk = useRef({ leg: 0, t: 0, pause: (name.length % 5) * 0.4, x: route?.[0][0] ?? x, z: route?.[0][1] ?? z, heading: facing });
 
   useEffect(() => {
@@ -121,7 +144,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
         const d = Math.hypot(dx, dz);
         if (d < 0.05) {
           w.leg = (w.leg + 1) % route.length;
-          w.pause = PAUSE_SECONDS;
+          w.pause = route[w.leg][2] ?? PAUSE_SECONDS;
         } else {
           const s = Math.min(d, WALK_SPEED * step);
           w.x += (dx / d) * s;
@@ -131,11 +154,22 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
           moving = true;
         }
       }
+      // Waiting at a stop with its own heading: turn to it (a customer facing the seller)
+      const stop = route[w.leg];
+      if (!moving && stop[3] !== undefined) w.heading += Math.atan2(Math.sin(stop[3] - w.heading), Math.cos(stop[3] - w.heading)) * Math.min(1, step * 5);
       root.current?.position.set(w.x, 0, w.z);
       if (group.current) group.current.rotation.y = w.heading;
+      onStop?.(!moving && w.pause > 0 ? w.leg : null);
+    }
+    // At a grill: face the coals, or turn to the customer being served
+    const serving = !!grill && grill.serving();
+    if (grill && group.current) {
+      const want = serving ? grill.serveFacing : facing;
+      const r = group.current.rotation;
+      r.y += Math.atan2(Math.sin(want - r.y), Math.cos(want - r.y)) * Math.min(1, step * 4);
     }
     const sitting = !!seat && !!gestures.Sit;
-    const talking = chatty && !sitting && lying === undefined && gestures.Talk && Math.floor((mixer.time + name.length * 1.7) / 9) % 3 === 0;
+    const talking = (serving && !!gestures.Talk) || (chatty && !grill && !sitting && lying === undefined && gestures.Talk && Math.floor((mixer.time + name.length * 1.7) / 9) % 3 === 0);
     const want = sitting ? 'Sit' : moving && walkName ? walkName : talking ? 'Talk' : idleName;
     if (want !== current.current) {
       const get = (n: string) => (n === 'Sit' || n === 'Talk' ? gestures[n as 'Sit' | 'Talk'] : actions[n]);
@@ -147,6 +181,22 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
       }
     }
     if (group.current && seat) group.current.position.y = sitting ? seatDrop(seat, look.height) : 0;
+    // Grill work, over the clip: both forearms out over the coals, the right hand turning the
+    // skewers and the left fanning, eased in and out so serving (Talk) takes over smoothly
+    if (grill) {
+      work.current += ((serving ? 0 : 1) - work.current) * Math.min(1, step * 4);
+      const k = work.current;
+      if (k > 0.01) {
+        const t = mixer.time;
+        const turn = 0.5 + 0.5 * Math.sin(t * 2.6);
+        const fan = 0.5 + 0.5 * Math.sin(t * 7.5 + 1);
+        pose(arms.rUpper, GRILL_UPPER_R, k);
+        pose(arms.lUpper, GRILL_UPPER_L, k);
+        pose(arms.rFore, GRILL_FORE_R, k * (0.8 + 0.25 * turn));
+        pose(arms.lFore, GRILL_FORE_L, k * (0.85 + 0.2 * fan));
+        pose(arms.rHand, GRILL_TURN, k * turn);
+      }
+    }
   });
 
   // Seated: the body goes just behind the cushion, facing the way the chair does

@@ -115,7 +115,8 @@ export const LAGOS_MARINA: DistrictSpec = {
       menu: ['boli-epa', 'akara-pap', 'puff-puff', 'fruit', 'suya', 'chin-chin', 'roast-fish'],
     },
     {
-      id: 'suya-spot', name: 'Mallam Sule Suya', kind: 'Suya grill', position: [6.3, 0, 6],
+      // Where you order: the end of the grill's counter, beside Mallam Sule (lib/foodService.ts cartStations)
+      id: 'suya-spot', name: 'Mallam Sule Suya', kind: 'Suya grill', position: [6.225, 0, 7.5],
       menu: ['suya', 'kilishi', 'corn-ube', 'roast-yam-pepper', 'masa'],
     },
     {

@@ -42,8 +42,9 @@ const FULL_MASK = (() => {
   t.needsUpdate = true;
   return t;
 })();
-/** How shiny skin is (0 mirror, 1 matt): healthy skin has a soft sheen, not a matt finish. */
-export const SKIN_ROUGHNESS = 0.48;
+/** How shiny skin is (0 mirror, 1 matt): healthy skin has a soft sheen, not a matt finish.
+ *  At 0.48 the highlights went hard and oily, and skin read as burnt: keep it soft. */
+export const SKIN_ROUGHNESS = 0.66;
 const HEAD_SLOTS: readonly (readonly [Slot, string])[] = [['hair', 'r']];
 
 const PATTERN_GLSL = /* glsl */ `
@@ -262,9 +263,10 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
           float ayeSkinW = ${cutout ? '0.0' : isHead ? '1.0 - ayeMask.r' : '1.0 - max(max(ayeMask.r, ayeMask.g), ayeMask.b)'};
           ayeSkinGlow = ayeSkinW;
           if (ayeSkinW > 0.001 && abs(uAyeSkin) > 0.001) {
-            // Deeper: towards a warm deep brown (sRGB about #4a2b19), keeping the texel's own light and shade
-            // (lum / typical skin lum). Colours here are linear, as diffuseColor is.
-            vec3 ayeDeep = vec3(0.068, 0.026, 0.011) * clamp(ayeLum / 0.3, 0.45, 1.6);
+            // Deeper: towards a natural deep brown (sRGB about #4b3326), keeping the texel's own light and
+            // shade (lum / typical skin lum). Colours here are linear, as diffuseColor is. (A redder target,
+            // sRGB #4a2b19, read as sunburnt or burnt skin.)
+            vec3 ayeDeep = vec3(0.070, 0.033, 0.019) * clamp(ayeLum / 0.3, 0.6, 1.5);
             vec3 ayeSkinCol = uAyeSkin > 0.0
               ? mix(diffuseColor.rgb, ayeDeep, uAyeSkin * 0.92)
               : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));
@@ -277,7 +279,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);\nroughnessFactor = mix(roughnessFactor, min(roughnessFactor, ${SKIN_ROUGHNESS.toFixed(2)}), ayeSkinGlow * (1.0 - ayeFinish));`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v7-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v8-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }

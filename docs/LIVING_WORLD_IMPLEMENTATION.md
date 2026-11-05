@@ -43,8 +43,18 @@ Status words used here:
 
 ### Food stalls
 
-You turn to face the cart or stall you're ordering from (`lib/foodService.ts`
-`faceStall`).
+- You turn to face the cart or stall you're ordering from (`lib/foodService.ts`
+  `faceStall`).
+- **The suya grill** (`cartStations`, `world/Props.tsx`):
+  - Mallam Sule works on the cart's working side, at the grill and board facing the
+    pavement, turning the skewers (arms posed in code, as eating is);
+  - you order at the grill end of the counter, facing him;
+  - two residents walk the pavement, stop at the counter to buy while he turns to serve
+    them, and walk on.
+- **Fixed:** pressing E at a street stall used to take you into a restaurant dining room
+  (only the on-screen button opened the stall). E now opens the stall menu too.
+  - **Verified:** E at the suya counter opened the menu, and "Eat here" on suya took
+    37 GHAI and raised fullness from 66 to 93.
 
 **Partial:** NPCs don't yet reserve activity spots, so the player and a
 resident can stand at the same counter. Collisions keep them apart.
