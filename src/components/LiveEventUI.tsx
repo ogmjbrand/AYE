@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Career } from './CharacterCreation';
-import { canDo, templateFor, type ActiveEvent, type PastEvent } from '../lib/liveEvents';
+import { canDo, objectiveSpot, templateFor, type ActiveEvent, type PastEvent } from '../lib/liveEvents';
 import { REPUTATIONS, type RepId } from '../lib/reputation';
 
 const GLASS = 'border border-white/10 bg-[#0b0a09]/80 text-ui-ink shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md';
@@ -21,11 +21,14 @@ function useEscape(onClose: () => void) {
 
 /**
  * The alert when something happens in the city: what, how far, how long is
- * left. Respond tracks it on the map; Not now hides it (it still happens).
- * Once you're on your way it shrinks to one line.
+ * left, and what your part would be. Accept sets off for the scene straight
+ * away; Decline hides it, with no penalty (it still happens). Once you're on
+ * your way it shrinks to one line.
  */
-export function EventAlert({ event, minutesLeft, distance, onRespond, onDismiss }: {
+export function EventAlert({ event, minutesLeft, distance, onRespond, onDismiss, role }: {
   event: ActiveEvent;
+  /** What you'd do there, for your career (e.g. "Give the driver first aid"). */
+  role?: string;
   minutesLeft: number;
   /** Metres to the scene, or null when it's somewhere you can't walk to from here. */
   distance: number | null;
@@ -48,9 +51,10 @@ export function EventAlert({ event, minutesLeft, distance, onRespond, onDismiss 
       <p className={`m-0 text-[10px] font-bold uppercase tracking-[0.16em] ${SEVERITY_TONE[t.severity]}`}>{SEVERITY_WORD[t.severity]} · {where}</p>
       <p className="m-0 mt-1 font-semibold">{t.title}</p>
       <p className="m-0 mt-0.5 text-xs text-ui-muted">{t.summary}</p>
+      {role && <p className="m-0 mt-1 text-xs"><span className="text-ui-muted">Your part:</span> {role}</p>}
       <div className="mt-2.5 flex items-center gap-2">
-        <button type="button" onClick={onRespond} className="rounded-full bg-ui-gold px-3 py-1.5 text-xs font-semibold text-black hover:bg-ui-gold-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Respond</button>
-        <button type="button" onClick={onDismiss} className="rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Not now</button>
+        <button type="button" onClick={onRespond} className="rounded-full bg-ui-gold px-3 py-1.5 text-xs font-semibold text-black hover:bg-ui-gold-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Accept mission</button>
+        <button type="button" onClick={onDismiss} className="rounded-full border border-ui-line px-3 py-1.5 text-xs hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Decline</button>
         <span className="ml-auto text-[11px] tabular-nums text-ui-muted">{minutesLeft} min left</span>
       </div>
     </section>
@@ -145,5 +149,67 @@ export function EventResult({ result, onClose }: { result: PastEvent; onClose: (
         </div>
       </div>
     </div>
+  );
+}
+
+function Tick({ on }: { on: boolean }) {
+  return <span aria-hidden="true" className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] ${on ? 'border-ui-accent bg-ui-accent text-black' : 'border-white/30'}`}>{on ? '✓' : ''}</span>;
+}
+
+/**
+ * The mission's objectives on screen while you're responding: reach the scene, then each thing
+ * you can do there, ticked off only when you've actually done it. "Go" walks you to the place it's
+ * done (beside the driver, at the car) and you do it there. When nothing is left for you, you can
+ * hand over and carry on with your day.
+ */
+export function MissionTracker({ event, career, equipment, minute, atScene, busy, onDo, onDetails, onFinish }: {
+  event: ActiveEvent;
+  career: Career;
+  equipment: readonly string[];
+  minute: number;
+  atScene: boolean;
+  /** Something is under way (walking to a spot): no new orders until it's done. */
+  busy: boolean;
+  onDo: (objectiveId: string) => void;
+  onDetails: () => void;
+  onFinish: () => void;
+}) {
+  const t = templateFor(event.kind);
+  // Yours: what you've done, and what your career and kit let you do (other people's jobs aren't listed)
+  const yours = t.objectives.filter((o) => event.done.includes(o.id)
+    || ((!o.careers || o.careers.includes(career)) && (!o.phone || equipment.includes('smartphone'))));
+  const open = t.objectives.filter((o) => canDo(event, o.id, career, equipment, minute).ok);
+  const reached = atScene || event.done.length > 0;
+  const finished = event.done.length > 0 && open.length === 0;
+  return (
+    <section aria-label={`${t.title} response`} className={`${GLASS} pointer-events-auto w-[min(19rem,calc(100vw-1.5rem))] rounded-2xl p-3 text-xs`}>
+      <p className={`m-0 text-[10px] font-bold uppercase tracking-[0.16em] ${SEVERITY_TONE[t.severity]}`}>{t.title} response · {Math.max(0, event.endsAt - minute)} min left</p>
+      <ul className="m-0 mt-2 grid list-none gap-1.5 p-0">
+        <li className="flex items-center gap-2"><Tick on={reached} /><span className={reached ? 'text-ui-muted line-through' : ''}>Reach the {t.title.toLowerCase()} scene</span></li>
+        {yours.map((o) => {
+          const done = event.done.includes(o.id);
+          const can = canDo(event, o.id, career, equipment, minute);
+          const spot = objectiveSpot(event, o.id);
+          return (
+            <li key={o.id} className="flex items-center gap-2">
+              <Tick on={done} />
+              <span className={`min-w-0 flex-1 ${done ? 'text-ui-muted line-through' : ''}`}>{o.label}{spot && !done ? <span className="text-ui-muted"> · {spot.what}</span> : null}</span>
+              {!done && can.ok && reached && (
+                <button type="button" disabled={busy} onClick={() => onDo(o.id)}
+                  className="shrink-0 rounded-full bg-ui-gold px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-ui-gold-strong disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Go</button>
+              )}
+              {!done && !can.ok && <span className="shrink-0 text-[10px] text-ui-muted" title={can.reason}>later</span>}
+            </li>
+          );
+        })}
+        <li className="flex items-center gap-2"><Tick on={false} /><span>Hand over and return to normal life</span></li>
+      </ul>
+      <div className="mt-2.5 flex items-center gap-2">
+        {finished
+          ? <button type="button" onClick={onFinish} className="rounded-full bg-ui-accent px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-ui-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Hand over and carry on</button>
+          : <button type="button" onClick={onDetails} disabled={!atScene} className="rounded-full border border-ui-line px-3 py-1.5 text-[11px] hover:border-ui-gold disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Details</button>}
+        <span className="ml-auto tabular-nums text-ui-muted">{money(event.earned)} so far</span>
+      </div>
+    </section>
   );
 }

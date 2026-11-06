@@ -12,6 +12,8 @@ import {
   directWorld,
   emptyLiveWorld,
   nextGap,
+  objectiveSpot,
+  SPOT_RADIUS,
   sanitiseLiveWorld,
   siteClear,
   siteFor,
@@ -40,6 +42,8 @@ function withEvent(kind: EventKind, hour = 10, phone = true): { s: GameState; e:
   return { s, e };
 }
 const at = (p: { x: number; z: number }) => ({ x: p.x + 0.5, z: p.z });
+/** Where an objective is done: its own spot (beside the driver, at the car), or anywhere at the scene. */
+const spotOf = (e: ActiveEvent, id: string) => objectiveSpot(e, id)?.at ?? at(e.scene);
 
 describe('where events happen', () => {
   it('every district has a clear place for every kind of event (the restaurant rush only where there is a restaurant)', () => {
@@ -181,14 +185,14 @@ describe('helping', () => {
 
   it('costs a little professional standing to start first aid and walk away', () => {
     const { s, e } = withEvent('road-accident');
-    const started = act({ ...s, world: { ...s.world, reputation: addReputation(emptyReputation(), { professional: 50 }) } }, { type: 'eventAct', objectiveId: 'first-aid', at: at(e.scene) });
+    const started = act({ ...s, world: { ...s.world, reputation: addReputation(emptyReputation(), { professional: 50 }) } }, { type: 'eventAct', objectiveId: 'first-aid', at: spotOf(e, 'first-aid') });
     expect(started.world.reputation.professional).toBe(62);
     const end = tick(started, templateFor('road-accident').minutes);
     const past = end.world.history.find((p) => p.id === e.id)!;
     expect(past.abandoned).toBe(true);
     expect(end.world.reputation.professional).toBe(62 - ABANDON_PENALTY);
     // Finishing the job doesn't
-    const handed = act(started, { type: 'eventAct', objectiveId: 'handover', at: at(e.scene) });
+    const handed = act(started, { type: 'eventAct', objectiveId: 'handover', at: spotOf(e, 'handover') });
     const fine = tick(handed, templateFor('road-accident').minutes);
     expect(fine.world.history.find((p) => p.id === e.id)!.abandoned).toBe(false);
     expect(fine.world.lastResult?.outcome).toBe('helped');
@@ -240,5 +244,70 @@ describe('saves', () => {
     expect(sanitiseLiveWorld(raw.world).active!.earned).toBe(15);
     expect(sanitiseLiveWorld({ active: { kind: 'alien-invasion' } }).active).toBeNull();
     expect(sanitiseLiveWorld(undefined).frequency).toBe('normal');
+  });
+});
+
+describe('road accident response: doing your part where it is done', () => {
+  it('puts every objective spot within reach of the scene and clear of the crashed cars and the street, wherever the crash happens', () => {
+    const district = districtById('lagos.marina');
+    for (let seed = 1; seed <= 40; seed++) {
+      const site = siteFor('road-accident', district, seeded(seed));
+      if (!site) continue;
+      const e = { kind: 'road-accident' as const, scene: site.scene };
+      for (const o of templateFor('road-accident').objectives) {
+        const spot = objectiveSpot(e, o.id);
+        if (!spot) continue;
+        expect(Math.hypot(spot.at.x - site.scene.x, spot.at.z - site.scene.z), o.id).toBeLessThanOrEqual(SCENE_RADIUS);
+        expect(siteClear(district.layout, spot.at.x, spot.at.z, 0.3), `${o.id} @ seed ${seed}`).toBe(true);
+      }
+    }
+  });
+
+  it('only counts first aid done beside the driver, not from across the scene', () => {
+    const { s, e } = withEvent('road-accident');
+    const spot = objectiveSpot(e, 'first-aid')!;
+    const far = { x: spot.at.x + SPOT_RADIUS + 2, z: spot.at.z };
+    expect(Math.hypot(far.x - e.scene.x, far.z - e.scene.z)).toBeLessThan(SCENE_RADIUS);
+    expect(act(s, { type: 'eventAct', objectiveId: 'first-aid', at: far }).world.active!.done).toEqual([]);
+    const done = act(s, { type: 'eventAct', objectiveId: 'first-aid', at: spot.at });
+    expect(done.world.active!.done).toContain('first-aid');
+    expect(done.balance).toBeGreaterThan(s.balance - 50);
+  });
+
+  it('runs the whole response once: accept, act at each spot, hand over, paid once, saved, back to normal life', () => {
+    const { s, e } = withEvent('road-accident');
+    let g = act(s, { type: 'eventRespond' });
+    expect(g.world.active!.responding).toBe(true);
+    // Nothing done yet: you can't hand over and leave
+    expect(act(g, { type: 'eventFinish' }).world.active).not.toBeNull();
+    const income0 = g.today.income;
+    for (const id of ['report', 'first-aid', 'handover', 'comfort', 'warn-traffic']) g = act(g, { type: 'eventAct', objectiveId: id, at: spotOf(e, id) });
+    const t = templateFor('road-accident');
+    const paid = t.objectives.filter((o) => g.world.active!.done.includes(o.id)).reduce((n, o) => n + o.reward, 0);
+    expect(g.world.active!.done).toEqual(['report', 'first-aid', 'handover', 'comfort', 'warn-traffic']);
+    expect(g.world.active!.earned).toBe(paid);
+    // Paid as income (achievements for helping can add their own bonus on top)
+    expect(g.today.income - income0).toBeGreaterThanOrEqual(paid);
+    // Doing one twice pays nothing more
+    expect(act(g, { type: 'eventAct', objectiveId: 'comfort', at: spotOf(e, 'comfort') }).world.active!.earned).toBe(paid);
+    // A doctor has nothing left (making the cars safe is an engineer's job): hand over
+    const over = act(g, { type: 'eventFinish' });
+    expect(over.world.active).toBeNull();
+    expect(over.world.lastResult).toMatchObject({ id: e.id, outcome: 'helped', earned: paid, abandoned: false });
+    expect(over.world.history.at(-1)!.id).toBe(e.id);
+    const store = new Map<string, string>();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) } as unknown as Storage;
+    saveProgress('c1', over, storage);
+    const back = loadProgress({ id: 'c1', career: 'doctor', lifestyle: 'ordinary' } as never, storage);
+    expect(back?.world.history.at(-1)).toMatchObject({ id: e.id, earned: paid });
+  });
+
+  it('keeps an engineer at work until the cars are safe', () => {
+    const { s, e } = withEvent('road-accident');
+    let g = act(s, { type: 'eventAct', objectiveId: 'comfort', at: spotOf(e, 'comfort') }, 'engineer');
+    expect(act(g, { type: 'eventFinish' }, 'engineer').world.active).not.toBeNull();
+    g = act(g, { type: 'eventAct', objectiveId: 'make-safe', at: spotOf(e, 'make-safe') }, 'engineer');
+    for (const id of ['report', 'warn-traffic']) g = act(g, { type: 'eventAct', objectiveId: id, at: spotOf(e, id) }, 'engineer');
+    expect(act(g, { type: 'eventFinish' }, 'engineer').world.active).toBeNull();
   });
 });

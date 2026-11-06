@@ -146,6 +146,14 @@ Out in the city, a **Things to do nearby** list shows the places within 60 m, ne
 - On arrival, it does what E does there: opens the stall's menu, goes into the building, opens the park, and so on.
 - Inside venues, the existing **Things to do here** list works the same way.
 
+## Emergency response: road accident (November 2026, verified in the browser)
+
+The road accident is now a full playable loop; see `EMERGENCY_RESPONSE.md` for the acceptance test and limits.
+- The alert names your part for your career, with **Accept mission** or **Decline**.
+- Accepting walks you to the scene from wherever you are.
+- An objectives tracker shows what's left. Each objective is done at its own spot: kneeling beside the injured driver, at the car, with the passenger, or up the road warning traffic.
+- **Hand over and carry on** ends the response once your part is done, pays once per objective, and saves the result in your history.
+
 ## Street life (November 2026, verified in the browser)
 
 Passers-by walk the boulevard's pavements between the district's real shops, stalls and restaurants (`src/lib/streetLife.ts`, `src/world/StreetLife.tsx`).

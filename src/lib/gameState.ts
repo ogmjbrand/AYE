@@ -56,7 +56,7 @@ import {
   STUDY_SESSION_MINUTES, canEnrol, canSitExam, canStudy, emptyQualifications, enrol as enrolQual, qualificationById, qualificationPay, sitExam,
   study as studyQual, type Qualifications,
 } from './qualifications';
-import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
+import { FIND_RADIUS, SCENE_RADIUS, SPOT_RADIUS, canDo, completeObjective, directWorld, emptyLiveWorld, finishEvent, objectiveSpot, openObjectives, templateFor, type EventFrequency, type LiveWorld } from './liveEvents';
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
 import { itemById, type Slot } from './fashion';
@@ -252,6 +252,7 @@ export type GameAction =
   | { type: 'eventAct'; objectiveId: string; at: { x: number; z: number } }
   /** Seen how the last event went. */
   | { type: 'eventSeen' }
+  | { type: 'eventFinish' }
   | { type: 'setEventFrequency'; frequency: EventFrequency }
   /** Divine Evolution: unlock (balance checked), take your supernatural form, return to human form, heal in your sanctuary. */
   | { type: 'ascendUnlock' }
@@ -959,6 +960,9 @@ function eventAct(state: GameState, objectiveId: string, at: { x: number; z: num
   const o = templateFor(e.kind).objectives.find((x) => x.id === objectiveId)!;
   const spot = o.atTarget ? e.target : e.scene;
   if (!spot || Math.hypot(at.x - spot.x, at.z - spot.z) > (o.atTarget ? FIND_RADIUS : SCENE_RADIUS)) return state;
+  // Done in a particular place (beside the driver, at the car): you have to be there
+  const place = objectiveSpot(e, o.id);
+  if (place && Math.hypot(at.x - place.at.x, at.z - place.at.z) > SPOT_RADIUS) return state;
   let next = state;
   for (let i = 0; i < o.minutes; i++) next = tick(next, career, lifestyle, false);
   next = {
@@ -1408,6 +1412,12 @@ function baseReducer(
       if (!e) return state;
       const active = action.type === 'eventRespond' ? { ...e, responding: true, dismissed: false } : { ...e, dismissed: true, responding: false };
       return { ...state, world: { ...state.world, active } };
+    }
+    case 'eventFinish': {
+      // Hand over and carry on: only once you've helped and there's nothing left you could do
+      const e = state.world.active;
+      if (state.summary || !e || !e.done.length || openObjectives(e, career, state.equipment, state.time.totalMinutes).length) return state;
+      return { ...state, world: finishEvent(state.world, state.time.totalMinutes) };
     }
     case 'eventSeen':
       return state.world.lastResult ? { ...state, world: { ...state.world, lastResult: null } } : state;

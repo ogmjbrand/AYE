@@ -332,6 +332,14 @@ export function unfinishedCommitments(e: ActiveEvent): string[] {
 /** Reputation lost for leaving a commitment unfinished: enough to notice, small enough to win back. */
 export const ABANDON_PENALTY = 8;
 
+/**
+ * You've done everything you can here: hand over to the services and get on with your day.
+ * Only once you've helped and nothing is left that you could do (lib/gameState.ts checks both).
+ */
+export function finishEvent(w: LiveWorld, minute: number): LiveWorld {
+  return w.active ? endEvent(w, minute) : w;
+}
+
 function endEvent(w: LiveWorld, minute: number): LiveWorld {
   const e = w.active!;
   const abandoned = unfinishedCommitments(e).length > 0;
@@ -386,6 +394,44 @@ export function completeObjective(w: LiveWorld, objectiveId: string): LiveWorld 
 /** Objectives anyone in the player's position could still usefully do. */
 export function openObjectives(e: ActiveEvent, career: Career, equipment: readonly string[], minute: number) {
   return templateFor(e.kind).objectives.filter((o) => canDo(e, o.id, career, equipment, minute).ok);
+}
+
+// ---------------------------------------------------------------- where each thing is done
+
+/** How close you must be to the place an objective is done. */
+export const SPOT_RADIUS = 1.6;
+
+export interface ObjectiveSpot {
+  at: Point;
+  /** Which way you face while you do it. */
+  facing: number;
+  /** Done down on the ground beside someone (first aid). */
+  kneel?: boolean;
+  /** Who or what it's done to, for the prompt. */
+  what: string;
+}
+
+/**
+ * Where in the scene an objective is done: beside the injured driver, at the wrecked car's door,
+ * with the shaken passenger, out in the road warning traffic. Null when it's done anywhere at the
+ * scene (a phone call). The positions match world/LiveEventScene.tsx.
+ */
+export function objectiveSpot(e: Pick<ActiveEvent, 'kind' | 'scene'>, objectiveId: string): ObjectiveSpot | null {
+  const { x, z } = e.scene;
+  if (e.kind !== 'road-accident') return null;
+  switch (objectiveId) {
+    // Kunle sits in the road at (x, z + 2.4): kneel at his side
+    case 'first-aid': return { at: { x: x - 0.9, z: z + 2.4 }, facing: Math.PI / 2, kneel: true, what: 'the injured driver' };
+    // The paramedic arrives at (x + 0.9, z + 3.3)
+    case 'handover': return { at: { x: x - 0.6, z: z + 3.6 }, facing: Math.atan2(1.5, -0.3), what: 'the paramedic' };
+    // The silver car's driver door
+    case 'make-safe': return { at: { x: x - 0.92, z: z + 0.92 }, facing: Math.atan2(-0.48, -1.32), what: 'the silver car' };
+    // Amaka stands at (x + 2.6, z + 2.6), facing -x
+    case 'comfort': return { at: { x: x + 1.7, z: z + 2.6 }, facing: Math.PI / 2, what: 'the passenger' };
+    // Up the road, facing the oncoming traffic
+    case 'warn-traffic': return { at: { x: x - 5.2, z: z + 2.6 }, facing: -Math.PI / 2, what: 'the oncoming traffic' };
+    default: return null;
+  }
 }
 
 // ---------------------------------------------------------------- where things happen

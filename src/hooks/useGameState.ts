@@ -97,6 +97,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     eventDismiss: () => dispatch({ type: 'eventDismiss' }),
     eventAct: (objectiveId: string, at: { x: number; z: number }) => dispatch({ type: 'eventAct', objectiveId, at }),
     eventSeen: () => dispatch({ type: 'eventSeen' }),
+    eventFinish: () => dispatch({ type: 'eventFinish' }),
     setEventFrequency: (frequency: EventFrequency) => dispatch({ type: 'setEventFrequency', frequency }),
     workTask: (taskId: string, choice: number) => dispatch({ type: 'workTask', taskId, choice, atWorkplace: atWorkRef.current() }),
     officeApply: (atReception: boolean) => dispatch({ type: 'officeApply', atReception }),

@@ -26,8 +26,8 @@ import { CriticalWarning, EmergencyTransition, HealthPanel, MedicalKit, MedicalS
 import { crashDamage, healthStatus } from './lib/health';
 import { LevelUp } from './components/LevelUp';
 import { levelProgress, totalXp } from './lib/lifeState';
-import { EventAlert, EventPanel, EventResult } from './components/LiveEventUI';
-import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, templateFor, type ActiveEvent } from './lib/liveEvents';
+import { EventAlert, EventPanel, EventResult, MissionTracker } from './components/LiveEventUI';
+import { EVENT_FREQUENCIES, FIND_RADIUS, FREQUENCY_LABEL, SCENE_RADIUS, canDo, objectiveSpot, templateFor, type ActiveEvent } from './lib/liveEvents';
 import PostEffects from './world/PostEffects';
 import { HOME_MODELS, preloadRealModels } from './world/realModels';
 import { WarmUp, type WarmProgress } from './world/WarmUp';
@@ -476,7 +476,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture,
     exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, phoneFriend, ride, bookHotel, hotelWash, buyVehicle, paintVehicle,
     drove, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut,
-    eventRespond, eventDismiss, eventAct, eventSeen, setEventFrequency,
+    eventRespond, eventDismiss, eventAct, eventSeen, eventFinish, setEventFrequency,
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
     buyGear, equipGear, unequipGear, repairGear, sellGear,
     hurt, buyMedical, useMedical, callMedic, restToRecover, enrolCourse, studyCourse, sitExam,
@@ -2432,6 +2432,59 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     });
     setArrival(ok ? `On your way: ${name.toLowerCase()}.` : `There's no way to get there on foot right now.`);
   };
+  // ——— Responding to an event: accept, travel there, do your part, hand over ———
+  /** Places to arrive at round the scene, clear of the wreckage, nearest the way you're coming first. */
+  const sceneArrivalSpots = (e: NonNullable<typeof liveEvent>): [number, number][] => {
+    const { x, z } = e.scene;
+    const ring: [number, number][] = [[x - 2.2, z + 4.2], [x + 2.2, z + 4.4], [x - 4.2, z + 2.8], [x + 4.4, z + 3.4], [x, z - 4.4], [x - 4.4, z - 2.4], [x + 4.4, z - 2.4]];
+    const { x: px, z: pz } = controller.position;
+    return ring.sort((a, b) => Math.hypot(a[0] - px, a[1] - pz) - Math.hypot(b[0] - px, b[1] - pz));
+  };
+  /** Set off for the event: out of wherever you are, then on foot through the streets to the scene. */
+  const travelToEvent = () => {
+    const e = liveEvent;
+    if (!e) return;
+    const t = templateFor(e.kind);
+    if (e.districtId !== district.id) { setArrival(`The ${t.title.toLowerCase()} is in another city.`); return; }
+    if (controller.drivingVehicleId) { setArrival(`Park and step out: the ${t.title.toLowerCase()} is marked on your map.`); return; }
+    const go = () => {
+      const ok = walkThen(sceneArrivalSpots(e), t.title, () => {
+        setArrival(`You're at the ${t.title.toLowerCase()}. Your objectives are on the right.`);
+      });
+      setArrival(ok ? `Responding: on your way to the ${t.title.toLowerCase()}.` : `There's no way through on foot from here: the ${t.title.toLowerCase()} is marked on your map.`);
+    };
+    if (offStreet) { goOutside(); setTimeout(go, 300); } else go();
+  };
+  const acceptMission = () => { eventRespond(); travelToEvent(); };
+  /** Do an objective where it's done: walk there, face it (kneel for first aid), then it's done. */
+  const doEventObjective = (id: string) => {
+    const e = liveEvent;
+    if (!e) return;
+    const o = templateFor(e.kind).objectives.find((x) => x.id === id);
+    if (!o) return;
+    const spot = objectiveSpot(e, id);
+    const here = () => ({ x: controller.position.x, z: controller.position.z });
+    if (!spot) {
+      if (atEventScene()) { eventAct(id, here()); setArrival(`Done: ${o.label.toLowerCase()}.`); }
+      else travelToEvent();
+      return;
+    }
+    const ok = walkThen([[spot.at.x, spot.at.z]], o.label, () => {
+      const at = here();
+      if (spot.kneel) sit.start({ seat: { id: `event-${id}`, x: spot.at.x + Math.sin(spot.facing) * 0.15, z: spot.at.z + Math.cos(spot.facing) * 0.15, facing: spot.facing, height: 0.12, approach: { x: at.x, z: at.z } }, place: o.label, minutes: 0, holdSeconds: 6 });
+      else placePlayer([at.x, 0, at.z], spot.facing);
+      eventAct(id, at);
+      setArrival(`${o.label}: done.${o.reward ? ` +${o.reward} GHAI.` : ''}`);
+    });
+    setArrival(ok ? `Going to ${spot.what}.` : `You can't get to ${spot.what} from here.`);
+  };
+  /** What you'd do at the event, for the alert: your career's own part first. */
+  const eventRole = (() => {
+    if (!liveEvent) return undefined;
+    const open = templateFor(liveEvent.kind).objectives.filter((o) => (!o.careers || o.careers.includes(character.career)) && (!o.phone || state.equipment.includes('smartphone')));
+    return (open.find((o) => o.careers) ?? open[0])?.label;
+  })();
+
   const goDoActivity = (a: Activity) => {
     const ok = walkThen(a.spots, a.label, () => {
       const here = venuePrompt?.();
@@ -3136,9 +3189,17 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
             event={liveEvent}
             minutesLeft={Math.max(0, liveEvent.endsAt - state.time.totalMinutes)}
             distance={offStreet ? null : Math.hypot(controller.position.x - (eventGoal ?? liveEvent.scene).x, controller.position.z - (eventGoal ?? liveEvent.scene).z)}
-            onRespond={eventRespond}
+            onRespond={acceptMission}
             onDismiss={eventDismiss}
+            role={eventRole}
           />
+        </div>
+      )}
+      {liveEvent && liveEvent.responding && !eventPanelOpen && !state.summary && liveEvent.districtId === district.id && (
+        <div className="pointer-events-none fixed right-3 top-[14.5rem] z-30 pointer-coarse:top-[17rem]">
+          <MissionTracker event={liveEvent} career={character.career} equipment={state.equipment} minute={state.time.totalMinutes}
+            atScene={atEventScene()} busy={false} onDo={doEventObjective} onDetails={helpAtEvent}
+            onFinish={() => { eventFinish(); setArrival('You handed over to the emergency services.'); }} />
         </div>
       )}
       {eventPanelOpen && liveEvent && (
