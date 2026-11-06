@@ -7,6 +7,10 @@ import { COURSES, RANKS, RESEARCH, consultCorrect, identificationQuestion, prepQ
 import { diagnose, emptyCare, sanitiseCare } from './careState';
 import { conditionById } from './healthcare';
 import { loadProgress, saveProgress } from './save';
+import { CARE_SEATS, HOSPITAL_INTERIOR, HOSPITAL_POINTS, hospitalInteractionAt } from './hospitalSite';
+import { doorSpot, interiorLayout } from './interiors';
+import { findPath, walkGridFor } from './pathfinding';
+import { standSpot } from './seating';
 
 const act = (s: GameState, a: Parameters<typeof gameReducer>[1]) => gameReducer(s, a, 'doctor', 'ordinary');
 const fresh = (balance = 5000) => createGameState(balance, createTime(10, 0));
@@ -26,6 +30,24 @@ describe('hospital departments and equipment', () => {
       expect(Object.keys(s.effect).length).toBeGreaterThan(0);
     }
     expect(validateHerbal()).toEqual([]);
+  });
+});
+
+describe('walking to every department', () => {
+  const grid = walkGridFor(interiorLayout(HOSPITAL_INTERIOR).obstacles);
+  const [dx, dz] = doorSpot(HOSPITAL_INTERIOR);
+  it('reaches every department point from the door, round the solid equipment, and the point is that department', () => {
+    for (const pt of HOSPITAL_POINTS) {
+      expect(findPath(grid, { x: dx, z: dz }, { x: pt.at[0], z: pt.at[1] }), pt.action).not.toBeNull();
+      expect(hospitalInteractionAt(HOSPITAL_INTERIOR, pt.at[0], pt.at[1]), pt.action).toBe(pt.action);
+    }
+  });
+  it('reaches where you stand to sit for every in-person treatment', () => {
+    for (const [id, seat] of Object.entries(CARE_SEATS)) {
+      const at = standSpot(seat);
+      expect(findPath(grid, { x: dx, z: dz }, at), id).not.toBeNull();
+    }
+    for (const s of CARE_SERVICES) if (!s.diagnoses || s.id === 'svc-checkup' || s.id === 'svc-imaging') expect(s.id in CARE_SEATS || ['svc-rehab'].includes(s.id), s.id).toBe(true);
   });
 });
 

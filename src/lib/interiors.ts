@@ -634,7 +634,8 @@ export function interiorLayout(i: Interior, extra: readonly Furniture[] = []): D
       style: 'residential',
     })),
     ...[...i.furniture, ...extra]
-      .filter((x) => !['rug', 'art', 'cabinet', 'mirror', 'computer', 'whiteboard', 'chair', 'dining-chair', 'wall-art'].includes(x.kind))
+      // Hospital equipment is solid, whatever kind it's filed under (lib/hospitalSite.ts)
+      .filter((x) => x.design?.startsWith('hosp-') || !['rug', 'art', 'cabinet', 'mirror', 'computer', 'whiteboard', 'chair', 'dining-chair', 'wall-art'].includes(x.kind))
       .map((x): Building => ({ position: [x.at[0], 0, x.at[1]], size: x.size, color: x.color, style: 'residential' })),
     ...(i.solids ?? []).map(([x, z, sx, sz]): Building => ({ position: [x, 0, z], size: [sx, 1, sz], color: i.wallColor, style: 'residential' })),
   ];

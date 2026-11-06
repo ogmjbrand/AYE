@@ -28,6 +28,12 @@ existing building gained two wings.
    - emergency treatment (free while your health is critical);
    - minor procedure, rehabilitation, an hour in the recovery room.
 
+   Treatments done to you are done in person (`CARE_SEATS`). When you confirm, your character
+   walks to the equipment and sits on it while the treatment runs: the examination couch, the
+   emergency trolley, the scanner's table, the operating table, a ward bed, the steam chair or the
+   herbal bath. The equipment is solid: you walk round it. A test checks that every department and
+   seat can be reached from the door.
+
    The equipment is drawn in `src/world/HospitalEquipment.tsx`:
    - emergency: trolley bed, monitors, crash cart, oxygen;
    - examination couch, CT scanner, X-ray console;

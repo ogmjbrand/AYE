@@ -48,16 +48,18 @@ function effectText(e: RemedyEffect): string {
 
 const PLAN_LABEL: Record<CarePlanKind, string> = { modern: 'Modern medicine', herbal: 'Herbal care', combined: 'Combined care' };
 
-interface Pending { title: string; price: number; effect: string; minutes: number; action: CareAction; done: string }
+interface Pending { title: string; price: number; effect: string; minutes: number; action: CareAction; done: string; /** A service or treatment done to you (sit for it). */ treatment?: string }
 
 interface Props {
   point: CareDepartmentPoint;
   state: GameState;
   act: (action: CareAction) => void;
   onClose: () => void;
+  /** Have a treatment done in person: the panel closes and you sit at the equipment while it's done. Returns false when there's no seat for it. */
+  onTreat?: (treatmentId: string, done: string) => boolean;
 }
 
-export function HealthcarePanel({ point, state, act, onClose }: Props) {
+export function HealthcarePanel({ point, state, act, onClose, onTreat }: Props) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -72,8 +74,10 @@ export function HealthcarePanel({ point, state, act, onClose }: Props) {
   const confirm = () => {
     if (!pending) return;
     act(pending.action);
-    setMessage(pending.done);
     setPending(null);
+    // Done to you in person: walk to the couch, chair or bath and sit there while it's done
+    if (pending.treatment && onTreat?.(pending.treatment, pending.done)) return;
+    setMessage(pending.done);
   };
   /** Do a herbal step and say how it went (the same pure rule the reducer runs). */
   const step = (action: CareAction, result: { ok: true; message: string } | { ok: false; reason: string }) => {
@@ -185,7 +189,7 @@ function ModernRoom({ point, state, ask, act }: { point: CareDepartmentPoint; st
             <Row key={s.id} title={s.name}
               detail={<>{s.description}<br />{effectText(s.effect)} · {s.minutes} min{s.diagnoses ? ' · gives a diagnosis' : ''}</>}
               right={<button type="button" className={buttonClass} disabled={!check.ok} title={check.ok ? undefined : check.reason}
-                onClick={() => ask({ title: s.name, price, effect: effectText(s.effect), minutes: s.minutes, action: { type: 'careService', serviceId: s.id }, done: `${s.name}: done.${s.diagnoses ? ' Your diagnosis and care plan are below.' : ''}` })}>
+                onClick={() => ask({ title: s.name, price, effect: effectText(s.effect), minutes: s.minutes, action: { type: 'careService', serviceId: s.id }, treatment: s.id, done: `${s.name}: done.${s.diagnoses ? ' Your diagnosis and care plan are below.' : ''}` })}>
                 {price === 0 ? 'Free' : `${price} GHAI`}</button>} />
           );
         })}
@@ -416,7 +420,7 @@ function Treatment({ state, ask, step }: { state: GameState; ask: (p: Pending) =
         {treatments.map((r) => (
           <Row key={r.id} title={r.name} detail={<>{r.forWhat}<br />{effectText(r.effect)} · {r.minutes} min</>}
             right={<button type="button" className={buttonClass} disabled={state.balance < r.price || !!state.health.recovery}
-              onClick={() => ask({ title: r.name, price: r.price, effect: effectText(r.effect), minutes: r.minutes, action: { type: 'careHerbalTreatment', remedyId: r.id }, done: `${r.name}: ${effectText(r.effect)}.` })}>{r.price} GHAI</button>} />
+              onClick={() => ask({ title: r.name, price: r.price, effect: effectText(r.effect), minutes: r.minutes, action: { type: 'careHerbalTreatment', remedyId: r.id }, treatment: r.id, done: `${r.name}: ${effectText(r.effect)}.` })}>{r.price} GHAI</button>} />
         ))}
       </Section>
       <Section title="Consultation table">

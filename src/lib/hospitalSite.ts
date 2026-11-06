@@ -1,4 +1,5 @@
 import type { Furniture, Interior } from './interiors';
+import type { Seat } from './seating';
 import { USE_RADIUS } from './interiors';
 
 export const HOSPITAL = {
@@ -131,10 +132,10 @@ export const HOSPITAL_INTERIOR: Interior = {
     kit('herb-consult-table', 19.6, 1.6, 1.2, 0.75, 0.8, '#8a5f38'),
     kit('herb-steam-chair', 23.4, 0.4, 0.8, 1.2, 0.8, '#c8b89a'),
     // Medicinal garden (raised beds) and the research bench
-    kit('herb-bed-a', 18.7, 7.6, 1.0, 0.55, 3.6),
-    kit('herb-bed-b', 20.9, 7.6, 1.0, 0.55, 3.6),
-    kit('herb-bed-c', 23.1, 7.6, 1.0, 0.55, 3.6),
-    kit('herb-research', 22.9, 5.0, 1.6, 0.9, 0.7, '#e3ddd2'),
+    kit('herb-bed-a', 18.7, 8.35, 1.0, 0.55, 2.5),
+    kit('herb-bed-b', 20.9, 8.35, 1.0, 0.55, 2.5),
+    kit('herb-bed-c', 23.1, 8.35, 1.0, 0.55, 2.5),
+    kit('herb-research', 22.9, 5.25, 1.6, 0.9, 0.7, '#e3ddd2'),
   ],
 };
 
@@ -165,7 +166,7 @@ export const HOSPITAL_POINTS: readonly { action: HospitalInteraction; at: readon
   { action: 'herbal-preparation', at: [21.0, -1.4], radius: 1.1 },
   { action: 'herbal-treatment', at: [20.4, 3.2], radius: 1.1 },
   { action: 'herbal-garden', at: [19.8, 5.0], radius: 1.0 },
-  { action: 'herbal-research', at: [22.6, 5.85], radius: 0.6 },
+  { action: 'herbal-research', at: [22.6, 6.35], radius: 0.6 },
 ];
 
 export function hospitalInteractionAt(interior: Interior, x: number, z: number): HospitalInteraction | null {
@@ -183,3 +184,18 @@ export function isInWard(x: number, z: number): boolean {
 export function isInSupervisorOffice(x: number, z: number): boolean {
   return x > 5 && z > 1;
 }
+
+/**
+ * Where you sit while a treatment is done to you, by service or herbal treatment id: on the edge
+ * of the examination couch, the emergency trolley, the scanner's table, the operating table, the
+ * steam chair or the herbal bath. Services with no seat (tests, rehabilitation) are done standing.
+ */
+export const CARE_SEATS: Readonly<Record<string, Seat>> = {
+  'svc-checkup': { id: 'care-exam-couch', x: -21.55, z: -3.5, facing: Math.PI / 2, height: 0.75, approach: { x: -20.6, z: -3.5 } },
+  'svc-emergency': { id: 'care-trolley', x: -21.3, z: -8.0, facing: Math.PI / 2, height: 0.8, approach: { x: -20.4, z: -8.0 } },
+  'svc-imaging': { id: 'care-ct-table', x: -21.5, z: 1.6, facing: Math.PI / 2, height: 0.7, approach: { x: -20.6, z: 1.6 } },
+  'svc-procedure': { id: 'care-or-table', x: -21.3, z: 5.0, facing: Math.PI / 2, height: 0.9, approach: { x: -20.4, z: 5.0 } },
+  'svc-recovery': { id: 'care-ward-bed', x: -13, z: 6.85, facing: Math.PI, height: 0.6, approach: { x: -13, z: 6.0 } },
+  'rem-lemongrass-steam': { id: 'care-steam-chair', x: 23.4, z: 0.4, facing: 0, height: 0.49, approach: { x: 23.4, z: 1.25 } },
+  'rem-neem-bath': { id: 'care-herb-bath', x: 22.6, z: 1.98, facing: Math.PI, height: 0.65, approach: { x: 22.6, z: 1.3 } },
+};

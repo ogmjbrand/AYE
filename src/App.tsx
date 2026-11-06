@@ -173,7 +173,7 @@ import { CampusPanel, type CampusPanelMode } from './components/CampusPanel';
 import { UniversityExterior, UniversityScene } from './world/UniversityScene';
 import { HospitalExterior, HospitalScene } from './world/HospitalScene';
 import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
-import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
+import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, CARE_SEATS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
 import { HealthcarePanel } from './components/HealthcarePanel';
 import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
 import { UNIVERSITY, UNIVERSITY_INTERIOR, UNIVERSITY_POINTS, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
@@ -1767,31 +1767,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         helpAtEvent();
         return;
       }
-      const { x, z } = controller.position;
-      const near = nearestVendor(district.vendors, x, z);
-      const counter = counterAt(district, x, z);
-      const door = homeAtDoor(district.id, x, z);
-      // The same as the prompt's button: a street stall serves you where you stand, others have a room
-      if (near) openVendor(near);
-      else if (atDealershipDoor()) enterDealership();
-      else if (atOfficeDoor()) goIntoOffice();
-      else if (atUniversityDoor()) goIntoUniversity();
-      else if (atHospitalDoor()) goIntoHospital();
-      else if (atAgency()) setAgencyOpen(true);
-      else if (restaurantAt(district, x, z)) enterPalms();
-      else if (barAt(district, x, z)) enterCantina();
-      else if (hotelAt(district, x, z)) enterHotel();
-      else if (spaAt(district, x, z)) enterSpa();
-      else if (counter === 'fashion') enterBoutique();
-      else if (counter === 'gadgets') setGadgets(true);
-      else if (counter === 'travel') setTravelOpen(true);
-      else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
-      else if (parkAt(district.park, x, z)) setParkOpen(true);
-      // Your own front door comes before a passer-by, as on the HUD
-      else if (door && door.id === state.home) setHomePanel(door);
-      else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
-      else if (taskOnOffer()) setTask(taskOnOffer());
-      else if (door) setHomePanel(door);
+      actOutdoorsHere();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -2403,6 +2379,57 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     return [];
   };
   /** Walk to an activity round whatever is in the way, then do what the E key does there. */
+  /** What E does where you stand out on the street (the same as the prompt's button). Returns whether anything happened. */
+  const actOutdoorsHere = (): boolean => {
+    const { x, z } = controller.position;
+    const near = nearestVendor(district.vendors, x, z);
+    const counter = counterAt(district, x, z);
+    const door = homeAtDoor(district.id, x, z);
+    // The same as the prompt's button: a street stall serves you where you stand, others have a room
+    if (near) openVendor(near);
+    else if (atDealershipDoor()) enterDealership();
+    else if (atOfficeDoor()) goIntoOffice();
+    else if (atUniversityDoor()) goIntoUniversity();
+    else if (atHospitalDoor()) goIntoHospital();
+    else if (atAgency()) setAgencyOpen(true);
+    else if (restaurantAt(district, x, z)) enterPalms();
+    else if (barAt(district, x, z)) enterCantina();
+    else if (hotelAt(district, x, z)) enterHotel();
+    else if (spaAt(district, x, z)) enterSpa();
+    else if (counter === 'fashion') enterBoutique();
+    else if (counter === 'gadgets') setGadgets(true);
+    else if (counter === 'travel') setTravelOpen(true);
+    else if (venueAt(district.nightlife, x, z)) setNightOpen(true);
+    else if (parkAt(district.park, x, z)) setParkOpen(true);
+    // Your own front door comes before a passer-by, as on the HUD
+    else if (door && door.id === state.home) setHomePanel(door);
+    else if (residentNear(district.id, x, z)) setTalking(residentNear(district.id, x, z)!);
+    else if (taskOnOffer()) setTask(taskOnOffer());
+    else if (door) setHomePanel(door);
+    else return false;
+    return true;
+  };
+  /** Places in this part of the city you can walk to and use, nearest first ("Things to do nearby"). */
+  const NEARBY_RADIUS = 60;
+  const PLACE_VERB: Record<PlaceKind, string> = { food: 'Eat at', shop: 'Shop at', workplace: 'Go to', home: 'Visit', public: 'Book travel at', nightlife: 'Night out at', park: 'Relax in', dealership: 'Look at cars at' };
+  const nearbyActivities = (): Activity[] => {
+    if (offStreet || controller.drivingVehicleId || asleep || sit.session) return [];
+    const { x, z } = controller.position;
+    return district.places
+      .filter((pl) => pl.kind !== 'home')
+      .map((pl) => ({ pl, d: Math.hypot(pl.position[0] - x, pl.position[2] - z) }))
+      .filter(({ d }) => d < NEARBY_RADIUS)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 10)
+      .map(({ pl, d }) => ({ label: `${PLACE_VERB[pl.kind]} ${pl.name} · ${Math.round(d)} m`, spots: aroundPoint([pl.position[0], pl.position[2]], 1.4) }));
+  };
+  const goDoNearby = (a: Activity) => {
+    const name = a.label.replace(/ · \d+ m$/, '');
+    const ok = walkThen(a.spots, name, () => {
+      if (!actOutdoorsHere()) setArrival(`You're at ${name.replace(/^\S+ (at|in|to) /, '')}.`);
+    });
+    setArrival(ok ? `On your way: ${name.toLowerCase()}.` : `There's no way to get there on foot right now.`);
+  };
   const goDoActivity = (a: Activity) => {
     const ok = walkThen(a.spots, a.label, () => {
       const here = venuePrompt?.();
@@ -2416,6 +2443,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     <main className="game">
       {venuePrompt && !stall && !vendor && !store && !studioOpen && (
         <ActivityMenu activities={venueActivities()} onGo={goDoActivity} />
+      )}
+      {!venuePrompt && !stall && !vendor && !store && !talking && (
+        <ActivityMenu title="Things to do nearby" activities={nearbyActivities()} onGo={goDoNearby} />
       )}
       {stall && (
         <StallMenu vendor={stall} diet={character.diet} balance={state.balance} eating={stallDish} onBuy={buyAtStall} onClose={closeStall}
@@ -2655,7 +2685,18 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onClose={() => setCampusPanel(null)}
         />
       )}
-      {carePanel && <HealthcarePanel point={carePanel} state={state} act={careAct} onClose={() => setCarePanel(null)} />}
+      {carePanel && <HealthcarePanel point={carePanel} state={state} act={careAct} onClose={() => setCarePanel(null)}
+        onTreat={(id, done) => {
+          const seat = CARE_SEATS[id];
+          if (!seat) return false;
+          setCarePanel(null);
+          // The panel held you still; you're free to walk to the couch now
+          setMovementBlocked(false);
+          // The treatment's time has passed in the game; you stay on the couch or chair a few moments, then get up
+          if (!sit.start({ seat, place: HOSPITAL_POINT_LABEL[carePanel], minutes: 0, holdSeconds: 7 })) return false;
+          setArrival(done);
+          return true;
+        }} />}
       {hospitalPanel && (
         <HospitalPanel
           mode={hospitalPanel}
