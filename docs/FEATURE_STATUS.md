@@ -141,6 +141,13 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 
 ## Hospital milestone (verified in the browser)
 
+**Update, November 2026: modern and herbal healthcare** (verified in the browser; details in `HEALTHCARE.md`).
+- **Two new wings:** a modern wing (emergency, examination, imaging, laboratory, surgery) and a Herbal Medicine Centre (dispensary, preparation room, medicinal garden, treatment room, research bench). Each has working equipment and staff.
+- **Open to every career:** paid services with a confirm step, diagnoses with modern, herbal or combined care plans, and a saved medicine cabinet.
+- **Herbal profession:** six ranks with training, a tool-by-tool preparation game, and research.
+- **Emergency stays:** admission stages and free herbal extras.
+- **Server:** priced purchases checked by the server and tested against real Postgres. The game doesn't call the server yet.
+
 **AYE General Hospital** (`src/lib/hospital.ts`, `src/world/Hospital.tsx`): E at any city's Hospital marker. It has a forecourt with an ambulance bay and a canopy sign. Inside are reception and waiting (with visitors), Emergency, the staff room, a corridor, two consulting rooms and a four-bed general ward. Collisions come from the same plan as the walls, and tests reach every room, spot and patient from the street.
 
 **Doctor's shift** (`GameState.shift`, saved):

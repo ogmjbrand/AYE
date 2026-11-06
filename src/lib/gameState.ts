@@ -60,6 +60,10 @@ import { FIND_RADIUS, SCENE_RADIUS, canDo, completeObjective, directWorld, empty
 import { fashionShowcaseResult } from './fashionShowcase';
 import { FASHION_MISSION_REWARD, fashionMissionStage } from './fashionMission';
 import { itemById, type Slot } from './fashion';
+import { addToCabinet, canBuyRemedy, canHaveService, canTakeRemedy, choosePlan, diagnose, emptyCare, servicePrice, takeExtra, takeFromCabinet, type CareState } from './careState';
+import { RECOVERY_EXTRAS, serviceById as careServiceById, type CarePlanKind } from './healthcare';
+import { remedyById, type PrepStep, type RemedyEffect } from './herbal';
+import { consult, doResearch, harvest as herbalHarvest, identify, plant as herbalPlant, prepare, sell, train, type ConsultChoice, type HerbalResult } from './herbalCareer';
 import { type OwnedVehicle, vehicleById, vehicleColourById } from './vehicleCatalog';
 import {
   OFFICE_TASK_MINUTES,
@@ -196,6 +200,8 @@ export interface GameState {
   gear: OwnedGear[];
   /** Health, emergency recovery and your medical kit: nobody ever dies (lib/health.ts). */
   health: Health;
+  /** Your healthcare: remedies, diagnosis and care plan, stay extras and your herbal profession (lib/careState.ts). */
+  care: CareState;
   /** Courses, study hours and earned qualifications (lib/qualifications.ts). */
   qualifications: Qualifications;
   /** Food bought to take away and not eaten yet, by dish id (lib/pantry.ts). */
@@ -204,6 +210,9 @@ export interface GameState {
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
 export type FurnitureTarget = { uid: string } | { builtin: number };
+
+/** The healthcare and herbal profession actions (lib/careState.ts, lib/herbalCareer.ts). */
+export type CareAction = Extract<GameAction, { type: `care${string}` | `herbal${string}` }>;
 
 export type GameAction =
   /** Take-away food: paid once, kept in your pantry until you eat it. */
@@ -252,6 +261,21 @@ export type GameAction =
   /** Health (lib/health.ts): harm from the world, healing items, a medic, resting through a recovery. */
   | { type: 'hurt'; amount: number; reason: string }
   | { type: 'buyMedical'; itemId: string }
+  // Healthcare (lib/healthcare.ts, lib/herbal.ts, lib/herbalCareer.ts)
+  | { type: 'careBuyRemedy'; remedyId: string }
+  | { type: 'careTakeRemedy'; remedyId: string }
+  | { type: 'careService'; serviceId: string }
+  | { type: 'careHerbalTreatment'; remedyId: string }
+  | { type: 'careChoosePlan'; plan: CarePlanKind }
+  | { type: 'careRecoveryExtra'; extraId: string }
+  | { type: 'herbalTrain'; courseId: string }
+  | { type: 'herbalIdentify'; plantId: string; answerId: string }
+  | { type: 'herbalPlant'; plot: number; plantId: string }
+  | { type: 'herbalHarvest'; plot: number }
+  | { type: 'herbalPrepare'; remedyId: string; order: PrepStep[] }
+  | { type: 'herbalConsult'; conditionId: string; choice: ConsultChoice }
+  | { type: 'herbalSell'; remedyId: string }
+  | { type: 'herbalResearch'; projectId: string; answers: number[] }
   | { type: 'useMedical'; itemId: string }
   | { type: 'callMedic' }
   | { type: 'restToRecover' }
@@ -419,6 +443,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     officeCareer: createOfficeCareer(),
     campus: createCampusState(Math.floor(time.totalMinutes / 1440)),
     hospital: createHospitalState(Math.floor(time.totalMinutes / 1440)),
+    care: emptyCare(),
     world: emptyLiveWorld(),
     supernatural: emptySupernatural(),
     gear: [],
@@ -1002,6 +1027,35 @@ function withHealth(state: GameState, health: Health): GameState {
 }
 
 /** One game minute of life: the clock, the world, supernatural energy and health. */
+/** A remedy or treatment's effect: its minutes pass, then health, needs, fullness and protection. */
+function careEffect(state: GameState, effect: RemedyEffect, minutes: number, career: Career, lifestyle: Lifestyle): GameState {
+  let next = state;
+  for (let i = 0; i < minutes; i++) next = liveMinute(next, career, lifestyle, false);
+  // An emergency that began meanwhile looks after you itself
+  if (next.health.recovery) return next;
+  let health = effect.heal ? healBy(next.health, effect.heal) : next.health;
+  if (effect.protect) health = { ...health, protectedUntil: Math.max(health.protectedUntil, next.time.totalMinutes + effect.protect) };
+  return {
+    ...next,
+    health,
+    fullness: Math.max(0, Math.min(100, next.fullness + (effect.fullness ?? 0))),
+    needs: addNeeds(next.needs, { energy: effect.energy ?? 0, hygiene: effect.hygiene ?? 0 }),
+  };
+}
+
+/** A step in the herbal profession: its time passes, its experience and pay land (pay as income). */
+function herbalStep(state: GameState, r: HerbalResult, minutes: number, career: Career, lifestyle: Lifestyle): GameState {
+  if (!r.ok || state.summary || state.health.recovery) return state;
+  let next = state;
+  for (let i = 0; i < minutes; i++) next = liveMinute(next, career, lifestyle, false);
+  return {
+    ...next,
+    balance: next.balance + r.pay,
+    today: { ...next.today, income: next.today.income + r.pay },
+    care: { ...next.care, herbal: r.herbal },
+  };
+}
+
 function liveMinute(state: GameState, career: Career, lifestyle: Lifestyle, atWorkplace: boolean): GameState {
   const next = tick(state, career, lifestyle, atWorkplace);
   const world = directWorld(next.world, next.districtId, next.time.totalMinutes, career);
@@ -1062,6 +1116,64 @@ function baseReducer(
         health: addToKit(state.health, item.id),
       };
     }
+    // ——— Healthcare: buying and taking remedies, hospital services, care plans ———
+    case 'careBuyRemedy': {
+      const r = remedyById(action.remedyId);
+      if (!r || state.summary || !canBuyRemedy(state.care, r.id, state.balance, state.care.herbal.research).ok) return state;
+      return { ...state, balance: state.balance - r.price, today: { ...state.today, expenses: state.today.expenses + r.price }, care: addToCabinet(state.care, r.id) };
+    }
+    case 'careTakeRemedy': {
+      const r = remedyById(action.remedyId);
+      if (!r || state.summary || !canTakeRemedy(state.care, r.id, !!state.health.recovery).ok) return state;
+      return careEffect({ ...state, care: takeFromCabinet(state.care, r.id) }, r.effect, r.minutes, career, lifestyle);
+    }
+    case 'careService': {
+      const svc = careServiceById(action.serviceId);
+      if (!svc || state.summary || !canHaveService(svc.id, state.balance, state.health.value, !!state.health.recovery).ok) return state;
+      const price = servicePrice(svc.id, state.health.value);
+      const now = state.time.totalMinutes;
+      const care: CareState = {
+        ...state.care,
+        servicesHad: state.care.servicesHad + 1,
+        diagnosis: svc.diagnoses ? { condition: diagnose(now, state.health.value), at: now, plan: null } : state.care.diagnosis,
+      };
+      const paid = { ...state, balance: state.balance - price, today: { ...state.today, expenses: state.today.expenses + price }, care };
+      return careEffect(paid, svc.effect, svc.minutes, career, lifestyle);
+    }
+    case 'careHerbalTreatment': {
+      const r = remedyById(action.remedyId);
+      if (!r || !r.service || state.summary || state.health.recovery || state.balance < r.price) return state;
+      const paid = { ...state, balance: state.balance - r.price, today: { ...state.today, expenses: state.today.expenses + r.price }, care: { ...state.care, servicesHad: state.care.servicesHad + 1 } };
+      return careEffect(paid, r.effect, r.minutes, career, lifestyle);
+    }
+    case 'careChoosePlan': {
+      const care = choosePlan(state.care, action.plan);
+      return care ? { ...state, care } : state;
+    }
+    case 'careRecoveryExtra': {
+      // Free, optional, and only on an emergency stay in hospital
+      const stay = state.health.recovery;
+      const extra = RECOVERY_EXTRAS.find((e) => e.id === action.extraId);
+      if (!stay || stay.place !== 'hospital' || !extra) return state;
+      const care = takeExtra(state.care, extra.id, stay.startedAt);
+      return care ? { ...state, care, needs: addNeeds(state.needs, extra.effect) } : state;
+    }
+    // ——— The herbal profession ———
+    case 'herbalTrain': {
+      if (state.summary) return state;
+      const r = train(state.care.herbal, action.courseId, state.balance);
+      if (!r.ok) return state;
+      let next: GameState = { ...state, balance: state.balance - (r.fee ?? 0), today: { ...state.today, expenses: state.today.expenses + (r.fee ?? 0) } };
+      for (let i = 0; i < (r.minutes ?? 0); i++) next = liveMinute(next, career, lifestyle, false);
+      return { ...next, care: { ...next.care, herbal: r.herbal } };
+    }
+    case 'herbalIdentify': return herbalStep(state, identify(state.care.herbal, action.plantId, action.answerId), 2, career, lifestyle);
+    case 'herbalPlant': return herbalStep(state, herbalPlant(state.care.herbal, action.plot, action.plantId, state.time.totalMinutes), 5, career, lifestyle);
+    case 'herbalHarvest': return herbalStep(state, herbalHarvest(state.care.herbal, action.plot, state.time.totalMinutes), 10, career, lifestyle);
+    case 'herbalPrepare': return herbalStep(state, prepare(state.care.herbal, action.remedyId, action.order), 20, career, lifestyle);
+    case 'herbalConsult': return herbalStep(state, consult(state.care.herbal, action.conditionId, action.choice), 20, career, lifestyle);
+    case 'herbalSell': return herbalStep(state, sell(state.care.herbal, action.remedyId), 2, career, lifestyle);
+    case 'herbalResearch': return herbalStep(state, doResearch(state.care.herbal, action.projectId, action.answers), 30, career, lifestyle);
     case 'useMedical': {
       const item = medicalItem(action.itemId);
       const now = state.time.totalMinutes;

@@ -14,6 +14,9 @@ import { FASHION_ITEMS } from '../lib/fashion';
 import { EQUIPMENT } from '../lib/equipment';
 import { HOURLY_LIVING_COST, HOURLY_WAGE, STARTING_BALANCE } from '../lib/gameState';
 import { careerLadder } from '../lib/progression';
+import { CARE_SERVICES } from '../lib/healthcare';
+import { REMEDIES } from '../lib/herbal';
+import { COURSES } from '../lib/herbalCareer';
 
 const SUPABASE_STUB = `
   create schema auth;
@@ -213,5 +216,48 @@ describe('player profile privacy foundation', () => {
     ])).rejects.toThrow(/check constraint/);
     await expect(as(ALICE, 'select * from public.search_player_profiles($1, $2)', ['a%', 100]))
       .rejects.toThrow(/invalid username prefix/);
+  });
+});
+
+describe('healthcare purchases on the server', () => {
+  let bob: string;
+  beforeAll(async () => {
+    [{ id: bob }] = await as<{ id: string }>(BOB, 'select id from public.characters');
+  });
+
+  it('prices every service, remedy, treatment and course as the game does', async () => {
+    const rows = await admin<{ id: string; kind: string; price: number; max_carry: number }>('select id, kind, price, max_carry from public.care_items');
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const s of CARE_SERVICES) expect(byId.get(s.id)).toMatchObject({ kind: 'service', price: s.price });
+    for (const r of REMEDIES) expect(byId.get(r.id)).toMatchObject({ kind: r.service ? 'treatment' : 'remedy', price: r.price, max_carry: r.max });
+    for (const c of COURSES) expect(byId.get(c.id)).toMatchObject({ kind: 'course', price: c.fee });
+    expect(rows.length).toBe(CARE_SERVICES.length + REMEDIES.length + COURSES.length);
+  });
+
+  it('charges the real price, fills the cabinet only up to what you may carry, and lets you take what you have', async () => {
+    const start = await balance(bob);
+    const [{ b }] = await as<{ b: number }>(BOB, `select public.buy_care($1, 'svc-checkup') as b`, [bob]);
+    expect(b).toBe(start - 120);
+    for (let i = 0; i < 3; i++) await as(BOB, `select public.buy_care($1, 'rem-pepper-soup')`, [bob]);
+    await expect(as(BOB, `select public.buy_care($1, 'rem-pepper-soup')`, [bob])).rejects.toThrow(/cabinet full/);
+    expect(await as(BOB, 'select item_id, count from public.care_cabinet')).toEqual([{ item_id: 'rem-pepper-soup', count: 3 }]);
+    expect(await balance(bob)).toBe(start - 120 - 3 * 60);
+    const [{ left }] = await as<{ left: number }>(BOB, `select public.take_remedy($1, 'rem-pepper-soup') as left`, [bob]);
+    expect(left).toBe(2);
+    await expect(as(BOB, `select public.take_remedy($1, 'rem-zobo')`, [bob])).rejects.toThrow(/none left/);
+    await expect(as(BOB, `select public.buy_care($1, 'free-cure')`, [bob])).rejects.toThrow(/unknown item/);
+  });
+
+  it("refuses what you can't afford, other players' cabinets and direct writes", async () => {
+    const [{ id: alice }] = await as<{ id: string }>(ALICE, 'select id from public.characters');
+    if ((await balance(alice)) > 100) await as(ALICE, `select public.spend($1, $2, 'rent')`, [alice, (await balance(alice)) - 100]);
+    const before = await balance(alice);
+    await expect(as(ALICE, `select public.buy_care($1, 'svc-procedure')`, [alice])).rejects.toThrow(/insufficient funds/);
+    expect(await balance(alice)).toBe(before);
+    await expect(as(ALICE, `select public.buy_care($1, 'rem-zobo')`, [bob])).rejects.toThrow(/no such character/);
+    expect(await as(ALICE, 'select * from public.care_cabinet')).toEqual([]);
+    await expect(as(ALICE, `insert into public.care_cabinet (character_id, item_id, count) values ($1, 'rem-zobo', 9)`, [alice])).rejects.toThrow(/permission denied/);
+    await expect(as(ALICE, `update public.care_items set price = 0`)).rejects.toThrow(/permission denied/);
+    await expect(as(null, `select public.buy_care($1, 'rem-zobo')`, [alice])).rejects.toThrow(/permission denied/);
   });
 });

@@ -1,3 +1,4 @@
+import { HospitalPiece } from './HospitalEquipment';
 import { RealModel } from './RealModel';
 import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -451,6 +452,7 @@ export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
   if (f.design?.startsWith('crown-')) return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><CrownPiece f={f} /></group>;
+  if (f.design?.startsWith('hosp-')) return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><HospitalPiece f={f} /></group>;
   if (f.design?.startsWith('studio-')) return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><StudioPiece f={f} /></group>;
   if (f.style === 'luxe' || f.kind === 'art') return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><LuxePiece f={f} /></group>;
   let parts: ReactNode;

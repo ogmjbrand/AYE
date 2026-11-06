@@ -173,7 +173,8 @@ import { CampusPanel, type CampusPanelMode } from './components/CampusPanel';
 import { UniversityExterior, UniversityScene } from './world/UniversityScene';
 import { HospitalExterior, HospitalScene } from './world/HospitalScene';
 import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
-import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type HospitalInteraction } from './lib/hospitalSite';
+import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
+import { HealthcarePanel } from './components/HealthcarePanel';
 import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
 import { UNIVERSITY, UNIVERSITY_INTERIOR, UNIVERSITY_POINTS, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
 import { campusForDay, attendClass, submitAssignment, assignmentForDay, academicStanding, CLASS_SLOTS, type ClassSlot } from './lib/campus';
@@ -477,7 +478,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     ascendUnlock, transformForm, returnToHuman, sanctuaryHeal,
     buyGear, equipGear, unequipGear, repairGear, sellGear,
     hurt, buyMedical, useMedical, callMedic, restToRecover, enrolCourse, studyCourse, sitExam,
-    buyTakeaway, eatFromPantry,
+    buyTakeaway, eatFromPantry, careAct,
   } = useGameState(
     character,
     () => character.career !== 'none' && !!districtRef.current && (
@@ -528,6 +529,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const [insideUniversity, setInsideUniversity] = useState(false);
   const [insideHospital, setInsideHospital] = useState(false);
   const [hospitalPanel, setHospitalPanel] = useState<HospitalPanelMode | null>(null);
+  /** A hospital department you're using as a patient or herbalist (open to every career). */
+  const [carePanel, setCarePanel] = useState<CareDepartmentPoint | null>(null);
   const [campusPanel, setCampusPanel] = useState<CampusPanelMode | null>(null);
   const [dealershipOpen, setDealershipOpen] = useState(false);
   const [dealershipModelId, setDealershipModelId] = useState(VEHICLE_CATALOG[0].id);
@@ -851,6 +854,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     if (inWorkplace) {
       if (insideHospital) {
         setHospitalPanel(null);
+        setCarePanel(null);
         placePlayer([HOSPITAL.position[0], 0, HOSPITAL.position[2]], -Math.PI / 2);
       } else if (insideUniversity) {
         setCampusPanel(null);
@@ -1429,6 +1433,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       setHospitalPanel('pharmacy');
       return;
     }
+    if (action !== 'reception' && action !== 'patient' && action !== 'supervisor') {
+      setCarePanel(action);
+      return;
+    }
     if (character.career !== 'doctor') {
       setArrival('Only hospital doctors can work here. Choose the Doctor career to join the staff.');
       return;
@@ -1790,9 +1798,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   });
 
   useEffect(() => {
-    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen || inventoryOpen || healthOpen || !!recovery);
+    setMovementBlocked(vendor !== null || store !== null || homePanel !== null || gadgets || travelOpen || talking !== null || hugging !== null || task !== null || locationsOpen || nightOpen || parkOpen || catalogueOpen || hostOpen || assistantOpen || campusPanel !== null || hospitalPanel !== null || carePanel !== null || officePanel !== null || dealershipOpen || agencyOpen || spaPanel !== null || spaServing !== null || phoneOpen || eventPanelOpen || divineOpen || questsOpen || inventoryOpen || healthOpen || !!recovery);
     return () => setMovementBlocked(false);
-  }, [eventPanelOpen, divineOpen, questsOpen, inventoryOpen, healthOpen, recovery, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
+  }, [eventPanelOpen, divineOpen, questsOpen, inventoryOpen, healthOpen, recovery, vendor, store, homePanel, gadgets, travelOpen, talking, hugging, task, locationsOpen, nightOpen, parkOpen, catalogueOpen, hostOpen, assistantOpen, campusPanel, hospitalPanel, carePanel, officePanel, dealershipOpen, agencyOpen, spaPanel, spaServing, phoneOpen]);
 
   // ── Survival (lib/health.ts): nobody dies ─────────────────────────────────
   // A crash in the car you're driving hurts, by how fast you hit
@@ -1832,7 +1840,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     if (controller.drivingVehicleId) { forceExitVehicle(); setDrivingVehicleId(null); }
     sit.cancel();
     setOsOpen(false); setPhoneOpen(false); setInventoryOpen(false); setDivineOpen(false); setQuestsOpen(false); setHealthOpen(false);
-    setHospitalPanel(null); setTravelOpen(false); setStore(null); setVendor(null); setGadgets(false); setTask(null); setTalking(null); setTrackedId(null);
+    setHospitalPanel(null); setCarePanel(null); setTravelOpen(false); setStore(null); setVendor(null); setGadgets(false); setTask(null); setTalking(null); setTrackedId(null);
     if (recovery.place === 'sanctuary' && home && interior && home.district === district.id) {
       goInside();
     } else if (district.id === HOSPITAL.districtId) {
@@ -2059,7 +2067,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         pharmacy: { verb: 'Visit', place: 'the pharmacy', onOpen: () => interactWithHospital('pharmacy') },
         supervisor: { verb: 'Speak to', place: 'the supervisor', onOpen: () => interactWithHospital('supervisor') },
         patient: { verb: 'See a patient on', place: 'the ward', onOpen: () => interactWithHospital('patient') },
-      })[action] : null;
+      } as Partial<Record<HospitalInteraction, { verb: string; place: string; onOpen: () => void }>>)[action]
+        ?? { verb: 'Use', place: HOSPITAL_POINT_LABEL[action as CareDepartmentPoint].replace(/^The /, 'the '), onOpen: () => interactWithHospital(action) } : null;
     }
     if (insideUniversity) {
       const action = universityInteractionAt(UNIVERSITY_INTERIOR, x, z);
@@ -2357,8 +2366,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     if (asleep || sit.session) return [];
     if (inWorkplace) {
       if (insideHospital) {
-        const label = { reception: 'Reception', pharmacy: 'The pharmacy', supervisor: 'The supervisor', patient: 'The ward' } as const;
-        return HOSPITAL_POINTS.map((pt) => ({ label: label[pt.action as keyof typeof label] ?? pt.action, spots: aroundPoint(pt.at, pt.radius) }));
+        return HOSPITAL_POINTS.map((pt) => ({ label: pt.action === 'door' ? 'Main entrance' : HOSPITAL_POINT_LABEL[pt.action], spots: aroundPoint(pt.at, pt.radius) }));
       }
       if (insideUniversity) {
         const label = { info: 'University directory', services: 'Student services', lecture: 'Lecture Hall A', study: 'Library desk', assignment: 'Computer lab', cafeteria: 'Cafeteria', centre: 'Student centre' } as const;
@@ -2647,6 +2655,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onClose={() => setCampusPanel(null)}
         />
       )}
+      {carePanel && <HealthcarePanel point={carePanel} state={state} act={careAct} onClose={() => setCarePanel(null)} />}
       {hospitalPanel && (
         <HospitalPanel
           mode={hospitalPanel}
@@ -2988,7 +2997,8 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       )}
       <CriticalWarning health={state.health} now={state.time.totalMinutes} supernatural={state.supernatural.unlockedAt !== null} onUseItem={useMedical} onCallMedic={requestMedic} onOpen={() => setHealthOpen(true)} />
       <MedicComing health={state.health} now={state.time.totalMinutes} />
-      {recovery && emergencyCard !== recovery.startedAt && !state.summary && <RecoveryPanel health={state.health} now={state.time.totalMinutes} onRest={restToRecover} />}
+      {recovery && emergencyCard !== recovery.startedAt && !state.summary && <RecoveryPanel health={state.health} now={state.time.totalMinutes} onRest={restToRecover}
+        extrasTaken={state.care.extras?.stay === recovery.startedAt ? state.care.extras.taken : []} onExtra={(extraId) => careAct({ type: 'careRecoveryExtra', extraId })} />}
       {recovery && emergencyCard === recovery.startedAt && (
         <EmergencyTransition place={recovery.place} reason={recovery.reason} onDone={dismissEmergencyCard} />
       )}

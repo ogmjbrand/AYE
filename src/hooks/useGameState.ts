@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
-import type { FurnitureTarget, GameState, PhoneContact } from '../lib/gameState';
+import type { CareAction, FurnitureTarget, GameState, PhoneContact } from '../lib/gameState';
 import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
 import { hasProgress, loadProgress, saveProgress } from '../lib/save';
@@ -86,6 +86,8 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     sanctuaryHeal: (atHome: boolean) => dispatch({ type: 'sanctuaryHeal', atHome }),
     hurt: (amount: number, reason: string) => dispatch({ type: 'hurt', amount, reason }),
     buyMedical: (itemId: string) => dispatch({ type: 'buyMedical', itemId }),
+    /** Hospital care, remedies and the herbal profession. */
+    careAct: (action: CareAction) => dispatch(action),
     useMedical: (itemId: string) => dispatch({ type: 'useMedical', itemId }),
     callMedic: () => dispatch({ type: 'callMedic' }),
     restToRecover: () => dispatch({ type: 'restToRecover' }),

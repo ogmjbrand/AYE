@@ -1,3 +1,4 @@
+import { ADMISSION_STAGES, RECOVERY_EXTRAS, admissionStage } from '../lib/healthcare';
 import { useEffect, useState } from 'react';
 import { Ambulance, BedDouble, Heart, HeartPulse, ShieldCheck, Sparkles } from 'lucide-react';
 import {
@@ -119,7 +120,11 @@ const STAFF: Record<RecoveryPlace, readonly string[]> = {
  * A recovery stay: where you are, why, health coming back, when you can carry
  * on, someone to talk to, and the choice to rest through the rest of it.
  */
-export function RecoveryPanel({ health, now, onRest }: { health: Health; now: number; onRest: () => void }) {
+export function RecoveryPanel({ health, now, onRest, extrasTaken = [], onExtra }: {
+  health: Health; now: number; onRest: () => void;
+  /** Optional, free extras on a hospital stay (lib/healthcare.ts RECOVERY_EXTRAS): ids already had this stay, and how to take one. */
+  extrasTaken?: readonly string[]; onExtra?: (id: string) => void;
+}) {
   const r = health.recovery;
   const [line, setLine] = useState(0);
   if (!r) return null;
@@ -132,12 +137,40 @@ export function RecoveryPanel({ health, now, onRest }: { health: Health; now: nu
       <p className="m-0 mt-1 text-xs text-ui-muted">Brought in because you {r.reason}. {r.place === 'hospital' ? 'Examined at A&E and moved to the ward.' : r.place === 'sanctuary' ? 'Your powers, transformations and belongings are all safe.' : ''}</p>
       <div className="mt-3"><HealthBar value={health.value} /></div>
       <p className="m-0 mt-2 text-xs"><span className="text-ui-muted">You can carry on at</span> <span className="font-semibold tabular-nums">{clock(r.until)}</span> <span className="text-ui-muted">· {Math.round(progress * 100)}% through your stay</span></p>
+      {r.place === 'hospital' && (() => {
+        const stage = admissionStage(progress);
+        const at = ADMISSION_STAGES.findIndex((s) => s.id === stage);
+        return (
+          <ol aria-label="Your stay" className="m-0 mt-3 grid list-none grid-cols-7 gap-1 p-0">
+            {ADMISSION_STAGES.map((s, i) => (
+              <li key={s.id} title={`${s.name}: ${s.note}`} className={`h-1.5 rounded-full ${i < at ? 'bg-[#4eae42]' : i === at ? 'bg-ui-gold' : 'bg-white/10'}`}><span className="sr-only">{s.name}{i === at ? ' (now)' : ''}</span></li>
+            ))}
+            <li className="col-span-7 mt-1 text-xs"><span className="font-semibold">{ADMISSION_STAGES[at].name}</span> <span className="text-ui-muted">· {ADMISSION_STAGES[at].note}</span></li>
+          </ol>
+        );
+      })()}
       <button type="button" onClick={() => setLine((l) => (l + 1) % lines.length)} className="mt-3 w-full rounded-xl border border-white/10 bg-[#1a1815] px-3 py-2 text-left text-xs text-ui-muted hover:border-ui-gold/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
         {lines[line]} <span className="text-ui-gold">· {r.place === 'hospital' ? 'Talk to the staff' : 'Reflect'}</span>
       </button>
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={onRest} className={`${GOLD} flex-1`}><BedDouble size={16} aria-hidden="true" className="mr-1.5 inline" /> Rest until recovered</button>
       </div>
+      {r.place === 'hospital' && onExtra && (
+        <div className="mt-3">
+          <p className="m-0 text-[11px] uppercase tracking-[0.14em] text-ui-muted">Optional, free · from the herbal centre</p>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            {RECOVERY_EXTRAS.map((e) => {
+              const had = extrasTaken.includes(e.id);
+              return (
+                <button key={e.id} type="button" disabled={had} onClick={() => onExtra(e.id)} title={e.note}
+                  className="rounded-xl border border-white/10 bg-[#1a1815] px-3 py-2 text-left text-xs hover:border-ui-gold/40 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">
+                  <span className="font-semibold">{e.name}</span> <span className="text-ui-muted">· +{e.effect.energy} energy{had ? ' · had' : ''}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <p className="m-0 mt-2 text-[11px] text-ui-muted">Treatment is free. You keep your money, home, career, items and achievements.</p>
     </section>
   );
