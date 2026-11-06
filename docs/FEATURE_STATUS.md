@@ -143,7 +143,7 @@ Walls, doors and collisions come from one plan. Tests prove every room, interact
 
 Out in the city, a **Things to do nearby** list shows the places within 60 m, nearest first: food, shops, workplaces, travel, nightlife, the park and car dealers.
 - Pick one and your character walks there round whatever is in the way.
-- On arrival, it does what E does there: opens the stall's menu, goes into the building, sits on the park bench, and so on.
+- On arrival, it does what E does there: opens the stall's menu, goes into the building, opens the park, and so on.
 - Inside venues, the existing **Things to do here** list works the same way.
 
 ## Hospital milestone (verified in the browser)
