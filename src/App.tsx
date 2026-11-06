@@ -175,6 +175,7 @@ import { HospitalExterior, HospitalScene } from './world/HospitalScene';
 import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
 import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, CARE_SEATS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
 import { HealthcarePanel } from './components/HealthcarePanel';
+import { StreetLife } from './world/StreetLife';
 import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
 import { UNIVERSITY, UNIVERSITY_INTERIOR, UNIVERSITY_POINTS, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
 import { campusForDay, attendClass, submitAssignment, assignmentForDay, academicStanding, CLASS_SLOTS, type ClassSlot } from './lib/campus';
@@ -431,6 +432,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} day={{ minuteOfDay: gameTime.hour * 60 + gameTime.minute, dayOfWeek: gameTime.dayOfWeek }} />
       <Traffic player={controller} />
       <Campers />
+      <StreetLife hour={gameTime.hour} />
       {liveEvent && <LiveEventScene event={liveEvent} minute={gameTime.totalMinutes} />}
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour

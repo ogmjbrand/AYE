@@ -146,6 +146,15 @@ Out in the city, a **Things to do nearby** list shows the places within 60 m, ne
 - On arrival, it does what E does there: opens the stall's menu, goes into the building, opens the park, and so on.
 - Inside venues, the existing **Things to do here** list works the same way.
 
+## Street life (November 2026, verified in the browser)
+
+Passers-by walk the boulevard's pavements between the district's real shops, stalls and restaurants (`src/lib/streetLife.ts`, `src/world/StreetLife.tsx`).
+- They stop at each door for 5–14 seconds, facing in, then move on.
+- The crowd follows the time of day: none in the small hours, 4 in the early morning, 8 through the day, fewer at night.
+- The low quality tier (phones) has half as many.
+- Each person keeps to one stretch of pavement and wears an everyday outfit from the resident outfit generator.
+- They aren't named on screen and you can't talk to them yet.
+
 ## Hospital milestone (verified in the browser)
 
 **Update, November 2026: modern and herbal healthcare** (verified in the browser; details in `HEALTHCARE.md`).

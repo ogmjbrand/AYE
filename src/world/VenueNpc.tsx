@@ -62,6 +62,10 @@ export interface NpcProps {
   uniform?: Partial<Record<Slot, Style>>;
   /** Lies face down on a table this high (a spa client), head towards `facing`; centred on x, z. */
   lying?: number;
+  /** A passer-by: no name over their head. */
+  tagless?: boolean;
+  /** Height of the ground they stand on (a raised pavement). */
+  groundY?: number;
 }
 
 const WALK_SPEED = 1.0;
@@ -78,7 +82,7 @@ const pose = (bone: Object3D | undefined, q: Quaternion, k: number) => {
 };
 const PAUSE_SECONDS = 2.2;
 
-function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform, lying, onStop, grill }: NpcProps) {
+function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, uniform, lying, onStop, grill, tagless = false, groundY = 0 }: NpcProps) {
   const look = lookById(lookId);
   const { scene, animations } = useGLTF(assetUrl(look.url), false, true);
   const group = useRef<Group>(null);
@@ -157,7 +161,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
       // Waiting at a stop with its own heading: turn to it (a customer facing the seller)
       const stop = route[w.leg];
       if (!moving && stop[3] !== undefined) w.heading += Math.atan2(Math.sin(stop[3] - w.heading), Math.cos(stop[3] - w.heading)) * Math.min(1, step * 5);
-      root.current?.position.set(w.x, 0, w.z);
+      root.current?.position.set(w.x, groundY, w.z);
       if (group.current) group.current.rotation.y = w.heading;
       onStop?.(!moving && w.pause > 0 ? w.leg : null);
     }
@@ -203,7 +207,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
   const at = seat ? [seat.x - Math.sin(seat.facing) * 0.08, seat.z - Math.cos(seat.facing) * 0.08] : [x, z];
   const heading = seat ? seat.facing : facing;
   return (
-    <group ref={root} position={[at[0], 0, at[1]]}>
+    <group ref={root} position={[at[0], groundY, at[1]]}>
       <group ref={group} rotation={[0, heading, 0]}>
         {lying === undefined ? <primitive object={figure} scale={scale} /> : (
           // Feet at the foot of the table, face down into the head rest
@@ -214,9 +218,11 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
       </group>
       {uniform && <OutfitStyler scene={figure} lookId={look.id} styles={uniform} skinTone={0} />}
       <Gestures body={look.body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />
-      <sprite position={[0, lying !== undefined ? lying + 0.75 : (seat ? look.height * 0.78 : look.height) + 0.3, 0]} scale={[0.8, 0.25, 1]}>
-        <spriteMaterial map={tag} depthWrite={false} transparent />
-      </sprite>
+      {!tagless && (
+        <sprite position={[0, lying !== undefined ? lying + 0.75 : (seat ? look.height * 0.78 : look.height) + 0.3, 0]} scale={[0.8, 0.25, 1]}>
+          <spriteMaterial map={tag} depthWrite={false} transparent />
+        </sprite>
+      )}
     </group>
   );
 }
