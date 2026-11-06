@@ -62,6 +62,10 @@ export const LAGOS_MARINA: DistrictSpec = {
       { position: [-3, 0, 10], heading: Math.PI, color: '#e9a800' },
       { position: [13, 0, 4], heading: -Math.PI / 2, color: '#e7e2d7', kind: 'car', bodyStyle: 'sedan' },
       { position: [13, 0, 20], heading: -Math.PI / 2, color: '#427b91', kind: 'car', bodyStyle: 'suv' },
+      // At the Crown Residence: two under the carport and one by the porch
+      { position: [-42.2, 0, 2.6], heading: 0, color: '#1c1d21', kind: 'car', bodyStyle: 'suv' },
+      { position: [-38.6, 0, 2.6], heading: 0, color: '#eceae6', kind: 'car', bodyStyle: 'sedan' },
+      { position: [-41.4, 0, 10.0], heading: 0, color: '#111214', kind: 'car', bodyStyle: 'sedan' },
     ],
     // Danfos and the odd private car, driving on the right
     traffic: [
@@ -79,6 +83,14 @@ export const LAGOS_MARINA: DistrictSpec = {
     terraceChairs: [{ x: 7.6, z: 18.75, facing: -Math.PI / 2 }, { x: 7.6, z: 21.25, facing: -Math.PI / 2 }],
     // A hotel guest's motorhome, parked beside the Grand Lagoon's west wall
     campers: [{ x: -32.6, z: 37.5, heading: Math.PI }],
+    // The Crown Residence: a walled compound west of the tower, its gate on the lane in from the boulevard
+    compounds: [{
+      id: 'crown-residence', name: 'The Crown Residence',
+      minX: -44.5, maxX: -30.5, minZ: -1, maxZ: 25,
+      gate: { z0: 8.5, z1: 13 },
+      house: { minX: -43.2, maxX: -31.8, minZ: 13.6, maxZ: 23.8 },
+      carport: { minX: -44.1, maxX: -35.2, minZ: -0.6, maxZ: 5.4 },
+    }],
     // Uptown Gardens, behind the hospital: in from the cross street, paths crossing at the middle
     park: {
       area: { minX: 20, maxX: 33, minZ: -13, maxZ: 4 },
@@ -184,6 +196,11 @@ export const LAGOS_MARINA: DistrictSpec = {
       id: 'lagoon-villa', district: 'lagos.marina', name: 'Lagoon Villa', kind: 'Villa by the lagoon', building: 'Lagoon Villa',
       door: [28, 0, -30.2], rentPerNight: 0, price: 600_000, band: 'luxury', tier: 'villa',
       description: 'Marble floors and floor-to-ceiling glass over the lagoon, a fireplace, dining for six, a study and a freestanding bath.',
+    },
+    {
+      id: 'crown-residence', district: 'lagos.marina', name: 'The Crown Residence', kind: 'Walled family compound', building: 'The Crown Residence',
+      door: [-37.5, 0, 12.7], rentPerNight: 0, price: 2_500_000, band: 'luxury', tier: 'crown',
+      description: 'The most expensive home in AYE: a walled compound with its own gate, lawns, a carport for three cars and a two-storey house. Inside, a double-height sculpted salon under fringe chandeliers, a sage-and-oak kitchen, a library wall and a principal suite with a freestanding bath.',
     },
   ],
   // Marker positions sit on the pavement or plaza in front of the matching building

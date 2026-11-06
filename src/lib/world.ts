@@ -4,6 +4,7 @@
  * one east–west street. Buildings sit back from the pavements.
  */
 import type { VehicleBodyStyle } from './vehicleCatalog';
+import { compoundObstacles, type CompoundSpec } from './compound';
 
 export type BuildingStyle = 'tower' | 'office' | 'residential' | 'shop';
 
@@ -96,6 +97,8 @@ export interface LayoutSpec {
   campers?: readonly { x: number; z: number; heading: number }[];
   /** Painted black-and-yellow kerbs and yellow edge lines (default), or plain grey kerbs and white lines. */
   streetStyle?: 'painted' | 'plain';
+  /** Walled private compounds (a house, its drive and carport) off the street (lib/compound.ts). */
+  compounds?: readonly CompoundSpec[];
   /** Distant city massing: seed and colours. */
   skyline: { seed: number; warm: readonly string[]; glass: readonly string[]; towerChance: number };
 }
@@ -212,6 +215,7 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...(spec.campers ?? []).map((c) => carFootprint(c.x, c.z, c.heading, CAMPER_SIZE.length, CAMPER_SIZE.width)),
     // A cart's counter runs across the way it faces
     ...(spec.foodCarts ?? []).map((c) => carFootprint(c.x, c.z, c.facing + Math.PI / 2, FOOD_CART_SIZE.length, FOOD_CART_SIZE.depth)),
+    ...(spec.compounds ?? []).flatMap(compoundObstacles),
     ...(spec.park?.benches ?? []).map((b) => {
       // Benches face along an axis; their footprint swaps width and depth when turned sideways
       const sideways = Math.abs(Math.sin(b.facing)) > 0.5;

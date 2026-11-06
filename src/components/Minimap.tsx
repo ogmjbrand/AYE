@@ -29,7 +29,7 @@ export const Minimap = memo(function Minimap({ district, controller, tracked }: 
   const trackedRef = useRef(tracked);
   trackedRef.current = tracked;
   const markerRef = useRef<SVGCircleElement>(null);
-  const { roadHalfWidth, crossStreet, buildings, park } = district.layout;
+  const { roadHalfWidth, crossStreet, buildings, park, compounds } = district.layout;
   const B = WORLD_BOUND;
 
   useEffect(() => {
@@ -77,6 +77,11 @@ export const Minimap = memo(function Minimap({ district, controller, tracked }: 
           fill="#3f6a4c" rx="2"
         />
       )}
+      {/* Walled compounds: the plot in green, the house on it */}
+      {(compounds ?? []).flatMap((c) => [
+        <rect key={`${c.id}-plot`} x={c.minX * scale} y={c.minZ * scale} width={(c.maxX - c.minX) * scale} height={(c.maxZ - c.minZ) * scale} fill="#3f5a46" stroke="#a89878" strokeWidth="0.6" />,
+        <rect key={`${c.id}-house`} x={c.house.minX * scale} y={c.house.minZ * scale} width={(c.house.maxX - c.house.minX) * scale} height={(c.house.maxZ - c.house.minZ) * scale} fill="#8a5a40" stroke="#c8673a" strokeWidth="0.5" />,
+      ])}
       {buildings.map((b, index) => (
         <rect
           key={`${b.name ?? b.style}-${index}`}
@@ -89,7 +94,7 @@ export const Minimap = memo(function Minimap({ district, controller, tracked }: 
         <circle key={place.id} cx={place.position[0] * scale} cy={place.position[2] * scale} r="2.1" fill={KIND_COLOR[place.kind] ?? '#fff'} stroke="#101215" strokeWidth="0.6" />
       ))}
     </>
-  ), [B, roadHalfWidth, crossStreet, park, buildings, district.places]);
+  ), [B, roadHalfWidth, crossStreet, park, buildings, compounds, district.places]);
 
   return (
     <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="size-full" role="img" aria-label={`Minimap of ${district.name}`}>

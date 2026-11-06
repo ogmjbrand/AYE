@@ -3,7 +3,8 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DoubleSide, type Group, type MeshStandardMaterial } from 'three';
 import type { Furniture, Interior } from '../lib/interiors';
-import { WALL_HEIGHT, lightSwitchSpot } from '../lib/interiors';
+import { WALL_HEIGHT, lightSwitchSpot, wallHeight } from '../lib/interiors';
+import { CrownDecor, CrownPiece } from './CrownResidence';
 import { sofaFacing } from '../lib/furniture';
 import { lightingAt } from './timeOfDay';
 import { marbleTexture, skyMoodAt, skylineTexture } from './venueTextures';
@@ -47,7 +48,7 @@ export function HomeInterior(props: ShellProps) {
 function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }: ShellProps) {
   const { width: w, depth: d } = interior;
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
-  const H = WALL_HEIGHT;
+  const H = wallHeight(interior);
   const doorW = 1.4;
   const side = (w - doorW) / 2;
   const windowSize = interior.window === 'full' ? [w * 0.8, H - 0.3] : interior.window === 'wide' ? [Math.min(3.2, w * 0.5), 1.4] : [1.1, 1.0];
@@ -92,10 +93,10 @@ function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }
       </mesh>
 
       {/* Window on the far wall */}
-      <mesh position={[0, windowY, d / 2 - 0.02]} rotation={[0, Math.PI, 0]}>
+      {interior.window !== 'none' && <mesh position={[0, windowY, d / 2 - 0.02]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={windowSize as [number, number]} />
         <meshStandardMaterial map={sky} emissiveMap={sky} emissive="#ffffff" emissiveIntensity={night > 0.5 ? 0.7 : 0.85} roughness={0.2} toneMapped={false} />
-      </mesh>
+      </mesh>}
       {interior.window === 'full' && Array.from({ length: 5 }, (_, i) => (
         <mesh key={i} position={[-windowSize[0] / 2 + (i * windowSize[0]) / 4, windowY, d / 2 - 0.04]}>
           <boxGeometry args={[0.05, windowSize[1], 0.04]} />
@@ -133,6 +134,7 @@ function HomeShell({ interior, gameTime, extra = [], lightsOn = true, children }
       <LightsOn.Provider value={lightsOn}>
         {interior.furniture.map((f, i) => <Piece key={i} f={f} />)}
         <HomeDecor interior={interior} night={night} />
+        {interior.tier === 'crown' && <CrownDecor interior={interior} night={night} hour={gameTime.hour} lightsOn={lightsOn} />}
         {/* Furniture you bought */}
         {extra.map((f, i) => <Piece key={`own-${i}`} f={f} />)}
       </LightsOn.Provider>
@@ -448,6 +450,7 @@ function LightSwitch({ spot, halfWidth, on }: { spot: readonly [number, number];
 export function Piece({ f }: { f: Furniture }) {
   const [w, h, d] = f.size;
   const [x, z] = f.at;
+  if (f.design?.startsWith('crown-')) return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><CrownPiece f={f} /></group>;
   if (f.design?.startsWith('studio-')) return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><StudioPiece f={f} /></group>;
   if (f.style === 'luxe' || f.kind === 'art') return <group position={[x, f.elevation ?? 0, z]} rotation={[0, f.rotation ?? 0, 0]}><LuxePiece f={f} /></group>;
   let parts: ReactNode;

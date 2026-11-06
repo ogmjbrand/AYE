@@ -62,6 +62,6 @@ describe.each(DISTRICTS.map((d) => [d.id, d] as const))('district %s', (_, d) =>
   });
 
   it('every building named by a home exists in the layout', () => {
-    for (const h of d.homes) expect(d.layout.buildings.some((b) => b.name === h.building), h.building).toBe(true);
+    for (const h of d.homes) expect(d.layout.buildings.some((b) => b.name === h.building) || (d.layout.compounds ?? []).some((c) => c.name === h.building), h.building).toBe(true);
   });
 });

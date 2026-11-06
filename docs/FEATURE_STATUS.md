@@ -239,6 +239,30 @@ What is done, and what it does not do yet:
     can't show through); female-adult-08 checked standing, walking, running and sitting.
   - **Partial:** no cape or pockets; not yet for the three people in long or bulky clothes.
 
+## The Crown Residence (November 2026, verified in the browser)
+
+- **The listing:** the most expensive home in AYE, 2,500,000 GHAI through OGM Homes (the
+  Lagoon Villa, the next dearest, is 600,000). It's well below the 1,000,000,000 GHAI
+  supernatural unlock.
+- **The compound** (`lib/compound.ts`, `world/Compound.tsx`), west of the tower on Lagoon
+  Boulevard, in from the lane:
+  - a stone boundary wall with terracotta coping, and a black sliding gate standing open;
+  - lawns, an asphalt drive, a green canopy carport and three parked cars;
+  - a two-storey house in white render and terracotta, with a pillared porch under a
+    balcony, roof rails and a rooftop stair tower.
+  - It is solid, on the minimap and the map, and walkable from the lane to the porch (tested).
+- **Inside** (`CROWN_INTERIOR`, `world/CrownResidence.tsx`), a 4.4 m high floor:
+  - **The salon:** a sculpted salon (our own plaster relief, fluted and beaded panels with
+    light strips, a coved ceiling, three cloud-shaped fringe chandeliers), curved sofas,
+    tube armchairs, cloud tables and olive trees;
+  - **The media wall:** swags over the screen and lit niches;
+  - **The library:** a wall of rounded columns, and a tall window with linen and sheer
+    curtains;
+  - **The kitchen:** the 14 ft straight sage-and-oak kitchen to its elevation: 2'6" base
+    units, 2' uppers with glass crockery shutters, 2' loft, a cove-lit false ceiling and
+    fluted oak side panels;
+  - **The suite:** a bedroom and a freestanding bath behind the partition.
+
 ## Next task (pick up here)
 
 

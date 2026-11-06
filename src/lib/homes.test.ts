@@ -15,10 +15,10 @@ describe('OGM Homes and the starter flat', () => {
     expect(interiorFor(starter).tier).toBe('room');
   });
 
-  it('sells five homes, from starter homes to a luxury villa, the dearer ones no smaller', () => {
+  it('sells six homes, from starter homes to the Crown Residence, the dearer ones no smaller', () => {
     const sale = homesForSale();
-    expect(sale).toHaveLength(5);
-    expect(sale.map((h) => h.band)).toEqual(['lower', 'lower', 'middle', 'middle', 'luxury']);
+    expect(sale).toHaveLength(6);
+    expect(sale.map((h) => h.band)).toEqual(['lower', 'lower', 'middle', 'middle', 'luxury', 'luxury']);
     const areas = sale.map((h) => { const i = interiorFor(h); return i.width * i.depth; });
     expect(areas.at(-1)).toBe(Math.max(...areas));
     expect(areas[0]).toBe(Math.min(...areas));

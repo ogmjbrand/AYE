@@ -44,14 +44,16 @@ export interface Furniture {
 
 export interface Interior {
   /** Rented: room to penthouse. Bought through OGM Homes: house (lower), family (middle class), villa (luxury), the lofts. */
-  tier: 'room' | 'flat' | 'apartment' | 'penthouse' | 'house' | 'family' | 'villa' | 'loft' | 'warehouse';
+  tier: 'room' | 'flat' | 'apartment' | 'penthouse' | 'house' | 'family' | 'villa' | 'loft' | 'warehouse' | 'crown';
   architecture: 'residential' | 'office' | 'restaurant' | 'boutique' | 'dealership';
   width: number;
   depth: number;
   wallColor: string;
   floorColor: string;
-  /** Big window on the far wall (penthouse: floor to ceiling). */
-  window: 'small' | 'wide' | 'full';
+  /** Big window on the far wall (penthouse: floor to ceiling); none where the far wall is a feature wall. */
+  window: 'small' | 'wide' | 'full' | 'none';
+  /** Ceiling height, where it isn't the usual WALL_HEIGHT (the Crown Residence's double-height salon). */
+  height?: number;
   /** Non-load-bearing interior walls, with central openings between rooms. */
   partitions: readonly InteriorWall[];
   furniture: readonly Furniture[];
@@ -62,6 +64,8 @@ export interface Interior {
 }
 
 export const WALL_HEIGHT = 2.9;
+/** This interior's ceiling height. */
+export const wallHeight = (i: Pick<Interior, 'height'>) => i.height ?? WALL_HEIGHT;
 /** Use radius for the bed and the door. */
 export const USE_RADIUS = 1.4;
 
@@ -265,7 +269,73 @@ export const INTERIORS: Record<Interior['tier'], Interior> = {
     // The fireplace on the east wall
     solids: [[6.7, -3.6, 0.6, 2.0]],
   },
+  // Set below, once its furniture helper exists
+  crown: undefined as unknown as Interior,
 };
+
+/** A Crown Residence piece: drawn by world/CrownResidence.tsx, solid and usable like any other. */
+const crown = (kind: FurnitureKind, design: string, x: number, z: number, w: number, h: number, d: number, color: string, rotation = 0): Furniture =>
+  ({ kind, at: [x, z], size: [w, h, d], color, design: `crown-${design}`, ...(rotation ? { rotation } : {}) });
+
+/**
+ * The Crown Residence (the most expensive home, bought through OGM Homes): one double-height
+ * floor, 18 × 13 m under a 4.4 m coved ceiling.
+ * - The salon in the middle: a sculpted relief wall at the back between fluted, beaded panels
+ *   and light strips, curved sofas and tube armchairs round a pair of cloud tables, olive trees,
+ *   and three fringe chandeliers.
+ * - The media wall on the partition to the west: draped plaster swags over the screen, columns
+ *   with lit niches either side, a bead pendant and a stacked-stone sculpture.
+ * - The east wing: a library wall of rounded columns with two armchairs, a tall window with
+ *   linen and sheer curtains, and the 14 ft straight kitchen (sage and oak, glass crockery
+ *   shutters, loft storage, a cove-lit false ceiling and fluted oak side panels).
+ * - Behind the partition: the principal bedroom, a wardrobe wall and a freestanding bath.
+ */
+export const CROWN_INTERIOR: Interior = {
+  tier: 'crown', architecture: 'residential', width: 18, depth: 13, height: 4.4, wallColor: '#e6e3de', floorColor: '#e9e6e1', window: 'none',
+  partitions: [
+    // Between the bedroom wing and the salon, with an opening to the bedroom by the salon's front
+    { position: [-3.5, 0, -3.35], size: [0.3, 4.4, 6.3] },
+    { position: [-3.5, 0, 4.0], size: [0.3, 4.4, 5.0] },
+  ],
+  furniture: [
+    // The salon
+    crown('sofa', 'sofa', 0.75, 5.5, 3.0, 0.85, 1.05, '#ece8e2'),
+    crown('armchair', 'tube-chair', -1.75, 5.2, 0.95, 0.8, 0.9, '#e7e3dd'),
+    crown('armchair', 'tube-chair', 3.25, 5.2, 0.95, 0.8, 0.9, '#e7e3dd'),
+    crown('lamp', 'side-lamp', -1.0, 5.8, 0.45, 1.25, 0.45, '#8a8a3a'),
+    crown('lamp', 'side-lamp', 2.5, 5.8, 0.45, 1.25, 0.45, '#8a8a3a'),
+    crown('sofa', 'sofa', -2.75, 2.7, 1.05, 0.85, 2.6, '#ece8e2'),
+    crown('sofa', 'sofa', 4.3, 2.7, 1.05, 0.85, 2.6, '#ece8e2'),
+    crown('table', 'cloud-table', 0.75, 2.6, 2.0, 0.42, 1.15, '#e3e0db'),
+    crown('plant', 'olive', -3.0, 5.95, 0.7, 2.3, 0.7, '#4b5a3a'),
+    crown('plant', 'olive', 4.55, 5.95, 0.7, 2.3, 0.7, '#4b5a3a'),
+    // The media wall and its sofa
+    crown('tv', 'tv', -3.12, -3.2, 0.12, 1.15, 2.0, '#0e0f11'),
+    crown('sofa', 'sofa', 0.7, -3.2, 1.05, 0.85, 2.8, '#ece8e2'),
+    crown('table', 'cloud-table-small', -1.2, -3.2, 0.95, 0.4, 1.5, '#e3e0db'),
+    // The east wing: library armchairs, the kitchen and its tall fridge
+    crown('armchair', 'tube-chair', 6.0, 5.2, 0.95, 0.8, 0.9, '#e7e3dd'),
+    crown('armchair', 'tube-chair', 8.0, 5.2, 0.95, 0.8, 0.9, '#e7e3dd'),
+    crown('lamp', 'side-table', 7.0, 5.6, 0.5, 0.6, 0.5, '#e3e0db'),
+    crown('counter', 'kitchen', 8.69, -3.95, 0.62, 0.92, 4.27, '#7d8f80'),
+    crown('fridge', 'tall-unit', 8.62, -1.2, 0.76, 2.4, 0.9, '#a4774d'),
+    // The bedroom wing
+    f('bed', -6.4, 4.85, 2.2, 0.6, 2.3, '#ece7df', 'luxe', 'chevron'),
+    f('dresser', -7.85, 5.75, 0.5, 0.55, 0.45, '#d9d4cc', 'luxe', 'nightstand'),
+    f('dresser', -4.95, 5.75, 0.5, 0.55, 0.45, '#d9d4cc', 'luxe', 'nightstand'),
+    f('wardrobe', -8.68, 1.4, 0.6, 2.4, 2.6, '#f3f1ec', 'luxe', 'marble'),
+    f('bathtub', -7.6, -5.4, 1.7, 0.6, 0.85, '#f2f1ee', 'luxe'),
+    crown('plant', 'olive', -4.3, -5.8, 0.6, 1.9, 0.6, '#4b5a3a'),
+  ],
+  solids: [
+    // The media wall's columns and swags stand out from the partition
+    [-3.2, -3.2, 0.35, 5.6],
+    // The library wall of columns at the back of the east wing
+    [7.05, 6.3, 3.7, 0.4],
+  ],
+};
+
+INTERIORS.crown = CROWN_INTERIOR;
 
 /** Furniture for the walk-in venues below: an optional height off the floor and a turn. */
 const fx = (

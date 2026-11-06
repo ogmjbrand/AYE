@@ -618,7 +618,7 @@ function Spa({ ctx }: { ctx: AppCtx }) {
         <p className="m-0 font-display text-xl font-bold">Alafia Spa</p>
         <p className="m-0 text-[12px] text-white/80">Open {OPEN_HOUR}:00–{CLOSE_HOUR}:00 · {open ? 'Open now' : 'Closed now'}</p>
       </div>
-      {s && dest ? <div className="mb-3"><GoButtons ctx={ctx} d={dest} onResult={say} /></div> : <Note>Alafia Spa is in Lagos, on the Marina. Fly or take the coach there from Travel.</Note>}
+      {s && dest ? <div className="mb-3"><GoButtons ctx={ctx} d={dest} onResult={say} /></div> : <Note>Alafia Spa is in Lagoon, on Lagoon Boulevard. Fly or take the coach there from Travel.</Note>}
       <Section title="Treatments">
         {SERVICES.map((v) => <Row key={v.id} title={v.name} sub={`${v.minutes} min${v.couples ? ' · for two, with a friend' : ''}`} right={ghai(v.price)} />)}
       </Section>

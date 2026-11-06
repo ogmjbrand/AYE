@@ -49,7 +49,7 @@ export const DISHES: readonly Dish[] = [
   d('boli-epa', 'Boli and epa', 'Nigeria', 10, 25, [], 'Roasted plantain with roasted groundnuts.'),
   d('akara-pap', 'Akara and pap', 'Nigeria', 12, 30, [], 'Crisp bean fritters with warm fermented corn porridge.'),
   d('puff-puff', 'Puff-puff', 'West Africa', 6, 15, [], 'Fried sweet dough balls.', 'Made with flour, sugar, yeast and water.'),
-  d('fruit', 'Pineapple, mango and watermelon', 'Lagos market', 8, 15, [], 'Fresh cut fruit in a bag.'),
+  d('fruit', 'Pineapple, mango and watermelon', 'Lagoon market', 8, 15, [], 'Fresh cut fruit in a bag.'),
   d('suya', 'Suya', 'Nigeria', 20, 30, ['meat'], 'Spiced grilled beef skewers with onions and yaji.'),
   d('chin-chin', 'Chin chin', 'Nigeria', 6, 12, ['egg', 'dairy'], 'Crunchy fried dough snack.'),
   d('roast-fish', 'Roasted catfish', 'Nigeria', 30, 45, ['fish'], 'Whole peppered catfish roasted over charcoal.'),

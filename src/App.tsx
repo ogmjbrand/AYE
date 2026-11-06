@@ -125,7 +125,7 @@ import { startEngine } from './lib/engineSound';
 import { Traffic } from './world/Traffic';
 import { HomeInterior } from './world/HomeInterior';
 import {
-  CAR_DEALERSHIP_INTERIOR, EATERY_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
+  CAR_DEALERSHIP_INTERIOR, EATERY_INTERIOR, RESTAURANT_INTERIOR, WALL_HEIGHT, wallHeight, RESTAURANT_TABLES, SWITCH_RADIUS, USE_RADIUS, bedSpot, dealershipInteractionAt, doorSpot, interiorFor, interiorLayout, lightSwitchSpot,
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
 import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse, standSpotsFor } from './lib/furniture';
@@ -254,7 +254,7 @@ interface DecorPlacementSession {
 }
 
 /** The title plate at home, by the kind of place it is. */
-const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment', house: 'My House', family: 'My House', villa: 'My Villa', loft: 'My Loft', warehouse: 'My Loft' };
+const MY_HOME: Record<Interior['tier'], string> = { room: 'My Room', flat: 'My Flat', apartment: 'My Apartment', penthouse: 'My Apartment', house: 'My House', family: 'My House', villa: 'My Villa', loft: 'My Loft', warehouse: 'My Loft', crown: 'My Residence' };
 
 /** Standing this close to a place puts its name on the title plate. */
 const PLATE_RADIUS = 9;
@@ -588,7 +588,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   /** Inside anywhere (your home, a venue or a workplace): not on the street. */
   const offStreet = indoors || inWorkplace || inPalms || inCantina || inHotel || inSpa || inBoutique;
   /** The ceiling over you indoors (the camera stays under it, so every room is roofed over); null on the street. */
-  const ceilingHeight = indoors || (inWorkplace && venueInterior) ? WALL_HEIGHT
+  const ceilingHeight = indoors && interior ? wallHeight(interior) : inWorkplace && venueInterior ? WALL_HEIGHT
     : inPalms ? PALMS_HEIGHT : inCantina ? CANTINA_HEIGHT : inHotel ? HOTEL_STOREY : inSpa ? SPA_STOREY : inBoutique ? BOUTIQUE_HEIGHT : null;
   /** The walls round you indoors (the camera stays inside them); null on the street. */
   const roomWalls: RoomWalls | null = indoors && interior ? centredWalls(interior)
@@ -2731,7 +2731,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
               </HomeInterior>
             ) : indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
-                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' ? 'home' : undefined} />
+                <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' || interior.tier === 'crown' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} bedtime={asleep} />
                 {asleep && <SleepingDuvet bedtime={asleep} />}
                 {decorPlacement && decorPlacementItem && (

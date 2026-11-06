@@ -115,7 +115,7 @@ export function DealershipPanel({ balance, purchasePaused = false, ownedVehicles
       >
         <header className="flex items-start justify-between gap-4 border-b border-ui-line/80 px-5 py-4 sm:px-7">
           <div>
-            <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.2em] text-ui-accent-strong">Marina Boulevard · Lagos</p>
+            <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.2em] text-ui-accent-strong">Lagoon Boulevard · Lagoon</p>
             <h2 id="dealership-title" className="m-0 mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">Marina Motors</h2>
             <p className="m-0 mt-1 text-xs text-ui-muted">Available balance <strong className="tabular-nums text-ui-ink">{balance.toLocaleString()} GHAI</strong></p>
           </div>

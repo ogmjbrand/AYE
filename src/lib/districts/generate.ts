@@ -27,6 +27,7 @@ const TRICYCLE_COLORS = ['#c99a2e', '#3d6e7a', '#7a3d3d'];
 const JEEPNEY_COLORS = ['#2f4a6b', '#6b2a2a', '#2e6b62'];
 import { WORLD_BOUND } from '../world';
 import { LAGOS_MARINA } from './lagos';
+import { insideCompound } from '../compound';
 import { ACCRA_OSU } from './accra';
 import { AVENUE } from './avenue';
 
@@ -344,7 +345,13 @@ export function generateDistrict(seed: CitySeed): DistrictSpec {
     if (role.startsWith('work:')) return work[role.slice(5) as WorkCareer].name;
     return { fashion: fashionHouse.name, gadgets: gadgetHub.name, night: nightlife.name, dealer: dealership?.name }[role as 'fashion'];
   };
-  const layout = layLayout(T.spec.layout, f, id);
+  // The Crown Residence (and the cars in its compound) is Lagoon's alone
+  const template = T.spec.layout;
+  const layout = layLayout({
+    ...template,
+    compounds: undefined,
+    vehicles: template.vehicles.filter((v) => !(template.compounds ?? []).some((c) => insideCompound(c, v.position))),
+  }, f, id);
   const walls = S.walls;
   const buildings: Building[] = layout.buildings.map((b, i) => {
     const role = b.name ? T.buildings[b.name] : undefined;

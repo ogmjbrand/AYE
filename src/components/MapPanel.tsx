@@ -56,7 +56,7 @@ export function MapPanel({ district, controller, homePlaceId, car = null, onGo, 
   const pick = (selected === CAR_PIN ? carSpot : all.find((p) => p.id === selected)) ?? null;
   const pickLabel = pick && 'kind' in pick ? KIND_LABEL[pick.kind] : 'Parked here';
   const B = WORLD_BOUND;
-  const { roadHalfWidth: ROAD_HALF_WIDTH, crossStreet: CROSS_STREET, buildings } = district.layout;
+  const { roadHalfWidth: ROAD_HALF_WIDTH, crossStreet: CROSS_STREET, buildings, compounds } = district.layout;
   // Map x is mirrored so east (-x) is on the right, matching the compass
   const mx = (v: number) => -v;
   const my = (v: number) => -v;
@@ -106,6 +106,12 @@ export function MapPanel({ district, controller, homePlaceId, car = null, onGo, 
             <svg viewBox={`${cx - half} ${cy - half} ${2 * half} ${2 * half}`} className="aspect-square w-full rounded-xl bg-[#1d2126]" role="img" aria-label={`Map of ${district.name}. You are the white arrow.`}>
               <rect x={-ROAD_HALF_WIDTH} y={-B} width={ROAD_HALF_WIDTH * 2} height={2 * B} fill="#3a3f46" />
               <rect x={-B} y={my(CROSS_STREET.maxZ)} width={2 * B} height={CROSS_STREET.maxZ - CROSS_STREET.minZ} fill="#3a3f46" />
+              {(compounds ?? []).map((c) => (
+                <g key={c.id}>
+                  <rect x={Math.min(mx(c.minX), mx(c.maxX))} y={Math.min(my(c.minZ), my(c.maxZ))} width={c.maxX - c.minX} height={c.maxZ - c.minZ} rx={0.4} fill="#33503c" stroke="#a89878" strokeWidth={0.3} />
+                  <rect x={Math.min(mx(c.house.minX), mx(c.house.maxX))} y={Math.min(my(c.house.minZ), my(c.house.maxZ))} width={c.house.maxX - c.house.minX} height={c.house.maxZ - c.house.minZ} rx={0.4} fill="#8a5a40" />
+                </g>
+              ))}
               {buildings.map((b, i) => (
                 <rect key={i} x={mx(b.position[0]) - b.size[0] / 2} y={my(b.position[2]) - b.size[2] / 2} width={b.size[0]} height={b.size[2]} rx={0.6} fill="#4d545d" />
               ))}

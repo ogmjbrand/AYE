@@ -14,6 +14,7 @@ import { modelPath } from './realModels';
 import { RealModel } from './RealModel';
 import { VenueNpc } from './VenueNpc';
 import { cartStations } from '../lib/foodService';
+import { Compounds } from './Compound';
 import { frondTexture } from './textures';
 
 // ---------------------------------------------------------------- palms
@@ -551,6 +552,7 @@ export function Props({ night }: { night: number }) {
         <ParkedDanfo key={i} vehicle={v} />
       ))}
       <MarketStalls />
+      <Compounds night={night} />
       <ErrorBoundary fallback={null}>
         <Suspense fallback={null}>
           <PavementBins />
