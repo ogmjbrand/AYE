@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Mesh, MeshStandardMaterial } from 'three';
-import { buildingFaceBehind, templateFor, type ActiveEvent, type Point } from '../lib/liveEvents';
+import { buildingFaceBehind, fireCasualtySeat, templateFor, type ActiveEvent, type Point } from '../lib/liveEvents';
 import { carFootprint, groundHeightAt, parkedObstacles, type Obstacle } from '../lib/world';
 import { lookById } from '../lib/looks';
 import { Car } from './Props';
@@ -211,7 +211,7 @@ function BuildingFire({ e, minute }: { e: ActiveEvent; minute: number }) {
       {crowd.map(([name, look], i) => (
         <Person key={name} name={name} who={evacuated ? 'Neighbour, safe' : 'Neighbour'} lookId={look} at={{ x: crowdX + (i % 2) * 0.8 * -side, z: z + 2.5 + i * 0.9 }} facing={evacuated ? -facing : facing} />
       ))}
-      {e.done.includes('rescue') && <Person name="Mama Ngozi" who="Rescued resident" lookId="female-adult-10" at={{ x: -side * (R + P / 2), z: z - 2 }} facing={facing} sitting />}
+      {e.done.includes('rescue') && <Person name="Mama Ngozi" who={e.done.includes('treat') ? 'Rescued, treated' : 'Rescued resident'} lookId="female-adult-10" at={fireCasualtySeat(e)} facing={Math.PI} sitting />}
       {e.done.includes('cordon') && <Cordon points={[[side * (R + 0.2), z - 4], [side * (R + 0.2), z + 4], [side * (R + P - 0.4), z + 4], [side * (R + P - 0.4), z - 4]]} />}
       {since >= FIRE_SERVICE_AFTER && (
         <>

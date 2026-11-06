@@ -153,6 +153,7 @@ The road accident is now a full playable loop; see `EMERGENCY_RESPONSE.md` for t
 - Accepting walks you to the scene from wherever you are.
 - An objectives tracker shows what's left. Each objective is done at its own spot: kneeling beside the injured driver, at the car, with the passenger, or up the road warning traffic.
 - **Hand over and carry on** ends the response once your part is done, pays once per objective, and saves the result in your history.
+- **Every event kind is now played this way:** collapse, missing person, broken-down car, restaurant rush and building fire, as well as the accident. Each objective is done at its own place in the scene, kneeling for medical help, talking people through it, or using the phone.
 
 ## Street life (November 2026, verified in the browser)
 

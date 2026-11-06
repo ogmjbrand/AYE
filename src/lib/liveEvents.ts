@@ -416,22 +416,104 @@ export interface ObjectiveSpot {
  * with the shaken passenger, out in the road warning traffic. Null when it's done anywhere at the
  * scene (a phone call). The positions match world/LiveEventScene.tsx.
  */
-export function objectiveSpot(e: Pick<ActiveEvent, 'kind' | 'scene'>, objectiveId: string): ObjectiveSpot | null {
+export function objectiveSpot(e: Pick<ActiveEvent, 'kind' | 'scene'> & { districtId?: string; target?: Point }, objectiveId: string): ObjectiveSpot | null {
   const { x, z } = e.scene;
-  if (e.kind !== 'road-accident') return null;
-  switch (objectiveId) {
-    // Kunle sits in the road at (x, z + 2.4): kneel at his side
-    case 'first-aid': return { at: { x: x - 0.9, z: z + 2.4 }, facing: Math.PI / 2, kneel: true, what: 'the injured driver' };
-    // The paramedic arrives at (x + 0.9, z + 3.3)
-    case 'handover': return { at: { x: x - 0.6, z: z + 3.6 }, facing: Math.atan2(1.5, -0.3), what: 'the paramedic' };
-    // The silver car's driver door
-    case 'make-safe': return { at: { x: x - 0.92, z: z + 0.92 }, facing: Math.atan2(-0.48, -1.32), what: 'the silver car' };
-    // Amaka stands at (x + 2.6, z + 2.6), facing -x
-    case 'comfort': return { at: { x: x + 1.7, z: z + 2.6 }, facing: Math.PI / 2, what: 'the passenger' };
-    // Up the road, facing the oncoming traffic
-    case 'warn-traffic': return { at: { x: x - 5.2, z: z + 2.6 }, facing: -Math.PI / 2, what: 'the oncoming traffic' };
-    default: return null;
+  const toward = (from: Point, to: Point) => Math.atan2(to.x - from.x, to.z - from.z);
+  const plan = districtById(e.districtId ?? 'lagos.marina').layout;
+  /**
+   * A place to do it. With `around` (the person or thing it's done to), a spot that turns out to be
+   * blocked (a lamp post, a stall) moves round them to the first clear side, still facing them.
+   */
+  const spot = (at: Point, facing: number, what: string, kneel = false, around?: Point): ObjectiveSpot => {
+    let p = at, f = facing;
+    if (around && !siteClear(plan, at.x, at.z, 0.3)) {
+      const dx = at.x - around.x, dz = at.z - around.z;
+      // Round them at the same distance first, then a little nearer or further
+      search: for (const k of [1, 0.7, 1.4, 1.8]) {
+        for (const turn of [Math.PI / 2, -Math.PI / 2, Math.PI, Math.PI / 4, -Math.PI / 4, (3 * Math.PI) / 4, (-3 * Math.PI) / 4, 0]) {
+          const c = Math.cos(turn), sn = Math.sin(turn);
+          const q = { x: around.x + (dx * c - dz * sn) * k, z: around.z + (dx * sn + dz * c) * k };
+          if (Math.hypot(q.x - e.scene.x, q.z - e.scene.z) <= SCENE_RADIUS - 0.2 && siteClear(plan, q.x, q.z, 0.3)) { p = q; f = toward(q, around); break search; }
+        }
+      }
+    }
+    return { at: p, facing: f, what, ...(kneel ? { kneel } : {}) };
+  };
+  switch (e.kind) {
+    case 'road-accident':
+      switch (objectiveId) {
+        // Kunle sits in the road at (x, z + 2.4): kneel at his side
+        case 'first-aid': return spot({ x: x - 0.9, z: z + 2.4 }, Math.PI / 2, 'the injured driver', true);
+        // The paramedic arrives at (x + 0.9, z + 3.3)
+        case 'handover': return spot({ x: x - 0.6, z: z + 3.6 }, Math.atan2(1.5, -0.3), 'the paramedic');
+        // The silver car's driver door
+        case 'make-safe': return spot({ x: x - 0.92, z: z + 0.92 }, Math.atan2(-0.48, -1.32), 'the silver car');
+        // Amaka stands at (x + 2.6, z + 2.6), facing -x
+        case 'comfort': return spot({ x: x + 1.7, z: z + 2.6 }, Math.PI / 2, 'the passenger');
+        // Up the road, facing the oncoming traffic
+        case 'warn-traffic': return spot({ x: x - 5.2, z: z + 2.6 }, -Math.PI / 2, 'the oncoming traffic');
+        default: return null;
+      }
+    case 'collapse':
+      // Mrs Adeyemi is on the pavement at the scene; the paramedic comes to (x + 1.2, z + 1)
+      switch (objectiveId) {
+        case 'recovery': return spot({ x, z: z + 0.9 }, Math.PI, 'Mrs Adeyemi', true, e.scene);
+        case 'treat': return spot({ x, z: z - 0.9 }, 0, 'Mrs Adeyemi', true, e.scene);
+        case 'handover': return spot({ x, z: z + 2.0 }, toward({ x, z: z + 2 }, { x: x + 1.2, z: z + 1 }), 'the paramedic', false, { x: x + 1.2, z: z + 1 });
+        default: return null;
+      }
+    case 'missing-person':
+      // His daughter Funmi waits at the scene facing +z; he's at the target until found
+      switch (objectiveId) {
+        case 'listen': return spot({ x, z: z + 1.0 }, Math.PI, 'his daughter', false, e.scene);
+        case 'find': return e.target ? spot({ x: e.target.x, z: e.target.z + 1.0 }, Math.PI, 'Baba Femi', false, e.target) : null;
+        case 'home': return spot({ x, z: z + 1.0 }, Math.PI, 'his daughter', false, e.scene);
+        default: return null;
+      }
+    case 'breakdown':
+      // The car points along +x: its boot at x - 2.1, its bonnet at x + 2.1
+      switch (objectiveId) {
+        case 'push': return spot({ x: x - 2.9, z }, Math.PI / 2, 'the back of the car');
+        case 'repair': return spot({ x: x + 2.9, z }, -Math.PI / 2, 'the engine');
+        default: return null;
+      }
+    case 'lunch-rush':
+      // The coach party queues outside the door, facing it
+      switch (objectiveId) {
+        case 'serve': return spot({ x: x - 0.5, z: z + 0.6 }, 0, 'the coach party', false, { x, z: z + 1.5 });
+        case 'run-floor': return spot({ x: x + 0.5, z: z + 0.6 }, 0, 'the coach party', false, { x, z: z + 1.5 });
+        default: return null;
+      }
+    case 'building-fire': {
+      const face = buildingFaceBehind(plan, x, z);
+      const side = face?.side ?? (Math.sign(x) || 1);
+      // Facing the burning shopfront; the front itself, and the kerb side of the fire
+      const atShop = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+      const front = face ? face.faceX - side * 0.9 : x + side * 1.0;
+      const kerb = x - side * 1.2;
+      switch (objectiveId) {
+        // Each moves round its point if a lamp post or stall is in the way
+        case 'evacuate': return spot({ x: kerb, z: z + 3.2 }, atShop, 'the neighbours', false, { x, z: z + 3.2 });
+        case 'extinguish': return spot({ x: front - side * 0.4, z }, atShop, 'the flames', false, { x: front + side * 0.6, z });
+        case 'rescue': return spot({ x: front, z: z - 0.6 }, atShop, 'the smoke-filled doorway', false, { x: front + side * 0.8, z: z - 0.6 });
+        case 'utilities': return spot({ x: front, z: z + 3.4 }, atShop, 'the gas and power meters', false, { x: front + side * 0.8, z: z + 3.4 });
+        case 'cordon': return spot({ x: kerb, z: z + 5 }, Math.PI, 'the crowd line', false, { x: kerb, z: z + 4 });
+        // The rescued resident sits on the kerb side, clear of the smoke
+        case 'treat': { const her = fireCasualtySeat(e); return spot({ x: her.x, z: her.z - 0.9 }, 0, 'the smoke casualties', true, her); }
+        case 'handover': return spot({ x: kerb, z: z - 5.0 }, side > 0 ? -Math.PI / 2 : Math.PI / 2, 'the paramedics', false, { x: kerb, z: z - 4 });
+        default: return null;
+      }
+    }
+    default:
+      return null;
   }
+}
+
+/** Where the rescued resident sits once she's out of the fire (world/LiveEventScene.tsx). */
+export function fireCasualtySeat(e: Pick<ActiveEvent, 'scene'> & { districtId?: string }): Point {
+  const layout = districtById(e.districtId ?? 'lagos.marina').layout;
+  const side = buildingFaceBehind(layout, e.scene.x, e.scene.z)?.side ?? (Math.sign(e.scene.x) || 1);
+  return { x: e.scene.x - side * 1.0, z: e.scene.z - 3.2 };
 }
 
 // ---------------------------------------------------------------- where things happen

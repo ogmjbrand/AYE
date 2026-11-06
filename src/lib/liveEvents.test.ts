@@ -311,3 +311,34 @@ describe('road accident response: doing your part where it is done', () => {
     expect(act(g, { type: 'eventFinish' }, 'engineer').world.active).toBeNull();
   });
 });
+
+describe('every event is played where it happens', () => {
+  it('puts every objective that is done in a particular place within reach of the scene and clear of walls and kit, in every district', () => {
+    for (const district of DISTRICTS) {
+      for (const t of EVENT_TEMPLATES) {
+        for (let seed = 1; seed <= 12; seed++) {
+          const site = siteFor(t.kind, district, seeded(seed));
+          if (!site) continue;
+          const e = { kind: t.kind, scene: site.scene, districtId: district.id, ...(site.target ? { target: site.target } : {}) };
+          for (const o of t.objectives) {
+            const spot = objectiveSpot(e, o.id);
+            if (!spot) continue;
+            const from = o.atTarget ? site.target! : site.scene;
+            expect(Math.hypot(spot.at.x - from.x, spot.at.z - from.z), `${district.id} ${t.kind} ${o.id}`).toBeLessThanOrEqual(o.atTarget ? 2.5 : SCENE_RADIUS);
+            expect(siteClear(district.layout, spot.at.x, spot.at.z, 0.3), `${district.id} ${t.kind} ${o.id} @ ${seed} (${spot.at.x.toFixed(1)}, ${spot.at.z.toFixed(1)})`).toBe(true);
+          }
+        }
+      }
+    }
+  }, 60_000);
+
+  it('gives every objective but a phone call a place to do it', () => {
+    for (const t of EVENT_TEMPLATES) {
+      const district = districtById('lagos.marina');
+      const site = siteFor(t.kind, district, seeded(3));
+      if (!site) continue;
+      const e = { kind: t.kind, scene: site.scene, districtId: district.id, ...(site.target ? { target: site.target } : {}) };
+      for (const o of t.objectives) expect(objectiveSpot(e, o.id) === null, `${t.kind} ${o.id}`).toBe(!!o.phone);
+    }
+  });
+});

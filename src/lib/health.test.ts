@@ -1,3 +1,4 @@
+import { objectiveSpot } from './liveEvents';
 import { describe, expect, it } from 'vitest';
 import type { Career } from '../components/CharacterCreation';
 import { createGameState, createTime, type GameState } from './gameState';
@@ -205,9 +206,9 @@ describe('the building fire', () => {
     let s = createGameState(1000, createTime(10, 0));
     const now = s.time.totalMinutes;
     s = { ...s, districtId: 'lagos.marina', health: { ...s.health, value: 20 }, world: { ...s.world, active: { id: `building-fire@${now}`, kind: 'building-fire', districtId: 'lagos.marina', startedAt: now, endsAt: now + 55, scene: site.scene, responding: true, dismissed: false, done: [], earned: 0, rep: {} } } };
-    s = act(s, { type: 'eventAct', objectiveId: 'evacuate', at: site.scene });
+    s = act(s, { type: 'eventAct', objectiveId: 'evacuate', at: objectiveSpot(s.world.active!, 'evacuate')!.at });
     const before = s.balance;
-    s = act(s, { type: 'eventAct', objectiveId: 'rescue', at: site.scene });
+    s = act(s, { type: 'eventAct', objectiveId: 'rescue', at: objectiveSpot(s.world.active!, 'rescue')!.at });
     expect(s.world.active?.done).toContain('rescue');
     expect(s.balance).toBeGreaterThan(before);
     // 20 health minus 30 of smoke: caught at the floor and taken to hospital, alive

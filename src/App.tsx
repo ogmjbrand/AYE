@@ -206,6 +206,8 @@ interface CityProps {
   eating?: boolean;
   /** What you're doing with your hands (lib/animationLibrary.ts). */
   activity?: { clip: ActivityClip; key: number } | null;
+  /** Helping at an event: talking someone through it. */
+  helping?: boolean;
 }
 
 interface CameraFollowProps {
@@ -398,7 +400,7 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false, activity = null }: CityProps) {
+function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false, activity = null, helping = false }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
@@ -437,7 +439,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour
         ? <DrivenVehicle controller={controller} colour={colour.hex} bodyStyle={model.bodyStyle} />
-        : <Player controller={controller} character={character} tryOn={tryOn} activity={activity} conversing={talkingTo !== null} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} eating={eating} />}
+        : <Player controller={controller} character={character} tryOn={tryOn} activity={activity} conversing={talkingTo !== null || helping} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} eating={eating} />}
     </>
   );
 }
@@ -630,8 +632,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const helpAtEvent = () => {
     if (!liveEvent) return;
     if (atEventTarget() && canDo(liveEvent, 'find', character.career, state.equipment, state.time.totalMinutes).ok) {
-      eventAct('find', { x: controller.position.x, z: controller.position.z });
-      setArrival('You found Baba Femi. Walk him back to his daughter at the park.');
+      doEventObjective('find');
       return;
     }
     if (atEventScene()) setEventPanelFor(liveEvent.id);
@@ -2456,6 +2457,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     if (offStreet) { goOutside(); setTimeout(go, 300); } else go();
   };
   const acceptMission = () => { eventRespond(); travelToEvent(); };
+  /** Talking someone through it (comforting, briefing, warning, waving people back): gestures for a few seconds. */
+  const [helpingTalk, setHelpingTalk] = useState(false);
+  const talkFor = (seconds: number) => { setHelpingTalk(true); window.setTimeout(() => setHelpingTalk(false), seconds * 1000); };
+  const TALK_OBJECTIVES = new Set(['comfort', 'handover', 'warn-traffic', 'listen', 'home', 'evacuate', 'cordon', 'serve', 'run-floor']);
   /** Do an objective where it's done: walk there, face it (kneel for first aid), then it's done. */
   const doEventObjective = (id: string) => {
     const e = liveEvent;
@@ -2465,7 +2470,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     const spot = objectiveSpot(e, id);
     const here = () => ({ x: controller.position.x, z: controller.position.z });
     if (!spot) {
-      if (atEventScene()) { eventAct(id, here()); setArrival(`Done: ${o.label.toLowerCase()}.`); }
+      if (atEventScene()) { if (o.phone) playOnce('PhoneText', 4); eventAct(id, here()); setArrival(`Done: ${o.label.toLowerCase()}.`); }
       else travelToEvent();
       return;
     }
@@ -2473,6 +2478,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       const at = here();
       if (spot.kneel) sit.start({ seat: { id: `event-${id}`, x: spot.at.x + Math.sin(spot.facing) * 0.15, z: spot.at.z + Math.cos(spot.facing) * 0.15, facing: spot.facing, height: 0.12, approach: { x: at.x, z: at.z } }, place: o.label, minutes: 0, holdSeconds: 6 });
       else placePlayer([at.x, 0, at.z], spot.facing);
+      if (TALK_OBJECTIVES.has(id)) talkFor(5);
       eventAct(id, at);
       setArrival(`${o.label}: done.${o.reward ? ` +${o.reward} GHAI.` : ''}`);
     });
@@ -2870,7 +2876,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} activity={playerActivity} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} activity={playerActivity} helping={helpingTalk} />
             )}
           </DistrictContext.Provider>
           <PostEffects />
@@ -3210,7 +3216,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           minute={state.time.totalMinutes}
           atScene={atEventScene()}
           atTarget={atEventTarget()}
-          onAct={(id) => eventAct(id, { x: controller.position.x, z: controller.position.z })}
+          onAct={(id) => { setEventPanelFor(null); doEventObjective(id); }}
           onClose={() => setEventPanelFor(null)}
         />
       )}

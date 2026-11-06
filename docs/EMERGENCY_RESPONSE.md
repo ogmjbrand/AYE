@@ -44,7 +44,36 @@ Where each objective in stage 4 is done:
 
 The game itself refuses an objective done away from its spot (more than 1.6 m), so opening a panel can never complete one.
 
-## 3. Acceptance test (spec section 15)
+## 3. Every event is played where it happens
+
+After the road accident, the other five event kinds got their own places, so every objective is walked to and done in the 3D scene (`objectiveSpot`). Only phone calls are done anywhere at the scene.
+
+| Event | Where each objective is done |
+|---|---|
+| Someone collapsed | Kneel beside her to put her in the recovery position; kneel to assess and treat her; brief the paramedic beside her. |
+| Missing person | Listen to his daughter; go to where Baba Femi is; walk him back to her. |
+| Broken-down car | Push from the boot; find the fault at the bonnet. |
+| Restaurant rush | At the door with the coach party. |
+| Building fire | Wave the neighbours back from the doorway; tackle the flames at the door; go into the smoke for the trapped resident; shut off the meters; hold the crowd line; kneel to treat the rescued resident (she now sits on your side of the street); brief the paramedics. |
+
+**How you act:**
+- Medical objectives are done kneeling.
+- Phone calls play the phone animation.
+- Talking someone through it (comforting, briefing, warning, waving people back) plays the talking gestures.
+
+**Placement and the Go button:**
+- If a lamp post or a stall is in the way, the spot moves round the person or thing to the first clear side.
+- A test checks every objective spot of every event kind, at 12 sites in every city, for reach and clearance.
+- **Go** works as soon as you've accepted: it walks you to the spot from wherever you are.
+- The scene's Details panel goes through the same walk.
+
+Checked in the browser on the building fire, as a doctor:
+- **The scene:** flames and smoke on the Marina Heights shopfront, the fire engine, two firefighters and the hose.
+- **Getting people out:** the neighbours moved away from the doorway, the objective ticked and the "First responder" achievement came with it.
+- **The trapped resident:** that rescue correctly showed "later" once its 25 minutes had gone.
+- **Treating the smoke casualties:** done kneeling beside the rescued resident, 310 GHAI so far.
+
+## 4. Acceptance test (spec section 15)
 
 Tested in the real game in a browser, and in unit tests (`src/lib/liveEvents.test.ts`). The browser
 renders at about 1 frame a second here, so the walks are slow and the game clock runs on while
@@ -74,11 +103,10 @@ In the third part the saved world held the event in history: outcome "helped", a
 | 13 | Saved | ✓ In the browser, local storage holds the result in history. A test also saves and reloads it. |
 | 14 | Back to normal life | ✓ The tracker closes and the result card says "Carry on". |
 
-## 4. Not done yet (said plainly)
+## 5. Not done yet (said plainly)
 
 - **Travel is on foot only.** There is no ambulance, police car or own-car drive to the scene yet. There are also no paramedic, firefighter, police, military or mechanic careers in AYE yet, so their transport and duties (spec section 3 and the section 5 table) wait for those careers. Doctors and engineers have their own duties today.
 - **The arrival shot is minimal.** There is no establishing camera move or siren audio yet: arrival is marked by the tracker and a message.
-- **The other five event kinds still use the panel.** Missing person, collapse, breakdown, restaurant rush and fire still work through the panel at the scene. They need their own objective spots, which is the next step now that the accident loop is proven.
 - **No multiplayer.** There is no shared server session yet, so cooperation, shared objectives and claiming a task (spec section 6) can't be built until accounts and realtime exist.
 - **Rewards are validated in the browser, not on a server.** The server rules exist for purchases, but event rewards aren't sent to a server yet (spec section 10).
 - **No arrival time limit beyond the event's own.** If you take longer than the event lasts, the services finish without you. That matches the original design but can feel harsh on slow devices.

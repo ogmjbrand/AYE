@@ -194,7 +194,7 @@ export function MissionTracker({ event, career, equipment, minute, atScene, busy
             <li key={o.id} className="flex items-center gap-2">
               <Tick on={done} />
               <span className={`min-w-0 flex-1 ${done ? 'text-ui-muted line-through' : ''}`}>{o.label}{spot && !done ? <span className="text-ui-muted"> · {spot.what}</span> : null}</span>
-              {!done && can.ok && reached && (
+              {!done && can.ok && (
                 <button type="button" disabled={busy} onClick={() => onDo(o.id)}
                   className="shrink-0 rounded-full bg-ui-gold px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-ui-gold-strong disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">Go</button>
               )}
