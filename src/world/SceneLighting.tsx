@@ -6,7 +6,7 @@ import { INDOOR, type IndoorMood } from './indoorMoods';
 import { Color, Vector3, type DirectionalLight, Object3D, type PointLight, type Scene } from 'three';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import type { GameTime } from '../lib/gameState';
-import type { WeatherCondition } from '../lib/weather';
+import { overcastAt, rainAmountAt, type WeatherCondition } from '../lib/weather';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { setNightGlow, setWet } from './materials';
 import { useQuality } from './quality';
@@ -43,23 +43,25 @@ function setBackground(scene: Scene, color: string) {
   scene.background = new Color(color);
 }
 
-export function SceneLighting({ gameTime, player, indoor, weather = 'clear' }: {
+export function SceneLighting({ gameTime, player, indoor, weatherOverride = null }: {
   gameTime: GameTime;
   player: PlayerHandle;
   /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. */
   indoor?: IndoorMood;
-  /** Outdoors only; indoor scenes are unaffected by the weather outside. */
-  weather?: WeatherCondition;
+  /** Forces every day's weather to one condition (the dev `?weather=` query); outdoors only. */
+  weatherOverride?: WeatherCondition | null;
 }) {
   const quality = useQuality();
-  const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute, weather), [gameTime.hour, gameTime.minute, weather]);
+  const overcast = useMemo(() => overcastAt(gameTime.totalMinutes, weatherOverride), [gameTime.totalMinutes, weatherOverride]);
+  const rainAmount = useMemo(() => rainAmountAt(gameTime.totalMinutes, weatherOverride), [gameTime.totalMinutes, weatherOverride]);
+  const l = useMemo(() => lightingAt(gameTime.hour, gameTime.minute, overcast), [gameTime.hour, gameTime.minute, overcast]);
   const sun = useRef<DirectionalLight>(null);
   const target = useMemo(() => new Object3D(), []);
   const fill = useRef<PointLight>(null);
-  const raining = !indoor && weather === 'rain';
+  const raining = !indoor && rainAmount > 0.001;
 
   useEffect(() => setNightGlow(l.night), [l.night]);
-  useEffect(() => setWet(!indoor && weather !== 'clear' ? (weather === 'rain' ? 1 : 0.4) : 0), [indoor, weather]);
+  useEffect(() => setWet(indoor ? 0 : overcast), [indoor, overcast]);
   // Set directly rather than by attaching a <color>, so moving between indoors and out never leaves the wrong one behind
   const { scene } = useThree();
   const background = indoor ? INDOOR[indoor].background : l.horizonColor;
@@ -116,8 +118,8 @@ export function SceneLighting({ gameTime, player, indoor, weather = 'clear' }: {
     <>
       <fog attach="fog" args={[l.fogColor, 45, 190]} />
       <SkyDome lighting={l} />
-      {l.night > 0.3 && weather === 'clear' && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
-      {raining && <Rain player={player} />}
+      {l.night > 0.3 && overcast < 0.2 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
+      {raining && <Rain player={player} amount={rainAmount} />}
 
       <hemisphereLight args={[l.skyColor, l.groundColor, l.hemiIntensity]} />
       <pointLight ref={fill} color="#ffd9b0" intensity={characterLightFor(l.sunIntensity)} distance={7} decay={2} />

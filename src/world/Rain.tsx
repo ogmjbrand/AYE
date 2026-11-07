@@ -11,8 +11,9 @@ const SPREAD = 7;
 const FALL_HEIGHT = 6;
 const FALL_SPEED = 11;
 
+const BASE_OPACITY = 0.3;
 const geometry = new BoxGeometry(0.015, 0.5, 0.015);
-const material = new MeshBasicMaterial({ color: '#cdd9e6', transparent: true, opacity: 0.3, depthWrite: false, toneMapped: false });
+const material = new MeshBasicMaterial({ color: '#cdd9e6', transparent: true, opacity: BASE_OPACITY, depthWrite: false, toneMapped: false });
 
 // One shared drop layout and scratch objects: rain never shows more than one instance
 // at a time, and these are animated imperatively every frame rather than through state.
@@ -31,13 +32,15 @@ const noScale = new Vector3(1, 1, 1);
  * Falling rain streaks around the player, following them like the sun's
  * shadow camera does. High quality tier only (spec: don't cost mobile FPS
  * for a decorative effect); mounted only while SceneLighting says it's
- * raining and the player is outdoors.
+ * raining and the player is outdoors. `amount` (0..1) fades the streaks in
+ * and out across the dawn/dusk weather transition instead of popping.
  */
-export function Rain({ player }: { player: PlayerHandle }) {
+export function Rain({ player, amount }: { player: PlayerHandle; amount: number }) {
   const quality = useQuality();
   const mesh = useRef<InstancedMesh>(null);
 
   useFrame((_, delta) => {
+    material.opacity = BASE_OPACITY * amount;
     const inst = mesh.current;
     if (!inst) return;
     for (let i = 0; i < drops.length; i++) {

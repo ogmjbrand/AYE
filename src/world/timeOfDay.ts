@@ -3,8 +3,6 @@
  * lighting can be tested without a GPU. Lagos sits near the equator: the sun
  * rises around 06:30 and sets around 18:45 all year.
  */
-import type { WeatherCondition } from '../lib/weather';
-
 export const SUNRISE = 6.5;
 export const SUNSET = 18.75;
 
@@ -43,11 +41,10 @@ export function sunElevation(hours: number): number {
   return Math.sin((Math.PI * (hours - SUNRISE)) / (SUNSET - SUNRISE));
 }
 
-/** How strongly cloud cover flattens the sky for a given weather condition. */
-const OVERCAST_STRENGTH: Record<WeatherCondition, number> = { clear: 0, overcast: 0.6, rain: 1 };
 const CLOUD_GREY = '#8a93a0';
 
-export function lightingAt(hour: number, minute = 0, weather: WeatherCondition = 'clear'): Lighting {
+/** `overcast` is continuous 0 (clear) to 1 (full rain); see lib/weather.ts's overcastAt for how it's derived. */
+export function lightingAt(hour: number, minute = 0, overcast = 0): Lighting {
   const h = hour + minute / 60;
   const elev = sunElevation(h);
   const dayT = clamp01((h - SUNRISE) / (SUNSET - SUNRISE));
@@ -87,18 +84,18 @@ export function lightingAt(hour: number, minute = 0, weather: WeatherCondition =
 
   // Clouds flatten and cool daylight (no golden glow, more ambient, duller sun); night stays
   // night either way since there's nothing to dim once the sun is already down.
-  const overcast = isDay ? OVERCAST_STRENGTH[weather] : 0;
-  if (overcast === 0) return base;
+  const cloud = isDay ? clamp01(overcast) : 0;
+  if (cloud === 0) return base;
   return {
     ...base,
-    sunColor: mixColor(base.sunColor, '#aab4c0', overcast * 0.7),
-    sunIntensity: base.sunIntensity * lerp(1, 0.35, overcast),
-    hemiIntensity: lerp(base.hemiIntensity, base.hemiIntensity * 1.15, overcast),
-    envIntensity: base.envIntensity * lerp(1, 0.55, overcast),
-    fogColor: mixColor(base.fogColor, CLOUD_GREY, overcast * 0.6),
-    skyColor: mixColor(base.skyColor, CLOUD_GREY, overcast * 0.6),
-    zenithColor: mixColor(base.zenithColor, CLOUD_GREY, overcast * 0.7),
-    horizonColor: mixColor(base.horizonColor, CLOUD_GREY, overcast * 0.6),
+    sunColor: mixColor(base.sunColor, '#aab4c0', cloud * 0.7),
+    sunIntensity: base.sunIntensity * lerp(1, 0.35, cloud),
+    hemiIntensity: lerp(base.hemiIntensity, base.hemiIntensity * 1.15, cloud),
+    envIntensity: base.envIntensity * lerp(1, 0.55, cloud),
+    fogColor: mixColor(base.fogColor, CLOUD_GREY, cloud * 0.6),
+    skyColor: mixColor(base.skyColor, CLOUD_GREY, cloud * 0.6),
+    zenithColor: mixColor(base.zenithColor, CLOUD_GREY, cloud * 0.7),
+    horizonColor: mixColor(base.horizonColor, CLOUD_GREY, cloud * 0.6),
     hdri: 'day',
   };
 }

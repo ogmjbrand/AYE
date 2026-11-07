@@ -34,26 +34,26 @@ describe('time of day lighting', () => {
     }
   });
 
-  it('defaults to clear weather, unchanged from before weather existed', () => {
-    expect(lightingAt(12, 30)).toEqual(lightingAt(12, 30, 'clear'));
+  it('defaults to clear (no cloud cover), unchanged from before weather existed', () => {
+    expect(lightingAt(12, 30)).toEqual(lightingAt(12, 30, 0));
   });
 
-  it('rain flattens and dims daylight but leaves night alone', () => {
-    const clearDay = lightingAt(12, 0, 'clear');
-    const rainyDay = lightingAt(12, 0, 'rain');
-    expect(rainyDay.sunIntensity).toBeLessThan(clearDay.sunIntensity);
-    expect(rainyDay.hdri).toBe('day');
+  it('full overcast flattens and dims daylight but leaves night alone', () => {
+    const clearDay = lightingAt(12, 0, 0);
+    const cloudyDay = lightingAt(12, 0, 1);
+    expect(cloudyDay.sunIntensity).toBeLessThan(clearDay.sunIntensity);
+    expect(cloudyDay.hdri).toBe('day');
 
-    const clearNight = lightingAt(23, 0, 'clear');
-    const rainyNight = lightingAt(23, 0, 'rain');
-    expect(rainyNight).toEqual(clearNight);
+    const clearNight = lightingAt(23, 0, 0);
+    const cloudyNight = lightingAt(23, 0, 1);
+    expect(cloudyNight).toEqual(clearNight);
   });
 
-  it('overcast sits between clear and rain', () => {
-    const clear = lightingAt(12, 0, 'clear').sunIntensity;
-    const overcast = lightingAt(12, 0, 'overcast').sunIntensity;
-    const rain = lightingAt(12, 0, 'rain').sunIntensity;
-    expect(overcast).toBeLessThan(clear);
-    expect(overcast).toBeGreaterThan(rain);
+  it('partial overcast sits strictly between clear and full cover', () => {
+    const clear = lightingAt(12, 0, 0).sunIntensity;
+    const partial = lightingAt(12, 0, 0.6).sunIntensity;
+    const full = lightingAt(12, 0, 1).sunIntensity;
+    expect(partial).toBeLessThan(clear);
+    expect(partial).toBeGreaterThan(full);
   });
 });

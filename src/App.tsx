@@ -87,7 +87,7 @@ import { ACHIEVEMENTS } from './lib/life';
 import { MOOD_PACE, moodLabel } from './lib/needs';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, isAdultResident, residentById, residentFacing, residentNear, type Resident } from './lib/people';
-import { weatherForDay, weatherOverride, type WeatherCondition } from './lib/weather';
+import { parseWeatherOverride, type WeatherCondition } from './lib/weather';
 import { canResidentAcceptHug, findHugPlan, type HugSession } from './lib/hug';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
@@ -124,7 +124,8 @@ interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
   character?: Character;
   gameTime: GameTime;
-  weather: WeatherCondition;
+  /** Forces every day's weather to one condition (the dev `?weather=` query); null in normal play. */
+  weatherOverride: WeatherCondition | null;
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
   district: District;
@@ -234,12 +235,12 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, weather, tryOn, homeId, district, talkingTo, car, parked, hugSession, onHugComplete }: CityProps) {
+function City({ controller, character, gameTime, weatherOverride, tryOn, homeId, district, talkingTo, car, parked, hugSession, onHugComplete }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
     <>
-      <SceneLighting gameTime={gameTime} player={controller} weather={weather} />
+      <SceneLighting gameTime={gameTime} player={controller} weatherOverride={weatherOverride} />
       <Streets />
       <Buildings />
       <Skyline />
@@ -367,10 +368,9 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     () => campusRef.current,
   );
   const district = districtById(state.districtId);
-  const weather = useMemo(
-    () => weatherOverride(window.location.search, import.meta.env.DEV) ?? weatherForDay(gameDay(state.time.totalMinutes)),
-    [state.time.totalMinutes],
-  );
+  // Dev-only forced weather (?weather=rain); the normal day-to-day condition and its smooth
+  // transition across midnight are computed inside SceneLighting from gameTime alone.
+  const weatherOverride = useMemo(() => parseWeatherOverride(window.location.search, import.meta.env.DEV), []);
   // Opening choices (traits, dream, first home) were applied as this life began: drop them so nothing applies them again
   useEffect(() => {
     if (character.start) onCharacterUpdate({ ...character, start: undefined });
@@ -1536,7 +1536,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} weather={weather} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} onHugComplete={finishHug} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} weatherOverride={weatherOverride} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} onHugComplete={finishHug} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
