@@ -31,7 +31,7 @@ import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
-import { maybeOfferIncident, rewardFor, type IncidentHistoryEntry } from './incidents';
+import { maybeOfferIncident, objectiveFor, rewardFor, type ActiveIncident, type IncidentHistoryEntry } from './incidents';
 
 // ---------------------------------------------------------------- actions and links
 
@@ -44,7 +44,9 @@ export type LifeAction =
   | { type: 'acceptIncident'; id: string }
   | { type: 'declineIncident'; id: string }
   | { type: 'arriveIncident'; id: string }
-  | { type: 'completeIncident'; id: string };
+  | { type: 'completeIncident'; id: string }
+  /** Dev-only visual QA (?incident=force): offers one immediately, bypassing the roll and cooldown. */
+  | { type: 'debugForceIncident' };
 
 export type AnyAction = GameAction | LifeAction;
 
@@ -752,6 +754,16 @@ function lifeOnly(s: GameState, action: LifeAction, career: Career): GameState {
       const paid = pay(s, amount, label, 'Incident complete', label, 8);
       return { ...paid, activeIncident: null, incidentHistory: history };
     }
+    case 'debugForceIncident': {
+      if (s.activeIncident) return s;
+      const district = districtById(s.districtId);
+      const incident: ActiveIncident = {
+        id: `road-accident:${s.districtId}:${s.time.totalMinutes}`,
+        kind: 'road-accident', districtId: s.districtId, position: district.spawn,
+        stage: 'offered', objective: objectiveFor(career), offeredAt: s.time.totalMinutes,
+      };
+      return { ...s, activeIncident: incident, lastIncidentAt: s.time.totalMinutes };
+    }
     case 'visit':
       return s;
   }
@@ -767,7 +779,7 @@ function offerIncidentIfDue(s: GameState, career: Career): GameState {
 
 const LIFE_TYPES: readonly LifeAction['type'][] = [
   'visit', 'setProfile', 'setDream', 'dismissWish', 'setSavingsGoal',
-  'acceptIncident', 'declineIncident', 'arriveIncident', 'completeIncident',
+  'acceptIncident', 'declineIncident', 'arriveIncident', 'completeIncident', 'debugForceIncident',
 ];
 const isLifeAction = (a: AnyAction): a is LifeAction => (LIFE_TYPES as readonly string[]).includes(a.type);
 

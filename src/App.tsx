@@ -364,7 +364,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp, acceptIncident, declineIncident, arriveIncident, completeIncident } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp, acceptIncident, declineIncident, arriveIncident, completeIncident, debugForceIncident } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -1234,6 +1234,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   useEffect(() => { goForRef.current = goFor; });
 
   // Dynamic emergency response: accept/decline, auto-travel, arrival, and the on-scene objective.
+  useEffect(() => {
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('incident') === 'force') debugForceIncident();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dev-only, fire once on mount
+  }, []);
   const trip = useSyncExternalStore(subscribeTrip, getTrip);
   useEffect(() => {
     const incident = state.activeIncident;
