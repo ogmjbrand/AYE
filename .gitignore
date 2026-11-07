@@ -46,3 +46,4 @@ assets-src/cc5/*-report.json
 
 # Blender studio outputs (scripts/blender): .blend, .glb and previews stay here until reviewed and promoted
 assets-src/blender/out/
+__pycache__/
