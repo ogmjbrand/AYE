@@ -176,6 +176,8 @@ import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPane
 import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, CARE_SEATS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
 import { HealthcarePanel } from './components/HealthcarePanel';
 import { StreetLife } from './world/StreetLife';
+import { WetStreet } from './world/WetStreet';
+import { FireLightRig } from './vfx/FireEffect';
 import { HOSPITAL_PATIENTS_PER_SHIFT, hospitalForDay, clockIn as hospitalClockInRule, brief as hospitalBriefRule, treatPatient as hospitalTreatRule, clockOut as hospitalClockOutRule } from './lib/hospital';
 import { UNIVERSITY, UNIVERSITY_INTERIOR, UNIVERSITY_POINTS, universityInteractionAt, isInLectureHall, isInLibrary, type UniversityInteraction } from './lib/university';
 import { campusForDay, attendClass, submitAssignment, assignmentForDay, academicStanding, CLASS_SLOTS, type ClassSlot } from './lib/campus';
@@ -413,6 +415,8 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
     <>
       <SceneLighting gameTime={gameTime} player={controller} weather={weather} />
       <Rain intensity={weather.rain} />
+      <WetStreet rain={weather.rain} wetness={weather.wetness} />
+      <FireLightRig />
       <LampPool focus={controller} />
       <Streets />
       <Buildings />

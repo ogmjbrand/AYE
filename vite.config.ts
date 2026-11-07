@@ -29,6 +29,8 @@ function keepPrivateAssetsOut(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), keepPrivateAssetsOut()],
+  // The game, plus the fire and water effects lab (/vfx.html) so it can be tried on the live site
+  build: { rollupOptions: { input: { main: 'index.html', vfx: 'vfx.html' } } },
   // Relative asset URLs so the build also works from a sub-path or a static preview host
   base: './',
 })

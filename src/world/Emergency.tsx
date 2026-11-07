@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { FireEffect } from '../vfx/FireEffect';
+import { HoseStream } from '../vfx/WaterFx';
 import { pbr } from './pbr';
 import { carFootprint, parkedObstacles, roadBlockers } from '../lib/world';
-import { AdditiveBlending, CanvasTexture, CatmullRomCurve3, Color, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Group, type Mesh } from 'three';
+import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three';
 
 /**
  * Emergency vehicles and fire, built from simple shapes with flashing light
@@ -174,75 +176,17 @@ export function EmergencyVehicle({ kind, position, heading, lights = true }: { k
   );
 }
 
-/** A soft round blob, bright in the middle and clear at the edge: what flames and smoke puffs are drawn with. */
-let softTexture: CanvasTexture | null = null;
-function soft(): CanvasTexture | null {
-  if (softTexture || typeof document === 'undefined') return softTexture;
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  if (!g) return null;
-  const grad = g.createRadialGradient(32, 36, 2, 32, 32, 31);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.45, 'rgba(255,255,255,0.55)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  softTexture = new CanvasTexture(c);
-  return softTexture;
-}
-
-const FLAME_COUNT = 30;
-const SMOKE_COUNT = 18;
-
 /**
- * Flames licking out of a doorway and window, and a column of smoke rising
- * and spreading. `strength` (0 … 1) shrinks the fire as it is put out.
- * Additive unlit flames and transparent smoke: no lights.
+ * Flames licking out of a doorway and the window above, with smoke pouring up and embers, drawn
+ * by the fire effects (vfx/FireEffect.tsx: shader-shaped flames, turbulent smoke, firelight).
+ * `strength` (0 … 1) shrinks the fire as it is put out; smoke smoulders on a while after.
  */
 export function Fire({ at, facing, strength }: { at: readonly [number, number, number]; facing: number; strength: number }) {
-  const flames = useRef<(Mesh | null)[]>([]);
-  const smoke = useRef<(Mesh | null)[]>([]);
-  const flameMat = useMemo(() => Array.from({ length: 3 }, (_, i) => new MeshBasicMaterial({ color: new Color(['#ff5a12', '#ff9a1f', '#ffd25a'][i]), map: soft(), transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false })), []);
-  const smokeMat = useMemo(() => new MeshBasicMaterial({ color: '#3a3836', map: soft(), transparent: true, opacity: 0.55, depthWrite: false, side: DoubleSide }), []);
-  const seeds = useMemo(() => Array.from({ length: Math.max(FLAME_COUNT, SMOKE_COUNT) }, (_, i) => ({ x: ((i * 37) % 11) / 11 - 0.5, phase: (i * 0.61) % 1, speed: 0.7 + ((i * 13) % 7) * 0.08 })), []);
-  useFrame(({ clock, camera }) => {
-    const t = clock.elapsedTime;
-    const k = Math.max(0, Math.min(1, strength));
-    flames.current.forEach((m, i) => {
-      if (!m) return;
-      const s = seeds[i];
-      const life = (t * s.speed * 1.6 + s.phase) % 1;
-      const window = i % 3 === 0;
-      m.visible = k > 0.02;
-      m.position.set(s.x * (window ? 2.4 : 2.8), (window ? 3.3 : 0.2) + life * 2.6 * k, 0.25 + Math.sin(t * 7 + i) * 0.08 + life * 0.4);
-      const size = (1 - life * 0.6) * (0.9 + 1.4 * k) * (window ? 1.1 : 1.5);
-      m.scale.set(size, size * 1.9, 1);
-      (m.material as MeshBasicMaterial).opacity = 0.9 * k * (1 - life * 0.6);
-    });
-    smoke.current.forEach((m, i) => {
-      if (!m) return;
-      const s = seeds[i];
-      const life = (t * 0.12 * s.speed + s.phase) % 1;
-      m.visible = k > 0.02 || life < 0.6;
-      m.position.set(s.x * 2.5 + life * 2, 3.5 + life * 16, 0.8 + life * 3.5);
-      m.scale.setScalar(1.2 + life * 5.5);
-      m.lookAt(camera.position);
-      smokeMat.opacity = 0.75 * Math.max(0.3, k);
-    });
-  });
+  const k = Math.max(0, Math.min(1, strength));
   return (
     <group position={at} rotation={[0, facing, 0]}>
-      {Array.from({ length: FLAME_COUNT }, (_, i) => (
-        <mesh key={i} ref={(m) => { flames.current[i] = m; }} material={flameMat[i % 3]}>
-          <planeGeometry args={[0.6, 0.6]} />
-        </mesh>
-      ))}
-      {Array.from({ length: SMOKE_COUNT }, (_, i) => (
-        <mesh key={`s${i}`} ref={(m) => { smoke.current[i] = m; }} material={smokeMat}>
-          <planeGeometry args={[1.4, 1.4]} />
-        </mesh>
-      ))}
+      <FireEffect kind="building" position={[0, 0.05, 0.35]} intensity={k} />
+      <FireEffect kind="building" position={[0, 2.9, 0.3]} intensity={k * 0.85} scale={0.75} light={false} groundGlow={false} smoke={false} />
       {/* glowing doorway and window, and the soot stain above them */}
       <mesh position={[0, 1.2, 0.04]} material={doorGlow} scale={[1, Math.max(0.2, strength), 1]}><planeGeometry args={[2.2, 2.4]} /></mesh>
       <mesh position={[0, 3.6, 0.04]} material={doorGlow} scale={[1, Math.max(0.2, strength), 1]}><planeGeometry args={[2.0, 1.4]} /></mesh>
@@ -252,45 +196,11 @@ export function Fire({ at, facing, strength }: { at: readonly [number, number, n
 }
 
 /**
- * A hose from the engine to the nozzle, and the jet of water arcing onto the
- * fire. Water droplets are additive streaks; the hose is a tube.
+ * A hose from the engine to the nozzle, and the jet of water arcing onto the fire: a streaming
+ * jet with spray, a splash where it lands and steam off the flames (vfx/WaterFx.tsx HoseStream).
  */
-export function HoseAndWater({ from, nozzle, target, spraying }: { from: readonly [number, number, number]; nozzle: readonly [number, number, number]; target: readonly [number, number, number]; spraying: boolean }) {
-  const hose = useMemo(() => {
-    const mid = new Vector3((from[0] + nozzle[0]) / 2 + 0.8, 0.06, (from[2] + nozzle[2]) / 2 - 0.6);
-    return new CatmullRomCurve3([new Vector3(from[0], 0.4, from[2]), new Vector3(from[0], 0.06, from[2] + 0.4), mid, new Vector3(nozzle[0], 0.06, nozzle[2] - 0.3), new Vector3(...nozzle)]);
-  }, [from, nozzle]);
-  const drops = useRef<Group>(null);
-  const dropMat = useMemo(() => new MeshBasicMaterial({ color: '#cfe8ff', transparent: true, opacity: 0.55, blending: AdditiveBlending, depthWrite: false, toneMapped: false }), []);
-  const DROPS = 26;
-  useFrame(({ clock }) => {
-    const g = drops.current;
-    if (!g) return;
-    g.visible = spraying;
-    if (!spraying) return;
-    const t = clock.elapsedTime;
-    g.children.forEach((c, i) => {
-      const u = (t * 1.3 + i / DROPS) % 1;
-      // A parabola from the nozzle to the target
-      const x = nozzle[0] + (target[0] - nozzle[0]) * u;
-      const z = nozzle[2] + (target[2] - nozzle[2]) * u;
-      const y = nozzle[1] + (target[1] - nozzle[1]) * u + Math.sin(u * Math.PI) * 2.2;
-      c.position.set(x + Math.sin(i * 5.1) * 0.08 * u, y, z + Math.cos(i * 3.7) * 0.08 * u);
-      c.scale.setScalar(0.6 + u * 1.4);
-    });
-  });
-  return (
-    <group>
-      <mesh material={mat.hose} castShadow>
-        <tubeGeometry args={[hose, 40, 0.06, 6, false]} />
-      </mesh>
-      <group ref={drops} visible={false}>
-        {Array.from({ length: DROPS }, (_, i) => (
-          <mesh key={i} material={dropMat}><sphereGeometry args={[0.09, 6, 4]} /></mesh>
-        ))}
-      </group>
-    </group>
-  );
+export function HoseAndWater({ from, nozzle, target, spraying, steam = 0.6 }: { from: readonly [number, number, number]; nozzle: readonly [number, number, number]; target: readonly [number, number, number]; spraying: boolean; steam?: number }) {
+  return <HoseStream from={from} nozzle={nozzle} target={target} spraying={spraying} steam={steam} />;
 }
 
 /** A traffic cone. */

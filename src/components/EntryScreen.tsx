@@ -20,6 +20,7 @@ import { formatHome } from '../lib/places';
 import { DISTRICTS } from '../lib/geography';
 import { SONGHAI } from '../lib/songhai';
 import { QUALITY_MODES, type QualityMode } from '../lib/settings';
+import { VFX_TIERS, VFX_TIER_LABEL, saveVfxTier, savedVfxTier, type VfxTier } from '../vfx/vfxQuality';
 import { Dumbbell, Globe2, Sparkles, Target, Trophy } from 'lucide-react';
 import { AyeLogo, SplashScene } from './AyeBrand';
 import { CloudAccountPanel } from './CloudAccountPanel';
@@ -73,6 +74,35 @@ const LINK =
  * The first thing a player sees: the AYE mark, Continue or start a new life,
  * how to play and settings. Saving is per device for now, and the screen says so.
  */
+const VFX_DETAIL: Record<VfxTier, string> = {
+  low: 'Lighter fire, smoke and water for older phones. No firelight.',
+  medium: 'Fuller fire and smoke, moving water, one firelight.',
+  high: 'The richest flames, smoke, embers and waves.',
+};
+
+/** Fire and water effects: follow the graphics quality, or a tier of their own (vfx/vfxQuality.ts). */
+function EffectsQuality() {
+  const [tier, setTier] = useState<VfxTier | null>(() => savedVfxTier());
+  const choose = (t: VfxTier | null) => { setTier(t); saveVfxTier(t); };
+  const options: (VfxTier | null)[] = [null, ...VFX_TIERS];
+  return (
+    <fieldset className="mt-5">
+      <legend className="text-xs font-semibold uppercase tracking-[0.18em] text-cc-gold">Fire and water effects</legend>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {options.map((t) => (
+          <label key={t ?? 'auto'} className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-cc-gold ${tier === t ? 'border-cc-gold bg-cc-gold/10' : 'border-cc-line hover:border-cc-muted'}`}>
+            <input type="radio" name="vfx" checked={tier === t} onChange={() => choose(t)} className="mt-1 accent-[#c9a45c]" />
+            <span>
+              <span className="block text-sm font-medium text-cc-ink">{t ? VFX_TIER_LABEL[t] : 'Automatic'}</span>
+              <span className="block text-xs text-cc-muted">{t ? VFX_DETAIL[t] : 'Follows the graphics quality above.'}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNewLife, onEditLook }: EntryScreenProps) {
   const [panel, setPanel] = useState<Panel>('splash');
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -242,6 +272,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                       ))}
                     </div>
                   </fieldset>
+                  <EffectsQuality />
                   <p className="mt-4 text-xs text-cc-muted">You can also switch quality in the game from the top bar. Your choice is remembered on this device.</p>
                 </PanelBody>
               )}
