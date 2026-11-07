@@ -110,6 +110,8 @@ export interface ParkLayout {
   benches: readonly { x: number; z: number; facing: number }[];
   /** Footpaths (drawn only, nothing solid): rectangles on the ground, which may lead out to the street. */
   paths: readonly { x0: number; x1: number; z0: number; z1: number }[];
+  /** An oval pond with a fountain (world/Park.tsx draws it; its stone rim is solid): centre and half-widths. */
+  pond?: { x: number; z: number; rx: number; rz: number };
 }
 export const BENCH_SIZE = [1.6, 0.9, 0.55] as const; // length, height, depth
 export const CHAIR_SIZE = 0.62;
@@ -211,6 +213,8 @@ export function buildLayout(spec: LayoutSpec): DistrictLayout {
     ...lampSpots.map((p) => ({ position: p, size: [0.25, 1, 0.25] as const })),
     ...spec.powerPoles.map((p) => ({ position: p, size: [0.3, 1, 0.3] as const })),
     ...(spec.park?.trees ?? []).map(([x, z]) => ({ position: [x, 0, z] as const, size: [0.5, 1, 0.5] as const })),
+    // The pond's rim (an oval, kept out as its bounding box less the corners' worth)
+    ...(spec.park?.pond ? [{ position: [spec.park.pond.x, 0, spec.park.pond.z] as const, size: [spec.park.pond.rx * 2 + 0.3, 1, spec.park.pond.rz * 2 + 0.3] as const }] : []),
     ...spec.terraceChairs.map((c) => ({ position: [c.x, 0, c.z] as const, size: [CHAIR_SIZE, 1, CHAIR_SIZE] as const })),
     ...(spec.campers ?? []).map((c) => carFootprint(c.x, c.z, c.heading, CAMPER_SIZE.length, CAMPER_SIZE.width)),
     // A cart's counter runs across the way it faces

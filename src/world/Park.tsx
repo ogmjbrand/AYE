@@ -5,6 +5,7 @@ import { Instances, type Placement } from './Instances';
 import { seeded } from '../lib/world';
 import { parkPathSurface, tiledMaterial } from './materials';
 import { pbr, pbrOpacity } from './pbr';
+import { ParkPond } from './ParkPond';
 
 // Dry-season colours: a sun-faded lawn, laterite paths, olive shade trees (muted, never the brand colours)
 const LAWN = '#7f7c55';
@@ -86,6 +87,7 @@ export function Park() {
       <Instances items={parts.canopies} material={mats.canopy} geometry={<icosahedronGeometry args={[1, 1]} />} />
       <Instances items={parts.seats} material={mats.wood} geometry={<boxGeometry args={[1, 1, 1]} />} />
       <Instances items={parts.backs} material={mats.wood} geometry={<boxGeometry args={[1, 1, 1]} />} />
+      {park.pond && <ParkPond pond={park.pond} />}
     </group>
   );
 }

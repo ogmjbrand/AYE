@@ -100,6 +100,8 @@ export const LAGOS_MARINA: DistrictSpec = {
         { x: 24.6, z: 0, facing: Math.PI / 2 }, { x: 27.4, z: 0, facing: -Math.PI / 2 },
       ],
       paths: [{ x0: 25, x1: 27, z0: -13, z1: 4 }, { x0: 20, x1: 33, z0: -4.5, z1: -2.5 }],
+      // In the south-east lawn, clear of the trees, benches and paths
+      pond: { x: 31, z: -9, rx: 1.4, rz: 1.0 },
     },
     skyline: {
       seed: 311,

@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { FireEffect } from '../vfx/FireEffect';
+import { BurningOpening, FireEffect } from '../vfx/FireEffect';
 import { HoseStream } from '../vfx/WaterFx';
+import { fireField, ignite, stepField } from '../vfx/fireModel';
 import { pbr } from './pbr';
 import { carFootprint, parkedObstacles, roadBlockers } from '../lib/world';
 import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three';
@@ -181,17 +182,53 @@ export function EmergencyVehicle({ kind, position, heading, lights = true }: { k
  * by the fire effects (vfx/FireEffect.tsx: shader-shaped flames, turbulent smoke, firelight).
  * `strength` (0 … 1) shrinks the fire as it is put out; smoke smoulders on a while after.
  */
-export function Fire({ at, facing, strength }: { at: readonly [number, number, number]; facing: number; strength: number }) {
+export function Fire({ at, facing, strength, hosed = false }: { at: readonly [number, number, number]; facing: number; strength: number; hosed?: boolean }) {
   const k = Math.max(0, Math.min(1, strength));
   return (
     <group position={at} rotation={[0, facing, 0]}>
       <FireEffect kind="building" position={[0, 0.05, 0.35]} intensity={k} />
       <FireEffect kind="building" position={[0, 2.9, 0.3]} intensity={k * 0.85} scale={0.75} light={false} groundGlow={false} smoke={false} />
+      <SpreadingFacade strength={k} hosed={hosed} />
       {/* glowing doorway and window, and the soot stain above them */}
-      <mesh position={[0, 1.2, 0.04]} material={doorGlow} scale={[1, Math.max(0.2, strength), 1]}><planeGeometry args={[2.2, 2.4]} /></mesh>
-      <mesh position={[0, 3.6, 0.04]} material={doorGlow} scale={[1, Math.max(0.2, strength), 1]}><planeGeometry args={[2.0, 1.4]} /></mesh>
+      <BurningOpening position={[0, 1.2, 0.04]} width={2.2} height={2.4} intensity={k} />
+      <BurningOpening position={[0, 3.6, 0.04]} width={2.0} height={1.4} intensity={k * 0.9} />
       <mesh position={[0, 5.5, 0.03]} material={soot}><planeGeometry args={[3.6, 5.5]} /></mesh>
     </group>
+  );
+}
+
+// The shopfront as a grid of surfaces fire can travel across: three bays across (the door's in the middle), three floors up
+const FACADE_COLS = 3, FACADE_ROWS = 3;
+const BAY = 2.6, STOREY = 2.9;
+
+/**
+ * Fire spreading across the shopfront by the fire rules (vfx/fireModel.ts): from the doorway to the
+ * neighbouring windows and the floors above, faster upwards. The crew's hose soaks and knocks down
+ * the bays nearest where it's aimed. Never bigger than the event's own fire (`strength`), so the
+ * event's rules and timing stay as they are.
+ */
+function SpreadingFacade({ strength, hosed }: { strength: number; hosed: boolean }) {
+  const [field, setField] = useState(() => ignite(fireField(FACADE_COLS, FACADE_ROWS, (_c, r) => (r === 0 ? 0.9 : 0.6)), 1, 0, 0.7));
+  const acc = useRef(0);
+  useFrame((_, dt) => {
+    acc.current += dt;
+    if (acc.current < 0.25) return;
+    const step = acc.current;
+    acc.current = 0;
+    // The hose aims at the doorway: its water reaches the bays round it, less the further off
+    setField((f) => stepField(f, step, (c, r) => (hosed ? Math.max(0, 0.9 - Math.hypot(c - 1, r) * 0.35) : 0)));
+  });
+  return (
+    <>
+      {field.cells.map((cell, i) => {
+        const c = i % FACADE_COLS, r = Math.floor(i / FACADE_COLS);
+        // The doorway and the window above it are the main fire, drawn above
+        if (c === 1 && r < 2) return null;
+        const k = Math.min(cell.intensity, strength * 1.3);
+        if (k < 0.02) return null;
+        return <FireEffect key={i} kind="small" position={[(c - 1) * BAY, 0.6 + r * STOREY, 0.3]} intensity={k} scale={1.6} light={false} groundGlow={false} smoke={r === 2} />;
+      })}
+    </>
   );
 }
 
@@ -213,7 +250,6 @@ export function Cone({ at }: { at: readonly [number, number, number] }) {
     </group>
   );
 }
-const doorGlow = new MeshBasicMaterial({ color: new Color('#ff7a1a'), transparent: true, opacity: 0.85, toneMapped: false });
 const soot = new MeshBasicMaterial({ color: '#0b0a09', transparent: true, opacity: 0.6, depthWrite: false });
 const coneMat = new MeshStandardMaterial({ color: '#ff6a12', roughness: 0.6 });
 

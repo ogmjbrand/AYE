@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { MeshStandardMaterial, PlaneGeometry, type Mesh } from 'three';
+import { CircleGeometry, MeshStandardMaterial, PlaneGeometry, type Mesh } from 'three';
 import { NOISE_GLSL } from './glsl';
 import { useVfx } from './useVfxTier';
 import { WAVES, addRipple, packRipples, type Ripple } from './waterModel';
@@ -30,10 +30,12 @@ export interface WaterSurfaceProps extends WaterOptions {
   wader?: () => { x: number; z: number } | null;
   /** Click or tap the surface to touch it (the effects lab). */
   touchable?: boolean;
+  /** An oval (a pond, a fountain basin) filling `size`, instead of a rectangle. */
+  round?: boolean;
 }
 
 /** A body of water: a pool's surface, a stretch of river, the sea, a puddle. */
-export function WaterSurface({ position = [0, 0, 0], rotationY = 0, size, wader, touchable = false, ...o }: WaterSurfaceProps) {
+export function WaterSurface({ position = [0, 0, 0], rotationY = 0, size, wader, touchable = false, round = false, ...o }: WaterSurfaceProps) {
   const { budget } = useVfx();
   const material = useMemo(() => createWaterMaterial(o, budget),
     // A new material only when what it's built from changes (kind, tier); the rest are uniforms
@@ -44,10 +46,16 @@ export function WaterSurface({ position = [0, 0, 0], rotationY = 0, size, wader,
   const geometry = useMemo(() => {
     const waves = budget.waterWaves && WAVES[o.kind].length > 0;
     const seg = waves ? Math.min(160, Math.max(8, Math.round(Math.max(size[0], size[1]) * (budget.waterOctaves >= 3 ? 2.5 : 1.5)))) : 1;
+    if (round) {
+      const g = new CircleGeometry(0.5, 48);
+      g.rotateX(-Math.PI / 2);
+      g.scale(size[0], 1, size[1]);
+      return g;
+    }
     const g = new PlaneGeometry(size[0], size[1], seg, seg);
     g.rotateX(-Math.PI / 2);
     return g;
-  }, [size, budget.waterWaves, budget.waterOctaves, o.kind]);
+  }, [size, budget.waterWaves, budget.waterOctaves, o.kind, round]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   const ripples = useRef<Ripple[]>([]);
   const last = useRef<{ x: number; z: number } | null>(null);
@@ -68,7 +76,8 @@ export function WaterSurface({ position = [0, 0, 0], rotationY = 0, size, wader,
     const w = wader?.();
     if (w && mesh.current) {
       const p = mesh.current.position;
-      const inside = Math.abs(w.x - p.x) < size[0] / 2 && Math.abs(w.z - p.z) < size[1] / 2;
+      const dx = (w.x - p.x) / (size[0] / 2), dz = (w.z - p.z) / (size[1] / 2);
+      const inside = round ? dx * dx + dz * dz < 1 : Math.abs(dx) < 1 && Math.abs(dz) < 1;
       if (inside && (!last.current || Math.hypot(w.x - last.current.x, w.z - last.current.z) > 0.6)) {
         ripples.current = addRipple(ripples.current, { x: w.x, z: w.z, at: t, strength: 1 }, budget.ripples);
         last.current = w;

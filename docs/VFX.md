@@ -15,7 +15,15 @@ The effects live in `src/vfx/` as independent, reusable components. The game's e
 
 **In the game:**
 - The building-fire event uses the new flames, smoke, embers, firelight and hose (Marina Heights, Lagoon Boulevard).
-- Puddles gather on the boulevard as the weather makes the street wet.
+- **The burning doorway and window** are shaded as a room on fire: hottest low down, flickering, smoky towards the top, charred round the frame. They replace the earlier flat orange panels.
+- **The building fire spreads** across the shopfront by the fire rules: from the doorway to the neighbouring windows and the floors above, faster upwards. Once the crew starts spraying, their hose soaks and knocks down the windows nearest where it's aimed. It is never bigger than the event's own fire, so the event's rules and timing are unchanged. The spreading uses the same rules the lab shows working. In the game it wasn't visibly confirmed in a screenshot, because the 1 fps test renderer reaches the moment the crew start spraying before the fire can spread.
+- **A vehicle fire at the road accident:** the red car's engine bay smoulders, with low flames and smoke, until someone makes the cars safe.
+- **Puddles** gather on the boulevard as the weather makes the street wet. Checked in the browser during a thunderstorm: dark reflective patches in the lanes.
+- **Uptown Gardens has a pond:** an oval of water in a stone rim with a fountain, in the south-east lawn. It's clear of every tree, bench and path; the park's name, paths and use-point are unchanged.
+  - The water ripples under the fountain's drops and the rain, and as you walk along its rim (an interactive surface).
+  - Its rim is solid.
+  - Generated cities get it too, mirrored with their park.
+  - Checked in the browser in the rain.
 - **Settings → Fire and water effects** picks Automatic, Low, Medium or High. Automatic follows the graphics quality.
 
 ## How it's built
@@ -74,6 +82,9 @@ None of these effects use a downloaded asset. Every flame, smoke puff, ember, ri
 - `src/vfx/waterModel.ts`, `src/vfx/waterMaterial.ts`, `src/vfx/WaterSurface.tsx`, `src/vfx/WaterFx.tsx`, `src/vfx/ballistics.ts`: water.
 - `src/vfx/lab/VfxLab.tsx`, `src/vfx/lab/main.tsx`, `vfx.html`: the lab.
 - `src/world/WetStreet.tsx`: puddles in the city.
+- `src/world/ParkPond.tsx`: the park's pond and fountain.
+- `BurningOpening` in `src/vfx/FireEffect.tsx`: a doorway or window with the room behind it alight.
+- `src/lib/parkPond.test.ts`: checks the pond is placed clear of trees, benches and paths and is solid, in every city with a park.
 - `src/vfx/vfx.test.ts`: 18 tests, covering:
   - the tiers;
   - fire growth, burning out, hose and extinguisher, spreading, determinism and stone;
@@ -83,14 +94,16 @@ None of these effects use a downloaded asset. Every flame, smoke puff, ember, ri
   - the water shader hooking into three's physical shader, a guard against GLSL reserved words, waves only where intended, and transparency.
 
 **Changed:**
-- `src/world/Emergency.tsx`: `Fire` and `HoseAndWater` use the new effects; props are unchanged.
+- `src/world/Emergency.tsx`: `Fire` and `HoseAndWater` use the new effects, and the shopfront spreads. Existing props are unchanged; `Fire` gains an optional `hosed`.
+- `src/world/LiveEventScene.tsx`: the smouldering crashed car, and the hose reaching the spreading fire.
+- `src/world/Park.tsx`, `src/lib/world.ts`, `src/lib/districts/lagos.ts`, `src/lib/districts/generate.ts`: the park pond (an optional `pond` on the park layout, solid).
+- `src/vfx/WaterSurface.tsx`: a `round` option for ponds and basins.
 - `src/App.tsx`: the light rig and puddles in the city.
 - `src/components/EntryScreen.tsx`: the effects setting.
 - `vite.config.ts`: builds the lab page too.
 
 ## Not done yet
 
-- **No building or furniture in the game burns by the spread rules yet.** The event fire's size still follows the event's own timeline. In the lab the spread rules drive the shopfront.
-- **No pool, river or sea in the game yet.** The water components exist, but no current Songhai location has one. They're ready for when one is placed (for example a villa's pool, or the lagoon itself).
-- **Puddles not yet seen in a screenshot.** The rain test was shot at an angle where the dark road hides them, so how they look in the game still needs checking.
-- **No physical splash collision:** droplets don't bounce off geometry, and the player wading is supported by `WaterSurface` (`wader`) but not yet connected to the player.
+- **The fire spread rules only drive the building fire.** No furniture or indoor fire uses them yet; the indoor small-fire preset is used only in the lab.
+- **No swimming pool, river or sea in the game yet.** The park pond is the game's first water body. The other components wait for a place that should have them (for example a villa's pool, or the lagoon's shore).
+- **No physical splash collision:** droplets don't bounce off geometry.

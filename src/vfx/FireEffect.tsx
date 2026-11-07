@@ -321,3 +321,42 @@ export function FireLightRig() {
     </>
   );
 }
+
+const OPENING_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const OPENING_FRAG = /* glsl */ `
+uniform float uTime, uIntensity;
+varying vec2 vUv;
+${NOISE_GLSL}
+${BLACKBODY_GLSL}
+void main() {
+  // A room on fire seen through its doorway or window: hottest low down and at the back,
+  // flickering, darker and smoke-filled towards the top, charred round the frame
+  float n = vfxFbm(vec2(vUv.x * 3.0, vUv.y * 2.0 - uTime * 0.9));
+  float flicker = 0.8 + 0.2 * sin(uTime * 9.0 + n * 6.0);
+  float heat = (1.0 - vUv.y * 0.85) * (0.45 + 0.75 * n) * flicker * uIntensity;
+  float frame = smoothstep(0.0, 0.08, vUv.x) * smoothstep(0.0, 0.08, 1.0 - vUv.x) * smoothstep(0.0, 0.05, vUv.y) * smoothstep(0.0, 0.1, 1.0 - vUv.y);
+  vec3 smoke = mix(vec3(0.05, 0.035, 0.03), vec3(0.12, 0.09, 0.08), n);
+  vec3 col = mix(smoke, vfxBlackbody(heat) * 1.4, smoothstep(0.08, 0.6, heat)) * mix(0.35, 1.0, frame);
+  gl_FragColor = vec4(col, 1.0);
+  #include <colorspace_fragment>
+}`;
+
+/** A doorway or window with the room behind it alight (or, once it's out, dark and smoky). */
+export function BurningOpening({ position, width, height, intensity }: { position: readonly [number, number, number]; width: number; height: number; intensity: number }) {
+  const { budget } = useVfx();
+  const material = useMemo(() => new ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uIntensity: { value: 1 } }, vertexShader: OPENING_VERT, fragmentShader: OPENING_FRAG,
+    defines: octaves(Math.min(2, budget.noiseOctaves)),
+  }), [budget.noiseOctaves]);
+  useEffect(() => () => material.dispose(), [material]);
+  const mesh = useRef<Mesh>(null);
+  useFrame(({ clock }) => {
+    const u = (mesh.current?.material as ShaderMaterial | undefined)?.uniforms;
+    if (u) { u.uTime.value = clock.elapsedTime; u.uIntensity.value = Math.max(0, Math.min(1, intensity)); }
+  });
+  return (
+    <mesh ref={mesh} position={position as [number, number, number]} material={material}>
+      <planeGeometry args={[width, height]} />
+    </mesh>
+  );
+}

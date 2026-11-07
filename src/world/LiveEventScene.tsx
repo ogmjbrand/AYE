@@ -8,6 +8,7 @@ import { Car } from './Props';
 import { WorldNPC } from './WorldNPC';
 import { nameTag } from './nameTag';
 import { Cordon, EmergencyVehicle, Fire, HoseAndWater } from './Emergency';
+import { FireEffect } from '../vfx/FireEffect';
 import { useLayout } from './DistrictContext';
 
 /** Minutes after an emergency starts before the computer-controlled services arrive. */
@@ -101,6 +102,8 @@ function Accident({ e, minute }: { e: ActiveEvent; minute: number }) {
   return (
     <group>
       {cars.map((c, i) => <Car key={i} vehicle={c} />)}
+      {/* The red car's engine bay smoulders until someone makes the cars safe */}
+      <FireEffect kind="vehicle" position={[x + 1.5 + Math.sin(cars[1].heading) * 1.5, 0.75, z + 0.6 + Math.cos(cars[1].heading) * 1.5]} intensity={e.done.includes('make-safe') ? 0 : 0.28} scale={0.6} smoulder={e.done.includes('make-safe') ? 0.05 : 0.5} groundGlow={false} />
       {[-1, 1].map((s) => <Cone key={s} at={{ x: x + s * 4.5, z: z + 2.2 * s }} />)}
       <Person name="Kunle" who={treated ? 'Driver, being treated' : 'Injured driver'} lookId="male-adult-04" at={{ x: x, z: z + 2.4 }} facing={Math.PI} sitting />
       <Person name="Amaka" who="Passenger" lookId="female-adult-06" at={{ x: x + 2.6, z: z + 2.6 }} facing={-Math.PI / 2} />
@@ -207,7 +210,7 @@ function BuildingFire({ e, minute }: { e: ActiveEvent; minute: number }) {
   const crowd = [['Kemi', 'female-adult-03'], ['Uche', 'male-adult-10'], ['Bola', 'female-adult-06'], ['Ade', 'male-adult-04']] as const;
   return (
     <group>
-      <Fire at={wall} facing={facing} strength={strength} />
+      <Fire at={wall} facing={facing} strength={strength} hosed={since >= SPRAY_AFTER && strength > 0} />
       {crowd.map(([name, look], i) => (
         <Person key={name} name={name} who={evacuated ? 'Neighbour, safe' : 'Neighbour'} lookId={look} at={{ x: crowdX + (i % 2) * 0.8 * -side, z: z + 2.5 + i * 0.9 }} facing={evacuated ? -facing : facing} />
       ))}

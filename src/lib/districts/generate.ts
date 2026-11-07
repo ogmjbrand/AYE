@@ -236,6 +236,7 @@ function layLayout(L: LayoutSpec, f: Frame, id: string): LayoutSpec {
       const r = rect(f, { minX: p.x0, maxX: p.x1, minZ: p.z0, maxZ: p.z1 });
       return { x0: r.minX, x1: r.maxX, z0: r.minZ, z1: r.maxZ };
     }),
+    ...(L.park.pond ? { pond: { x: L.park.pond.x * f.sx, z: L.park.pond.z * f.sz, rx: L.park.pond.rx, rz: L.park.pond.rz } } : {}),
   };
   const row = <R extends { x: number; spacing: number; offset: number }>(r: R): R => (f.sz > 0 ? r : { ...r, offset: flipOffset(r) });
   return {
