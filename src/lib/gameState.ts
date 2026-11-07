@@ -38,6 +38,7 @@ import { FULL_NEEDS, MOOD_TASK_MULTIPLIER, SLEEP_ENERGY, TIRED_THRESHOLD, addNee
 import { catalogueItem, findSpot, fits, homeComfort, walkable, nextUid, replaceAll, resaleValue, furnitureUse, type OwnedFurniture } from './furniture';
 import { interiorFor, type Interior } from './interiors';
 import { emptyLife, modifiers, type LifeState } from './lifeState';
+import type { ActiveIncident, IncidentHistoryEntry } from './incidents';
 import type { FurnitureKind } from './interiors';
 import type { CatalogueItem } from './furniture';
 import { clockIn, clockOut, emptyShift, patientById, rollShift, saw, type ShiftState } from './hospital';
@@ -144,6 +145,12 @@ export interface GameState {
   school: SchoolState;
   /** A doctor's shift at AYE General Hospital (lib/hospital.ts). */
   shift: ShiftState;
+  /** The emergency-response mission in progress, if any (lib/incidents.ts). Absent in older saves. */
+  activeIncident?: ActiveIncident | null;
+  /** Game minute the last incident was offered, so a new one waits out the cooldown. -1 if none yet. */
+  lastIncidentAt?: number;
+  /** Completed incidents, most recent last (lib/incidents.ts). Absent in older saves. */
+  incidentHistory?: IncidentHistoryEntry[];
   /** Saved data from systems this version doesn't run, stored back unchanged (lib/save.ts). */
   legacy?: Record<string, unknown>;
 }
@@ -305,6 +312,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     workPerformance: { excellent: 0, reasonable: 0, poor: 0 },
     officeCareer: createOfficeCareer(),
     needs: FULL_NEEDS, furniture: [], life: emptyLife(), school: emptySchool(), shift: emptyShift(),
+    activeIncident: null, lastIncidentAt: -1, incidentHistory: [],
   };
 }
 

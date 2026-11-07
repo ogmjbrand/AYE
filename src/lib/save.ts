@@ -23,6 +23,7 @@ import { sanitiseFurniture } from './furniture';
 import { sanitiseLife } from './lifeState';
 import { recogniseExisting } from './life';
 import { sanitiseOfficeCareer } from './officeCareer';
+import { sanitiseActiveIncident, sanitiseIncidentHistory } from './incidents';
 import { migrateOwnedVehicles } from './saveMigration';
 import { isSkinToneId, skinToneDepth } from './skinTone';
 
@@ -181,6 +182,10 @@ export function loadProgress(character: Character, storage: Storage = localStora
       poor: performanceCount(performanceData.poor),
     },
     officeCareer: sanitiseOfficeCareer(p.officeCareer),
+    // Saves from before dynamic events start with no mission in progress and no cooldown
+    activeIncident: sanitiseActiveIncident(p.activeIncident),
+    lastIncidentAt: isInt(p.lastIncidentAt, -1, Number.MAX_SAFE_INTEGER) ? p.lastIncidentAt : -1,
+    incidentHistory: sanitiseIncidentHistory(p.incidentHistory),
     // Data from systems this version doesn't run is carried along untouched
     ...(legacy ? { legacy } : {}),
     // Saves from before needs start with every need met, and own no furniture
@@ -213,12 +218,12 @@ export function saveProgress(characterId: string, state: GameState, storage: Sto
   const {
     time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour,
     lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer,
-    needs, furniture, life, school, shift, legacy,
+    needs, furniture, life, school, shift, activeIncident, lastIncidentAt, incidentHistory, legacy,
   } = state;
   storage.setItem(PROGRESS_KEY, JSON.stringify({
     characterId, time, balance, today, minutesWorkedThisHour, fullness, home, workMinutes, equipment, cars, districtId, relationships, lastTaskHour,
     lastShowcaseDay, fashionMissionItemId, fashionMissionCompleted, workPerformance, officeCareer,
-    needs, furniture, life: { ...life, celebrations: [] }, school, shift,
+    needs, furniture, life: { ...life, celebrations: [] }, school, shift, activeIncident, lastIncidentAt, incidentHistory,
     ...(legacy ? { legacy } : {}),
   }));
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
@@ -82,12 +82,16 @@ import { Celebrations } from './components/os/Celebrations';
 import type { LifeLink } from './lib/life';
 import { spotToUse } from './lib/furniture';
 import { residentPosition, residentsIn } from './lib/people';
-import { getTrip, setPace } from './hooks/usePlayerController';
+import { getTrip, setPace, subscribeTrip } from './hooks/usePlayerController';
 import { ACHIEVEMENTS } from './lib/life';
 import { MOOD_PACE, moodLabel } from './lib/needs';
 import { SceneLighting as InteriorLighting } from './world/SceneLighting';
 import { gameDay, isAdultResident, residentById, residentFacing, residentNear, type Resident } from './lib/people';
 import { parseWeatherOverride, type WeatherCondition } from './lib/weather';
+import { INCIDENT_INTERACT_RADIUS, type ActiveIncident } from './lib/incidents';
+import { IncidentAlert } from './components/IncidentAlert';
+import { IncidentObjectivePanel } from './components/IncidentObjectivePanel';
+import { RoadAccidentScene } from './world/RoadAccidentScene';
 import { canResidentAcceptHug, findHugPlan, type HugSession } from './lib/hug';
 import { formatDuration, travelOption, type TravelMode } from './lib/travel';
 import { HomeMarkers } from './world/HomeMarkers';
@@ -126,6 +130,8 @@ interface CityProps {
   gameTime: GameTime;
   /** Forces every day's weather to one condition (the dev `?weather=` query); null in normal play. */
   weatherOverride: WeatherCondition | null;
+  /** The in-progress emergency-response mission, if its location is in this district. */
+  incidentHere: ActiveIncident | null;
   tryOn: Partial<Record<Slot, string | null>>;
   homeId: string | null;
   district: District;
@@ -235,12 +241,13 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, weatherOverride, tryOn, homeId, district, talkingTo, car, parked, hugSession, onHugComplete }: CityProps) {
+function City({ controller, character, gameTime, weatherOverride, incidentHere, tryOn, homeId, district, talkingTo, car, parked, hugSession, onHugComplete }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
     <>
       <SceneLighting gameTime={gameTime} player={controller} weatherOverride={weatherOverride} />
+      {incidentHere && <RoadAccidentScene incident={incidentHere} />}
       <Streets />
       <Buildings />
       <Skyline />
@@ -357,7 +364,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const campusRef = useRef(false);
   const hospitalRef = useRef(false);
   const onShiftRef = useRef(false);
-  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp } = useGameState(
+  const { state, rest, dismissSummary, eat, purchase, moveIn, moveOut, buyEquipment, travel, socialise, hug, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, clockIn, clockOut, seePatient, buyCar, sellCar, fuel, parkCar, startClass, leaveClass, participate, finishClass, study, handIn, campusVisit, joinClub, campusChat, freshenUp, acceptIncident, declineIncident, arriveIncident, completeIncident } = useGameState(
     character,
     // A student's workplace is the campus: every minute there in school hours counts (the existing hourly student rate)
     // A doctor's workplace is the hospital: paid only while clocked in there
@@ -980,6 +987,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return null;
   };
 
+  const incidentInRange = (incident: ActiveIncident) => {
+    const { x, z } = controller.position;
+    return Math.hypot(incident.position[0] - x, incident.position[2] - z) <= INCIDENT_INTERACT_RADIUS;
+  };
   // E opens the food vendor or the boutique you're standing at
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1012,6 +1023,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         return;
       }
       if (drivingNow) return;
+      const activeIncident = state.activeIncident;
+      if (activeIncident && (activeIncident.stage === 'travelling' || activeIncident.stage === 'arrived') && incidentInRange(activeIncident)) {
+        if (activeIncident.stage === 'travelling') arriveIncident(activeIncident.id);
+        completeIncident(activeIncident.id);
+        return;
+      }
       const { x, z } = controller.position;
       const near = nearestVendor(district.vendors, x, z);
       const counter = counterAt(district, x, z);
@@ -1215,6 +1232,25 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   const goForRef = useRef(goFor);
   useEffect(() => { goForRef.current = goFor; });
+
+  // Dynamic emergency response: accept/decline, auto-travel, arrival, and the on-scene objective.
+  const trip = useSyncExternalStore(subscribeTrip, getTrip);
+  useEffect(() => {
+    const incident = state.activeIncident;
+    if (incident && incident.stage === 'travelling' && trip?.status === 'arrived' && trip.destinationId === incident.id) {
+      arriveIncident(incident.id);
+    }
+  }, [trip, state.activeIncident, arriveIncident]);
+  const acceptIncidentAlert = () => {
+    const incident = state.activeIncident;
+    if (!incident || incident.stage !== 'offered') return;
+    if (offStreet) goOutside();
+    acceptIncident(incident.id);
+    const { x, z } = controller.position;
+    const ok = setMoveTarget(makeTarget(x, z, incident.position[0], incident.position[2], false), { destinationId: incident.id, label: 'the accident scene' });
+    setArrival(ok ? 'Responding to a road accident report.' : 'Heading to the accident scene.');
+  };
+  const declineIncidentAlert = () => { if (state.activeIncident) declineIncident(state.activeIncident.id); };
   const runInPark = (minutes: number) => {
     setParkOpen(false);
     const here = parkAt(district.park, controller.position.x, controller.position.z);
@@ -1536,7 +1572,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} weatherOverride={weatherOverride} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} onHugComplete={finishHug} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} weatherOverride={weatherOverride} incidentHere={state.activeIncident && state.activeIncident.districtId === district.id ? state.activeIncident : null} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} onHugComplete={finishHug} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
@@ -1689,6 +1725,12 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         <p role="status" className="pointer-events-none fixed left-1/2 top-24 z-40 m-0 -translate-x-1/2 rounded-xl border border-ui-line bg-ui-panel/90 px-4 py-2 text-sm text-ui-ink shadow-xl">
           {arrival}
         </p>
+      )}
+      {state.activeIncident?.stage === 'offered' && (
+        <IncidentAlert incident={state.activeIncident} onAccept={acceptIncidentAlert} onDecline={declineIncidentAlert} />
+      )}
+      {state.activeIncident && (state.activeIncident.stage === 'travelling' || state.activeIncident.stage === 'arrived') && (
+        <IncidentObjectivePanel incident={state.activeIncident} inRange={incidentInRange(state.activeIncident)} />
       )}
       <HUD
         district={district}

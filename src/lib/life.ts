@@ -31,6 +31,7 @@ import { careerLadder, levelIndex } from './progression';
 import { HANGOUT_LEVEL, friendshipLevel, gameDay, residentById, residentsIn, type Activity } from './people';
 import type { District } from './geography';
 import { equipmentById } from './equipment';
+import { maybeOfferIncident, rewardFor, type IncidentHistoryEntry } from './incidents';
 
 // ---------------------------------------------------------------- actions and links
 
@@ -39,7 +40,11 @@ export type LifeAction =
   | { type: 'setProfile'; bio: string; traits: TraitId[] }
   | { type: 'setDream'; dream: DreamId }
   | { type: 'dismissWish'; id: string }
-  | { type: 'setSavingsGoal'; amount: number | null };
+  | { type: 'setSavingsGoal'; amount: number | null }
+  | { type: 'acceptIncident'; id: string }
+  | { type: 'declineIncident'; id: string }
+  | { type: 'arriveIncident'; id: string }
+  | { type: 'completeIncident'; id: string };
 
 export type AnyAction = GameAction | LifeAction;
 
@@ -731,12 +736,39 @@ function lifeOnly(s: GameState, action: LifeAction, career: Career): GameState {
       if (amount !== null && !(amount > 0 && amount <= 100_000_000)) return s;
       return { ...s, life: { ...s.life, savingsGoal: amount } };
     }
+    case 'acceptIncident':
+      if (s.activeIncident?.id !== action.id || s.activeIncident.stage !== 'offered') return s;
+      return { ...s, activeIncident: { ...s.activeIncident, stage: 'travelling' } };
+    case 'declineIncident':
+      return s.activeIncident?.id === action.id ? { ...s, activeIncident: null } : s;
+    case 'arriveIncident':
+      if (s.activeIncident?.id !== action.id || s.activeIncident.stage !== 'travelling') return s;
+      return { ...s, activeIncident: { ...s.activeIncident, stage: 'arrived' } };
+    case 'completeIncident': {
+      if (s.activeIncident?.id !== action.id || s.activeIncident.stage !== 'arrived') return s;
+      const { amount, label } = rewardFor(s.activeIncident.objective);
+      const entry: IncidentHistoryEntry = { id: s.activeIncident.id, kind: s.activeIncident.kind, completedAt: s.time.totalMinutes };
+      const history = [...(s.incidentHistory ?? []), entry].slice(-20);
+      const paid = pay(s, amount, label, 'Incident complete', label, 8);
+      return { ...paid, activeIncident: null, incidentHistory: history };
+    }
     case 'visit':
       return s;
   }
 }
 
-const LIFE_TYPES: readonly LifeAction['type'][] = ['visit', 'setProfile', 'setDream', 'dismissWish', 'setSavingsGoal'];
+/** Offers a new emergency-response mission, at most once per cooldown, when none is already active. */
+function offerIncidentIfDue(s: GameState, career: Career): GameState {
+  if (s.activeIncident) return s;
+  const district = districtById(s.districtId);
+  const offer = maybeOfferIncident(s.time.totalMinutes, s.lastIncidentAt ?? -Infinity, s.districtId, district.spawn, career);
+  return offer ? { ...s, activeIncident: offer, lastIncidentAt: offer.offeredAt } : s;
+}
+
+const LIFE_TYPES: readonly LifeAction['type'][] = [
+  'visit', 'setProfile', 'setDream', 'dismissWish', 'setSavingsGoal',
+  'acceptIncident', 'declineIncident', 'arriveIncident', 'completeIncident',
+];
 const isLifeAction = (a: AnyAction): a is LifeAction => (LIFE_TYPES as readonly string[]).includes(a.type);
 
 /** The game's reducer: core rules, then the life engine on top. */
@@ -756,6 +788,7 @@ export function lifeReducer(state: GameState, action: AnyAction, career: Career,
   next = applyEvents(next, events, career, state.time.totalMinutes);
   next = settle(next, career);
   next = topUpWishes(next, career);
+  next = offerIncidentIfDue(next, career);
   return next;
 }
 
