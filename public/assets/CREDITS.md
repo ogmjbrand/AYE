@@ -20,6 +20,8 @@ The HDRIs are used for lighting and reflections only; the visible sky is rendere
 
 `female-body.glb` is built by `scripts/makehuman/build-body.mjs` from the MakeHuman base mesh, targets and game-engine rig weights in the MPFB repository (github.com/makehumancommunity/mpfb2). MakeHuman assets and their output are **CC0** (public domain); credit given with thanks to the MakeHuman community.
 
+The body's skin texture is `skins/young_african_female/young_darkskinned_female_diffuse.png` from the MakeHuman System Assets pack (makehumancommunity.org), © 2020 Data Collection AB, Joel Palmius and Jonas Hauquier, released CC0; resized to 1K and converted to WebP by the same build script's call to `scripts/optimize-glb.mjs`. Two face-shape morph targets (`smile`, `noseWide`) use the already-verified `faceunits01` (Mika Suominen, CC0) and `nose01` (Elvaerwyn, CC0) packs in `assets-src/makehuman/targets/`.
+
 ## Furniture and flowers (models/furniture/)
 
 From the Khronos glTF Sample Assets (github.com/KhronosGroup/glTF-Sample-Assets), rebuilt by

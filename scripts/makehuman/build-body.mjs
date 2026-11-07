@@ -7,14 +7,20 @@
 // 3. Poses the arms down by the shoulders with the rig's own skin weights (linear blend skinning), so the
 //    figure stands like a body-type chart instead of in MakeHuman's arms-out pose.
 // 4. Writes public/assets/characters/mh/female-body.glb: one mesh with real morph targets (weight, muscle,
-//    cup size, bust, waist, hips, belly, buttocks, hip width) on the body, eyes and scalp, each target posed
-//    the same way and with its own normals, plus a `_REST` attribute (unposed position) that the swimwear
-//    shader uses to place a two-piece on the body.
+//    cup size, bust, waist, hips, belly, buttocks, hip width, plus a first face proof - smile, nose width)
+//    on the body, eyes and scalp, each target posed the same way and with its own normals, plus a `_REST`
+//    attribute (unposed position) that the swimwear shader uses to place a two-piece on the body.
+// 5. The body carries real UVs (read from the base OBJ, discarded until now) and a real skin texture
+//    (MakeHuman system assets, CC0; see docs/CHARACTER_PIPELINE.md) instead of a flat colour fill. The
+//    source PNG isn't committed - it's expected at assets-src/makehuman/cache/young_african_female_diffuse.png
+//    (extract skins/young_african_female/young_darkskinned_female_diffuse.png from the MakeHuman system-assets
+//    archive); the script fails with that path if it's missing rather than silently shipping a flat colour.
 //
 // Units: the base mesh is in decimetres, Y up, facing +Z; the GLB is in metres with the feet at y = 0.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { gunzipSync } from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { Document, NodeIO } from '@gltf-transform/core';
 
 const ROOT = new URL('../../', import.meta.url);
@@ -34,19 +40,34 @@ async function cached(rel) {
   return readFileSync(file);
 }
 const targetText = async (rel) => gunzipSync(await cached(`targets/${rel}.target.gz`)).toString('utf8');
+// Face/nose/ears/hands targets were uploaded locally (assets-src/makehuman/targets/), not
+// fetched from MPFB's repo like the body-shape ones above: plain text, not gzipped.
+const LOCAL_TARGET_CATEGORIES = ['faceunits', 'nose', 'ears', 'hands'];
+const anyTargetText = (rel) => (LOCAL_TARGET_CATEGORIES.includes(rel.split('/')[0])
+  ? readFileSync(new URL(`assets-src/makehuman/targets/${rel}.target`, ROOT), 'utf8')
+  : targetText(rel));
 
 // ---------------------------------------------------------------- base mesh
 const obj = readFileSync(new URL('assets-src/makehuman/base/base.obj', ROOT), 'utf8').split('\n');
 const base = [];
+// Texture coordinates (`vt` lines) and a parallel-to-`groups` map of per-corner UV indices.
+// Kept separate from `groups` so every position-index-only consumer below (landmarks, arm
+// weighting, morph deltas) is completely unaffected; only the 'body' primitive's export reads it.
+const uvs = [];
 const groups = new Map();
+const groupUVs = new Map();
 let group = '';
 for (const l of obj) {
   if (l.startsWith('v ')) base.push(l.split(/\s+/).slice(1, 4).map(Number));
+  else if (l.startsWith('vt ')) uvs.push(l.split(/\s+/).slice(1, 3).map(Number));
   else if (l.startsWith('g ')) group = l.slice(2).trim();
   else if (l.startsWith('f ')) {
-    const idx = l.split(/\s+/).slice(1).filter(Boolean).map((t) => parseInt(t.split('/')[0], 10) - 1);
-    if (!groups.has(group)) groups.set(group, []);
+    const parts = l.split(/\s+/).slice(1).filter(Boolean);
+    const idx = parts.map((t) => parseInt(t.split('/')[0], 10) - 1);
+    const uvIdx = parts.map((t) => { const p = t.split('/')[1]; return p ? parseInt(p, 10) - 1 : -1; });
+    if (!groups.has(group)) { groups.set(group, []); groupUVs.set(group, []); }
     groups.get(group).push(idx);
+    groupUVs.get(group).push(uvIdx);
   }
 }
 const N = base.length;
@@ -83,10 +104,18 @@ const MORPHS = [
   ['hipWidth', 'hip/hip-scale-horiz-incr', 1],
   ['belly', 'stomach/stomach-pregnant-incr', 0.7],
   ['buttocks', 'buttocks/buttocks-volume-incr', 1],
+  // A first proof that face-shaping works end to end (already-verified-to-deform-correctly
+  // ARKit/nose packs, assets-src/makehuman/targets/): a symmetric smile, and nose width.
+  ['smile', ['faceunits/mouthSmileLeft', 'faceunits/mouthSmileRight'], 1],
+  ['noseWide', 'nose/elvs_nose_widening_1', 1],
 ];
 const deltas = [];
 for (const [, rel, scale] of MORPHS) {
-  const d = parseTarget(await targetText(rel));
+  const d = new Float32Array(N * 3);
+  for (const r of Array.isArray(rel) ? rel : [rel]) {
+    const part = parseTarget(await anyTargetText(r));
+    for (let i = 0; i < d.length; i++) d[i] += part[i];
+  }
   if (scale !== 1) for (let i = 0; i < d.length; i++) d[i] *= scale;
   deltas.push(d);
 }
@@ -175,10 +204,18 @@ const acc = (type, arr) => doc.createAccessor().setType(type).setArray(arr).setB
 const mesh = doc.createMesh('female-body');
 for (const [name, gs] of PRIMS) {
   const faces = gs.flatMap((g) => groups.get(g));
-  const used = [...new Set(faces.flat())].sort((a, b) => a - b);
-  const remap = new Map(used.map((v, i) => [v, i]));
+  const withUV = name === 'body';
+  const faceUVs = withUV ? gs.flatMap((g) => groupUVs.get(g)) : null;
+  // One entry per face corner, keyed on position only (as before) or position+UV for the
+  // textured body: a seam vertex with two different UVs has to become two output vertices,
+  // or the texture tears across the seam.
+  const cornerKeys = faces.map((f, fi) => f.map((pos, ci) => (withUV ? `${pos}:${faceUVs[fi][ci]}` : `${pos}`)));
+  const order = [...new Set(cornerKeys.flat())];
+  const sorted = withUV ? order : order.map(Number).sort((a, b) => a - b).map(String);
+  const used = sorted.map((k) => Number(k.split(':')[0]));
+  const remap = new Map(sorted.map((k, i) => [k, i]));
   const tris = [];
-  for (const f of faces) for (let i = 1; i + 1 < f.length; i++) tris.push(remap.get(f[0]), remap.get(f[i]), remap.get(f[i + 1]));
+  cornerKeys.forEach((f) => { for (let i = 1; i + 1 < f.length; i++) tris.push(remap.get(f[0]), remap.get(f[i]), remap.get(f[i + 1])); });
   const index = new Uint32Array(tris);
   const p0 = toM(posed, used);
   const n0 = normals(p0, index, used.length);
@@ -187,8 +224,28 @@ for (const [name, gs] of PRIMS) {
     .setAttribute('NORMAL', acc('VEC3', n0))
     .setAttribute('_REST', acc('VEC3', toM(rest, used)))
     .setIndices(acc('SCALAR', index));
-  // Distinct colours keep the three materials apart when the file is optimised
-  prim.setMaterial(doc.createMaterial(name).setBaseColorFactor({ body: [0.35, 0.22, 0.15, 1], eyes: [0.9, 0.9, 0.88, 1], cap: [0.05, 0.04, 0.04, 1] }[name]));
+  const material = doc.createMaterial(name);
+  if (withUV) {
+    // glTF's V is top-down; OBJ's is bottom-up (images stored bottom row first)
+    const uvArr = new Float32Array(sorted.length * 2);
+    sorted.forEach((k, i) => {
+      const uvIdx = Number(k.split(':')[1]);
+      const [u, v] = uvIdx >= 0 ? uvs[uvIdx] : [0, 0];
+      uvArr[i * 2] = u;
+      uvArr[i * 2 + 1] = 1 - v;
+    });
+    prim.setAttribute('TEXCOORD_0', acc('VEC2', uvArr));
+    const skinPath = new URL('assets-src/makehuman/cache/young_african_female_diffuse.png', ROOT);
+    if (!existsSync(skinPath)) {
+      throw new Error(`Skin texture not found at ${skinPath.pathname}. See docs/CHARACTER_PIPELINE.md for where it comes from (MakeHuman system assets, CC0).`);
+    }
+    const texture = doc.createTexture('skin').setImage(readFileSync(skinPath)).setMimeType('image/png').setURI('skin.png');
+    material.setBaseColorTexture(texture).setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(0.75).setMetallicFactor(0);
+  } else {
+    // Distinct flat colours keep the eyes/cap materials apart when the file is optimised
+    material.setBaseColorFactor({ eyes: [0.9, 0.9, 0.88, 1], cap: [0.05, 0.04, 0.04, 1] }[name]);
+  }
+  prim.setMaterial(material);
   morphPositions.forEach((mp, k) => {
     const pk = toM(mp, used);
     const nk = normals(pk, index, used.length);
@@ -216,9 +273,10 @@ const landmarks = { height, nipple: R(nipple), pelvis, crotch: R(crotch), hipSid
 console.log('landmarks', JSON.stringify(landmarks, (k, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)));
 doc.createScene('body').addChild(doc.createNode('female-body').setMesh(mesh).setExtras({ landmarks }));
 // Written uncompressed to the cache, then optimised (meshopt) into public/ for the game
-const raw = new URL('female-body.raw.glb', CACHE).pathname;
+const raw = fileURLToPath(new URL('female-body.raw.glb', CACHE));
 await new NodeIO().write(raw, doc);
-const opt = spawnSync(process.execPath, [new URL('scripts/optimize-glb.mjs', ROOT).pathname, raw, new URL('female-body.glb', OUT).pathname], { stdio: 'inherit' });
+// 1K body texture budget, per docs/CHARACTER_PIPELINE.md's performance plan
+const opt = spawnSync(process.execPath, [fileURLToPath(new URL('scripts/optimize-glb.mjs', ROOT)), raw, fileURLToPath(new URL('female-body.glb', OUT)), '1024'], { stdio: 'inherit' });
 if (opt.status !== 0) process.exit(opt.status ?? 1);
 writeFileSync(new URL('female-body.json', OUT), JSON.stringify({ morphs: names, landmarks }, null, 2));
 console.log('wrote public/assets/characters/mh/female-body.glb');

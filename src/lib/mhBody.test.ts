@@ -27,7 +27,9 @@ describe('MakeHuman body', () => {
   });
 
   it('the built model has every morph the game sets', () => {
-    expect(meta.morphs).toEqual([...MH_MORPHS]);
+    // One-directional: the file may carry morphs the game doesn't drive yet (e.g. a first
+    // proof-of-concept face morph), but every morph mhInfluences() sets must really exist.
+    for (const k of MH_MORPHS) expect(meta.morphs, k).toContain(k);
   });
 
   it('skin colours run from lighter to deeper', () => {
