@@ -43,3 +43,6 @@ assets-src/cc5/*-report.json
 
 # accidental output folder from an unexpanded $dest script variable
 /$dest/
+
+# Blender studio outputs (scripts/blender): .blend, .glb and previews stay here until reviewed and promoted
+assets-src/blender/out/
