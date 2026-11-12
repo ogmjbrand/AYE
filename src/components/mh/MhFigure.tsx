@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Mesh, MeshStandardMaterial, SRGBColorSpace, SphereGeometry, Vector3, type Object3D } from 'three';
+import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Mesh, MeshStandardMaterial, SRGBColorSpace, SphereGeometry, Vector3, type Object3D, type Texture } from 'three';
 import { assetUrl } from '../../lib/assetManifest';
 import { MH_BODY_URL, MH_MORPHS, mhInfluences, mhSkinColor, type MhHair } from '../../lib/mhBody';
 import type { BodyShape } from '../../lib/bodyShape';
@@ -24,8 +24,8 @@ const REST_VERTEX = (shader: { vertexShader: string }) => {
  * (so it follows every morph): triangle cups with halter and under-bust
  * strings, and a bottom whose leg line runs from the hips to the crotch.
  */
-function skinMaterial(lm: Landmarks) {
-  const m = new MeshStandardMaterial({ roughness: 0.52, metalness: 0 });
+function skinMaterial(lm: Landmarks, map: Texture | null) {
+  const m = new MeshStandardMaterial({ roughness: 0.52, metalness: 0, map });
   const uniforms = { uNip: { value: new Vector3(...lm.nipple) }, uCrotchY: { value: lm.crotch[1] }, uPelvisZ: { value: lm.pelvis[2] }, uHipX: { value: lm.hipSide[0] }, uSuit: { value: 1 } };
   m.userData.suit = uniforms.uSuit;
   m.onBeforeCompile = (shader) => {
@@ -135,7 +135,13 @@ function applyLook(built: Built, shape: BodyShape, skinTone: number, hair: MhHai
       if (i !== undefined) m.morphTargetInfluences[i] = inf[k];
     }
   }
-  built.skin.color.setRGB(...mhSkinColor(skinTone), SRGBColorSpace);
+  // mhSkinColor was calibrated as a flat fill (no texture); now that the body carries a real
+  // photographed skin texture, using it at full strength as a multiply would crush the photo
+  // towards mud. Blend it towards white so the slider still shifts tone, without destroying the
+  // texture - a body kit with no texture (map null) keeps the original full-strength behaviour.
+  const [r, g, b] = mhSkinColor(skinTone);
+  const tintBlend = built.skin.map ? 0.4 : 1;
+  built.skin.color.setRGB(1 + (r - 1) * tintBlend, 1 + (g - 1) * tintBlend, 1 + (b - 1) * tintBlend, SRGBColorSpace);
   (built.skin.userData.suit as { value: number }).value = suit ? 1 : 0;
   for (const [id, mesh] of Object.entries(built.shells)) mesh.visible = id === hair;
 }
@@ -171,7 +177,10 @@ export function MhFigure({ shape, skinTone = 0.7, hair = 'afro', suit = true }: 
     const body = meshes.find((m) => (m.material as MeshStandardMaterial).name === 'body')!;
     const eyes = meshes.find((m) => (m.material as MeshStandardMaterial).name === 'eyes')!;
     const scalp = meshes.find((m) => (m.material as MeshStandardMaterial).name === 'cap')!;
-    const skin = skinMaterial(lm);
+    // Keep the GLB's own skin texture (if the asset has one); the custom shader below only
+    // adds the two-piece overlay and rest-pose seaming on top, same as before.
+    const bodyMap = (body.material as MeshStandardMaterial).map ?? null;
+    const skin = skinMaterial(lm, bodyMap);
     body.material = skin;
     // Eye centres from the rest positions of each eyeball
     const rest = eyes.geometry.getAttribute('_rest');

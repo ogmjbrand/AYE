@@ -344,10 +344,10 @@ export const HOURLY_LIVING_COST: Record<Lifestyle, number> = {
 };
 
 export const STARTING_BALANCE: Record<Lifestyle, number> = {
-  student: 2500,
-  ordinary: 5000,
-  'middle-class': 12500,
-  luxury: 25000,
+  student: 1_000_000,
+  ordinary: 1_000_000,
+  'middle-class': 1_000_000,
+  luxury: 1_000_000,
 };
 
 /** Fullness lost per game minute: a full meter empties in 16 game hours. */

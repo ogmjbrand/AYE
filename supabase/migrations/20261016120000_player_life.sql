@@ -301,7 +301,7 @@ insert into public.career_levels (rung, min_hours, pay) values
   (0, 0, 1.00), (1, 16, 1.15), (2, 40, 1.35), (3, 80, 1.60), (4, 160, 2.00);
 
 insert into public.lifestyles (id, starting_balance, hourly_living_cost) values
-  ('student', 2500, 7), ('ordinary', 5000, 17), ('middle-class', 12500, 40), ('luxury', 25000, 83);
+  ('student', 1000000, 7), ('ordinary', 1000000, 17), ('middle-class', 1000000, 40), ('luxury', 1000000, 83);
 
 insert into public.shop_items (id, kind, price, career, pay_bonus) values
   ('top-ankara-sunset', 'fashion', 450, null, 0),

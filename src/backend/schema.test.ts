@@ -125,8 +125,15 @@ describe('player life on the server', () => {
     expect(b).toBe(STARTING_BALANCE.ordinary - 900);
     await expect(as(ALICE, `select public.buy_item($1, 'top-kente-gold')`, [alice])).rejects.toThrow(/already owned/);
     await expect(as(ALICE, `select public.buy_item($1, 'free-money')`, [alice])).rejects.toThrow(/unknown item/);
+    // Drain down to 100 left, in chunks under spend()'s own per-call cap (a single real rent
+    // payment is never this large; this is just the test's way of getting to "nearly broke")
+    let toDrain = b - 100;
+    while (toDrain > 0) {
+      const chunk = Math.min(toDrain, 100000);
+      await as(ALICE, `select public.spend($1, $2, 'rent')`, [alice, chunk]);
+      toDrain -= chunk;
+    }
     // Too expensive: refused by the server, balance unchanged
-    await as(ALICE, `select public.spend($1, $2, 'rent')`, [alice, b - 100]);
     await expect(as(ALICE, `select public.buy_item($1, 'smartphone')`, [alice])).rejects.toThrow(/insufficient funds/);
     expect(await balance(alice)).toBe(100);
   });

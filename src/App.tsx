@@ -175,6 +175,7 @@ import { HospitalExterior, HospitalScene } from './world/HospitalScene';
 import { HospitalPanel, type HospitalPanelMode } from './components/HospitalPanel';
 import { HOSPITAL, HOSPITAL_INTERIOR, HOSPITAL_POINTS, HOSPITAL_POINT_LABEL, CARE_SEATS, hospitalInteractionAt, isInWard, isInSupervisorOffice, type CareDepartmentPoint, type HospitalInteraction } from './lib/hospitalSite';
 import { HealthcarePanel } from './components/HealthcarePanel';
+import { FurnitureDrag } from './world/FurnitureDrag';
 import { StreetLife } from './world/StreetLife';
 import { WetStreet } from './world/WetStreet';
 import { FireLightRig } from './vfx/FireEffect';
@@ -528,7 +529,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     () => (home ? furnitureForHome(persistedDecor.filter((item) => item.id !== decorPlacement?.placementId), home.id) : []),
     [home, persistedDecor, decorPlacement?.placementId],
   );
-  const extraPieces = useMemo(() => [...ownedPieces.map((p) => p.f), ...decorPieces], [ownedPieces, decorPieces]);
+  // Dragging furniture across the floor (world/FurnitureDrag.tsx): the piece in hand, and a word when it can't go there
+  const [draggingUid, setDraggingUid] = useState<string | null>(null);
+  const [decorNote, setDecorNote] = useState<{ text: string; at: number } | null>(null);
+  const extraPieces = useMemo(() => [...ownedPieces.filter((p) => p.uid !== draggingUid).map((p) => p.f), ...decorPieces], [ownedPieces, decorPieces, draggingUid]);
   const roomLayout = useMemo(() => (interior ? interiorLayout(interior, extraPieces) : null), [interior, extraPieces]);
   // Main's walk-in workplaces, each its own interior
   const [insideOffice, setInsideOffice] = useState(false);
@@ -2615,6 +2619,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
           onSell={sellFurniture}
           onPlace={placeFurniture}
           onStore={storeFurniture}
+          notice={decorNote}
           onClose={() => setCatalogueOpen(false)}
         />
       )}
@@ -2846,6 +2851,19 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
               </HomeInterior>
             ) : indoors && interior ? (
               <HomeInterior key={`home-${home!.id}`} interior={interior} gameTime={state.time} extra={extraPieces} lightsOn={lightsOn}>
+                {catalogueOpen && (
+                  <FurnitureDrag
+                    interior={interior}
+                    owned={state.furniture}
+                    controlsRef={controlsRef}
+                    onPlace={placeFurniture}
+                    onDragging={setDraggingUid}
+                    onBlocked={(uid) => {
+                      const name = catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.name ?? 'That piece';
+                      setDecorNote({ text: `${name} doesn't fit there, so it's back where it was.`, at: Date.now() });
+                    }}
+                  />
+                )}
                 <InteriorLighting gameTime={state.time} player={controller} indoor={interior.tier === 'penthouse' || interior.tier === 'apartment' || interior.tier === 'family' || interior.tier === 'villa' || interior.tier === 'warehouse' || interior.tier === 'crown' ? 'home' : undefined} />
                 <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} bedtime={asleep} />
                 {asleep && <SleepingDuvet bedtime={asleep} />}

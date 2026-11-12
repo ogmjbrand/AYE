@@ -53,33 +53,40 @@ interface FurnitureCatalogueProps {
   onSell: (uid: string) => void;
   onPlace: (uid: string, at: readonly [number, number], rot: 0 | 1) => void;
   onStore: (uid: string) => void;
+  /** A message from dragging pieces in the room (a new `at` shows it again). */
+  notice?: { text: string; at: number } | null;
   onClose: () => void;
 }
 
 const PILL = 'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold';
 const SMALL = 'rounded-full border border-ui-gold/30 px-2.5 py-1 text-xs hover:border-ui-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold disabled:cursor-not-allowed disabled:opacity-40';
-const NUDGE = 0.25;
-
 /**
  * The home catalogue: browse and buy furniture by category or search, see
- * each piece in 3D, then arrange what you own (move, turn, put away, sell).
- * Opens as a side panel so the room stays in view.
+ * each piece in 3D, then arrange what you own (drag it across the floor,
+ * turn, put away, sell). Opens as a side panel so the room stays in view;
+ * "Move in the room" folds it to a bar so a phone screen shows the room too.
  */
-export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, onPlace, onStore, onClose }: FurnitureCatalogueProps) {
+export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, onPlace, onStore, notice = null, onClose }: FurnitureCatalogueProps) {
   const [tab, setTab] = useState<'shop' | 'mine'>('shop');
   const [room, setRoom] = useState<DecorRoom | 'all'>('all');
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  // Whichever said something last: this panel, or a piece dropped in the room (a notice this panel has since spoken over is old)
+  const [ownNote, setOwnNote] = useState<{ text: string | null; over: typeof notice }>({ text: null, over: null });
+  const setNote = (text: string | null) => setOwnNote({ text, over: notice });
+  const note = notice && notice !== ownNote.over ? notice.text : ownNote.text;
+  const [arranging, setArranging] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      // Escape steps back from a preview first
+      // Escape steps back from a preview or the room first
       if (previewId) setPreviewId(null);
+      else if (arranging) setArranging(false);
       else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [previewId, onClose]);
+  }, [previewId, arranging, onClose]);
+  const placed = owned.filter((o) => o.at).length;
 
   // The Luxe collection first, then the rest
   const items = useMemo(() => CATALOGUE.filter((c) => room === 'all' || c.room === room).slice().sort((a, b) => Number(b.style === 'luxe') - Number(a.style === 'luxe')), [room]);
@@ -112,6 +119,20 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
   };
 
   const preview = previewId ? catalogueItem(previewId) : null;
+  if (arranging && interior) {
+    return (
+      <div role="dialog" aria-label="Move furniture" className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-ui-gold/40 bg-[#0d1412]/95 px-4 py-3 text-ui-ink shadow-2xl">
+        <Icon name="decor" className="h-5 w-5 shrink-0 text-ui-gold-strong" />
+        <p role="status" className="m-0 min-w-0 flex-1 text-sm">
+          {note ?? (placed ? 'Drag a piece across the floor to move it. Green fits; red puts it back.' : 'Nothing of yours is placed in the room yet.')}
+        </p>
+        <button type="button" onClick={() => { setArranging(false); setNote(null); }}
+          className="shrink-0 rounded-full bg-ui-gold px-4 py-1.5 text-sm font-semibold text-[#2a1c06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">
+          Done
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full justify-end sm:w-auto" onClick={onClose}>
       <div
@@ -186,6 +207,12 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             {owned.length === 0 && <p className="m-0 text-sm text-ui-muted">You haven't bought any furniture yet. Your home comes furnished; anything you buy goes alongside.</p>}
             {!interior && owned.length > 0 && <p className="m-0 mb-2 text-sm text-ui-muted">You have no home, so everything is in storage.</p>}
+            {interior && placed > 0 && (
+              <div className="mb-2 flex items-center gap-2 rounded-2xl border border-ui-gold/25 bg-[#141d1a] p-2.5">
+                <p className="m-0 flex-1 text-xs text-ui-ink/85">Drag any piece of yours across the floor to move it.</p>
+                <button type="button" className={SMALL} onClick={() => { setArranging(true); setNote(null); }}>Move in the room</button>
+              </div>
+            )}
             <ul className="m-0 grid list-none gap-2 p-0">
               {owned.map((o) => {
                 const item = catalogueItem(o.itemId)!;
@@ -200,10 +227,6 @@ export function FurnitureCatalogue({ balance, owned, interior, onBuy, onSell, on
                       <div className="mt-2 flex flex-wrap items-center gap-1">
                         {o.at && interior && (
                           <>
-                            <button type="button" className={SMALL} aria-label="Move left" onClick={() => tryPlace(o, [o.at![0] + NUDGE, o.at![1]], o.rot)}>←</button>
-                            <button type="button" className={SMALL} aria-label="Move right" onClick={() => tryPlace(o, [o.at![0] - NUDGE, o.at![1]], o.rot)}>→</button>
-                            <button type="button" className={SMALL} aria-label="Move towards the window" onClick={() => tryPlace(o, [o.at![0], o.at![1] + NUDGE], o.rot)}>↑</button>
-                            <button type="button" className={SMALL} aria-label="Move towards the door" onClick={() => tryPlace(o, [o.at![0], o.at![1] - NUDGE], o.rot)}>↓</button>
                             <button type="button" className={SMALL} onClick={() => tryPlace(o, o.at!, o.rot ? 0 : 1)}>Turn</button>
                             <button type="button" className={SMALL} onClick={() => onStore(o.uid)}>Put away</button>
                           </>

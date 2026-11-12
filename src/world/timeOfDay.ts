@@ -41,7 +41,10 @@ export function sunElevation(hours: number): number {
   return Math.sin((Math.PI * (hours - SUNRISE)) / (SUNSET - SUNRISE));
 }
 
-export function lightingAt(hour: number, minute = 0): Lighting {
+const CLOUD_GREY = '#8a93a0';
+
+/** `overcast` is continuous 0 (clear) to 1 (full rain); see lib/weather.ts's overcastAt for how it's derived. */
+export function lightingAt(hour: number, minute = 0, overcast = 0): Lighting {
   const h = hour + minute / 60;
   const elev = sunElevation(h);
   const dayT = clamp01((h - SUNRISE) / (SUNSET - SUNRISE));
@@ -62,7 +65,7 @@ export function lightingAt(hour: number, minute = 0): Lighting {
   const sunColor = isDay ? mixColor('#fff4e0', '#ffb36b', golden) : '#9db4ff';
   const sunIntensity = isDay ? lerp(1.2, 3.2, clamp01(elev / 0.6)) * (1 - golden * 0.35) : 0.35 * night + 0.15;
 
-  return {
+  const base: Lighting = {
     sunDirection,
     sunColor,
     sunIntensity,
@@ -77,5 +80,22 @@ export function lightingAt(hour: number, minute = 0): Lighting {
     horizonColor: horizon,
     night,
     hdri: night > 0.5 ? 'night' : golden > 0.4 || twilight > 0 ? 'golden' : 'day',
+  };
+
+  // Clouds flatten and cool daylight (no golden glow, more ambient, duller sun); night stays
+  // night either way since there's nothing to dim once the sun is already down.
+  const cloud = isDay ? clamp01(overcast) : 0;
+  if (cloud === 0) return base;
+  return {
+    ...base,
+    sunColor: mixColor(base.sunColor, '#aab4c0', cloud * 0.7),
+    sunIntensity: base.sunIntensity * lerp(1, 0.35, cloud),
+    hemiIntensity: lerp(base.hemiIntensity, base.hemiIntensity * 1.15, cloud),
+    envIntensity: base.envIntensity * lerp(1, 0.55, cloud),
+    fogColor: mixColor(base.fogColor, CLOUD_GREY, cloud * 0.6),
+    skyColor: mixColor(base.skyColor, CLOUD_GREY, cloud * 0.6),
+    zenithColor: mixColor(base.zenithColor, CLOUD_GREY, cloud * 0.7),
+    horizonColor: mixColor(base.horizonColor, CLOUD_GREY, cloud * 0.6),
+    hdri: 'day',
   };
 }

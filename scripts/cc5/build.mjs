@@ -1,15 +1,16 @@
 // Builds the game-ready Character Creator 5 character from the CC export.
 // The FBX, JSON, textures/ folder and .ccRestore are only read, never changed.
 //
-//   node scripts/cc5/build.mjs [sourceDir] [--reuse-raw]
+//   node scripts/cc5/build.mjs [sourceDir] [--reuse-raw] [--character aaron|woman]
 //
-// sourceDir holds HUMAN.fbx + HUMAN.json + textures/ (default: OneDrive\Documents,
-// or CC5_SOURCE_DIR). Needs Blender 4.2+ (BLENDER=path\to\blender.exe if it isn't
+// aaron (default): sourceDir holds HUMAN.fbx + HUMAN.json + textures/ (default:
+// OneDrive\Documents, or CC5_SOURCE_DIR). woman: WOMAN.fbx + WOMAN.json (default:
+// Downloads), the women's player body, animated with the feminine Rocketbox clips. Needs Blender 4.2+ (BLENDER=path\to\blender.exe if it isn't
 // in Program Files). Writes:
-//   assets-src/cc5/aaron-<profile>-raw.glb   Blender export, full-size textures (git-ignored)
-//   public/assets/private/characters/cc5/aaron.glb       close-up player model
-//   public/assets/private/characters/cc5/aaron-lite.glb  distance LOD
-//   public/assets/private/characters/cc5/aaron.json      what was built, for the viewer and checks
+//   assets-src/cc5/<name>-<profile>-raw.glb   Blender export, full-size textures (git-ignored)
+//   public/assets/private/characters/cc5/<name>.glb       close-up player model
+//   public/assets/private/characters/cc5/<name>-lite.glb  distance LOD
+//   public/assets/private/characters/cc5/<name>.json      what was built, for the viewer and checks
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -23,16 +24,29 @@ import sharp from 'sharp';
 const root = resolve(import.meta.dirname, '..', '..');
 // --reuse-raw skips Blender when its exports exist (for tuning the optimise step)
 const reuseRaw = process.argv.includes('--reuse-raw');
-const sourceArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
-const sourceDir = resolve(sourceArg ?? process.env.CC5_SOURCE_DIR ?? join(homedir(), 'OneDrive', 'Documents'));
-const animSource = join(root, 'public/assets/models/characters/rocketbox/male-adult-12.glb');
+// Each player body: its CC export, where it usually is, and the Rocketbox look whose
+// clips (and gestures for the same body type) are retargeted onto it. Ground speeds
+// of those clips are src/lib/looks.ts FEMININE / MASCULINE.
+const CHARACTERS = {
+  aaron: { file: 'HUMAN', dir: join(homedir(), 'OneDrive', 'Documents'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
+  woman: { file: 'WOMAN', dir: join(homedir(), 'Downloads'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
+};
+const charAt = process.argv.indexOf('--character');
+const name = charAt >= 0 ? process.argv[charAt + 1] : 'aaron';
+const character = CHARACTERS[name];
+if (!character) {
+  console.error(`[cc5] unknown --character ${name}; use ${Object.keys(CHARACTERS).join(' or ')}`);
+  process.exit(1);
+}
+const sourceArg = process.argv.slice(2).find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--character');
+const sourceDir = resolve(sourceArg ?? process.env.CC5_SOURCE_DIR ?? character.dir);
+const animSource = join(root, `public/assets/models/characters/rocketbox/${character.anim}.glb`);
 // Talk, Listen, Wave and Sit for the same body type, retargeted into the close-up model
-const gestureSource = join(root, 'public/assets/models/characters/rocketbox/gestures-masculine.glb');
+const gestureSource = join(root, `public/assets/models/characters/rocketbox/gestures-${character.gestures}.glb`);
 const rawDir = join(root, 'assets-src/cc5');
 // Reallusion content: usable in the game, not redistributable, so private/ (git-ignored)
 const outDir = join(root, 'public/assets/private/characters/cc5');
-// Ground speeds of the Rocketbox masculine clips (src/lib/looks.ts MASCULINE)
-const SOURCE_SPEEDS = { walk: 1.03, run: 2.8 };
+const SOURCE_SPEEDS = character.speeds;
 
 // Longest texture side per profile; the first matching rule wins (texture names come
 // from CC). Budgeted by what the camera sees: the face gets the detail, skin under
@@ -58,6 +72,9 @@ const ALPHA_CUTOFF = [
   [/^Hair_/, 0.35],
   [/^Beard_/, 0.3],
   [/Eyelash|^Brows_/, 0.2],
+  // A ready-dressed ActorScan (WOMAN.fbx) is one material whose opacity only cuts out
+  // hair strands; blending the whole body would sort it against itself
+  [/^Character$/, 0.4],
 ];
 // Closed surfaces: drawing their back faces only costs fill rate
 const SINGLE_SIDED = /^Std_(Skin_|Nails|Eye_|Upper_Teeth|Lower_Teeth|Tongue)/;
@@ -83,10 +100,10 @@ const fail = (msg) => {
   process.exit(1);
 };
 
-const fbx = findSource('HUMAN.fbx');
-const json = findSource('HUMAN.json');
-if (!fbx || !json) fail(`HUMAN.fbx and HUMAN.json not found in ${sourceDir}`);
-if (!existsSync(join(sourceDir, 'textures'))) console.warn('[cc5] no textures/ folder next to HUMAN.json; roughness, AO and opacity maps will be missing');
+const fbx = findSource(`${character.file}.fbx`);
+const json = findSource(`${character.file}.json`);
+if (!fbx || !json) fail(`${character.file}.fbx and ${character.file}.json not found in ${sourceDir}`);
+if (!existsSync(join(sourceDir, 'textures'))) console.warn(`[cc5] no textures/ folder next to ${character.file}.json; roughness, AO and opacity maps will be missing`);
 const blender = findBlender();
 if (!blender) fail('Blender was not found. Install Blender 4.2 or newer (https://www.blender.org/download/) or set BLENDER to blender.exe.');
 mkdirSync(rawDir, { recursive: true });
@@ -126,13 +143,13 @@ async function gesturesOnRig(out) {
   await io.write(out, doc);
   return out;
 }
-const gesturesRig = await gesturesOnRig(join(rawDir, 'rocketbox-gestures-rig.glb'));
+const gesturesRig = await gesturesOnRig(join(rawDir, `rocketbox-gestures-${character.gestures}-rig.glb`));
 // Only file names: this JSON is served from public/, so no local paths
 const meta = { source: { fbx: basename(fbx), json: basename(json), fbxMB: mb(statSync(fbx).size) }, builtAt: new Date().toISOString(), profiles: {} };
 
 for (const profile of ['main', 'lite']) {
-  const raw = join(rawDir, `aaron-${profile}-raw.glb`);
-  const reportPath = join(rawDir, `aaron-${profile}-report.json`);
+  const raw = join(rawDir, `${name}-${profile}-raw.glb`);
+  const reportPath = join(rawDir, `${name}-${profile}-report.json`);
   if (reuseRaw && existsSync(raw) && existsSync(reportPath)) {
     console.log(`\n[cc5] ${profile}: reusing ${raw}`);
   } else {
@@ -142,9 +159,9 @@ for (const profile of ['main', 'lite']) {
       '--python', join(root, 'scripts/cc5/convert_cc5.py'),
       '--', fbx, json, animSource, raw, reportPath, profile, gesturesRig,
     ], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-    writeFileSync(join(rawDir, `blender-${profile}.log`), `${r.stdout}\n${r.stderr}`);
+    writeFileSync(join(rawDir, `blender-${name}-${profile}.log`), `${r.stdout}\n${r.stderr}`);
     if (r.status !== 0 || !existsSync(reportPath) || /Traceback/.test(r.stdout + r.stderr)) {
-      fail(`Blender conversion failed (${profile}); see assets-src/cc5/blender-${profile}.log`);
+      fail(`Blender conversion failed (${profile}); see assets-src/cc5/blender-${name}-${profile}.log`);
     }
   }
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -180,11 +197,11 @@ for (const profile of ['main', 'lite']) {
     gpuBytes += (w * h * 4 * 4) / 3;
     textureList.push(`${tex.getName()} ${w}x${h}`);
   }
-  const out = join(outDir, profile === 'main' ? 'aaron.glb' : 'aaron-lite.glb');
+  const out = join(outDir, profile === 'main' ? `${name}.glb` : `${name}-lite.glb`);
   await io.write(out, doc);
   const clips = doc.getRoot().listAnimations().map((a) => a.getName());
   meta.profiles[profile] = {
-    file: `private/characters/cc5/${profile === 'main' ? 'aaron.glb' : 'aaron-lite.glb'}`,
+    file: `private/characters/cc5/${profile === 'main' ? `${name}.glb` : `${name}-lite.glb`}`,
     fileMB: mb(statSync(out).size),
     rawMB: mb(statSync(raw).size),
     triangles: report.triangles,
@@ -197,7 +214,7 @@ for (const profile of ['main', 'lite']) {
     textureList,
     warnings: report.warnings,
   };
-  meta.retarget = { from: 'rocketbox/male-adult-12.glb', turnDegrees: report.turn_degrees, hipRatio: report.hip_ratio, maxAlignDegrees: report.max_align_degrees, clips: report.clips };
+  meta.retarget = { from: `rocketbox/${character.anim}.glb`, turnDegrees: report.turn_degrees, hipRatio: report.hip_ratio, maxAlignDegrees: report.max_align_degrees, clips: report.clips };
   if (profile === 'main') {
     // The game scales the body to the player's height; strides scale with leg length
     // relative to height, so the clip ground speeds do too (keeps feet from sliding)
@@ -208,5 +225,5 @@ for (const profile of ['main', 'lite']) {
   console.log(`[cc5] ${profile}: ${meta.profiles[profile].fileMB} MB, ${report.triangles} triangles, ${textureList.length} textures ≈ ${meta.profiles[profile].textureGpuMB} MB GPU, clips: ${clips.join(', ')}`);
 }
 
-writeFileSync(join(outDir, 'aaron.json'), `${JSON.stringify(meta, null, 2)}\n`);
-console.log(`\n[cc5] wrote ${join(outDir, 'aaron.json')}`);
+writeFileSync(join(outDir, `${name}.json`), `${JSON.stringify(meta, null, 2)}\n`);
+console.log(`\n[cc5] wrote ${join(outDir, `${name}.json`)}`);

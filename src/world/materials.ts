@@ -199,3 +199,4 @@ export function setNightGlow(night: number) {
   // Lamp light spreads and shines on a wet street
   if (cache) cache.lightPool.emissiveIntensity = night * 0.42 * (1 + 1.3 * wetNow);
 }
+
