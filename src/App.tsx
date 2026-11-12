@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, OrbitControls as OrbitControlsImpl, PerformanceMonitor } from '@react-three/drei';
 import type { OrbitControls } from 'three-stdlib';
-import { ACESFilmicToneMapping, Vector3, type Group } from 'three';
+import { ACESFilmicToneMapping, Spherical, Vector3, type Group } from 'three';
 import { enterVehicle, exitVehicle, forceExitVehicle, getTrip, onVehicleCrash, placePlayer, setMovementBlocked, setMoveTarget, setPace, usePlayerController, walkStraight } from './hooks/usePlayerController';
 import { useWalkThen } from './hooks/useWalkThen';
 import type { PlayerHandle } from './hooks/usePlayerController';
@@ -272,17 +272,32 @@ const PLATE_SUBTITLE: Record<PlaceKind, string> = { food: 'Food & drinks', shop:
 const PLATE_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm', dealership: 'car' };
 
 function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }: CameraFollowProps) {
-  // The distance you've chosen (by zooming), and where the camera actually is when something's in the way
-  const view = useRef({ want: -1, at: -1, lift: 0, dir: new Vector3(), clear: 0 });
-  if (import.meta.env.DEV) (window as unknown as { __ayeCamera?: unknown }).__ayeCamera = view.current;
+  // The view you've chosen (angle and zoom), and where the camera actually is when something's in the way
+  const view = useRef({ want: -1, at: -1, lift: 0, clear: 0, moved: false, ideal: new Vector3(), placed: new Vector3() });
+  // Development builds: the camera's state, for the browser checks
+  useEffect(() => { if (import.meta.env.DEV) (window as unknown as { __ayeCamera?: unknown }).__ayeCamera = view.current; }, []);
   useFrame(({ camera }, delta) => {
     const controls = controlsRef.current;
     if (!controls) return;
-    // Put the camera back where you chose before the controls read it, so a wall pulling it in
-    // doesn't also change your zoom
+    // Last frame a wall or vehicle moved the camera from the view you chose. The orbit controls have
+    // since applied your dragging and zooming to where it was drawn: carry that same change of angle
+    // and zoom over to the view you chose, so a wall never changes your view, and you can always
+    // turn it away from the wall.
     const v = view.current;
-    if (v.want > 0 && v.at > 0 && (v.at < v.want - 1e-3 || v.lift > 0)) {
-      camera.position.copy(controls.target).addScaledVector(v.dir, v.want);
+    if (v.moved) {
+      v.moved = false;
+      followOffset.copy(camera.position).sub(controls.target);
+      sphereDrawn.setFromVector3(v.placed);
+      sphereNow.setFromVector3(followOffset);
+      sphereChosen.setFromVector3(v.ideal);
+      const turned = sphereNow.theta - sphereDrawn.theta;
+      sphereChosen.theta += Math.atan2(Math.sin(turned), Math.cos(turned));
+      sphereChosen.phi = Math.min(controls.maxPolarAngle, Math.max(0.05, sphereChosen.phi + sphereNow.phi - sphereDrawn.phi));
+      // Zoom: compared with where the controls themselves would hold the drawn camera (never nearer
+      // than their minimum distance), so their own limit isn't mistaken for you zooming out
+      const drawnAt = Math.min(controls.maxDistance, Math.max(controls.minDistance, sphereDrawn.radius));
+      sphereChosen.radius = Math.min(controls.maxDistance, Math.max(controls.minDistance, sphereChosen.radius * (sphereNow.radius / drawnAt)));
+      camera.position.copy(controls.target).add(followOffset.setFromSpherical(sphereChosen));
     }
     followTarget.set(controller.position.x, CAMERA_TARGET_HEIGHT, controller.position.z);
     followShift.copy(followTarget).sub(controls.target);
@@ -314,7 +329,6 @@ function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }:
     const want = followOffset.length();
     if (want > 1e-3) {
       followOffset.divideScalar(want);
-      v.dir.copy(followOffset);
       const obstacles = obstaclesWithVehicles();
       const clear = clearCameraDistance(controls.target, followOffset, want, obstacles);
       const at = nextCameraDistance(v.at > 0 ? v.at : want, want, clear, Math.min(delta, 0.1));
@@ -327,7 +341,10 @@ function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }:
       v.lift = need >= v.lift ? need : Math.max(need, v.lift - Math.min(delta, 0.1) * 0.8);
       if (at < want - 1e-3 || v.lift > 0) {
         const d = v.lift > 0 ? tipUp(followOffset, v.lift) : followOffset;
+        v.ideal.copy(followOffset).multiplyScalar(want);
         camera.position.set(controls.target.x + d.x * at, controls.target.y + d.y * at, controls.target.z + d.z * at);
+        v.placed.copy(camera.position).sub(controls.target);
+        v.moved = true;
         clamped = true;
       }
     }
@@ -350,6 +367,7 @@ function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }:
   return null;
 }
 const followOffset = new Vector3();
+const sphereDrawn = new Spherical(), sphereNow = new Spherical(), sphereChosen = new Spherical();
 /** How far under an indoor ceiling the camera stays. */
 const CEILING_CLEARANCE = 0.25;
 /** How far inside a room's walls the camera stays (past the walls' own thickness). */
