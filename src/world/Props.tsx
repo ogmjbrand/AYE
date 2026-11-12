@@ -531,11 +531,12 @@ function CartPeople({ cart }: { cart: { x: number; z: number; facing: number } }
   const counterStop = (r: number) => (r === 0 ? 2 : 3);
   return (
     <>
-      <VenueNpc lookId="male-adult-15" name="Mallam Sule" role="Suya seller" x={st.seller.x} z={st.seller.z} facing={st.seller.facing}
+      {/* The cart stands on the pavement (FoodCarts), so the seller and his customers do too */}
+      <VenueNpc lookId="male-adult-15" name="Mallam Sule" role="Suya seller" x={st.seller.x} z={st.seller.z} facing={st.seller.facing} groundY={PAVEMENT_HEIGHT}
         grill={{ serving: () => atCounter.current.some(Boolean), serveFacing: st.counter.facing + Math.PI }} />
       {CART_CUSTOMERS.map((c, r) => (
         <VenueNpc key={c.name} lookId={c.lookId} name={c.name} role="Buying suya" x={routes[r][0][0]} z={routes[r][0][1]} facing={0}
-          route={routes[r]} onStop={(stop) => { atCounter.current[r] = stop === counterStop(r); }} />
+          route={routes[r]} groundY={PAVEMENT_HEIGHT} onStop={(stop) => { atCounter.current[r] = stop === counterStop(r); }} />
       ))}
     </>
   );

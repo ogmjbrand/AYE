@@ -3,6 +3,7 @@ import type { PlayerHandle } from '../hooks/usePlayerController';
 import { WorldNPC } from './WorldNPC';
 import { signTexture } from './textures';
 import { UNIVERSITY } from '../lib/university';
+import { groundHeightAt } from '../lib/world';
 import { Lamp } from './LampPool';
 
 const [DOOR_X, , DOOR_Z] = UNIVERSITY.position;
@@ -101,8 +102,8 @@ function CampusApproach() {
         </mesh>
       </group>
       {/* Streetlights, palms and benches along the verge */}
-      {[-10, 0, 10].map((o) => <Streetlight key={`l${o}`} position={[-4.4, 0, z + o + 2]} />)}
-      {[-9, -4.5, 4.5, 9].map((o) => <Palm key={`p${o}`} position={[-4.6, 0, z + o]} />)}
+      {[-10, 0, 10].map((o) => <Streetlight key={`l${o}`} position={[-4.4, groundHeightAt(-4.4, z + o + 2), z + o + 2]} />)}
+      {[-9, -4.5, 4.5, 9].map((o) => <Palm key={`p${o}`} position={[-4.6, groundHeightAt(-4.6, z + o), z + o]} />)}
       {[-6.6, 6.6].map((o) => (
         <group key={`b${o}`} position={[-9.6, 0, z + o]}>
           <mesh position={[0, 0.45, 0]} castShadow><boxGeometry args={[0.5, 0.08, 1.6]} /><meshStandardMaterial color="#8a6a4a" /></mesh>
@@ -127,7 +128,7 @@ function CampusApproach() {
         npcId="uni-gate-guard"
         role="security guard"
         lookId="male-adult-18"
-        position={[-6.8, 0, z - 1.6]}
+        position={[-6.8, groundHeightAt(-6.8, z - 1.6), z - 1.6]}
         facing={Math.PI / 2}
       />
     </group>
