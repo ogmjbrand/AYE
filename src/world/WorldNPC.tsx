@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cullAsPerson } from './cullPerson';
+import { useNpcBody } from './useNpcBody';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, LoopOnce, Material, type Group, type Mesh } from 'three';
@@ -110,6 +111,7 @@ function NPCModel({
   const lastPosition = useRef(position);
   const state = useRef<AnimationState | null>(null);
   const heading = useRef(facing);
+  const body = useNpcBody(npcId ?? role);
   const wasNear = useRef(false);
   const lastWave = useRef(-Infinity);
   const waveUntil = useRef(0);
@@ -218,7 +220,14 @@ function NPCModel({
     const turn = Math.atan2(Math.sin(desiredFacing - heading.current), Math.cos(desiredFacing - heading.current));
     heading.current += turn * Math.min(1, step * 6);
     lastPosition.current = currentPosition;
-    root.current?.position.set(currentPosition[0], currentPosition[1], currentPosition[2]);
+    // Solid to the player; walking, they step aside for anyone in their way (lib/bodies.ts)
+    if (walking) {
+      const at = body.walk(currentPosition[0], currentPosition[2], currentFacing, true, step);
+      root.current?.position.set(at.x, currentPosition[1], at.z);
+    } else {
+      body.stand(currentPosition[0], currentPosition[2]);
+      root.current?.position.set(currentPosition[0], currentPosition[1], currentPosition[2]);
+    }
     if (rig.current) {
       rig.current.rotation.y = heading.current;
       rig.current.position.y += ((seat ? bodyDrop : 0) - rig.current.position.y) * Math.min(1, step * 5);

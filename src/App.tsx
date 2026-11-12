@@ -8,7 +8,8 @@ import { useWalkThen } from './hooks/useWalkThen';
 import type { PlayerHandle } from './hooks/usePlayerController';
 import { useCurrentNeighborhood } from './hooks/useCurrentNeighborhood';
 import { useGameState } from './hooks/useGameState';
-import { FOOD_CART_SIZE, activeLayout, groundHeightAt, movingObstacles, resolveCollisions, setActiveLayout } from './lib/world';
+import { FOOD_CART_SIZE, activeLayout, groundHeightAt, movingObstacles, obstaclesWithVehicles, resolveCollisions, setActiveLayout } from './lib/world';
+import { CAMERA_MIN_DISTANCE, clearCameraDistance, liftCameraClear, nextCameraDistance, tipUp } from './lib/cameraCollision';
 import { Buildings, Skyline } from './world/Buildings';
 import { Props } from './world/Props';
 import { SceneLighting } from './world/SceneLighting';
@@ -238,7 +239,8 @@ const followShift = new Vector3();
  * Third-person framing: the camera looks at chest height from about 4.5 m
  * behind and 1.5 m above, so the player fills a good part of the frame.
  */
-const CAMERA_TARGET_HEIGHT = 1.25;
+/** The camera looks at your upper body (chest and shoulders), not your feet or a point in the world. */
+const CAMERA_TARGET_HEIGHT = 1.35;
 /** Going to bed, from turning to the bed to the night passing: lying down (lib/bedSleep.ts BED_DOWN_SECONDS), then the room fades. */
 const SLEEP_SCENE_MS = 9000;
 
@@ -270,9 +272,18 @@ const PLATE_SUBTITLE: Record<PlaceKind, string> = { food: 'Food & drinks', shop:
 const PLATE_ICON: Record<PlaceKind, IconName> = { food: 'restaurant', shop: 'bag', workplace: 'career', home: 'home', public: 'go', nightlife: 'spark', park: 'palm', dealership: 'car' };
 
 function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }: CameraFollowProps) {
-  useFrame(({ camera }) => {
+  // The distance you've chosen (by zooming), and where the camera actually is when something's in the way
+  const view = useRef({ want: -1, at: -1, lift: 0, dir: new Vector3(), clear: 0 });
+  if (import.meta.env.DEV) (window as unknown as { __ayeCamera?: unknown }).__ayeCamera = view.current;
+  useFrame(({ camera }, delta) => {
     const controls = controlsRef.current;
     if (!controls) return;
+    // Put the camera back where you chose before the controls read it, so a wall pulling it in
+    // doesn't also change your zoom
+    const v = view.current;
+    if (v.want > 0 && v.at > 0 && (v.at < v.want - 1e-3 || v.lift > 0)) {
+      camera.position.copy(controls.target).addScaledVector(v.dir, v.want);
+    }
     followTarget.set(controller.position.x, CAMERA_TARGET_HEIGHT, controller.position.z);
     followShift.copy(followTarget).sub(controls.target);
     // Ease after the player as they move; jump straight there after a long move (arriving in a city, a save loading)
@@ -297,6 +308,29 @@ function CameraFollow({ controller, controlsRef, ceiling = null, walls = null }:
     }
     controls.update();
     let clamped = false;
+    // Camera collision (lib/cameraCollision.ts): sweep from your upper body to the camera; if a
+    // building, wall or vehicle is in the way, come in in front of it, then ease back out once clear
+    followOffset.copy(camera.position).sub(controls.target);
+    const want = followOffset.length();
+    if (want > 1e-3) {
+      followOffset.divideScalar(want);
+      v.dir.copy(followOffset);
+      const obstacles = obstaclesWithVehicles();
+      const clear = clearCameraDistance(controls.target, followOffset, want, obstacles);
+      const at = nextCameraDistance(v.at > 0 ? v.at : want, want, clear, Math.min(delta, 0.1));
+      v.want = want;
+      v.at = at;
+      v.clear = clear;
+      // No room even close in (you're against the wall it's behind): rise over your shoulder instead
+      // of entering the wall, and settle back down gently once there's room again
+      const need = clear < CAMERA_MIN_DISTANCE ? liftCameraClear(controls.target, followOffset, at, obstacles).lift : 0;
+      v.lift = need >= v.lift ? need : Math.max(need, v.lift - Math.min(delta, 0.1) * 0.8);
+      if (at < want - 1e-3 || v.lift > 0) {
+        const d = v.lift > 0 ? tipUp(followOffset, v.lift) : followOffset;
+        camera.position.set(controls.target.x + d.x * at, controls.target.y + d.y * at, controls.target.z + d.z * at);
+        clamped = true;
+      }
+    }
     if (ceiling !== null && camera.position.y > ceiling - CEILING_CLEARANCE) {
       camera.position.y = ceiling - CEILING_CLEARANCE;
       clamped = true;

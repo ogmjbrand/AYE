@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { Vector3 } from 'three';
 import { PLAYER_RADIUS, activeLayout, obstaclesWithVehicles, resolveCollisions, type Obstacle } from '../lib/world';
+import { moveCircle } from '../lib/collision';
+import { bodiesNear, setBody } from '../lib/bodies';
+
+/** The player's id among the characters' bodies (lib/bodies.ts). */
+export const PLAYER_BODY = 'player';
 import { movementIntent, type StickInput } from '../lib/movementInput';
 import { STUCK_SECONDS, steerTowards, type MoveTarget } from '../lib/clickToMove';
 import { buildWalkGrid, findPath, walkGridFor, type Point } from '../lib/pathfinding';
@@ -169,11 +174,14 @@ const playerHandle: PlayerHandle = {
     const prevX = playerHandle.position.x;
     const prevZ = playerHandle.position.z;
     const piece = passThrough ? obstaclesWithVehicles().find(isPassThrough) : undefined;
-    const resolved = resolveCollisions(
-      prevX + playerHandle.velocity.x * delta,
-      prevZ + playerHandle.velocity.z * delta,
-      undefined,
-      piece ? obstaclesWithVehicles().filter((o) => o !== piece) : undefined,
+    // Sub-stepped and solved against every solid and every other character (lib/collision.ts):
+    // you slide along walls and round people, and never end up inside anything
+    const resolved = moveCircle(
+      prevX, prevZ,
+      playerHandle.velocity.x * delta, playerHandle.velocity.z * delta,
+      PLAYER_RADIUS,
+      piece ? obstaclesWithVehicles().filter((o) => o !== piece) : obstaclesWithVehicles(),
+      bodiesNear(prevX, prevZ, PLAYER_BODY),
     );
     // Stepped into the piece and out again: it's solid once more
     if (passThrough) {
@@ -183,6 +191,7 @@ const playerHandle: PlayerHandle = {
     }
     playerHandle.position.x = resolved.x;
     playerHandle.position.z = resolved.z;
+    setBody(PLAYER_BODY, resolved.x, resolved.z, { r: PLAYER_RADIUS });
 
     // Lose the speed that was absorbed by a wall so the player doesn't "stick" to it
     if (delta > 0) {

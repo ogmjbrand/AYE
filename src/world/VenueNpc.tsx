@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { cullAsPerson } from './cullPerson';
+import { useNpcBody } from './useNpcBody';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import { Box3, CanvasTexture, Euler, Material, Quaternion, SRGBColorSpace, type Group, type Mesh, type Object3D } from 'three';
@@ -129,6 +130,7 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
     rFore: findRigBone(figure, 'rightForearm'), lFore: findRigBone(figure, 'leftForearm'),
     rHand: findRigBone(figure, 'rightHand'),
   }), [figure]);
+  const body = useNpcBody(name);
   const walk = useRef({ leg: 0, t: 0, pause: (name.length % 5) * 0.4, x: route?.[0][0] ?? x, z: route?.[0][1] ?? z, heading: facing });
 
   useEffect(() => {
@@ -161,10 +163,14 @@ function Npc({ lookId, name, role, x, z, facing, seat, route, chatty = false, un
       // Waiting at a stop with its own heading: turn to it (a customer facing the seller)
       const stop = route[w.leg];
       if (!moving && stop[3] !== undefined) w.heading += Math.atan2(Math.sin(stop[3] - w.heading), Math.cos(stop[3] - w.heading)) * Math.min(1, step * 5);
-      root.current?.position.set(w.x, groundY, w.z);
+      // Stepping aside for anyone in the way, then back onto the path (lib/bodies.ts)
+      const at = body.walk(w.x, w.z, w.heading, moving, step);
+      root.current?.position.set(at.x, groundY, at.z);
       if (group.current) group.current.rotation.y = w.heading;
       onStop?.(!moving && w.pause > 0 ? w.leg : null);
     }
+    // Someone who stays put (a seller, a seated guest, a patient): solid, and others go round them
+    else if (root.current) body.stand(root.current.position.x, root.current.position.z);
     // At a grill: face the coals, or turn to the customer being served
     const serving = !!grill && grill.serving();
     if (grill && group.current) {

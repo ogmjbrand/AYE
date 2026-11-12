@@ -13,6 +13,7 @@ import { HUG_DURATION_MS, hugPathPose, hugPositionBlend } from '../lib/hug';
 import { pedestrianInTrafficPath, trafficSnapshot } from '../lib/traffic';
 import type { PlayerHandle } from '../hooks/usePlayerController';
 import { groundHeightAt } from '../lib/world';
+import { useNpcBody } from './useNpcBody';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useDistrict } from './DistrictContext';
 import { withRelaxedHands } from '../components/handPose';
@@ -101,6 +102,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession, day }: {
   const root = useRef<Group>(null);
   const clock = useRef((resident.id.charCodeAt(0) % 7) * 1.7);
   const heading = useRef(resident.facing);
+  const body = useNpcBody(resident.id);
   // A routine follows the game clock, smoothed between its once-a-minute ticks so walks don't jump
   const dayNow = useRef(day);
   useEffect(() => { dayNow.current = day; }, [day]);
@@ -112,6 +114,7 @@ function ResidentFigure({ resident, player, talkingTo, hugSession, day }: {
     if (root.current) root.current.visible = !routine || routine.present;
     if (routine && !routine.present) {
       clearLivePosition(resident.id);
+      body.leave();
       return;
     }
     const here = routine?.pose ?? residentPose(resident, clock.current);
@@ -148,9 +151,14 @@ function ResidentFigure({ resident, player, talkingTo, hugSession, day }: {
     // Turn smoothly along the shortest way round
     const diff = Math.atan2(Math.sin(want - heading.current), Math.cos(want - heading.current));
     heading.current += diff * Math.min(1, step * 6);
-    root.current?.position.set(pose.x, groundHeightAt(pose.x, pose.z), pose.z);
+    // Solid to the player and keeping their distance from others; out of the way for a hug (lib/bodies.ts)
+    let at = { x: pose.x, z: pose.z };
+    if (activeHug) body.leave();
+    else if (pose.moving) at = body.walk(pose.x, pose.z, heading.current, true, step);
+    else body.stand(pose.x, pose.z);
+    root.current?.position.set(at.x, groundHeightAt(at.x, at.z), at.z);
     if (group.current) group.current.rotation.y = heading.current;
-    setLivePosition(resident.id, pose.x, pose.z, heading.current);
+    setLivePosition(resident.id, at.x, at.z, heading.current);
     // Body language: a wave when you come over, then talking and listening in turns while you chat
     const inConversation = talkingTo === resident.id;
     if (inConversation && conversationStart.current === null) conversationStart.current = mixer.time;
