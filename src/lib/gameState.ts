@@ -24,6 +24,7 @@
  */
 import { dishById } from './food';
 import { addToPantry, canStore, takeFromPantry, type Pantry } from './pantry';
+import { CHORES, CLEAN_HOME, afterCooking, afterDay, counterWashes, doChore, homeFunFactor, type ChoreId, type Chores } from './chores';
 import type { Career, Lifestyle } from '../components/CharacterCreation';
 import { ROUGH_SLEEP_FULLNESS_LOSS, forSale, homeById, moveInFee } from './homes';
 import { careerLevel, levelIndex } from './progression';
@@ -206,6 +207,8 @@ export interface GameState {
   qualifications: Qualifications;
   /** Food bought to take away and not eaten yet, by dish id (lib/pantry.ts). */
   pantry: Pantry;
+  /** Dishes, laundry and mess at home (lib/chores.ts). */
+  chores: Chores;
 }
 
 /** A piece of furniture to use: one you bought, or one the home came with (by index). */
@@ -299,6 +302,7 @@ export type GameAction =
   | { type: 'placeFurniture'; uid: string; at: readonly [number, number]; rot: 0 | 1 }
   | { type: 'storeFurniture'; uid: string }
   | { type: 'useFurniture'; target: FurnitureTarget; near: boolean }
+  | { type: 'chore'; id: ChoreId; near: boolean }
   | { type: 'exercise'; minutes: number; atPark: boolean }
   | { type: 'hug'; residentId: string }
   | { type: 'fashionShowcase'; owned: string[]; equipped: Partial<Record<Slot, string>> }
@@ -451,6 +455,7 @@ export function createGameState(balance: number, time: GameTime = createTime()):
     health: emptyHealth(),
     qualifications: emptyQualifications(),
     pantry: {},
+    chores: { ...CLEAN_HOME },
   };
 }
 
@@ -869,6 +874,8 @@ function operateFurniture(state: GameState, target: FurnitureTarget, near: boole
   } else {
     kind = interior.furniture[target.builtin]?.kind;
   }
+  // With a stove to cook on, the counter is where you wash up while there are dirty dishes
+  if (kind === 'counter' && counterWashes(state.chores, homeHasStove(state))) return houseChore(state, 'dishes', near, career, lifestyle);
   const use = kind ? furnitureUse(kind, quality) : undefined;
   if (!use) return state;
   const cost = use.cost ?? 0;
@@ -877,7 +884,7 @@ function operateFurniture(state: GameState, target: FurnitureTarget, near: boole
   for (let i = 0; i < use.minutes; i++) next = tick(next, career, lifestyle, false);
   const mods = modifiers(state.life);
   const cooking = kind === 'stove' || kind === 'counter';
-  const funScale = HOME_FUN.includes(kind!) ? mods.homeFun * (kind === 'bookshelf' || kind === 'speaker' ? mods.readingFun : 1) : 1;
+  const funScale = HOME_FUN.includes(kind!) ? mods.homeFun * (kind === 'bookshelf' || kind === 'speaker' ? mods.readingFun : 1) * homeFunFactor(state.chores) : 1;
   const gains = { ...use.gains, fun: (use.gains.fun ?? 0) > 0 ? Math.round(use.gains.fun! * funScale) : use.gains.fun };
   if (cooking) gains.fun = (gains.fun ?? 0) + mods.mealFun;
   return {
@@ -885,7 +892,24 @@ function operateFurniture(state: GameState, target: FurnitureTarget, near: boole
     needs: addNeeds(next.needs, gains),
     fullness: Math.min(100, next.fullness + Math.round((use.fullness ?? 0) * (cooking ? mods.cookFullness : 1))),
     workMinutes: next.workMinutes + (career !== 'none' ? Math.round((use.xpMinutes ?? 0) * mods.studyXp) : 0),
+    chores: cooking ? afterCooking(next.chores) : next.chores,
   };
+}
+
+/** Whether your home (its own pieces or ones you placed) has a stove. */
+function homeHasStove(state: GameState): boolean {
+  const interior = homeInterior(state);
+  if (!interior) return false;
+  return interior.furniture.some((f) => f.kind === 'stove')
+    || state.furniture.some((o) => !!o.at && catalogueItem(o.itemId)?.kind === 'stove');
+}
+
+/** Keeping house (lib/chores.ts): at home, it takes its minutes and costs nothing. */
+function houseChore(state: GameState, id: ChoreId, near: boolean, career: Career, lifestyle: Lifestyle): GameState {
+  if (state.summary || !near || !homeInterior(state)) return state;
+  let next = state;
+  for (let i = 0; i < CHORES[id].minutes; i++) next = tick(next, career, lifestyle, false);
+  return { ...next, chores: doChore(next.chores, id) };
 }
 
 /** A run in the park: tiring and sweaty, but fun (fitness grows through lib/life.ts). */
@@ -932,6 +956,8 @@ function sleep(state: GameState, career: Career, lifestyle: Lifestyle, atHome: b
   return {
     ...next,
     fullness: rough ? Math.max(0, next.fullness - ROUGH_SLEEP_FULLNESS_LOSS) : next.fullness,
+    // A day's clothes go in the basket, and a home lived in gets messier (only the one you live in)
+    chores: next.home ? afterDay(next.chores) : next.chores,
     today: emptyLedger(),
     summary: {
       income,
@@ -1479,6 +1505,8 @@ function baseReducer(
       return state.summary ? state : { ...state, furniture: state.furniture.map((o) => (o.uid === action.uid ? { ...o, at: null } : o)) };
     case 'useFurniture':
       return operateFurniture(state, action.target, action.near, career, lifestyle);
+    case 'chore':
+      return houseChore(state, action.id, action.near, career, lifestyle);
     case 'exercise':
       return exercise(state, action.minutes, action.atPark, career, lifestyle);
     default:

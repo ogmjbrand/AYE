@@ -129,6 +129,7 @@ import {
   restaurantInteractionAt, restaurantTableById, type Furniture,
 } from './lib/interiors';
 import { asFurniture, catalogueItem, furnitureSeat, nearPiece, furnitureUse, standSpotsFor } from './lib/furniture';
+import { CHORES, choreNote, counterWashes, dueChores, type ChoreId } from './lib/chores';
 import type { FurnitureKind, Interior } from './lib/interiors';
 import { currentMood, type FurnitureTarget } from './lib/gameState';
 import { FurnitureCatalogue } from './components/FurnitureCatalogue';
@@ -480,7 +481,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const insideHospitalRef = useRef(false);
   const {
     state, rest, dismissSummary, eat, purchase, moveIn, buyHome, spaTreat, spaHire, spaClockIn, spaClockOut, spaSession, moveOut, buyEquipment, travel,
-    socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture,
+    socialise, hug, fashionShowcase, buyFashionItem, nightOut, wait, workTask, buyFurniture, sellFurniture, placeFurniture, storeFurniture, operateFurniture, doChore,
     exercise, visit, setProfile, setDream, dismissWish, setSavingsGoal, phoneFriend, ride, bookHotel, hotelWash, buyVehicle, paintVehicle,
     drove, officeApply, officeClockIn, officeTask, officeClockOut, campusClass, campusAssignment, campusStudy, hospitalClockIn, hospitalBrief, hospitalPatient, hospitalClockOut,
     eventRespond, eventDismiss, eventAct, eventSeen, eventFinish, setEventFrequency,
@@ -982,14 +983,23 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     ...interior.furniture.map((f, i) => ({ target: { builtin: i }, f, quality: 1 })),
     ...ownedPieces.map(({ uid, f }) => ({ target: { uid }, f, quality: catalogueItem(state.furniture.find((o) => o.uid === uid)?.itemId)?.quality ?? 1 })),
   ];
+  /** With a stove to cook on, the kitchen counter is where you wash up while there are dirty dishes (lib/chores.ts). */
+  const washingUpAt = (f: HomePiece['f']) => f.kind === 'counter' && counterWashes(state.chores, homePieces().some((p) => p.f.kind === 'stove'));
   /** The piece of furniture you're standing at that does something (shower, sofa, cooker…), if any. */
   const usableHere = (): (HomePiece & { verb: string; cost: number; minutes: number }) | null => {
     const { x, z } = controller.position;
     for (const p of homePieces()) {
+      if (washingUpAt(p.f) && nearPiece(p.f, x, z)) return { ...p, verb: CHORES.dishes.verb, cost: 0, minutes: CHORES.dishes.minutes };
       const use = furnitureUse(p.f.kind, p.quality);
       if (use && nearPiece(p.f, x, z)) return { ...p, verb: use.verb, cost: use.cost ?? 0, minutes: use.minutes };
     }
     return null;
+  };
+  /** A chore, once you're where it's done. */
+  const finishChore = (id: ChoreId) => {
+    doChore(id, true);
+    const c = CHORES[id];
+    setArrival(`${c.verb}: ${c.minutes} min pass.${id === 'tidy' ? ' The place looks lovely.' : ''}`);
   };
   /** A place to stand that nothing solid is in. */
   const clearSpot = ([x, z]: readonly [number, number]) => {
@@ -1002,6 +1012,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
    * back out; everything else passes its time where you stand.
    */
   const operatePiece = (p: HomePiece) => {
+    if (washingUpAt(p.f)) { finishChore('dishes'); return; }
     const use = furnitureUse(p.f.kind, p.quality);
     if (!use) return;
     if (p.f.kind === 'bed') { goToBed(); return; }
@@ -2499,6 +2510,38 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
     return (open.find((o) => o.careers) ?? open[0])?.label;
   })();
 
+  /**
+   * At home: the chores that need doing (lib/chores.ts), then one line for each thing you can use.
+   * Only labels here: where to go is worked out when you pick one (goDoHome), from where you are then.
+   */
+  const homeActivities = (): Activity[] => {
+    if (!indoors || !interior || !home || home.id !== state.home || asleep || sit.session) return [];
+    const pieces = homePieces();
+    const chores = dueChores(state.chores)
+      .filter((c) => !c.at || pieces.some((p) => c.at!.includes(p.f.kind)))
+      .map((c) => ({ label: `${c.verb} · ${choreNote(state.chores, c.id)}`, spots: [] }));
+    const verbs = pieces.flatMap((p) => {
+      const use = furnitureUse(p.f.kind, p.quality);
+      return use && !washingUpAt(p.f) ? [use.verb] : [];
+    });
+    return [...chores, ...verbs.filter((v, i) => verbs.indexOf(v) === i).map((label) => ({ label, spots: [] }))];
+  };
+  /** Do the picked line: walk to the nearest piece for it, round anything in the way, and do it there. */
+  const goDoHome = (a: Activity) => {
+    const { x, z } = controller.position;
+    const pieces = homePieces().sort((p, q) => Math.hypot(p.f.at[0] - x, p.f.at[1] - z) - Math.hypot(q.f.at[0] - x, q.f.at[1] - z));
+    const chore = dueChores(state.chores).find((c) => a.label.startsWith(`${c.verb} ·`));
+    if (chore) {
+      if (!chore.at) { finishChore(chore.id); return; }
+      const p = pieces.find((q) => chore.at!.includes(q.f.kind));
+      if (!p) return;
+      const ok = walkThen(standSpotsFor(p.f).filter(clearSpot), chore.verb.toLowerCase(), () => finishChore(chore.id));
+      setArrival(ok ? `${chore.verb}: on your way.` : `There's no way to get there right now.`);
+      return;
+    }
+    const p = pieces.find((q) => !washingUpAt(q.f) && furnitureUse(q.f.kind, q.quality)?.verb === a.label);
+    if (p && !goUsePiece(p)) setArrival(`There's no way to reach the ${p.f.kind} right now.`);
+  };
   const goDoActivity = (a: Activity) => {
     const ok = walkThen(a.spots, a.label, () => {
       const here = venuePrompt?.();
@@ -2515,6 +2558,9 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
       )}
       {!venuePrompt && !stall && !vendor && !store && !talking && (
         <ActivityMenu title="Things to do nearby" activities={nearbyActivities()} onGo={goDoNearby} />
+      )}
+      {!venuePrompt && !stall && !vendor && !store && !talking && !catalogueOpen && (
+        <ActivityMenu title="Things to do at home" activities={homeActivities()} onGo={goDoHome} />
       )}
       {stall && (
         <StallMenu vendor={stall} diet={character.diet} balance={state.balance} eating={stallDish} onBuy={buyAtStall} onClose={closeStall}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Character } from '../components/CharacterCreation';
 import type { CareAction, FurnitureTarget, GameState, PhoneContact } from '../lib/gameState';
+import type { ChoreId } from '../lib/chores';
 import { applyStart, lifeReducer, type AnyAction } from '../lib/life';
 import type { DreamId, TraitId } from '../lib/lifeState';
 import { hasProgress, loadProgress, saveProgress } from '../lib/save';
@@ -122,6 +123,7 @@ export function useGameState(character: Character, isAtWorkplace: () => boolean)
     placeFurniture: (uid: string, at: readonly [number, number], rot: 0 | 1) => dispatch({ type: 'placeFurniture', uid, at, rot }),
     storeFurniture: (uid: string) => dispatch({ type: 'storeFurniture', uid }),
     operateFurniture: (target: FurnitureTarget, near: boolean) => dispatch({ type: 'useFurniture', target, near }),
+    doChore: (id: ChoreId, near: boolean) => dispatch({ type: 'chore', id, near }),
     exercise: (minutes: number, atPark: boolean) => dispatch({ type: 'exercise', minutes, atPark }),
     visit: (placeId: string) => dispatch({ type: 'visit', placeId }),
     setProfile: (bio: string, traits: TraitId[]) => dispatch({ type: 'setProfile', bio, traits }),
