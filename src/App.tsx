@@ -22,7 +22,18 @@ import { TransformAura } from './world/TransformAura';
 import { MedicResponder } from './world/MedicResponder';
 import { Rain } from './world/Rain';
 import { setWetness } from './world/materials';
-import { WEATHER_LABEL, weatherAt } from './lib/weather';
+import { WEATHER_LABEL, type Weather } from './lib/weather';
+import { useCityWeather } from './world/useCityWeather';
+import { WindDriver } from './world/WindDriver';
+import { armWeatherAudio } from './lib/weatherAudio';
+import { dayOfYear } from './lib/sun';
+
+/** The HUD's weather note: what it's doing and the temperature, and a special event by name. */
+function weatherLabel(w: Weather): string {
+  const t = w.temperature !== undefined ? ` ${Math.round(w.temperature)}°C` : '';
+  if (w.source === 'event' && w.event) return `${w.event.label}${t}`;
+  return `${(w.fog ?? 0) > 0.5 ? 'Fog' : WEATHER_LABEL[w.kind]}${t}`;
+}
 import { CriticalWarning, EmergencyTransition, HealthPanel, MedicalKit, MedicalShop, MedicComing, RecoveryPanel } from './components/Survival';
 import { crashDamage, healthStatus } from './lib/health';
 import { LevelUp } from './components/LevelUp';
@@ -195,6 +206,8 @@ import './App.css';
 
 interface CityProps {
   controller: ReturnType<typeof usePlayerController>;
+  /** This city's weather now (world/useCityWeather.ts): real, event or simulated. */
+  weather: Weather;
   character?: Character;
   gameTime: GameTime;
   tryOn: Partial<Record<Slot, string | null>>;
@@ -456,19 +469,21 @@ function OfficeExteriorEntrance({ player }: { player: PlayerHandle }) {
   );
 }
 
-function City({ controller, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false, activity = null, helping = false }: CityProps) {
+function City({ controller, weather, character, gameTime, tryOn, homeId, district, ownedVehicles, talkingTo, hugSession, onHugComplete, liveEvent, eating = false, activity = null, helping = false }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   const owned = ownedVehicles.find((vehicle) => vehicle.modelId === controller.drivingVehicleId);
   const model = owned && vehicleById(owned.modelId);
   const colour = owned && vehicleColourById(owned.colour);
-  // The weather here, minute by minute (lib/weather.ts): streets get wet, and dry out after the rain
-  const weather = useMemo(() => weatherAt(district.id, gameTime.totalMinutes), [district.id, gameTime.totalMinutes]);
+  // The weather here, minute by minute: streets get wet, and dry out after the rain
   useEffect(() => setWetness(weather.wetness), [weather.wetness]);
+  // The real sun for this city's latitude and today's date (lib/sun.ts)
+  const sky = useMemo(() => ({ lat: district.city.lat, dayOfYear: dayOfYear(new Date()) }), [district.city.lat]);
   return (
     <>
-      <SceneLighting gameTime={gameTime} player={controller} weather={weather} />
-      <Rain intensity={weather.rain} />
+      <SceneLighting gameTime={gameTime} player={controller} weather={weather} sky={sky} />
+      <Rain intensity={weather.rain} windSpeed={weather.windSpeed ?? 3} windFrom={weather.windFrom ?? 220} />
+      <WindDriver speed={weather.windSpeed ?? 3} from={weather.windFrom ?? 220} />
       <WetStreet rain={weather.rain} wetness={weather.wetness} />
       <FireLightRig />
       <LampPool focus={controller} />
@@ -492,7 +507,7 @@ function City({ controller, character, gameTime, tryOn, homeId, district, ownedV
       <Residents player={controller} talkingTo={talkingTo} hugSession={hugSession} day={{ minuteOfDay: gameTime.hour * 60 + gameTime.minute, dayOfWeek: gameTime.dayOfWeek }} />
       <Traffic player={controller} />
       <Campers />
-      <StreetLife hour={gameTime.hour} />
+      <StreetLife hour={gameTime.hour} rain={weather.rain} thunder={weather.thunder ?? 0} />
       {liveEvent && <LiveEventScene event={liveEvent} minute={gameTime.totalMinutes} />}
       {quality.contactShadows && !controller.drivingVehicleId && <FootShadow controller={controller} />}
       {controller.drivingVehicleId && model && colour
@@ -550,6 +565,10 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
   const district = districtById(state.districtId);
+  // This city's weather: live from the real world, a special event, or simulated (world/useCityWeather.ts)
+  const cityWeather = useCityWeather(district, state.time.totalMinutes);
+  // Rain and thunder sound start after the first touch or key (browsers' rule for audio)
+  useEffect(() => armWeatherAudio(), []);
   // Opening choices (traits, dream, first home) were applied as this life began: drop them so nothing applies them again
   useEffect(() => {
     if (character.start) onCharacterUpdate({ ...character, start: undefined });
@@ -2996,7 +3015,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
                 <Player controller={controller} character={character} tryOn={tryOn} activity={playerActivity} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} activity={playerActivity} helping={helpingTalk} />
+              <City key={district.id} controller={controller} weather={cityWeather} character={character} gameTime={state.time} tryOn={tryOn} homeId={state.home} district={district} ownedVehicles={state.ownedVehicles} talkingTo={talking?.id ?? null} hugSession={hugging} onHugComplete={finishHug} liveEvent={liveEvent} eating={eating} activity={playerActivity} helping={helpingTalk} />
             )}
           </DistrictContext.Provider>
           <PostEffects />
@@ -3396,7 +3415,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         level={levelProgress(totalXp(state.life.skills))}
         health={{ value: state.health.value, critical: healthStatus(state.health) === 'critical', recovering: !!recovery }}
         onOpenHealth={() => setHealthOpen(true)}
-        weather={offStreet ? undefined : WEATHER_LABEL[weatherAt(district.id, state.time.totalMinutes).kind]}
+        weather={offStreet ? undefined : weatherLabel(cityWeather)}
         insideHome={inWorkplace ? { name: plate.title, prompt: workplacePrompt } : inBoutique ? { name: district.fashionHouse.name, prompt: boutiquePrompt } : inPalms ? { name: district.restaurant!.name, prompt: palmsPrompt } : inCantina && district.bar ? { name: district.bar.name, prompt: cantinaPrompt } : inHotel && district.hotel ? { name: district.hotel.name, prompt: hotelPrompt } : inSpa && district.spa ? { name: district.spa.name, prompt: spaPrompt } : indoors && interior ? {
           name: home!.name,
           prompt: () => {

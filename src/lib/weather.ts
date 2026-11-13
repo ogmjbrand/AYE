@@ -23,7 +23,32 @@ export interface Weather {
   cloud: number;
   /** How wet the ground is, 0 … 1. */
   wetness: number;
+  /** The rest are filled in by every source; older callers may ignore them. */
+  /** Air temperature, °C. */
+  temperature?: number;
+  /** Relative humidity, 0 … 1. */
+  humidity?: number;
+  /** Wind speed, m/s, and the compass bearing it blows FROM, degrees (meteorological). */
+  windSpeed?: number;
+  windFrom?: number;
+  /** How far you can see, metres. */
+  visibility?: number;
+  /** Fog, 0 … 1 (visibility under about 1 km). */
+  fog?: number;
+  /** Lightning, 0 (none) … 1 (a violent storm overhead): how often it flashes. */
+  thunder?: number;
+  /**
+   * Where this came from, kept separate so real weather and gameplay are never confused:
+   * 'live' (the real weather for this city and hour), 'cached' (the last real reading, while the
+   * service can't be reached), 'simulated' (AYE's own weather: offline, development, or no data)
+   * or 'event' (a special gameplay event is overriding the real weather here).
+   */
+  source?: WeatherSource;
+  /** The special event, when source is 'event' (lib/weatherEvents.ts). */
+  event?: { id: string; label: string };
 }
+
+export type WeatherSource = 'live' | 'cached' | 'simulated' | 'event';
 
 export const BLOCK_MINUTES = 180;
 const FADE_MINUTES = 30;
@@ -88,5 +113,25 @@ export function weatherAt(districtId: string, minute: number): Weather {
     const r = rainAt(districtId, t);
     wetness = r > 0.05 ? Math.min(1, wetness + WET_PER_MINUTE * 10 * r * 1.5) : Math.max(0, wetness - DRY_PER_MINUTE * 10);
   }
-  return { kind, rain: rainAt(districtId, m), cloud: CLOUD[kind], wetness: Math.round(wetness * 1000) / 1000 };
+  const rain = rainAt(districtId, m);
+  // The rest of the simulated weather, from the same block and the time of day: breezier in
+  // storms, cooler at night and in the rain, damper when it's wet
+  const hour = (m / 60) % 24;
+  const warmth = Math.cos(((hour - 15) / 24) * 2 * Math.PI); // warmest mid-afternoon
+  const base = 27 - (CLIMATE[districtId] === undefined ? 4 : 0);
+  const windSpeed = { clear: 2.5, cloudy: 4, rain: 6, storm: 12 }[kind] * (0.75 + roll(`${districtId}:${block}:wind`) * 0.5);
+  return {
+    kind,
+    rain,
+    cloud: CLOUD[kind],
+    wetness: Math.round(wetness * 1000) / 1000,
+    temperature: Math.round((base + 4 * warmth - 3 * rain) * 10) / 10,
+    humidity: Math.min(1, 0.6 + 0.1 * CLOUD[kind] + 0.3 * rain),
+    windSpeed: Math.round(windSpeed * 10) / 10,
+    windFrom: Math.round(roll(`${districtId}:${Math.floor(block / 4)}:dir`) * 360),
+    visibility: kind === 'storm' ? 3000 : kind === 'rain' ? 7000 : 20000,
+    fog: 0,
+    thunder: kind === 'storm' ? 0.7 : 0,
+    source: 'simulated',
+  };
 }

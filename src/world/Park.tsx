@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { windSway } from './wind';
 import { Euler, MeshStandardMaterial, Vector3 } from 'three';
 import { useDistrict } from './DistrictContext';
 import { Instances, type Placement } from './Instances';
@@ -21,7 +22,8 @@ const WOOD = '#7a5a3c';
 export function Park() {
   const park = useDistrict().layout.park;
   const mats = useMemo(() => ({
-    canopy: new MeshStandardMaterial({ color: CANOPY, roughness: 0.9, flatShading: true }),
+    // The crowns sway in the wind (world/wind.ts): about 3.5 m up, bending up to 0.35 m in a gale
+    canopy: windSway(new MeshStandardMaterial({ color: CANOPY, roughness: 0.9, flatShading: true }), 3.5, 0.35),
     trunk: new MeshStandardMaterial({ color: TRUNK, roughness: 0.95 }),
     wood: new MeshStandardMaterial({ color: WOOD, roughness: 0.8 }),
     // Fallen leaves under each tree (ambientCG ScatteredLeaves007, with its cut-out so the lawn shows between them)

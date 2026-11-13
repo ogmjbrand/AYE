@@ -7,16 +7,17 @@ import { useMemo } from 'react';
 import { VenueNpc } from './VenueNpc';
 import { useDistrict, useLayout } from './DistrictContext';
 import { useQuality } from './quality';
-import { crowdSize, shoppersFor } from '../lib/streetLife';
+import { crowdSize, outInWeather, shoppersFor } from '../lib/streetLife';
 import { generateNpcAppearance } from '../lib/npcFashion';
 import { lookById } from '../lib/looks';
 import { PAVEMENT_HEIGHT } from '../lib/world';
 
-export function StreetLife({ hour }: { hour: number }) {
+export function StreetLife({ hour, rain = 0, thunder = 0 }: { hour: number; rain?: number; thunder?: number }) {
   const district = useDistrict();
   const layout = useLayout();
   const quality = useQuality();
-  const count = Math.round(crowdSize(hour) * (quality.quality === 'high' ? 1 : 0.5));
+  // Fewer out in the rain: people shelter indoors until it eases (outInWeather)
+  const count = Math.round(crowdSize(hour) * (quality.quality === 'high' ? 1 : 0.5) * outInWeather(rain, thunder));
   // Everyone who could be out today, so people already walking stay the same as the crowd thins
   const everyone = useMemo(() => shoppersFor(district.id, district.places, layout, 8), [district.id, district.places, layout]);
   const looks = useMemo(() => everyone.map((s) => generateNpcAppearance(s.id, s.doing, lookById(s.lookId).body === 'feminine').styles), [everyone]);

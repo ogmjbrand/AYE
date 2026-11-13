@@ -100,3 +100,9 @@ export function shoppersFor(districtId: string, places: readonly Place[], l: Str
     };
   });
 }
+
+/**
+ * How many of the day's passers-by stay out in this weather (1 = all). Rain sends people indoors:
+ * a shower keeps about half the street, a thunderstorm only the few who have to be out.
+ */
+export const outInWeather = (rain: number, thunder: number) => Math.max(0.15, 1 - 0.55 * Math.min(1, rain) - 0.3 * Math.min(1, thunder));

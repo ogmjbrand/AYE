@@ -3,6 +3,8 @@
  * lighting can be tested without a GPU. Lagos sits near the equator: the sun
  * rises around 06:30 and sets around 18:45 all year.
  */
+import { solarPosition, sunVector } from '../lib/sun';
+
 export const SUNRISE = 6.5;
 export const SUNSET = 18.75;
 
@@ -43,15 +45,36 @@ export function sunElevation(hours: number): number {
 
 const CLOUD_GREY = '#8a93a0';
 
-/** `overcast` is continuous 0 (clear) to 1 (full rain); see lib/weather.ts's overcastAt for how it's derived. */
-export function lightingAt(hour: number, minute = 0, overcast = 0): Lighting {
+/** A city's place on the globe and the date, for its real sun (lib/sun.ts). */
+export interface SkyPlace {
+  lat: number;
+  dayOfYear: number;
+}
+
+/** Sun height on lightingAt's scale (1 at the day's noon, 0 at sunrise and sunset, about −0.18 an hour after dusk), and the direction to it. */
+function sunAt(h: number, sky?: SkyPlace): { elev: number; sunDirection: [number, number, number] } {
+  if (!sky) {
+    const elev = sunElevation(h);
+    const dayT = clamp01((h - SUNRISE) / (SUNSET - SUNRISE));
+    // Sun travels east (+X) to west (-X), slightly to the south (-Z).
+    const az = Math.PI * dayT;
+    return { elev, sunDirection: [Math.cos(az) * 0.9, Math.max(elev, -0.25), -0.35] };
+  }
+  // The real sun for this latitude and date: its own sunrise, sunset, height and bearing
+  const { elevation, azimuth } = solarPosition(sky.lat, sky.dayOfYear, h);
+  const noon = Math.max(0.05, Math.sin(solarPosition(sky.lat, sky.dayOfYear, 12).elevation));
+  const elev = elevation >= 0 ? Math.sin(elevation) / noon : (Math.sin(elevation) / Math.sin(10 * Math.PI / 180)) * 0.18;
+  const [x, y, z] = sunVector(elevation, azimuth);
+  return { elev, sunDirection: [x, Math.max(y, -0.25), z] };
+}
+
+/**
+ * `overcast` is continuous 0 (clear) to 1 (full rain); see lib/weather.ts's overcastAt for how it's derived.
+ * With `sky`, the sun is the real one for that city and day (lib/sun.ts); without, Lagos's fixed day.
+ */
+export function lightingAt(hour: number, minute = 0, overcast = 0, sky?: SkyPlace): Lighting {
   const h = hour + minute / 60;
-  const elev = sunElevation(h);
-  const dayT = clamp01((h - SUNRISE) / (SUNSET - SUNRISE));
-  // Sun travels east (+X) to west (-X), slightly to the south (-Z).
-  const az = Math.PI * dayT;
-  const up = Math.max(elev, -0.25);
-  const sunDirection: [number, number, number] = [Math.cos(az) * 0.9, up, -0.35];
+  const { elev, sunDirection } = sunAt(h, sky);
 
   const isDay = elev > 0;
   const golden = isDay ? clamp01(1 - elev / 0.35) : 0; // low sun → warm

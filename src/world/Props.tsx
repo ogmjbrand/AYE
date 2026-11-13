@@ -1,4 +1,5 @@
 import { Suspense, useMemo, useRef } from 'react';
+import { windSway } from './wind';
 import { useGLTF, useTexture } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Euler, Matrix4, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Vector3, type Mesh,
@@ -49,7 +50,8 @@ function Palms() {
 export function PalmGrove({ spots: palmSpots, seed = 29 }: { spots: readonly (readonly [number, number, number])[]; seed?: number }) {
   const frondGeo = useFrondGeometry();
   const frondMat = useMemo(
-    () => new MeshStandardMaterial({ map: frondTexture(), alphaTest: 0.5, side: DoubleSide, roughness: 0.8 }),
+    // Fronds sway in the wind (world/wind.ts): the crown is about 6 m up, bending up to 0.7 m in a gale
+    () => windSway(new MeshStandardMaterial({ map: frondTexture(), alphaTest: 0.5, side: DoubleSide, roughness: 0.8 }), 6, 0.7),
     [],
   );
   const trunkMat = useMemo(() => new MeshStandardMaterial({ color: '#7b6b55', roughness: 0.95 }), []);

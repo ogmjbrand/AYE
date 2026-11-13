@@ -10,8 +10,10 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { setNightGlow } from './materials';
 import { useQuality } from './quality';
 import { SkyDome } from './SkyDome';
-import { lightingAt, type HdriKey } from './timeOfDay';
+import { lightingAt, type HdriKey, type SkyPlace } from './timeOfDay';
 import type { Weather } from '../lib/weather';
+import { Lightning } from './Lightning';
+import { setRainSound } from '../lib/weatherAudio';
 
 /** Real city light for reflections and image-based lighting (ambientCG, CC0; the visible sky is SkyDome's). */
 const HDRI: Record<HdriKey, string> = {
@@ -42,9 +44,11 @@ function setBackground(scene: Scene, color: string) {
   scene.background = new Color(color);
 }
 
-export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }: {
+export function SceneLighting({ gameTime, player, indoor: indoorProp, weather, sky }: {
   gameTime: GameTime;
   player: PlayerHandle;
+  /** The city's latitude and the date, for its real sun (lib/sun.ts); without, Lagos's fixed day. */
+  sky?: SkyPlace;
   /** Outdoors: cloud dims the sun and rain closes the fog in (lib/weather.ts). */
   weather?: Weather;
   /** Inside a venue or a smart home: warm overhead light and studio reflections instead of the sky. `true`: a bright, daylit work building. */
@@ -52,7 +56,7 @@ export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }:
 }) {
   const indoor: IndoorMood | undefined = indoorProp === true ? 'campus' : indoorProp || undefined;
   const quality = useQuality();
-  const clear = useMemo(() => lightingAt(gameTime.hour, gameTime.minute), [gameTime.hour, gameTime.minute]);
+  const clear = useMemo(() => lightingAt(gameTime.hour, gameTime.minute, 0, sky), [gameTime.hour, gameTime.minute, sky]);
   const overcast = weather ? Math.max(0, weather.cloud - 0.1) / 0.9 : 0;
   const rain = weather?.rain ?? 0;
   // Cloud takes most of the sun and some of the sky's reflections; rain greys the air and brings the haze closer
@@ -68,6 +72,13 @@ export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }:
   const fill = useRef<PointLight>(null);
 
   useEffect(() => setNightGlow(l.night), [l.night]);
+  // The rain's sound: full outside, muffled through the walls indoors
+  const rainNow = weather?.rain ?? 0;
+  useEffect(() => setRainSound(rainNow, !!indoor), [rainNow, indoor]);
+  // How far you can see: the real visibility (fog, haze, a downpour) closes the distance in
+  const visibility = weather?.visibility ?? 20000;
+  const fogFar = Math.min(190 - 110 * rain, Math.max(22, visibility / 40));
+  const fogNear = Math.min(45 - 25 * rain, fogFar * 0.3);
   // Set directly rather than by attaching a <color>, so moving between indoors and out never leaves the wrong one behind
   const { scene } = useThree();
   const background = indoor ? INDOOR[indoor].background : l.horizonColor;
@@ -122,7 +133,8 @@ export function SceneLighting({ gameTime, player, indoor: indoorProp, weather }:
 
   return (
     <>
-      <fog attach="fog" args={[l.fogColor, 45 - 25 * rain, 190 - 110 * rain]} />
+      <fog attach="fog" args={[l.fogColor, fogNear, fogFar]} />
+      <Lightning thunder={weather?.thunder ?? 0} player={player} />
       <SkyDome lighting={l} />
       {l.night > 0.3 && <Stars radius={200} depth={60} count={2500} factor={4} fade speed={0} />}
 
