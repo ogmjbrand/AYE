@@ -1,4 +1,4 @@
-import { Color, DataTexture, NoColorSpace, type Material, type MeshStandardMaterial, type Texture } from 'three';
+import { Color, DataTexture, NoColorSpace, Vector4, type Material, type MeshStandardMaterial, type Texture } from 'three';
 import { PATTERNS, SLOTS, type Slot, type Style } from '../lib/fashion';
 
 /**
@@ -31,7 +31,26 @@ interface SlotUniforms {
 export interface StyleUniforms extends Partial<Record<Slot, SlotUniforms>> {
   skinTone: { value: Color };
   skinToneEnabled: { value: number };
+  /** Vitiligo (lib/skinAppearance.ts): patch spheres in the model's bind-pose space (xyz centre, w radius). */
+  vitiligo: { value: Vector4[] };
+  vitiligoCount: { value: number };
+  vitiligoColor: { value: Color };
+  /** 0 rounded patches, 1 irregular edges. */
+  vitiligoIrregular: { value: number };
 }
+
+/** The most vitiligo patches one material takes (lib/skinAppearance.ts MAX_PATCHES). */
+export const VITILIGO_SLOTS = 12;
+
+/** Value noise in 3D, for the irregular edges of vitiligo patches. */
+const VITILIGO_GLSL = /* glsl */ `
+float ayeVHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float ayeVNoise(vec3 x) {
+  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(ayeVHash(i), ayeVHash(i + vec3(1,0,0)), f.x), mix(ayeVHash(i + vec3(0,1,0)), ayeVHash(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(ayeVHash(i + vec3(0,0,1)), ayeVHash(i + vec3(1,0,1)), f.x), mix(ayeVHash(i + vec3(0,1,1)), ayeVHash(i + vec3(1,1,1)), f.x), f.y), f.z);
+}
+`;
 
 const BODY_SLOTS: readonly (readonly [Slot, string])[] = [['top', 'r'], ['bottom', 'g'], ['shoes', 'b']];
 
@@ -212,6 +231,10 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   const uniforms: StyleUniforms = {
     skinTone: { value: new Color('#ffffff') },
     skinToneEnabled: { value: 0 },
+    vitiligo: { value: Array.from({ length: VITILIGO_SLOTS }, () => new Vector4(0, 0, 0, 1)) },
+    vitiligoCount: { value: 0 },
+    vitiligoColor: { value: new Color('#f2d8cb') },
+    vitiligoIrregular: { value: 1 },
   };
   for (const [slot] of slots) {
     uniforms[slot] = {
@@ -237,8 +260,17 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
     shader.uniforms.uAyeSkinTone = uniforms.skinTone;
     shader.uniforms.uAyeSkinToneEnabled = uniforms.skinToneEnabled;
     decl += 'uniform vec3 uAyeSkinTone; uniform float uAyeSkinToneEnabled;\n';
+    shader.uniforms.uAyeVit = uniforms.vitiligo;
+    shader.uniforms.uAyeVitCount = uniforms.vitiligoCount;
+    shader.uniforms.uAyeVitColor = uniforms.vitiligoColor;
+    shader.uniforms.uAyeVitIrregular = uniforms.vitiligoIrregular;
+    decl += `uniform vec4 uAyeVit[${VITILIGO_SLOTS}]; uniform float uAyeVitCount; uniform vec3 uAyeVitColor; uniform float uAyeVitIrregular;\nvarying vec3 vAyeBind;\n`;
+    // Where each point of the skin is in the model's own (bind-pose) space, so patches stay put as the body moves
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vAyeBind;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAyeBind = position;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${decl}${PATTERN_GLSL}`)
+      .replace('#include <common>', `#include <common>\n${decl}${PATTERN_GLSL}${VITILIGO_GLSL}`)
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
@@ -272,6 +304,20 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
               : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));
             diffuseColor.rgb = mix(diffuseColor.rgb, ayeSkinCol, ayeSkinW);
           }
+          // Vitiligo: depigmented patches over the skin, keeping its texture's light and shade
+          if (ayeSkinW > 0.001 && uAyeVitCount > 0.5) {
+            float ayeVit = 0.0;
+            for (int i = 0; i < ${VITILIGO_SLOTS}; i++) {
+              if (float(i) >= uAyeVitCount) break;
+              vec4 pv = uAyeVit[i];
+              float d = length(vAyeBind - pv.xyz) / pv.w;
+              d += (ayeVNoise(vAyeBind * (3.0 / pv.w)) - 0.5) * 0.9 * uAyeVitIrregular;
+              ayeVit = max(ayeVit, 1.0 - smoothstep(0.78, 1.0, d));
+            }
+            float ayeVLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+            vec3 ayeVCol = uAyeVitColor * clamp(0.5 + 1.6 * sqrt(ayeVLum), 0.62, 1.0);
+            diffuseColor.rgb = mix(diffuseColor.rgb, ayeVCol, ayeVit * ayeSkinW);
+          }
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
       )
@@ -279,7 +325,7 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ayeRough, ayeFinish);\nroughnessFactor = mix(roughnessFactor, min(roughnessFactor, ${SKIN_ROUGHNESS.toFixed(2)}), ayeSkinGlow * (1.0 - ayeFinish));`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v8-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v9-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
 }
@@ -313,4 +359,13 @@ export function applySkinShade(material: Material, tone: number) {
 export function applySkinTone(uniforms: StyleUniforms, color: string, enabled: boolean) {
   uniforms.skinTone.value.set(color);
   uniforms.skinToneEnabled.value = enabled ? 1 : 0;
+}
+
+/** Vitiligo patches (lib/skinAppearance.ts vitiligoPatches) on a material set up by installStyleShader. */
+export function applyVitiligo(uniforms: StyleUniforms, patches: readonly { center: readonly number[]; radius: number }[], irregular: boolean, color = '#f2d8cb') {
+  const n = Math.min(VITILIGO_SLOTS, patches.length);
+  for (let i = 0; i < n; i++) uniforms.vitiligo.value[i].set(patches[i].center[0], patches[i].center[1], patches[i].center[2], Math.max(1e-4, patches[i].radius));
+  uniforms.vitiligoCount.value = n;
+  uniforms.vitiligoIrregular.value = irregular ? 1 : 0;
+  uniforms.vitiligoColor.value.set(color);
 }

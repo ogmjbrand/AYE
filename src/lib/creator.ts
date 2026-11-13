@@ -5,6 +5,7 @@
  * character's appearance (money, progress and owned clothes are kept).
  */
 import { MAX_TRAITS, TRAITS, type DreamId, type TraitId } from './lifeState';
+import { sanitiseSkin, type SkinAppearance } from './skinAppearance';
 import type { Career, Character, Lifestyle } from '../components/CharacterCreation';
 import type { Diet } from './food';
 import type { Gender } from './identity';
@@ -46,6 +47,8 @@ export interface Draft {
   skinToneId: SkinToneId;
   /** The tint's colour (a custom one, or the tone's own). */
   skinColor: string;
+  /** Skin & pigmentation (lib/skinAppearance.ts); undefined keeps the person's own skin with the settings above. */
+  skin?: SkinAppearance;
   /** What's worn per slot: an item id, or null for the person's own garment or hair. */
   outfit: Partial<Record<Slot, string | null>>;
   lifestyle: Lifestyle;
@@ -90,6 +93,7 @@ export function draftFrom(c: Character): Draft {
     body: c.body, lookId: c.lookId, heightCm: c.heightCm, shape: sanitiseShape(c.shape), skinTone: c.skinTone ?? 0,
     skinToneId: isSkinToneId(c.skinToneId) ? c.skinToneId : DEFAULT_SKIN_TONE,
     skinColor: isSkinColor(c.skinColor) ? c.skinColor : skinToneById(isSkinToneId(c.skinToneId) ? c.skinToneId : DEFAULT_SKIN_TONE).color,
+    skin: sanitiseSkin(c.skin) ?? undefined,
     outfit: { ...c.wardrobe.equipped }, lifestyle: c.lifestyle, career: c.career, diet: c.diet, traits: [], dream: null, homeId: null, bio: '',
   };
 }
@@ -199,6 +203,7 @@ export function buildCharacter(d: Draft, opts: { existing?: Character; id?: stri
     shape: sanitiseShape(d.shape), skinTone: clampTone(d.skinTone),
     skinToneId: isSkinToneId(d.skinToneId) ? d.skinToneId : DEFAULT_SKIN_TONE,
     skinColor: isSkinColor(d.skinColor) ? d.skinColor : undefined,
+    skin: sanitiseSkin(d.skin) ?? undefined,
     wardrobe,
   };
   if (existing) return { ...existing, ...appearance };

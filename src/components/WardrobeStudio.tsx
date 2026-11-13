@@ -74,6 +74,7 @@ export function WardrobeStudio({ character, onConfirm, onSaveOutfits, onToggleFa
               skinTone={character.skinTone}
               skinToneId={character.skinToneId}
               skinColor={character.skinColor}
+              skin={character.skin}
               hairstyleItemId={draft.hairstyle}
               view={view}
               onViewReleased={() => setView(null)}

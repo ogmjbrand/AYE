@@ -175,6 +175,7 @@ export function Player({
               skinTone={character?.skinTone}
               skinToneId={character?.skinToneId}
               skinColor={character?.skinColor}
+              skin={character?.skin}
               conversing={conversing}
               hugSession={hugSession}
               eating={eating}

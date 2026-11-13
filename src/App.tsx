@@ -3183,7 +3183,7 @@ export function Game({ character, quality: qualityMode, onQualityChange, showRou
         <BoutiquePanel
           section={section}
           districtId={district.id}
-          wearer={{ lookId: character.lookId, heightCm: character.heightCm, shape: character.shape, skinTone: character.skinTone, skinToneId: character.skinToneId, skinColor: character.skinColor }}
+          wearer={{ lookId: character.lookId, heightCm: character.heightCm, shape: character.shape, skinTone: character.skinTone, skinToneId: character.skinToneId, skinColor: character.skinColor, skin: character.skin }}
           wardrobe={wardrobe}
           balance={state.balance}
           onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}

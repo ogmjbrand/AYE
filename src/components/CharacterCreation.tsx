@@ -1,3 +1,5 @@
+import type { SkinAppearance } from '../lib/skinAppearance';
+import { SkinPigmentation } from './SkinPigmentation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { CharacterPreview, type PreviewFocus, type PreviewView } from './CharacterPreview';
 import { BodyTypeChart } from './mh/BodyTypeChart';
@@ -75,6 +77,8 @@ export interface Character {
   skinToneId?: SkinToneId;
   /** A custom colour for the tint. */
   skinColor?: string;
+  /** Skin & pigmentation (lib/skinAppearance.ts): a preset, its shade and fine-tuning, vitiligo or albinism. Overrides the three above when set. */
+  skin?: SkinAppearance;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
   /** Furniture owned and placed in the player's homes. Older saves omit this. */
@@ -171,7 +175,7 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
 
   return (
     <Shell
-      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} skinToneId={draft.skinToneId} skinColor={draft.skinColor} styles={styles} focus={focus}
+      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} skinToneId={draft.skinToneId} skinColor={draft.skinColor} skin={draft.skin} styles={styles} focus={focus}
       avatarName={draft.name.trim() || 'New avatar'}
       previewSub={hasPlayerBody(draft.lookId)
         ? `Character Creator 5 · ${draft.heightCm} cm`
@@ -380,6 +384,8 @@ function FaceStage({ draft, set }: StageProps) {
   const look = describedLook(draft.lookId);
   return (
     <>
+      <SkinPigmentation skin={draft.skin} onChange={(skin) => set({ skin })} />
+      {!draft.skin && <>
       <div className="space-y-2.5">
         <p className={SECTION_LABEL}>Skin tone</p>
         <Slider id="skin" label="Skin" min={-1} max={1} step={0.05} value={draft.skinTone} onChange={(v) => set({ skinTone: v })} ends={['Lighter', 'Deeper']}
@@ -396,6 +402,7 @@ function FaceStage({ draft, set }: StageProps) {
           : <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>}
       </div>
       <SkinTonePicker skinTone={draft.skinToneId} skinColor={draft.skinColor} onChange={(skinToneId, skinColor) => set({ skinToneId, skinColor })} />
+      </>}
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
@@ -621,10 +628,10 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, skinToneId, skinColor, focus, onFocus, onRandomise, onUndo, onReset }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, skinToneId, skinColor, skin, focus, onFocus, onRandomise, onUndo, onReset }: {
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
-  shape: BodyShape; skinTone: number; skinToneId: SkinToneId; skinColor: string; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
+  shape: BodyShape; skinTone: number; skinToneId: SkinToneId; skinColor: string; skin?: SkinAppearance; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
   onRandomise?: () => void;
   /** Step back one change, or back to how you started; left out when there's nothing to undo. */
@@ -655,7 +662,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} focus={focus} view={view} onViewReleased={() => setView(null)} interactive />
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} skin={skin} focus={focus} view={view} onViewReleased={() => setView(null)} interactive />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

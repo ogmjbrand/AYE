@@ -34,6 +34,7 @@ import { sanitiseChores } from './chores';
 import { sanitiseGear } from './careerGear';
 import { sanitiseHomeDecor } from './homeDecor';
 import { DEFAULT_SKIN_TONE, isSkinColor, isSkinToneId } from './skinTone';
+import { sanitiseSkin } from './skinAppearance';
 import { sanitiseOwnedVehicles, vehicleById } from './vehicleCatalog';
 
 const CHARACTER_KEY = 'aye_character';
@@ -125,6 +126,8 @@ export function parseCharacter(data: unknown): Character | null {
     skinTone: isNum(c.skinTone, -1, 1) ? Math.round(c.skinTone * 100) / 100 : 0,
     skinToneId: isSkinToneId(c.skinToneId) ? c.skinToneId : isSkinToneId(c.skinTone) ? c.skinTone : DEFAULT_SKIN_TONE,
     skinColor: isSkinColor(c.skinColor) ? c.skinColor : undefined,
+    // Saves from before Skin & pigmentation have none: they keep the skin settings above
+    skin: sanitiseSkin(c.skin) ?? undefined,
   };
 }
 

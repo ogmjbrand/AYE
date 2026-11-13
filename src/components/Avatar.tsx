@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, Color, Euler, LoopOnce, LoopRepeat, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
+import { Box3, Color, Euler, LoopOnce, LoopRepeat, Material as MaterialBase, NoColorSpace, Quaternion, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D, type SkinnedMesh } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
@@ -9,7 +9,7 @@ import { seatDrop } from '../lib/seating';
 import { assetUrl, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
-import { applySkinShade, applySkinTone, applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
+import { applySkinShade, applySkinTone, applyStyles, applyVitiligo, installStyleShader, type StyleUniforms } from './outfitShader';
 import { applyBodyShape } from './bodyShapeSkin';
 import { createRelaxedHands } from './relaxedHands';
 import { withRelaxedHands } from './handPose';
@@ -26,7 +26,8 @@ import { sewnById, sewnFileFor } from '../lib/garmentRegistry';
 import { DEFAULT_SKIN_TONE, isSkinColor, skinToneById, skinToneDepth, type SkinToneId } from '../lib/skinTone';
 import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
 import { createReachHugClip } from '../lib/hugAnimation';
-import { findRigBone } from '../lib/characterRig';
+import { findRigBone, normalizeRigBoneName } from '../lib/characterRig';
+import { VITILIGO_ANCHORS, VITILIGO_PATCH_COLOUR, albinismHairColour, skinColour, vitiligoPatches, type SkinAppearance } from '../lib/skinAppearance';
 import { ONE_SHOT, type ActivityClip } from '../lib/animationLibrary';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
@@ -44,15 +45,61 @@ interface OutfitStylerProps {
   /** A skin tint (lib/skinTone.ts); 'original' keeps the authored skin. */
   skinToneId?: SkinToneId;
   skinColor?: string;
+  /** Skin & pigmentation from the creator (lib/skinAppearance.ts); when set it decides the skin. */
+  skin?: SkinAppearance | null;
+}
+
+/**
+ * Points on the skin each bone vitiligo patches anchor to moves, in a skinned mesh's own geometry
+ * (a sample of the vertices that bone mainly moves), and the body's height (its longest extent). Worked out from the mesh
+ * itself, so it holds whatever axes or bind matrices the model was exported with. Cached per geometry.
+ */
+const anchorCache = new WeakMap<object, { anchors: Map<string, [number, number, number][]>; height: number }>();
+function skinAnchors(mesh: SkinnedMesh): { anchors: Map<string, [number, number, number][]>; height: number } {
+  const cached = anchorCache.get(mesh.geometry);
+  if (cached) return cached;
+  const anchors = new Map<string, [number, number, number][]>();
+  const bones = mesh.skeleton?.bones ?? [];
+  const want = new Map<number, string>();
+  for (const name of new Set(Object.values(VITILIGO_ANCHORS).flatMap((a) => a.bones))) {
+    const n = normalizeRigBoneName(name).toLowerCase();
+    const i = bones.findIndex((b) => normalizeRigBoneName(b.name).toLowerCase() === n);
+    if (i >= 0) want.set(i, name);
+  }
+  const pos = mesh.geometry.getAttribute('position');
+  const idx = mesh.geometry.getAttribute('skinIndex');
+  const wts = mesh.geometry.getAttribute('skinWeight');
+  if (pos && idx && wts) {
+    for (let v = 0; v < pos.count; v++) {
+      // The bone that moves this vertex most: the vertex is a point of that bone's skin
+      let best = -1, bw = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = wts.getComponent(v, k);
+        if (w > bw) { bw = w; best = idx.getComponent(v, k); }
+      }
+      const name = want.get(best);
+      if (!name) continue;
+      const list = anchors.get(name) ?? [];
+      // A sample of the surface is plenty (every 7th vertex)
+      if (v % 7 === 0) list.push([pos.getX(v), pos.getY(v), pos.getZ(v)]);
+      anchors.set(name, list);
+    }
+  }
+  mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox;
+  const height = box ? Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z) : 1;
+  const out = { anchors, height };
+  anchorCache.set(mesh.geometry, out);
+  return out;
 }
 
 /** Applies fabrics, hair colour and skin tone using the look's garment maps (built-in looks only). */
-export function OutfitStyler({ scene, lookId, styles, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor }: OutfitStylerProps) {
+export function OutfitStyler({ scene, lookId, styles, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, skin = null }: OutfitStylerProps) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
   const [uniforms, materials, tinted] = useMemo(() => {
     const list: StyleUniforms[] = [];
     const mats: Material[] = [];
-    const tint: StyleUniforms[] = [];
+    const tint: { u: StyleUniforms; mesh: SkinnedMesh | null }[] = [];
     for (const tex of [bodyMask, headMask]) {
       // Garment maps are data in glTF UV space, like the model's own textures
       tex.flipY = false;
@@ -65,21 +112,33 @@ export function OutfitStyler({ scene, lookId, styles, skinTone = 0, skinToneId =
       for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         const u = installStyleShader(mat, /_head$/i.test(mat.name) ? headMask : bodyMask);
         if (u) { list.push(u); mats.push(mat); }
-        if (u && /_(body|head)$/i.test(mat.name)) tint.push(u);
+        if (u && /_(body|head)$/i.test(mat.name)) tint.push({ u, mesh: (mesh as SkinnedMesh).isSkinnedMesh ? (mesh as SkinnedMesh) : null });
       }
     });
     return [list, mats, tint] as const;
   }, [scene, bodyMask, headMask]);
+  // Albinism lightens the hair (and the lashes that follow it) unless a dye has been chosen
+  const hair = skin ? albinismHairColour(skin) : null;
+  const shown = useMemo(() => (hair && !styles.hair ? { ...styles, hair: { pattern: 'solid', colors: [hair, hair, hair], scale: 1 } as Style } : styles), [styles, hair]);
   useEffect(() => {
-    for (const u of uniforms) applyStyles(u, styles);
-  }, [uniforms, styles]);
+    for (const u of uniforms) applyStyles(u, shown);
+  }, [uniforms, shown]);
   useEffect(() => {
-    for (const m of materials) applySkinShade(m, skinTone);
-  }, [materials, skinTone]);
+    // The creator's skin sets the pigmentation outright; older characters keep the depth slider
+    for (const m of materials) applySkinShade(m, skin ? 0 : skinTone);
+  }, [materials, skinTone, skin]);
   useEffect(() => {
-    const color = isSkinColor(skinColor) ? skinColor : skinToneById(skinToneId).color;
-    for (const u of tinted) applySkinTone(u, color, skinToneId !== 'original');
-  }, [tinted, skinToneId, skinColor]);
+    const color = skin ? skinColour(skin) : isSkinColor(skinColor) ? skinColor : skinToneById(skinToneId).color;
+    for (const { u } of tinted) applySkinTone(u, color, !!skin || skinToneId !== 'original');
+  }, [tinted, skinToneId, skinColor, skin]);
+  useEffect(() => {
+    // Vitiligo patches, placed on each mesh around its own bones, sized by the whole body (the head is its own small mesh)
+    const height = Math.max(0, ...tinted.map(({ mesh }) => (mesh ? skinAnchors(mesh).height : 0)));
+    for (const { u, mesh } of tinted) {
+      if (!skin?.vitiligo || !mesh) { applyVitiligo(u, [], false); continue; }
+      applyVitiligo(u, vitiligoPatches(skin.vitiligo, skinAnchors(mesh).anchors, height), skin.vitiligo.shape === 'irregular', VITILIGO_PATCH_COLOUR);
+    }
+  }, [tinted, skin]);
   return null;
 }
 
@@ -209,7 +268,7 @@ function privateCopy(shared: Object3D): Object3D {
 /** Dark opaque tights, worn under a sewn dress. */
 const TIGHTS: Style = { pattern: 'solid', colors: ['#2a2321', '#2a2321', '#3a302c'], scale: 1, fabric: FABRICS.jersey };
 
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null, activity = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, skin = null, conversing = false, own = false, sitHeight, perch, hugSession = null, eating = false, shoeItemId = null, hairstyleItemId = null, activity = null }: {
   controller: PlayerHandle;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
   own?: boolean;
@@ -229,6 +288,8 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   skinToneId?: SkinToneId;
   /** Optional player-selected colour layered over a complexion or source skin texture. */
   skinColor?: string;
+  /** Skin & pigmentation from the creator (lib/skinAppearance.ts). */
+  skin?: SkinAppearance | null;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
   styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
@@ -453,7 +514,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
-      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={shownStyles ?? NO_STYLES} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} />}
+      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={shownStyles ?? NO_STYLES} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} skin={skin} />}
       {/* The CC5 body has no garment maps: its own clothes are recoloured, and a chosen swatch deepens or lightens its skin */}
       {playerBody && <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={Math.max(-1, Math.min(1, skinTone + skinToneDepth(skinToneId)))} />}
       {styles?.bag && <HeldBag scene={scene} style={styles.bag} />}

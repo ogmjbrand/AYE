@@ -1,3 +1,4 @@
+import type { SkinAppearance } from '../lib/skinAppearance';
 import { Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, OrbitControls } from '@react-three/drei';
@@ -98,7 +99,7 @@ function PreviewError() {
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, hairstyleItemId, focus = 'body', view = null, onViewReleased, interactive = false }: {
+export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0, skinToneId = DEFAULT_SKIN_TONE, skinColor, skin = null, hairstyleItemId, focus = 'body', view = null, onViewReleased, interactive = false }: {
   shape?: BodyShape;
   skinTone?: number;
   lookId?: string;
@@ -107,6 +108,7 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
   /** A skin tint (lib/skinTone.ts) and an optional custom colour for it. */
   skinToneId?: SkinToneId;
   skinColor?: string;
+  skin?: SkinAppearance | null;
   hairstyleItemId?: string | null;
   focus?: PreviewFocus;
   /** Hold the person turned to show this side; dragging the view lets go (onViewReleased). */
@@ -137,7 +139,7 @@ export function CharacterPreview({ lookId, heightCm, styles, shape, skinTone = 0
       <Turntable spin={spin} faceFront={interactive && focus === 'face'} view={interactive ? view : null}>
         <ErrorBoundary fallback={<PreviewError />}>
           <Suspense fallback={null}>
-            <Avatar key={lookId} controller={still} own lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} hairstyleItemId={hairstyleItemId} />
+            <Avatar key={lookId} controller={still} own lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} skinToneId={skinToneId} skinColor={skinColor} skin={skin} hairstyleItemId={hairstyleItemId} />
           </Suspense>
         </ErrorBoundary>
       </Turntable>

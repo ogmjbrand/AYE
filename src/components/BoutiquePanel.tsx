@@ -1,3 +1,4 @@
+import type { SkinAppearance } from '../lib/skinAppearance';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { COLOUR_CHOICES, recolourable, styleIn, swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
@@ -46,6 +47,7 @@ export interface WearerLook {
   skinTone?: number;
   skinToneId?: SkinToneId;
   skinColor?: string;
+  skin?: SkinAppearance;
 }
 
 /** A picture of the piece on your character, framed on where it's worn (sets: the whole outfit). */
@@ -70,8 +72,8 @@ function wearJob(items: FashionItem[], w: WearerLook, colours: Record<string, st
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {
-    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${w.skinToneId ?? ''}:${w.skinColor ?? ''}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => `${i.id}${colours[i.id] ?? ''}`).join('+')}`,
-    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} skinToneId={w.skinToneId} skinColor={w.skinColor} />,
+    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${w.skinToneId ?? ''}:${w.skinColor ?? ''}:${JSON.stringify(w.skin ?? null)}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => `${i.id}${colours[i.id] ?? ''}`).join('+')}`,
+    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} skinToneId={w.skinToneId} skinColor={w.skinColor} skin={w.skin} />,
     camera,
     size: 320,
   };
