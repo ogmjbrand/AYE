@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf, CC5_SKIN_MATERIALS } from './cc5Body';
+import {
+  cc5AlbinismMultiplier, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf, cc5UndertoneMultiplier,
+  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_SKIN_MATERIALS,
+} from './cc5Body';
 import type { Style } from './fashion';
 
 describe('CC5 player body', () => {
@@ -12,9 +15,12 @@ describe('CC5 player body', () => {
     expect(cc5SlotOf('Brows_Hair_Transparency')).toBeNull();
   });
 
-  it('recognises the skin materials only', () => {
-    for (const m of ['Std_Skin_Head', 'Std_Skin_Body', 'Std_Skin_Arm', 'Std_Skin_Leg', 'Std_Nails']) expect(CC5_SKIN_MATERIALS.test(m)).toBe(true);
-    for (const m of ['Std_Eye_L', 'Std_Upper_Teeth', 'Std_Eyelash']) expect(CC5_SKIN_MATERIALS.test(m)).toBe(false);
+  it('recognises the skin materials only, with or without the newer exports\' "_Pbr" suffix', () => {
+    for (const m of ['Std_Skin_Head', 'Std_Skin_Body', 'Std_Skin_Arm', 'Std_Skin_Leg', 'Std_Nails',
+      'Std_Skin_Head_Pbr', 'Std_Skin_Body_Pbr', 'Std_Skin_Arm_Pbr', 'Std_Skin_Leg_Pbr', 'Std_Nails_Pbr']) {
+      expect(CC5_SKIN_MATERIALS.test(m)).toBe(true);
+    }
+    for (const m of ['Std_Eye_L', 'Std_Upper_Teeth', 'Std_Eyelash', 'Std_Eyelash_Pbr']) expect(CC5_SKIN_MATERIALS.test(m)).toBe(false);
   });
 
   it('wears a style by its main colour, and keeps the original without one', () => {
@@ -30,5 +36,26 @@ describe('CC5 player body', () => {
     }
     expect(cc5SkinMultiplier(1)[0]).toBeLessThan(1);
     expect(cc5SkinMultiplier(-1)[0]).toBeGreaterThan(1);
+  });
+
+  it('keeps undertone at 0 a no-op and stays in range', () => {
+    expect(cc5UndertoneMultiplier(0)).toEqual([1, 1, 1]);
+    expect(cc5UndertoneMultiplier(1)[0]).toBeGreaterThan(1);
+    expect(cc5UndertoneMultiplier(-1)[2]).toBeGreaterThan(1);
+  });
+
+  it('only lightens brows and lashes as albinism intensity rises', () => {
+    expect(cc5AlbinismMultiplier(0)).toEqual([1, 1, 1]);
+    expect(cc5AlbinismMultiplier(1)[0]).toBeGreaterThan(cc5AlbinismMultiplier(0.5)[0]);
+    expect(cc5AlbinismMultiplier(-1)).toEqual([1, 1, 1]);
+  });
+
+  it('recognises brow and eyelash materials on both split-material bodies, old and new naming', () => {
+    for (const m of ['Brows_Hair_Transparency', 'Brows_Base_Transparency', 'Eyelash_Low', 'Eyelash_Up', 'Lash_Thick_Transparency_Pbr', 'Brows_Hair_Transparency_Pbr']) {
+      expect(CC5_BROW_LASH_MATERIALS.test(m)).toBe(true);
+    }
+    expect(CC5_BROW_LASH_MATERIALS.test('Std_Skin_Head')).toBe(false);
+    expect(CC5_HAS_SPLIT_MATERIALS.masculine).toBe(true);
+    expect(CC5_HAS_SPLIT_MATERIALS.feminine).toBe(true);
   });
 });

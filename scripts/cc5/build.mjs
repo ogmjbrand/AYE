@@ -28,8 +28,13 @@ const reuseRaw = process.argv.includes('--reuse-raw');
 // clips (and gestures for the same body type) are retargeted onto it. Ground speeds
 // of those clips are src/lib/looks.ts FEMININE / MASCULINE.
 const CHARACTERS = {
-  aaron: { file: 'HUMAN', dir: join(homedir(), 'OneDrive', 'Documents'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
-  woman: { file: 'WOMAN', dir: join(homedir(), 'Downloads'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
+  // Replaced 2026-11-15 with newer CC5-built exports (Aaron/Ariana): both now have a
+  // real skin/garment/brow/lash material split, unlike the old HUMAN.fbx (aaron kept
+  // it) / WOMAN.fbx (a one-material ActorScan woman had). Keys stay aaron/woman so
+  // CC5_BODIES in assetManifest.ts (masculine -> aaron.json, feminine -> woman.json)
+  // doesn't need to change.
+  aaron: { file: 'Aaron', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'Aaron'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
+  woman: { file: 'Ariana', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'Ariana'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
 };
 const charAt = process.argv.indexOf('--character');
 const name = charAt >= 0 ? process.argv[charAt + 1] : 'aaron';
@@ -51,18 +56,20 @@ const SOURCE_SPEEDS = character.speeds;
 // Longest texture side per profile; the first matching rule wins (texture names come
 // from CC). Budgeted by what the camera sees: the face gets the detail, skin under
 // the shirt and trousers and the teeth get little. CC ships up to 4096 px.
+// Newer CC5-built exports (Ariana, newer Aaron) infix "_Pbr" before the Diffuse/Normal
+// suffix (e.g. Std_Skin_Head_Pbr_Diffuse); older exports have no infix. "(_Pbr)?" covers both.
 const TEXTURE_RULES = {
   main: [
-    [/^Std_Skin_Head_Diffuse/, 2048],
-    [/^Std_Skin_(Body|Leg)_Diffuse/, 512],
+    [/^Std_Skin_Head(_Pbr)?_Diffuse/, 2048],
+    [/^Std_Skin_(Body|Leg)(_Pbr)?_Diffuse/, 512],
     [/^Std_Skin_(Body|Leg)|Teeth|Tongue|Std_Nails/, 256],
-    [/Std_Eye_|Std_Cornea|Eyelash|Brows|Beard|Hair_Clap/, 512],
-    [/^Std_Skin_Head_Normal|^Std_Skin_Arm_Diffuse|^Hair_Transparency_Diffuse/, 1024],
+    [/Std_Eye_|Std_Cornea|Eyelash|Lash_|Brows|Beard|Hair_Clap/, 512],
+    [/^Std_Skin_Head(_Pbr)?_Normal|^Std_Skin_Arm(_Pbr)?_Diffuse|^Hair_Transparency_Diffuse/, 1024],
     [/_(Diffuse|Diffuse-.*)$/, 1024],
     [/./, 512],
   ],
   lite: [
-    [/^Std_Skin_Head_Diffuse|^Hair_Transparency_Diffuse/, 512],
+    [/^Std_Skin_Head(_Pbr)?_Diffuse|^Hair_Transparency_Diffuse/, 512],
     [/_(Diffuse|Diffuse-.*)$/, 256],
     [/./, 128],
   ],
@@ -71,7 +78,7 @@ const TEXTURE_RULES = {
 const ALPHA_CUTOFF = [
   [/^Hair_/, 0.35],
   [/^Beard_/, 0.3],
-  [/Eyelash|^Brows_/, 0.2],
+  [/Eyelash|^Lash_|^Brows_/, 0.2],
   // A ready-dressed ActorScan (WOMAN.fbx) is one material whose opacity only cuts out
   // hair strands; blending the whole body would sort it against itself
   [/^Character$/, 0.4],

@@ -194,6 +194,8 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('hair-burgundy', 'hair', 'Burgundy', 300, 'Salon', 'solid', ['#5b1b26']),
   item('hair-honey-blonde', 'hair', 'Honey blonde', 300, 'Salon', 'solid', ['#b48748']),
   item('hair-platinum', 'hair', 'Platinum', 450, 'Salon', 'solid', ['#d8d2c4']),
+  // Very pale, low-pigment hair; useful alongside the Albinism skin category but open to anyone
+  item('hair-pale-white', 'hair', 'Pale white', 150, 'Salon', 'solid', ['#f1ecdf']),
   hairstyle('hairstyle-afro', 'Natural afro', 650),
   hairstyle('hairstyle-braids', 'Long braids', 850),
   hairstyle('hairstyle-ponytail', 'Ponytail', 600),

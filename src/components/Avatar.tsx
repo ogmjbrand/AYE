@@ -9,21 +9,32 @@ import { seatDrop } from '../lib/seating';
 import { assetUrl, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
-import { applySkinTone, applyStyles, installStyleShader, type StyleUniforms } from './outfitShader';
+import { applySkinPigmentation, applyStyles, installSkinOnlyShader, installStyleShader, type StyleUniforms } from './outfitShader';
+import { DEFAULT_VITILIGO, type VitiligoPattern } from '../lib/skinPigmentation';
 import { applyBodyShape } from './bodyShapeSkin';
 import { withRelaxedHands } from './handPose';
 import { Gestures, type GestureActions } from './Gestures';
 import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
-import { CC5_SKIN_MATERIALS, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf } from '../lib/cc5Body';
+import {
+  cc5AlbinismMultiplier, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf, cc5UndertoneMultiplier,
+  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_SKIN_MATERIALS,
+} from '../lib/cc5Body';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { createReachHugClip } from '../lib/hugAnimation';
 
 const NO_STYLES: Partial<Record<Slot, Style>> = {};
 const maskUrl = (lookId: string, part: 'body' | 'head') => assetUrl(`models/characters/rocketbox/masks/${lookId}-${part}.png`);
 
-/** Applies fabrics and hair colour using the look's garment maps (built-in looks only). */
-export function OutfitStyler({ scene, lookId, styles, skinTone }: { scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
+/** Applies fabrics, hair colour and skin pigmentation using the look's garment maps (built-in looks only). */
+export function OutfitStyler({ scene, lookId, styles, skinTone, undertone = 0, vitiligo = DEFAULT_VITILIGO }: {
+  scene: Object3D; lookId: string; styles: Partial<Record<Slot, Style>>;
+  /** -1 lighter … 1 deeper than the person's own skin. */
+  skinTone: number;
+  /** -1 cool … 1 warm undertone shift, independent of depth. */
+  undertone?: number;
+  vitiligo?: VitiligoPattern;
+}) {
   const [bodyMask, headMask] = useTexture([maskUrl(lookId, 'body'), maskUrl(lookId, 'head')]);
   const [uniforms, materials] = useMemo(() => {
     const list: StyleUniforms[] = [];
@@ -48,32 +59,55 @@ export function OutfitStyler({ scene, lookId, styles, skinTone }: { scene: Objec
     for (const u of uniforms) applyStyles(u, styles);
   }, [uniforms, styles]);
   useEffect(() => {
-    for (const m of materials) applySkinTone(m, skinTone);
-  }, [materials, skinTone]);
+    for (const m of materials) applySkinPigmentation(m, { depth: skinTone, undertone, vitiligo });
+  }, [materials, skinTone, undertone, vitiligo]);
   return null;
 }
 
 /**
  * The Character Creator 5 body wears its own modelled clothes: the wardrobe
- * recolours them by material, and skin tone tints the skin (lib/cc5Body.ts).
+ * recolours them by material. On the split-material body (aaron), skin gets
+ * the full per-pixel pigmentation shader (depth, undertone and vitiligo
+ * patches) and brows/lashes lighten for albinism; on the single-material
+ * body (the WOMAN.fbx scan), skin tone is a plain colour multiply over her
+ * whole material, since her skin and clothes share one texture
+ * (lib/cc5Body.ts: CC5_HAS_SPLIT_MATERIALS).
  */
-function Cc5Styler({ scene, styles, skinTone }: { scene: Object3D; styles: Partial<Record<Slot, Style>>; skinTone: number }) {
+function Cc5Styler({ scene, styles, skinTone, undertone = 0, vitiligo = DEFAULT_VITILIGO, albinismIntensity = 0, splitMaterials }: {
+  scene: Object3D; styles: Partial<Record<Slot, Style>>; skinTone: number; undertone?: number; vitiligo?: VitiligoPattern; albinismIntensity?: number; splitMaterials: boolean;
+}) {
   useEffect(() => {
-    const [r, g, b] = cc5SkinMultiplier(skinTone);
+    const [sr, sg, sb] = cc5SkinMultiplier(skinTone);
+    const [ur, ug, ub] = cc5UndertoneMultiplier(undertone);
+    const [ar, ag, ab] = cc5AlbinismMultiplier(albinismIntensity);
     scene.traverse((o) => {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
       for (const m of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as MeshStandardMaterial[]) {
-        if (!m.color) continue;
-        const base = (m.userData.cc5Base ??= m.color.clone()) as Color;
         const slot = cc5SlotOf(m.name);
         const wear = slot ? cc5GarmentColor(styles[slot]) : null;
-        if (wear) m.color.set(wear);
-        else if (CC5_SKIN_MATERIALS.test(m.name)) m.color.setRGB(base.r * r, base.g * g, base.b * b);
+        if (wear) {
+          m.color?.set(wear);
+          continue;
+        }
+        if (splitMaterials && CC5_SKIN_MATERIALS.test(m.name)) {
+          const u = installSkinOnlyShader(m);
+          if (u) applySkinPigmentation(m, { depth: skinTone, undertone, vitiligo });
+          continue;
+        }
+        if (splitMaterials && CC5_BROW_LASH_MATERIALS.test(m.name)) {
+          if (!m.color) continue;
+          const base = (m.userData.cc5Base ??= m.color.clone()) as Color;
+          m.color.setRGB(base.r * ar, base.g * ag, base.b * ab);
+          continue;
+        }
+        if (!m.color) continue;
+        const base = (m.userData.cc5Base ??= m.color.clone()) as Color;
+        if (!splitMaterials) m.color.setRGB(base.r * sr * ur, base.g * sg * ug, base.b * sb * ub);
         else m.color.copy(base);
       }
     });
-  }, [scene, styles, skinTone]);
+  }, [scene, styles, skinTone, undertone, vitiligo, albinismIntensity, splitMaterials]);
   return null;
 }
 
@@ -131,7 +165,9 @@ function privateCopy(shared: Object3D): Object3D {
       const c = m.clone();
       c.onBeforeCompile = MaterialBase.prototype.onBeforeCompile;
       c.customProgramCacheKey = MaterialBase.prototype.customProgramCacheKey;
-      delete (c.userData as { ayeStyle?: unknown }).ayeStyle;
+      delete (c.userData as { ayeStyle?: unknown; ayePigment?: unknown; cc5Base?: unknown }).ayeStyle;
+      delete (c.userData as { ayeStyle?: unknown; ayePigment?: unknown; cc5Base?: unknown }).ayePigment;
+      delete (c.userData as { ayeStyle?: unknown; ayePigment?: unknown; cc5Base?: unknown }).cc5Base;
       return c;
     };
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(fresh) : fresh(mesh.material);
@@ -144,7 +180,7 @@ function privateCopy(shared: Object3D): Object3D {
  * lib/assetManifest.ts) or one of the built-in looks in lib/looks.ts. Picks
  * idle / walk / run from the speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, conversing = false, own = false, hugSession = null }: {
+export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
   controller: PlayerHandle;
   /** Sharing a hug with a resident: the embrace plays once the two have met (lib/hug.ts). */
   hugSession?: HugSession | null;
@@ -156,6 +192,12 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   shape?: BodyShape;
   /** Deeper (to 1) or lighter (to -1) than the person's own skin; 0 keeps it. */
   skinTone?: number;
+  /** -1 cool … 1 warm undertone shift, independent of depth. */
+  undertone?: number;
+  /** Patchy depigmentation (lib/skinPigmentation.ts); off by default. */
+  vitiligo?: VitiligoPattern;
+  /** 0 fully pigmented … 1 fully depigmented hair, brows and lashes (where the model supports it). */
+  albinismIntensity?: number;
   /** Fabrics and hair colour to wear (lib/fashion.ts); original clothes where a slot is empty. */
   styles?: Partial<Record<Slot, Style>>;
   /** Which person to show (lib/looks.ts); the default look if omitted. */
@@ -278,8 +320,10 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   return (
     <group ref={group} dispose={null}>
       <primitive object={scene} scale={scale} />
-      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
-      {playerBody && <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={skinTone} />}
+      {styledLook && <OutfitStyler scene={scene} lookId={styledLook} styles={styles ?? NO_STYLES} skinTone={skinTone} undertone={undertone} vitiligo={vitiligo} />}
+      {playerBody && (
+        <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={skinTone} undertone={undertone} vitiligo={vitiligo} albinismIntensity={albinismIntensity} splitMaterials={CC5_HAS_SPLIT_MATERIALS[bodyType]} />
+      )}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );

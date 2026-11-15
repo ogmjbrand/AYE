@@ -132,8 +132,18 @@ report['source'] = {
 
 # --------------------------------------------------------------- materials ---
 cc = json.load(open(json_path, encoding='utf-8-sig'))
-# Built characters are "Avatar"; scanned, ready-dressed ones (one mesh, one texture) are "ActorScan"
-cc_meshes = next(v for v in cc[next(iter(cc))]['Object'].values() if v.get('Type') in ('Avatar', 'ActorScan'))['Meshes']
+cc_top_name = next(iter(cc))
+cc_objects = cc[cc_top_name]['Object']
+# Built characters are "Avatar"; scanned, ready-dressed ones (one mesh, one texture) are "ActorScan".
+# Newer Unity Pipeline Plugin builds drop the 'Type' tag entirely when the export
+# contains only the avatar (no scene props/lights) -- in that case the object
+# keyed under the same name as the top-level JSON key *is* the character.
+cc_character = next((v for v in cc_objects.values() if v.get('Type') in ('Avatar', 'ActorScan')), None)
+if cc_character is None:
+    cc_character = cc_objects.get(cc_top_name)
+if cc_character is None:
+    cc_character = max(cc_objects.values(), key=lambda v: len(v.get('Meshes', {})))
+cc_meshes = cc_character['Meshes']
 
 
 def find_image(path, non_color):

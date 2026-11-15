@@ -1,5 +1,6 @@
 import { Color, DataTexture, NoColorSpace, type Material, type MeshStandardMaterial, type Texture } from 'three';
 import { PATTERNS, SLOTS, type Slot, type Style } from '../lib/fashion';
+import { DEFAULT_VITILIGO, type VitiligoPattern } from '../lib/skinPigmentation';
 
 /**
  * Restyles a Rocketbox avatar's clothes and hair in the fragment shader.
@@ -11,7 +12,11 @@ import { PATTERNS, SLOTS, type Slot, type Style } from '../lib/fashion';
  *
  * Skin (every texel the garment map leaves uncovered) can be made deeper or
  * lighter within a natural range, keeping the person's own pores, shading
- * and undertone. Cut-out cards (hijab drapes, eyelashes) are never skin.
+ * and undertone, and can take an independent warm/cool undertone shift and a
+ * procedural, parameterised vitiligo pattern (lib/skinPigmentation.ts) — no
+ * extra texture asset is needed for either. Cut-out cards (hijab drapes,
+ * eyelashes) are never skin. Roughness and normal detail always come from the
+ * model's own maps, untouched by any of this.
  */
 
 interface SlotUniforms {
@@ -28,8 +33,12 @@ interface SlotUniforms {
 }
 
 export interface StyleUniforms extends Partial<Record<Slot, SlotUniforms>> {
-  skinTone: { value: Color };
-  skinToneEnabled: { value: number };
+  /** Warm (towards 1,1,1 scaled up on red/green) or cool (towards blue) multiply on skin texels; (1,1,1) is a no-op. */
+  undertone: { value: Color };
+  vitiligoOn: { value: number };
+  vitiligoCoverage: { value: number };
+  vitiligoScale: { value: number };
+  vitiligoSeed: { value: number };
 }
 
 const BODY_SLOTS: readonly (readonly [Slot, string])[] = [['top', 'r'], ['bottom', 'g'], ['shoes', 'b']];
@@ -155,8 +164,11 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   if (cutout) mask = FULL_MASK;
 
   const uniforms: StyleUniforms = {
-    skinTone: { value: new Color('#ffffff') },
-    skinToneEnabled: { value: 0 },
+    undertone: { value: new Color(1, 1, 1) },
+    vitiligoOn: { value: 0 },
+    vitiligoCoverage: { value: DEFAULT_VITILIGO.coverage },
+    vitiligoScale: { value: DEFAULT_VITILIGO.scale },
+    vitiligoSeed: { value: DEFAULT_VITILIGO.seed },
   };
   for (const [slot] of slots) {
     uniforms[slot] = {
@@ -167,7 +179,8 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
   const isHead = slots === HEAD_SLOTS;
   m.userData.ayeStyle = uniforms;
   const skin = { value: 0 };
-  (m.userData as { ayeSkin?: { value: number } }).ayeSkin = skin;
+  const pigment: PigmentUniforms = { skin, undertone: uniforms.undertone, vitiligoOn: uniforms.vitiligoOn, vitiligoCoverage: uniforms.vitiligoCoverage, vitiligoScale: uniforms.vitiligoScale, vitiligoSeed: uniforms.vitiligoSeed };
+  (m.userData as { ayePigment?: PigmentUniforms }).ayePigment = pigment;
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uAyeMask = { value: mask };
     shader.uniforms.uAyeSkin = skin;
@@ -179,9 +192,13 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       decl += `uniform float uAye_${slot}_rough; uniform float uAye_${slot}_weave; uniform float uAye_${slot}_metal;\n`;
       decl += `uniform vec3 uAye_${slot}_a; uniform vec3 uAye_${slot}_b; uniform vec3 uAye_${slot}_c;\n`;
     }
-    shader.uniforms.uAyeSkinTone = uniforms.skinTone;
-    shader.uniforms.uAyeSkinToneEnabled = uniforms.skinToneEnabled;
-    decl += 'uniform vec3 uAyeSkinTone; uniform float uAyeSkinToneEnabled;\n';
+    shader.uniforms.uAyeUndertone = uniforms.undertone;
+    shader.uniforms.uAyeVitiligoOn = uniforms.vitiligoOn;
+    shader.uniforms.uAyeVitiligoCoverage = uniforms.vitiligoCoverage;
+    shader.uniforms.uAyeVitiligoScale = uniforms.vitiligoScale;
+    shader.uniforms.uAyeVitiligoSeed = uniforms.vitiligoSeed;
+    decl += `uniform vec3 uAyeUndertone; uniform float uAyeVitiligoOn;
+    uniform float uAyeVitiligoCoverage; uniform float uAyeVitiligoScale; uniform float uAyeVitiligoSeed;\n`;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${decl}${PATTERN_GLSL}`)
       .replace(
@@ -193,13 +210,6 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
         float ayeFinish = 0.0;
         {
           vec4 ayeMask = texture2D(uAyeMask, vMapUv);
-          ${cutout ? '' : `
-          float ayeSkinCoverage = ${isHead ? 'ayeMask.r' : 'max(ayeMask.r, max(ayeMask.g, ayeMask.b))'};
-          float ayeSkinWeight = (1.0 - clamp(ayeSkinCoverage, 0.0, 1.0)) * uAyeSkinToneEnabled;
-          float ayeSkinLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-          vec3 ayeSkinShade = uAyeSkinTone * (0.45 + 1.1 * sqrt(clamp(ayeSkinLum, 0.0, 1.0)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, ayeSkinShade, ayeSkinWeight);
-          `}
           // Keep the fabric's folds: brightness of the original texel, lifted so dark cloth still shows the new colour
           float ayeLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           float ayeShade = ${isHead ? '0.35 + 1.25 * sqrt(ayeLum)' : '0.5 + 0.75 * sqrt(ayeLum)'};
@@ -214,6 +224,28 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
               : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));
             diffuseColor.rgb = mix(diffuseColor.rgb, ayeSkinCol, ayeSkinW);
           }
+          if (ayeSkinW > 0.001) {
+            // Undertone: a gentle warm or cool multiply, independent of depth; (1,1,1) is a no-op
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uAyeUndertone, ayeSkinW);
+            // Vitiligo: irregular depigmented patches (a cellular pattern seeded per person), lighter and
+            // desaturated, with a soft edge; drawn procedurally so no mask texture is needed
+            if (uAyeVitiligoOn > 0.5) {
+              vec2 ayeVp = vMapUv * (36.0 * uAyeVitiligoScale) + uAyeVitiligoSeed * 17.0;
+              vec2 ayeVCell = floor(ayeVp);
+              float ayeVDist = 2.0;
+              for (int ayeVDx = -1; ayeVDx <= 1; ayeVDx++) {
+                for (int ayeVDy = -1; ayeVDy <= 1; ayeVDy++) {
+                  vec2 ayeCell = ayeVCell + vec2(float(ayeVDx), float(ayeVDy));
+                  vec2 ayePoint = ayeCell + vec2(ayeHash(ayeCell), ayeHash(ayeCell + 11.7));
+                  ayeVDist = min(ayeVDist, length(ayeVp - ayePoint));
+                }
+              }
+              float ayeThreshold = mix(0.08, 0.95, clamp(uAyeVitiligoCoverage, 0.0, 1.0));
+              float ayeVPatch = 1.0 - smoothstep(ayeThreshold, ayeThreshold + 0.16, ayeVDist);
+              vec3 ayeDepigmented = mix(diffuseColor.rgb, vec3(0.86, 0.78, 0.7), 0.82);
+              diffuseColor.rgb = mix(diffuseColor.rgb, ayeDepigmented, ayeVPatch * ayeSkinW);
+            }
+          }
           ${slots.map(([slot, ch]) => slotGlsl(slot, ch)).join('\n')}
         }`,
       )
@@ -223,9 +255,80 @@ export function installStyleShader(material: Material, maskTexture: Texture): St
       )
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ayeMetal, ayeFinish);');
   };
-  m.customProgramCacheKey = () => `aye-style-v5-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
+  m.customProgramCacheKey = () => `aye-style-v6-${cutout ? 'cutout' : isHead ? 'head' : 'body'}`;
   m.needsUpdate = true;
   return uniforms;
+}
+
+const AYE_HASH_GLSL = 'float ayeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n';
+
+/** Depth, undertone and vitiligo for a material that's entirely skin (no garment mask or fabric slots). */
+const PIGMENT_ONLY_FRAGMENT = /* glsl */ `
+{
+  float ayeLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  if (abs(uAyeSkin) > 0.001) {
+    // Deeper: towards a warm deep brown, keeping the texel's own light and shade. Colours here are linear.
+    vec3 ayeDeep = vec3(0.068, 0.026, 0.011) * clamp(ayeLum / 0.3, 0.45, 1.6);
+    diffuseColor.rgb = uAyeSkin > 0.0
+      ? mix(diffuseColor.rgb, ayeDeep, uAyeSkin * 0.92)
+      : min(diffuseColor.rgb * (1.0 - 0.32 * uAyeSkin), vec3(1.0));
+  }
+  // Undertone: a gentle warm or cool multiply, independent of depth; (1,1,1) is a no-op
+  diffuseColor.rgb *= uAyeUndertone;
+  // Vitiligo: irregular depigmented patches drawn procedurally (no mask texture needed)
+  if (uAyeVitiligoOn > 0.5) {
+    vec2 ayeVp = vMapUv * (36.0 * uAyeVitiligoScale) + uAyeVitiligoSeed * 17.0;
+    vec2 ayeVCell = floor(ayeVp);
+    float ayeVDist = 2.0;
+    for (int ayeVDx = -1; ayeVDx <= 1; ayeVDx++) {
+      for (int ayeVDy = -1; ayeVDy <= 1; ayeVDy++) {
+        vec2 ayeCell = ayeVCell + vec2(float(ayeVDx), float(ayeVDy));
+        vec2 ayePoint = ayeCell + vec2(ayeHash(ayeCell), ayeHash(ayeCell + 11.7));
+        ayeVDist = min(ayeVDist, length(ayeVp - ayePoint));
+      }
+    }
+    float ayeThreshold = mix(0.08, 0.95, clamp(uAyeVitiligoCoverage, 0.0, 1.0));
+    float ayeVPatch = 1.0 - smoothstep(ayeThreshold, ayeThreshold + 0.16, ayeVDist);
+    vec3 ayeDepigmented = mix(diffuseColor.rgb, vec3(0.86, 0.78, 0.7), 0.82);
+    diffuseColor.rgb = mix(diffuseColor.rgb, ayeDepigmented, ayeVPatch);
+  }
+}`;
+
+/**
+ * Installs the depth/undertone/vitiligo skin shader on a material that is
+ * entirely skin — the CC5 player body's split skin and nails materials
+ * (CC5_SKIN_MATERIALS in lib/cc5Body.ts), which have no garment mask and
+ * need no fabric slots. Installed once; later calls return the same uniforms.
+ */
+export function installSkinOnlyShader(material: Material): PigmentUniforms | null {
+  const m = material as MeshStandardMaterial & { userData: { ayePigment?: PigmentUniforms } };
+  if (m.userData.ayePigment) return m.userData.ayePigment;
+  if (!m.map) return null;
+  const pigment: PigmentUniforms = {
+    skin: { value: 0 },
+    undertone: { value: new Color(1, 1, 1) },
+    vitiligoOn: { value: 0 },
+    vitiligoCoverage: { value: DEFAULT_VITILIGO.coverage },
+    vitiligoScale: { value: DEFAULT_VITILIGO.scale },
+    vitiligoSeed: { value: DEFAULT_VITILIGO.seed },
+  };
+  m.userData.ayePigment = pigment;
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uAyeSkin = pigment.skin;
+    shader.uniforms.uAyeUndertone = pigment.undertone;
+    shader.uniforms.uAyeVitiligoOn = pigment.vitiligoOn;
+    shader.uniforms.uAyeVitiligoCoverage = pigment.vitiligoCoverage;
+    shader.uniforms.uAyeVitiligoScale = pigment.vitiligoScale;
+    shader.uniforms.uAyeVitiligoSeed = pigment.vitiligoSeed;
+    const decl = `uniform float uAyeSkin; uniform vec3 uAyeUndertone; uniform float uAyeVitiligoOn;
+    uniform float uAyeVitiligoCoverage; uniform float uAyeVitiligoScale; uniform float uAyeVitiligoSeed;\n`;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${decl}${AYE_HASH_GLSL}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${PIGMENT_ONLY_FRAGMENT}`);
+  };
+  m.customProgramCacheKey = () => 'aye-cc5-skin-v1';
+  m.needsUpdate = true;
+  return pigment;
 }
 
 /** Points the uniforms at the styles to show; slots without a style show the original clothes. */
@@ -247,8 +350,34 @@ export function applyStyles(uniforms: StyleUniforms, styles: Partial<Record<Slot
   }
 }
 
-/** Deeper (up to 1) or lighter (down to -1) skin for a material set up by installStyleShader. */
-export function applySkinTone(material: Material, tone: number) {
-  const u = (material.userData as { ayeSkin?: { value: number } }).ayeSkin;
-  if (u) u.value = Math.max(-1, Math.min(1, tone));
+interface PigmentUniforms {
+  skin: { value: number };
+  undertone: { value: Color };
+  vitiligoOn: { value: number };
+  vitiligoCoverage: { value: number };
+  vitiligoScale: { value: number };
+  vitiligoSeed: { value: number };
+}
+
+/** Warm (towards 1) or cool (towards -1) multiply on skin texels, independent of depth; 0 is a no-op. */
+const undertoneTint = (amount: number): [number, number, number] => {
+  const t = Math.max(-1, Math.min(1, amount));
+  return t >= 0 ? [1 + 0.07 * t, 1 + 0.015 * t, 1 - 0.1 * t] : [1 + 0.06 * t, 1 + 0.01 * t, 1 - 0.09 * t];
+};
+
+/**
+ * Depth, undertone and vitiligo pattern for a material set up by
+ * installStyleShader or installSkinOnlyShader. Every field keeps the
+ * person's own skin where it's zero/disabled, so this is safe to call even
+ * where nothing's changed.
+ */
+export function applySkinPigmentation(material: Material, pigmentation: { depth: number; undertone: number; vitiligo: VitiligoPattern }) {
+  const u = (material.userData as { ayePigment?: PigmentUniforms }).ayePigment;
+  if (!u) return;
+  u.skin.value = Math.max(-1, Math.min(1, pigmentation.depth));
+  u.undertone.value.setRGB(...undertoneTint(pigmentation.undertone));
+  u.vitiligoOn.value = pigmentation.vitiligo.enabled ? 1 : 0;
+  u.vitiligoCoverage.value = pigmentation.vitiligo.coverage;
+  u.vitiligoScale.value = pigmentation.vitiligo.scale;
+  u.vitiligoSeed.value = pigmentation.vitiligo.seed;
 }

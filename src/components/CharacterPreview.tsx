@@ -10,6 +10,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { MhFigure } from './mh/MhFigure';
 import type { Slot, Style } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
+import { DEFAULT_PIGMENTATION, type SkinPigmentation } from '../lib/skinPigmentation';
 
 export type PreviewFocus = 'body' | 'face';
 
@@ -86,12 +87,14 @@ function Placeholder({ color }: { color: string }) {
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, styles, shape, skinTone = 0, focus = 'body', interactive = false, figure = false }: {
+export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, styles, shape, skinTone = 0, pigmentation = DEFAULT_PIGMENTATION, focus = 'body', interactive = false, figure = false }: {
   /** Show the body-type figure (MakeHuman body in a two-piece) instead of the person. */
   figure?: boolean;
   outfitColor?: string;
   shape?: BodyShape;
   skinTone?: number;
+  /** Undertone, vitiligo and albinism (lib/skinPigmentation.ts); neutral if omitted. */
+  pigmentation?: SkinPigmentation;
   lookId?: string;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
@@ -124,7 +127,10 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, st
             {figure && shape ? (
               <group scale={height / 1.67}><MhFigure shape={shape} skinTone={Math.max(0.3, skinTone)} hair="afro" /></group>
             ) : (
-              <Avatar key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} />
+              <Avatar
+                key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone}
+                undertone={pigmentation.undertone} vitiligo={pigmentation.vitiligo} albinismIntensity={pigmentation.albinismIntensity}
+              />
             )}
           </Suspense>
         </ErrorBoundary>

@@ -15,13 +15,18 @@ import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wa
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl, isCc5Body } from '../lib/assetManifest';
+import { CC5_HAS_SPLIT_MATERIALS } from '../lib/cc5Body';
+import { type SkinPigmentation } from '../lib/skinPigmentation';
+import { SkinPigmentationPanel } from './SkinPigmentationPanel';
 
 /** The player's body is the Character Creator 5 character for their body type (lib/assetManifest.ts), unless it isn't available. */
 const hasPlayerBody = (lookId: string) => isCc5Body(lookById(lookId).body);
 /**
  * What each CC5 body looks like, for the stages' descriptions. Aaron (HUMAN.fbx) has
- * separate garments, so colours apply to each piece and skin tone to the skin; the
- * woman (WOMAN.fbx, a ready-dressed scan) is one material, so neither can change yet.
+ * separate garments and skin materials, so colours apply to each piece and full skin
+ * pigmentation (including vitiligo patches and brow/lash pigment) applies to the skin;
+ * the woman (WOMAN.fbx, a ready-dressed scan) is one material, so garment colours don't
+ * apply yet and skin depth/undertone tint her whole outfit (see lib/cc5Body.ts).
  */
 const CC5_LOOK = {
   masculine: { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers', restyle: true },
@@ -65,6 +70,8 @@ export interface Character {
   shape: BodyShape;
   /** -1 lighter … 1 deeper than the person's own skin; 0 (or missing in old saves) keeps it. */
   skinTone?: number;
+  /** Category, undertone, vitiligo pattern and albinism intensity (lib/skinPigmentation.ts); missing in old saves keeps everything neutral. */
+  pigmentation?: SkinPigmentation;
   /** Clothes and hair dye bought in the game (lib/fashion.ts). */
   wardrobe: Wardrobe;
   lifestyle: Lifestyle;
@@ -147,7 +154,7 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
 
   return (
     <Shell
-      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} styles={styles} focus={focus}
+      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} pigmentation={draft.pigmentation} styles={styles} focus={focus}
       bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody(draft.lookId)}
       avatarName={draft.name.trim() || 'New avatar'}
       previewSub={hasPlayerBody(draft.lookId)
@@ -353,23 +360,19 @@ function ProportionsStage({ draft, set }: StageProps) {
 
 function FaceStage({ draft, set }: StageProps) {
   const look = describedLook(draft.lookId);
+  // Vitiligo patches and independent brow/lash control need a split-material body (CC5 aaron);
+  // the single-material CC5 body (the woman scan) still gets depth and undertone, applied to her whole material.
+  const splitCc5 = hasPlayerBody(draft.lookId) && CC5_HAS_SPLIT_MATERIALS[draft.body];
+  const preciseSkin = !hasPlayerBody(draft.lookId) || splitCc5;
   return (
     <>
-      <div className="space-y-2.5">
-        <p className={SECTION_LABEL}>Skin tone</p>
-        <Slider id="skin" label="Skin" min={-1} max={1} step={0.05} value={draft.skinTone} onChange={(v) => set({ skinTone: v })} ends={['Lighter', 'Deeper']}
-          display={draft.skinTone === 0 ? 'Natural' : draft.skinTone > 0 ? `${Math.round(draft.skinTone * 100)}% deeper` : `${Math.round(-draft.skinTone * 100)}% lighter`} />
-        <div className="grid grid-cols-8 gap-2" role="radiogroup" aria-label="Skin tone presets">
-          {SKIN_STEPS.map((t) => (
-            <button key={t.value} type="button" role="radio" aria-checked={Math.abs(draft.skinTone - t.value) < 0.01} aria-label={t.label} title={t.label} onClick={() => set({ skinTone: t.value })}
-              className={`aspect-square rounded-full border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cc-gold ${Math.abs(draft.skinTone - t.value) < 0.01 ? 'border-cc-gold scale-110' : 'border-transparent hover:border-cc-gold/60'}`}
-              style={{ background: t.color }} />
-          ))}
-        </div>
-        {hasPlayerBody(draft.lookId) && !look.restyle
-          ? <p className="text-xs text-cc-muted">Her skin and clothes share one texture in her Character Creator model, so skin tone is saved with your life but shows her own skin for now.</p>
-          : <p className="text-xs text-cc-muted">Adjusts the person&rsquo;s own skin, keeping its texture and shading; clothes and hair aren&rsquo;t affected. The swatches are steps from lighter to deeper; the exact shade depends on the person.</p>}
-      </div>
+      <SkinPigmentationPanel
+        depth={draft.skinTone}
+        pigmentation={draft.pigmentation}
+        onChange={(depth, pigmentation) => set({ skinTone: depth, pigmentation })}
+        preciseSkin={preciseSkin}
+        browLashControl={splitCc5}
+      />
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
@@ -491,18 +494,6 @@ function ReviewStage({ draft, set, editing }: StageProps & { editing?: Character
   );
 }
 
-/** Tone steps for the swatch row (relative to the person's own skin, as the slider is). */
-const SKIN_STEPS: readonly { value: number; label: string; color: string }[] = [
-  { value: -0.75, label: 'Much lighter', color: '#d9a882' },
-  { value: -0.4, label: 'Lighter', color: '#c38f6a' },
-  { value: 0, label: 'Natural', color: 'linear-gradient(135deg,#b07a55,#7a4a2c)' },
-  { value: 0.25, label: 'A little deeper', color: '#94603d' },
-  { value: 0.45, label: 'Deeper', color: '#7b4b2e' },
-  { value: 0.65, label: 'Rich', color: '#623a22' },
-  { value: 0.85, label: 'Deep', color: '#4a2b19' },
-  { value: 1, label: 'Deepest', color: '#352013' },
-];
-
 /** Personality, a dream and a first home for a new life: the same choices the Life OS offers later. */
 function StartChoicesFields({ draft, set }: StageProps) {
   const budget = STARTING_BALANCE[draft.lifestyle];
@@ -595,11 +586,11 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, focus, onFocus, onRandomise, bodyFigure = false }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, pigmentation, focus, onFocus, onRandomise, bodyFigure = false }: {
   bodyFigure?: boolean;
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
-  shape: BodyShape; skinTone: number; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
+  shape: BodyShape; skinTone: number; pigmentation: SkinPigmentation; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
   onRandomise?: () => void;
 }) {
@@ -626,7 +617,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} focus={focus} interactive figure={bodyFigure} />
+          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} pigmentation={pigmentation} focus={focus} interactive figure={bodyFigure} />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

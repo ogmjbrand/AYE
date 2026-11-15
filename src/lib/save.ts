@@ -26,6 +26,7 @@ import { sanitiseOfficeCareer } from './officeCareer';
 import { sanitiseActiveIncident, sanitiseIncidentHistory } from './incidents';
 import { migrateOwnedVehicles } from './saveMigration';
 import { isSkinToneId, skinToneDepth } from './skinTone';
+import { sanitisePigmentation } from './skinPigmentation';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -92,6 +93,8 @@ export function parseCharacter(data: unknown): Character | null {
     // an earlier version becomes its depth, and the name is kept alongside
     skinTone: isNum(c.skinTone, -1, 1) ? Math.round(c.skinTone * 100) / 100 : isSkinToneId(c.skinTone) ? skinToneDepth(c.skinTone) : 0,
     ...(typeof c.skinTone === 'string' ? { legacySkinTone: c.skinTone } : {}),
+    // Saves from before pigmentation categories keep the plain skin-tone slider, with everything else neutral
+    pigmentation: sanitisePigmentation(c.pigmentation),
   };
 }
 
