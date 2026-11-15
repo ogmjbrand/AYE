@@ -193,10 +193,11 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('top-bogolan-earth', 'top', 'Bogolan mud cloth · Earth', 520, 'African prints', 'bogolan', ['#3b2a1e', '#e8dcc4', '#8a5a32'], 16),
   item('top-batik-ocean', 'top', 'Batik · Ocean', 420, 'African prints', 'batik', ['#1d4f73', '#e9e2cf', '#2f7fa3'], 14),
   item('top-houndstooth-mono', 'top', 'Houndstooth · Monochrome', 600, 'Tailored', 'houndstooth', ['#1b1b1d', '#efece6'], 40),
-  // A real modelled piece, not a recolour of the body's own clothes -- so far only
-  // for Ariana (lib/assetManifest.ts "woman"); extracted from one of her own CC5
-  // exports (Avatar13b), so it's correctly weight-painted to her exact proportions
+  // Real modelled pieces, not recolours of the body's own clothes -- so far only
+  // for Ariana (lib/assetManifest.ts "woman"); extracted from her own CC5 exports
+  // (Avatar13b), so they're correctly weight-painted to her exact proportions
   cc5Garment('top-ariana-turtleneck', 'top', 'Turtleneck sweater · Modelled', 900, '#3a3d44', { path: 'private/characters/cc5/garments/turtleneck-sweater.glb', characterId: 'woman' }),
+  cc5Garment('top-ariana-trench', 'top', 'Slim trench coat · Modelled', 1400, '#8a7a5c', { path: 'private/characters/cc5/garments/slim-trench-coat.glb', characterId: 'woman' }),
   // Bottoms
   item('bottom-denim-classic', 'bottom', 'Denim · Classic blue', 300, 'Everyday', 'solid', ['#3a5883']),
   item('bottom-denim-black', 'bottom', 'Denim · Washed black', 300, 'Everyday', 'solid', ['#2a2b2f']),
@@ -209,6 +210,12 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('bottom-bogolan-earth', 'bottom', 'Bogolan mud cloth · Earth', 540, 'African prints', 'bogolan', ['#3b2a1e', '#e8dcc4', '#8a5a32'], 16),
   item('bottom-batik-ocean', 'bottom', 'Batik · Ocean', 440, 'African prints', 'batik', ['#1d4f73', '#e9e2cf', '#2f7fa3'], 14),
   item('bottom-houndstooth-mono', 'bottom', 'Houndstooth · Monochrome', 620, 'Tailored', 'houndstooth', ['#1b1b1d', '#efece6'], 40),
+  // Denim shorts (Avatar13b) were built but are NOT registered here: Ariana's default
+  // outfit is one skirt mesh covering her whole lower body with no separate
+  // underwear mesh beneath it, so a 'bottom' piece visibly clips through the skirt
+  // and the skirt can't be hidden to fix it without exposing her nude body instead.
+  // The GLB is on disk (public/assets/private/characters/cc5/garments/denim-shorts.
+  // glb) for whenever Ariana gets a real split skirt/underwear base to replace.
   // Shoes
   item('shoes-clean-white', 'shoes', 'Clean white', 250, 'Everyday', 'solid', ['#efefea']),
   item('shoes-leather-black', 'shoes', 'Leather · Black', 700, 'Tailored', 'solid', ['#1b1b1d']),
