@@ -41,3 +41,6 @@ assets-src/cc5/*-report.json
 
 # accidental output folder from an unexpanded $dest script variable
 /$dest/
+
+# Python bytecode cache from running/syntax-checking scripts/cc5/*.py locally
+__pycache__/
