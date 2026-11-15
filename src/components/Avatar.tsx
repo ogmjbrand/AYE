@@ -6,7 +6,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
 
-import { assetUrl, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
+import { assetUrl, defaultCc5CharacterId, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
 import type { Slot, Style } from '../lib/fashion';
 import { applySkinPigmentation, applyStyles, installSkinOnlyShader, installStyleShader, type StyleUniforms } from './outfitShader';
@@ -180,8 +180,10 @@ function privateCopy(shared: Object3D): Object3D {
  * lib/assetManifest.ts) or one of the built-in looks in lib/looks.ts. Picks
  * idle / walk / run from the speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
+export function Avatar({ controller, lookId, cc5CharacterId, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
   controller: PlayerHandle;
+  /** Which Character Creator 5 person to be (lib/assetManifest.ts); that body's default if omitted. */
+  cc5CharacterId?: string;
   /** Sharing a hug with a resident: the embrace plays once the two have met (lib/hug.ts). */
   hugSession?: HugSession | null;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
@@ -206,9 +208,10 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
   heightCm?: number;
 }) {
   const group = useRef<Group>(null);
-  // The CC5 body for this body type (or one listed in public/assets/manifest.json) replaces the built-in looks
+  // The chosen CC5 character (or one listed in public/assets/manifest.json) replaces the built-in looks
   const bodyType = lookById(lookId).body;
-  const avatarFile: AvatarFile = useMemo(() => playerBodyFor(bodyType) ?? lookById(lookId), [bodyType, lookId]);
+  const characterId = cc5CharacterId ?? defaultCc5CharacterId(bodyType);
+  const avatarFile: AvatarFile = useMemo(() => playerBodyFor(characterId) ?? lookById(lookId), [characterId, lookId]);
   const targetHeight = heightCm ? heightCm / 100 : avatarFile.height;
   const { scene: shared, animations } = useGLTF(assetUrl(avatarFile.url), false, true);
   const scene = useMemo(() => (own ? privateCopy(shared) : shared), [shared, own]);
@@ -251,7 +254,7 @@ export function Avatar({ controller, lookId, heightCm, styles, shape, skinTone =
     applyBodyShape(scene, JSON.parse(shapeKey) as BodyShape);
   }, [scene, shapeKey]);
   // Garment maps exist only for the built-in looks; the player body (CC5) is styled by material
-  const playerBody = playerBodyFor(bodyType) !== null;
+  const playerBody = playerBodyFor(characterId) !== null;
   const styledLook = playerBody ? null : lookById(lookId).id;
 
   // Built-in looks: gestures (talk, listen, wave, sit, hug) arrive in their own file after the person is on screen

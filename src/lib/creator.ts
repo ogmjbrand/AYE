@@ -10,6 +10,7 @@ import type { Diet } from './food';
 import type { Gender } from './identity';
 import { FASHION_ITEMS, sanitiseWardrobe, type FashionItem, type Slot, type Wardrobe } from './fashion';
 import { HEIGHT_RANGE, LOOKS, defaultHeightCm, looksFor, type BodyType } from './looks';
+import { cc5CharactersFor, defaultCc5CharacterId, sanitiseCc5CharacterId, type Cc5CharacterId } from './assetManifest';
 import { AVERAGE_SHAPE, SHAPE_PRESETS, FEMININE_SHAPE_PRESETS, sanitiseShape, shapePresets, type BodyShape } from './bodyShape';
 import { STARTING_BALANCE } from './gameState';
 import { DEFAULT_PIGMENTATION, sanitisePigmentation, type SkinPigmentation } from './skinPigmentation';
@@ -38,6 +39,8 @@ export interface Draft {
   region: string;
   body: BodyType;
   lookId: string;
+  /** Which Character Creator 5 person to be, when one is available for this body (lib/assetManifest.ts). */
+  cc5CharacterId: Cc5CharacterId;
   heightCm: number;
   shape: BodyShape;
   /** -1 lighter … 1 deeper than the person's own skin. */
@@ -75,7 +78,7 @@ export function newDraft(country = 'NG'): Draft {
   const body: BodyType = 'feminine';
   return {
     name: '', gender: 'unspecified', heritage: 'unspecified', ethnicGroup: '', country, region: '',
-    body, lookId: looksFor(body)[0].id, heightCm: defaultHeightCm(body), shape: AVERAGE_SHAPE, skinTone: 0, pigmentation: { ...DEFAULT_PIGMENTATION },
+    body, lookId: looksFor(body)[0].id, cc5CharacterId: defaultCc5CharacterId(body), heightCm: defaultHeightCm(body), shape: AVERAGE_SHAPE, skinTone: 0, pigmentation: { ...DEFAULT_PIGMENTATION },
     outfit: {}, lifestyle: 'ordinary', career: 'none', diet: 'everything', traits: [], dream: null, homeId: null, bio: '',
   };
 }
@@ -84,7 +87,7 @@ export function newDraft(country = 'NG'): Draft {
 export function draftFrom(c: Character): Draft {
   return {
     name: c.name, gender: c.gender, heritage: c.heritage, ethnicGroup: c.ethnicGroup, country: c.country, region: c.region,
-    body: c.body, lookId: c.lookId, heightCm: c.heightCm, shape: sanitiseShape(c.shape), skinTone: c.skinTone ?? 0,
+    body: c.body, lookId: c.lookId, cc5CharacterId: sanitiseCc5CharacterId(c.body, c.cc5CharacterId), heightCm: c.heightCm, shape: sanitiseShape(c.shape), skinTone: c.skinTone ?? 0,
     pigmentation: sanitisePigmentation(c.pigmentation),
     outfit: { ...c.wardrobe.equipped }, lifestyle: c.lifestyle, career: c.career, diet: c.diet, traits: [], dream: null, homeId: null, bio: '',
   };
@@ -94,7 +97,7 @@ export function draftFrom(c: Character): Draft {
 export function withBody(d: Draft, body: BodyType): Draft {
   if (d.body === body) return d;
   const shape = body === 'masculine' ? { ...d.shape, bust: 0, waist: 0 } : d.shape;
-  return { ...d, body, lookId: looksFor(body)[0].id, heightCm: defaultHeightCm(body), shape };
+  return { ...d, body, lookId: looksFor(body)[0].id, cc5CharacterId: defaultCc5CharacterId(body), heightCm: defaultHeightCm(body), shape };
 }
 
 // ---------------------------------------------------------------- presets and randomise
@@ -125,7 +128,7 @@ export const STARTER_PRESETS: readonly StarterPreset[] = [
 export function applyPreset(d: Draft, p: StarterPreset): Draft {
   const shape = shapePresets(p.body).find((s) => s.id === p.shape)?.shape ?? AVERAGE_SHAPE;
   const outfit = Object.fromEntries(Object.entries(p.outfit).filter(([, id]) => isStarter(id!, d.country)));
-  return { ...d, body: p.body, lookId: p.lookId, heightCm: p.heightCm, shape, skinTone: p.skinTone, pigmentation: { ...DEFAULT_PIGMENTATION }, outfit };
+  return { ...d, body: p.body, lookId: p.lookId, cc5CharacterId: defaultCc5CharacterId(p.body), heightCm: p.heightCm, shape, skinTone: p.skinTone, pigmentation: { ...DEFAULT_PIGMENTATION }, outfit };
 }
 
 /** A random but coherent appearance for the chosen body: a real person, a real figure, starter clothes. Identity and life choices stay. */
@@ -141,6 +144,7 @@ export function randomise(d: Draft, rand: () => number = Math.random): Draft {
     weight: jitter(base.weight, 0.3), muscle: jitter(base.muscle, 0.2), curves: jitter(base.curves, 0.2),
     shoulders: jitter(base.shoulders, 0.4), legs: jitter(base.legs, 0.4),
   });
+  const cc5CharacterId = pick(cc5CharactersFor(d.body));
   const mid = defaultHeightCm(d.body);
   const heightCm = Math.round(Math.max(HEIGHT_RANGE.min, Math.min(HEIGHT_RANGE.max, mid + (rand() - 0.5) * 20)));
   const starters = starterItems(d.country);
@@ -153,7 +157,7 @@ export function randomise(d: Draft, rand: () => number = Math.random): Draft {
   const naturals = starters.filter((i) => i.slot === 'hair' && ['hair-natural-black', 'hair-dark-brown', 'hair-blue-black'].includes(i.id));
   outfit.hair = look.covered || rand() < 0.5 ? null : pick(rand() < 0.75 ? naturals : starters.filter((i) => i.slot === 'hair')).id;
   const skinTone = Math.round((rand() * 1.4 - 0.4) * 20) / 20;
-  return { ...d, lookId: look.id, shape, heightCm, skinTone, pigmentation: { ...DEFAULT_PIGMENTATION }, outfit };
+  return { ...d, lookId: look.id, cc5CharacterId, shape, heightCm, skinTone, pigmentation: { ...DEFAULT_PIGMENTATION }, outfit };
 }
 
 // ---------------------------------------------------------------- save
@@ -166,6 +170,7 @@ export function problems(d: Draft): string[] {
   if (!d.name.trim()) out.push('Enter a name.');
   const look = LOOKS.find((l) => l.id === d.lookId);
   if (!look || look.body !== d.body) out.push('Choose a person for this body.');
+  if (!cc5CharactersFor(d.body).includes(d.cc5CharacterId)) out.push('Choose a person for this body.');
   return out;
 }
 
@@ -191,6 +196,7 @@ export function buildCharacter(d: Draft, opts: { existing?: Character; id?: stri
   const appearance = {
     name: d.name.trim().slice(0, 32), gender: d.gender, heritage: d.heritage, ethnicGroup: d.ethnicGroup.trim().slice(0, 40),
     country: d.country, region: d.region.trim().slice(0, 60), body: d.body, lookId: d.lookId,
+    cc5CharacterId: sanitiseCc5CharacterId(d.body, d.cc5CharacterId),
     heightCm: Math.round(Math.max(HEIGHT_RANGE.min, Math.min(HEIGHT_RANGE.max, d.heightCm))),
     shape: sanitiseShape(d.shape), skinTone: clampTone(d.skinTone), pigmentation: sanitisePigmentation(d.pigmentation), wardrobe,
   };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseManifest, wantsCc5Avatar } from './assetManifest';
+import { cc5CharactersFor, CC5_CHARACTERS, defaultCc5CharacterId, parseManifest, sanitiseCc5CharacterId, wantsCc5Avatar } from './assetManifest';
 
 describe('asset manifest', () => {
   it('accepts a valid manifest', () => {
@@ -81,5 +81,28 @@ describe('asset manifest', () => {
     // Players can't switch back to the old looks from the address bar
     expect(wantsCc5Avatar('?avatar=default', false)).toBe(true);
     expect(wantsCc5Avatar('?avatar=other', true)).toBe(true);
+  });
+
+  it('lists the CC5 characters defined for each body, main look first', () => {
+    const masculine = cc5CharactersFor('masculine');
+    const feminine = cc5CharactersFor('feminine');
+    expect(masculine).toEqual(['aaron', 'neutralM']);
+    expect(feminine).toEqual(['woman', 'neutralF']);
+    for (const id of [...masculine, ...feminine]) expect(CC5_CHARACTERS[id]).toBeDefined();
+  });
+
+  it('defaults to the main look, and keeps a valid choice', () => {
+    expect(defaultCc5CharacterId('masculine')).toBe('aaron');
+    expect(defaultCc5CharacterId('feminine')).toBe('woman');
+    expect(sanitiseCc5CharacterId('masculine', 'neutralM')).toBe('neutralM');
+    expect(sanitiseCc5CharacterId('feminine', 'woman')).toBe('woman');
+  });
+
+  it('falls back to the body\'s default for an unknown, missing or mismatched character id', () => {
+    expect(sanitiseCc5CharacterId('masculine', undefined)).toBe('aaron');
+    expect(sanitiseCc5CharacterId('masculine', 'not-a-real-character')).toBe('aaron');
+    // A feminine character id saved against a masculine body doesn't leak through
+    expect(sanitiseCc5CharacterId('masculine', 'woman')).toBe('aaron');
+    expect(sanitiseCc5CharacterId('feminine', 'aaron')).toBe('woman');
   });
 });

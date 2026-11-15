@@ -43,6 +43,13 @@ const CHARACTERS = {
   // at export/Aaron and export/Ariana if a bald/underwear-only variant is ever needed.
   aaron: { file: 'AaronClothed', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'AaronClothed'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
   woman: { file: 'ArianaClothed', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'ArianaClothed'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
+  // Second selectable look per body type (2026-11-15): same CC5-built split-material
+  // avatars, but only the plain-pose export exists for these two (bald, Bra/Underwear_
+  // Bottoms/Boxers only -- no *_Clothed project was ever made for them), so they show up
+  // undressed until a wardrobe item is equipped. Same ground speeds as the main look of
+  // their body type; swap in once a real measurement exists if their proportions differ.
+  neutralM: { file: 'NeutralM', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'NeutralM'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
+  neutralF: { file: 'NeutralF', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'NeutralF'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
 };
 const charAt = process.argv.indexOf('--character');
 const name = charAt >= 0 ? process.argv[charAt + 1] : 'aaron';

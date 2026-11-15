@@ -32,6 +32,7 @@ const STILL = { position: new Vector3(), direction: 0, velocity: new Vector3(), 
 /** Who you are, for pictures of clothes on your own character. */
 export interface WearerLook {
   lookId: string;
+  cc5CharacterId?: string;
   heightCm?: number;
   shape?: BodyShape;
   skinTone?: number;
@@ -51,8 +52,8 @@ function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
     set: { position: [0.35, 0.55 * h, 2.9], target: [0, 0.5 * h, 0], fov: 32 },
   }[where] as SnapshotJob['camera'];
   return {
-    key: `wear:${w.lookId}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => i.id).join('+')}`,
-    scene: () => <Avatar controller={STILL} own lookId={w.lookId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
+    key: `wear:${w.lookId}:${w.cc5CharacterId ?? ''}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => i.id).join('+')}`,
+    scene: () => <Avatar controller={STILL} own lookId={w.lookId} cc5CharacterId={w.cc5CharacterId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
     camera,
     size: 320,
   };

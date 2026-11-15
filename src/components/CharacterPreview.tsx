@@ -87,7 +87,7 @@ function Placeholder({ color }: { color: string }) {
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, styles, shape, skinTone = 0, pigmentation = DEFAULT_PIGMENTATION, focus = 'body', interactive = false, figure = false }: {
+export function CharacterPreview({ outfitColor = '#36527d', lookId, cc5CharacterId, heightCm, styles, shape, skinTone = 0, pigmentation = DEFAULT_PIGMENTATION, focus = 'body', interactive = false, figure = false }: {
   /** Show the body-type figure (MakeHuman body in a two-piece) instead of the person. */
   figure?: boolean;
   outfitColor?: string;
@@ -96,6 +96,8 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, st
   /** Undertone, vitiligo and albinism (lib/skinPigmentation.ts); neutral if omitted. */
   pigmentation?: SkinPigmentation;
   lookId?: string;
+  /** Which Character Creator 5 person to be (lib/assetManifest.ts); that body's default if omitted. */
+  cc5CharacterId?: string;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
   focus?: PreviewFocus;
@@ -128,7 +130,7 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, heightCm, st
               <group scale={height / 1.67}><MhFigure shape={shape} skinTone={Math.max(0.3, skinTone)} hair="afro" /></group>
             ) : (
               <Avatar
-                key={lookId} controller={still} lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone}
+                key={`${lookId}:${cc5CharacterId}`} controller={still} lookId={lookId} cc5CharacterId={cc5CharacterId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone}
                 undertone={pigmentation.undertone} vitiligo={pigmentation.vitiligo} albinismIntensity={pigmentation.albinismIntensity}
               />
             )}

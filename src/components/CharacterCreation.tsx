@@ -14,27 +14,32 @@ import { HEIGHT_RANGE, bodyForGender, lookById, looksFor, type BodyType } from '
 import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wardrobe } from '../lib/fashion';
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
-import { assetUrl, isCc5Body } from '../lib/assetManifest';
+import { assetUrl, cc5CharactersFor, CC5_CHARACTERS, isCc5Body, type Cc5CharacterId } from '../lib/assetManifest';
 import { CC5_HAS_SPLIT_MATERIALS } from '../lib/cc5Body';
 import { type SkinPigmentation } from '../lib/skinPigmentation';
 import { SkinPigmentationPanel } from './SkinPigmentationPanel';
 
-/** The player's body is the Character Creator 5 character for their body type (lib/assetManifest.ts), unless it isn't available. */
-const hasPlayerBody = (lookId: string) => isCc5Body(lookById(lookId).body);
+/** Whether this specific Character Creator 5 character is actually built and available. */
+const hasPlayerBody = (characterId: Cc5CharacterId) => isCc5Body(characterId);
 /**
- * What each CC5 body looks like, for the stages' descriptions. Aaron (HUMAN.fbx) has
- * separate garments and skin materials, so colours apply to each piece and full skin
- * pigmentation (including vitiligo patches and brow/lash pigment) applies to the skin;
- * the woman (WOMAN.fbx, a ready-dressed scan) is one material, so garment colours don't
- * apply yet and skin depth/undertone tint her whole outfit (see lib/cc5Body.ts).
+ * What each CC5 character looks like, for the stages' descriptions. Aaron and Ariana
+ * (woman) are real dressed avatars with separate garment, skin, brow and lash
+ * materials, so skin pigmentation (including vitiligo and brow/lash pigment) always
+ * applies to the skin; shoes and hair colour apply to their own modelled pieces, but
+ * neither has a separate top/bottom piece to recolour yet (Aaron's shirt and trousers
+ * are recolourable -- see restyle -- but Ariana wears a one-piece skirt, not a separate
+ * top and bottom). The neutral alternatives are undressed (no *_Clothed export exists
+ * for them yet) -- see lib/cc5Body.ts and memory/aye_cc5_player_body.md.
  */
-const CC5_LOOK = {
-  masculine: { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers', restyle: true },
-  feminine: { hair: 'Long, straight', outfit: 'Black blouse, cropped trousers and loafers', restyle: false },
-} as const;
-/** What the person looks like: their CC5 body's or the chosen look's. */
-const describedLook = (lookId: string): { hair: string; facialHair?: string; covered?: boolean; outfit: string; restyle?: boolean } =>
-  hasPlayerBody(lookId) ? CC5_LOOK[lookById(lookId).body] : lookById(lookId);
+const CC5_LOOK: Record<Cc5CharacterId, { hair: string; facialHair?: string; outfit: string; restyle: boolean }> = {
+  aaron: { hair: 'Slicked back', facialHair: 'Stubble', outfit: 'Shirt, slim trousers and sneakers', restyle: true },
+  woman: { hair: 'Finger Wave Pixie', outfit: 'A skirt, heels and an earring', restyle: false },
+  neutralM: { hair: 'Bald', outfit: 'Boxers only -- no outer clothes yet', restyle: false },
+  neutralF: { hair: 'Bald', outfit: 'A bra and underwear only -- no outer clothes yet', restyle: false },
+};
+/** What the person looks like: their CC5 character's or the chosen Rocketbox look's. */
+const describedLook = (lookId: string, characterId: Cc5CharacterId): { hair: string; facialHair?: string; covered?: boolean; outfit: string; restyle?: boolean } =>
+  hasPlayerBody(characterId) ? CC5_LOOK[characterId] : lookById(lookId);
 import { STARTING_BALANCE } from '../lib/gameState';
 import {
   EDIT_STAGES, STAGES, STARTER_PRESETS, applyPreset, buildCharacter, draftFrom, newDraft, problems, randomise, starterItems, withBody,
@@ -65,6 +70,8 @@ export interface Character {
   body: BodyType;
   /** Which 3D person (lib/looks.ts) and how tall, in centimetres. */
   lookId: string;
+  /** Which Character Creator 5 person to be, when more than one exists for this body; missing in old saves gets that body's default (lib/assetManifest.ts). */
+  cc5CharacterId?: string;
   heightCm: number;
   /** Build, muscle, curves, belly, bust, waist, shoulders and legs (lib/bodyShape.ts). */
   shape: BodyShape;
@@ -154,11 +161,11 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
 
   return (
     <Shell
-      lookId={draft.lookId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} pigmentation={draft.pigmentation} styles={styles} focus={focus}
-      bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody(draft.lookId)}
+      lookId={draft.lookId} cc5CharacterId={draft.cc5CharacterId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} pigmentation={draft.pigmentation} styles={styles} focus={focus}
+      bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody(draft.cc5CharacterId)}
       avatarName={draft.name.trim() || 'New avatar'}
-      previewSub={hasPlayerBody(draft.lookId)
-        ? `Character Creator 5 · ${draft.heightCm} cm`
+      previewSub={hasPlayerBody(draft.cc5CharacterId)
+        ? `${CC5_CHARACTERS[draft.cc5CharacterId].label} · Character Creator 5 · ${draft.heightCm} cm`
         : `${lookById(draft.lookId).hair}${lookById(draft.lookId).facialHair ? ` · ${lookById(draft.lookId).facialHair}` : ''} · ${draft.heightCm} cm`}
       nav={nav}
       title={stage.title}
@@ -277,13 +284,22 @@ function BodyStage({ draft, set, setDraft }: StageProps & { setDraft: (f: (d: Dr
         </div>
         <p className="mt-2 text-xs text-cc-muted">A starting point for person, figure, skin and clothes. Change anything afterwards, or press Randomise on the preview.</p>
       </div>
-      {hasPlayerBody(draft.lookId) ? (
+      {cc5CharactersFor(draft.body).some((id) => hasPlayerBody(id)) ? (
         <div>
           <p className={SECTION_LABEL}>Person</p>
-          <div className="rounded-lg border border-cc-gold bg-cc-gold/10 px-3 py-2.5 text-sm text-cc-ink">
-            Your character, made in Character Creator 5
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Person">
+            {cc5CharactersFor(draft.body).map((id) => {
+              const built = hasPlayerBody(id);
+              return (
+                <button key={id} type="button" role="radio" aria-checked={draft.cc5CharacterId === id} disabled={!built}
+                  onClick={() => set({ cc5CharacterId: id })}
+                  className={`rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${draft.cc5CharacterId === id ? 'border-cc-gold bg-cc-gold/10 text-cc-ink' : 'border-cc-line text-cc-muted hover:border-cc-gold/60'}`}>
+                  {CC5_CHARACTERS[id].label}{!built && ' (not built)'}
+                </button>
+              );
+            })}
           </div>
-          <p className="mt-2 text-xs text-cc-muted">Their own face, hair and modelled clothes. Choose the height, skin tone, hair colour and the colours you wear; the 3D preview shows them as you go.</p>
+          <p className="mt-2 text-xs text-cc-muted">Made in Character Creator 5. Each has their own face, hair and modelled clothes. Choose the height, skin tone, hair colour and the colours you wear; the 3D preview shows them as you go.</p>
         </div>
       ) : (
       <div>
@@ -351,7 +367,7 @@ function ProportionsStage({ draft, set }: StageProps) {
           <Slider key={s.key} id={`shape-${s.key}`} label={s.label} min={s.min} max={1} step={0.05} value={shape[s.key]} onChange={(v) => set({ shape: { ...shape, [s.key]: v } })} ends={s.ends} />
         ))}
       </div>
-      {hasPlayerBody(draft.lookId)
+      {hasPlayerBody(draft.cc5CharacterId)
         ? <p className="text-xs text-cc-muted">Your Character Creator body keeps the proportions it was modelled with; these settings are saved with your life.</p>
         : <p className="text-xs text-cc-muted">Shape changes the 3D model itself: each part of the body is filled out or slimmed down around the skeleton, so walking, running and sitting animations still fit. Every slider stays within natural limits.</p>}
     </>
@@ -359,11 +375,11 @@ function ProportionsStage({ draft, set }: StageProps) {
 }
 
 function FaceStage({ draft, set }: StageProps) {
-  const look = describedLook(draft.lookId);
+  const look = describedLook(draft.lookId, draft.cc5CharacterId);
   // Vitiligo patches and independent brow/lash control need a split-material body (CC5 aaron);
   // the single-material CC5 body (the woman scan) still gets depth and undertone, applied to her whole material.
-  const splitCc5 = hasPlayerBody(draft.lookId) && CC5_HAS_SPLIT_MATERIALS[draft.body];
-  const preciseSkin = !hasPlayerBody(draft.lookId) || splitCc5;
+  const splitCc5 = hasPlayerBody(draft.cc5CharacterId) && CC5_HAS_SPLIT_MATERIALS[draft.body];
+  const preciseSkin = !hasPlayerBody(draft.cc5CharacterId) || splitCc5;
   return (
     <>
       <SkinPigmentationPanel
@@ -376,7 +392,7 @@ function FaceStage({ draft, set }: StageProps) {
       <div>
         <p className={SECTION_LABEL}>Face</p>
         <p className="text-sm text-cc-ink">{look.facialHair ? `Facial hair: ${look.facialHair}.` : 'No facial hair.'}</p>
-        {hasPlayerBody(draft.lookId)
+        {hasPlayerBody(draft.cc5CharacterId)
           ? <p className="mt-1 text-xs text-cc-muted">Your face as you made it in Character Creator 5.</p>
           : <p className="mt-1 text-xs text-cc-muted">Each person has their own photo-based face. Separate face shaping (nose, lips, jaw, eyes) arrives with the new morph-based character system; until then, choose a different person under Person for a different face.</p>}
       </div>
@@ -385,14 +401,14 @@ function FaceStage({ draft, set }: StageProps) {
 }
 
 function HairStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = describedLook(draft.lookId);
+  const look = describedLook(draft.lookId, draft.cc5CharacterId);
   const options = editing ? FASHION_ITEMS.filter((i) => i.slot === 'hair' && editing.wardrobe.owned.includes(i.id)) : starterItems(draft.country).filter((i) => i.slot === 'hair');
   return (
     <>
       <div>
         <p className={SECTION_LABEL}>Hairstyle</p>
         <p className="text-sm text-cc-ink">{look.hair}</p>
-        {hasPlayerBody(draft.lookId)
+        {hasPlayerBody(draft.cc5CharacterId)
           ? <p className="mt-1 text-xs text-cc-muted">The style you gave your character in Character Creator 5. Pick a colour below.</p>
           : <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>}
       </div>
@@ -424,14 +440,14 @@ function SwatchRow({ items, value, onPick, originalLabel }: { slot: Slot; items:
 }
 
 function ClothesStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = describedLook(draft.lookId);
+  const look = describedLook(draft.lookId, draft.cc5CharacterId);
   const pool = editing ? FASHION_ITEMS.filter((i) => editing.wardrobe.owned.includes(i.id)) : starterItems(draft.country);
   return (
     <>
       <p className="text-sm text-cc-muted">
-        {look.outfit}. {hasPlayerBody(draft.lookId) && !look.restyle
-          ? 'Her outfit is part of her Character Creator model (one material), so colours you choose are saved with your life but don’t change her clothes yet; new 3D garments for her are on the way.'
-          : hasPlayerBody(draft.lookId)
+        {look.outfit}. {hasPlayerBody(draft.cc5CharacterId) && !look.restyle
+          ? 'There isn’t a separate top and bottom piece on this model yet, so the colours you choose are saved with your life but don’t change what they’re wearing; new 3D garments are on the way.'
+          : hasPlayerBody(draft.cc5CharacterId)
           ? 'Choose the colour of each piece; it’s applied to the garment on the 3D model, keeping its folds (patterned fabrics show their main colour).'
           : 'Choose the fabric and colour of each piece; it’s applied to the garment on the 3D model, keeping its folds.'}
         {editing ? ' These are the clothes you own; buy more at the boutique.' : ' Starter pieces are free and yours to keep.'}
@@ -451,7 +467,7 @@ function ClothesStage({ draft, set, editing }: StageProps & { editing?: Characte
 }
 
 function ReviewStage({ draft, set, editing }: StageProps & { editing?: Character }) {
-  const look = describedLook(draft.lookId);
+  const look = describedLook(draft.lookId, draft.cc5CharacterId);
   const preset = presetFor(draft.shape, draft.body);
   const wearing = (['top', 'bottom', 'shoes', 'hair'] as const)
     .map((s) => (draft.outfit[s] ? FASHION_ITEMS.find((i) => i.id === draft.outfit[s])?.name : null))
@@ -586,9 +602,9 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, heightCm, styles, shape, skinTone, pigmentation, focus, onFocus, onRandomise, bodyFigure = false }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, cc5CharacterId, heightCm, styles, shape, skinTone, pigmentation, focus, onFocus, onRandomise, bodyFigure = false }: {
   bodyFigure?: boolean;
-  children: ReactNode; avatarName: string; previewSub: string; lookId: string; heightCm: number;
+  children: ReactNode; avatarName: string; previewSub: string; lookId: string; cc5CharacterId: Cc5CharacterId; heightCm: number;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
   shape: BodyShape; skinTone: number; pigmentation: SkinPigmentation; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
@@ -617,7 +633,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} pigmentation={pigmentation} focus={focus} interactive figure={bodyFigure} />
+          <CharacterPreview lookId={lookId} cc5CharacterId={cc5CharacterId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} pigmentation={pigmentation} focus={focus} interactive figure={bodyFigure} />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

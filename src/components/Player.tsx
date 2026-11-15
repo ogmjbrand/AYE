@@ -122,7 +122,7 @@ export function Player({ controller, character, tryOn, conversing = false, car =
       {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
+          <Avatar controller={controller} lookId={character?.lookId} cc5CharacterId={character?.cc5CharacterId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
         </Suspense>
       </ErrorBoundary>
       )}

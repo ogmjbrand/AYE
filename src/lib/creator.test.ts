@@ -5,6 +5,7 @@ import { LOOKS, HEIGHT_RANGE, lookById } from './looks';
 import { itemById } from './fashion';
 import { sanitiseShape } from './bodyShape';
 import { parseCharacter } from './save';
+import { cc5CharactersFor, defaultCc5CharacterId } from './assetManifest';
 
 /** A seeded random number generator, so random characters are repeatable in tests. */
 const seeded = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
@@ -28,6 +29,16 @@ describe('character creator', () => {
     expect(lookById(d.lookId).body).toBe('masculine');
     expect(d.shape.bust).toBe(0);
     expect(d.shape.waist).toBe(0);
+    // The CC5 character resets to the new body's default, never one for the old body
+    expect(d.cc5CharacterId).toBe(defaultCc5CharacterId('masculine'));
+  });
+
+  it('a new draft and every preset start on the default CC5 character for their body', () => {
+    expect(newDraft().cc5CharacterId).toBe(defaultCc5CharacterId('feminine'));
+    for (const p of STARTER_PRESETS) {
+      const d = applyPreset(newDraft('NG'), p);
+      expect(d.cc5CharacterId).toBe(defaultCc5CharacterId(p.body));
+    }
   });
 
   it('presets use real people, real figures and starter clothes', () => {
@@ -48,6 +59,7 @@ describe('character creator', () => {
         expect(d.heightCm).toBeGreaterThanOrEqual(HEIGHT_RANGE.min);
         expect(d.heightCm).toBeLessThanOrEqual(HEIGHT_RANGE.max);
         expect(sanitiseShape(d.shape)).toEqual(d.shape);
+        expect(cc5CharactersFor(body)).toContain(d.cc5CharacterId);
         if (body === 'masculine') expect(d.shape.bust).toBe(0);
         expect(Math.abs(d.skinTone)).toBeLessThanOrEqual(1);
         for (const [slot, id] of Object.entries(d.outfit)) {

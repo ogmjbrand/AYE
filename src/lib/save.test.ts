@@ -18,7 +18,7 @@ const character: Character = {
   id: 'abc', name: 'Ada', lifestyle: 'ordinary', career: 'doctor', diet: 'vegan',
   colorR: 1, colorG: 2, colorB: 3, balance: 5000, createdAt: 1, lastBalanceUpdate: 1,
   gender: 'woman', heritage: 'black-african', ethnicGroup: 'Igbo', country: 'NG', region: 'Enugu',
-  body: 'feminine', lookId: 'female-adult-10', heightCm: 168, skinTone: 0, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15, bust: 0, waist: 0, shoulders: 0, legs: 0 },
+  body: 'feminine', lookId: 'female-adult-10', cc5CharacterId: 'woman', heightCm: 168, skinTone: 0, shape: { weight: 0.3, muscle: 0, curves: 0.9, belly: 0.15, bust: 0, waist: 0, shoulders: 0, legs: 0 },
   pigmentation: DEFAULT_PIGMENTATION,
   wardrobe: { owned: ['top-ankara-sunset', 'hair-copper'], equipped: { top: 'top-ankara-sunset' } },
 };

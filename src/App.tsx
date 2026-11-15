@@ -1670,7 +1670,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         <BoutiquePanel
           section={section}
           districtId={district.id}
-          wearer={{ lookId: character.lookId, heightCm: character.heightCm, shape: character.shape, skinTone: character.skinTone }}
+          wearer={{ lookId: character.lookId, cc5CharacterId: character.cc5CharacterId, heightCm: character.heightCm, shape: character.shape, skinTone: character.skinTone }}
           wardrobe={wardrobe}
           balance={state.balance}
           onTryOn={(slot, id) => setTryOn((t) => ({ ...t, [slot]: id }))}

@@ -119,16 +119,18 @@ export const assetManifest = () => current;
 
 /** Which kind of body a character has (lib/looks.ts BodyType; kept here so looks.ts can import from this file). */
 export type PlayerBodyType = 'feminine' | 'masculine';
-let playerBodies: Partial<Record<PlayerBodyType, AvatarFile>> = {};
+/** A specific Character Creator 5 person a player of a body type can choose to be. */
+export type Cc5CharacterId = string;
+let playerBodies: Partial<Record<Cc5CharacterId, AvatarFile>> = {};
 
 /**
- * The model drawn for a player of this body type: a model listed in manifest.json
- * for everyone, else the Character Creator 5 body built for that type, else null
- * (the built-in Rocketbox looks).
+ * The model drawn for a player who chose this CC5 character: a model listed in
+ * manifest.json for everyone, else the Character Creator 5 body built for that
+ * character, else null (the built-in Rocketbox looks).
  */
-export const playerBodyFor = (body: PlayerBodyType): AvatarFile | null => current.avatar ?? playerBodies[body] ?? null;
-/** True when the body drawn for this type is a Character Creator 5 one (styled by material, not garment maps). */
-export const isCc5Body = (body: PlayerBodyType) => !current.avatar && !!playerBodies[body];
+export const playerBodyFor = (characterId: Cc5CharacterId): AvatarFile | null => current.avatar ?? playerBodies[characterId] ?? null;
+/** True when the body drawn for this character id is a Character Creator 5 one (styled by material, not garment maps). */
+export const isCc5Body = (characterId: Cc5CharacterId) => !current.avatar && !!playerBodies[characterId];
 
 /** URL of a file inside public/assets/. */
 export const assetUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`;
@@ -168,18 +170,31 @@ async function dropMissingFiles(m: AssetManifest): Promise<AssetManifest> {
 }
 
 /**
- * The player's body is a Character Creator 5 character (node scripts/cc5/build.mjs):
- * Aaron for men, the woman (--character woman) for women. The built-in Rocketbox
- * looks are only a fallback: for a body type whose files aren't there (they're
- * private, so a fresh copy of the repository doesn't have them), or in the
- * development server with ?avatar=default to compare. The saved character is not
- * changed; only the model drawn for it is.
+ * The player's body is a Character Creator 5 character (node scripts/cc5/build.mjs),
+ * chosen from these options for their body type -- Aaron or a neutral alternative for
+ * men, Ariana or a neutral alternative for women (2026-11-15: added a second option per
+ * body type; see memory/aye_cc5_player_body.md). The built-in Rocketbox looks are only
+ * a fallback: for a character whose files aren't there (they're private, so a fresh
+ * copy of the repository doesn't have them), or in the development server with
+ * ?avatar=default to compare. The saved character is not changed; only the model
+ * drawn for it is.
  */
-export const CC5_BODIES: Record<PlayerBodyType, string> = {
-  masculine: 'private/characters/cc5/aaron.json',
-  feminine: 'private/characters/cc5/woman.json',
+export const CC5_CHARACTERS: Record<Cc5CharacterId, { body: PlayerBodyType; info: string; label: string; buildArg: string }> = {
+  aaron: { body: 'masculine', info: 'private/characters/cc5/aaron.json', label: 'Aaron', buildArg: 'aaron' },
+  neutralM: { body: 'masculine', info: 'private/characters/cc5/neutralM.json', label: 'Neutral', buildArg: 'neutralM' },
+  woman: { body: 'feminine', info: 'private/characters/cc5/woman.json', label: 'Ariana', buildArg: 'woman' },
+  neutralF: { body: 'feminine', info: 'private/characters/cc5/neutralF.json', label: 'Neutral', buildArg: 'neutralF' },
 };
-export const CC5_INFO = CC5_BODIES.masculine;
+/** The CC5 characters defined for a body type, main look first. */
+export const cc5CharactersFor = (body: PlayerBodyType): Cc5CharacterId[] =>
+  (Object.keys(CC5_CHARACTERS) as Cc5CharacterId[]).filter((id) => CC5_CHARACTERS[id].body === body);
+/** The character a player of this body type gets when they haven't chosen one (or an old save predates choice). */
+export const defaultCc5CharacterId = (body: PlayerBodyType): Cc5CharacterId => cc5CharactersFor(body)[0];
+/** A saved character id if it's still defined and matches the body, else that body's default. */
+export const sanitiseCc5CharacterId = (body: PlayerBodyType, id: unknown): Cc5CharacterId =>
+  typeof id === 'string' && CC5_CHARACTERS[id]?.body === body ? id : defaultCc5CharacterId(body);
+/** The dev-only CC5 viewer's default character. */
+export const CC5_INFO = CC5_CHARACTERS.aaron.info;
 
 export function wantsCc5Avatar(search: string, dev: boolean): boolean {
   return !(dev && new URLSearchParams(search).get('avatar') === 'default');
@@ -210,18 +225,18 @@ export async function loadAssetManifest(): Promise<void> {
   } catch (err) {
     console.warn('[AYE assets] manifest.json could not be read; using built-in assets', err);
   }
-  // A model listed in manifest.json stays everyone's body; otherwise each body type gets its CC5 character
+  // A model listed in manifest.json stays everyone's body; otherwise each CC5 character that's built becomes available
   if (!current.avatar && wantsCc5Avatar(window.location.search, import.meta.env.DEV)) {
-    const types = Object.keys(CC5_BODIES) as PlayerBodyType[];
-    const found = await Promise.all(types.map((t) => cc5Avatar(CC5_BODIES[t])));
+    const ids = Object.keys(CC5_CHARACTERS) as Cc5CharacterId[];
+    const found = await Promise.all(ids.map((id) => cc5Avatar(CC5_CHARACTERS[id].info)));
     playerBodies = {};
-    types.forEach((t, i) => {
+    ids.forEach((id, i) => {
       const avatar = found[i];
       if (avatar) {
-        playerBodies[t] = avatar;
-        console.info(`[AYE assets] ${t} player body: ${avatar.url}`);
+        playerBodies[id] = avatar;
+        console.info(`[AYE assets] ${id} player body: ${avatar.url}`);
       } else {
-        console.warn(`[AYE assets] the ${t} CC5 player body is not built (node scripts/cc5/build.mjs${t === 'feminine' ? ' --character woman' : ''}); using the built-in looks for it.`);
+        console.warn(`[AYE assets] the ${id} CC5 player body is not built (node scripts/cc5/build.mjs --character ${CC5_CHARACTERS[id].buildArg}); using the built-in looks for it.`);
       }
     });
   }

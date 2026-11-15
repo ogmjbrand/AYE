@@ -171,6 +171,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
               <CharacterPreview
                 outfitColor={`rgb(${saved.colorR}, ${saved.colorG}, ${saved.colorB})`}
                 lookId={saved.lookId}
+                cc5CharacterId={saved.cc5CharacterId}
                 heightCm={saved.heightCm}
                 styles={resolveStyles(saved.wardrobe.equipped)}
                 shape={saved.shape}

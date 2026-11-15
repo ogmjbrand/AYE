@@ -27,6 +27,7 @@ import { sanitiseActiveIncident, sanitiseIncidentHistory } from './incidents';
 import { migrateOwnedVehicles } from './saveMigration';
 import { isSkinToneId, skinToneDepth } from './skinTone';
 import { sanitisePigmentation } from './skinPigmentation';
+import { sanitiseCc5CharacterId } from './assetManifest';
 
 const CHARACTER_KEY = 'aye_character';
 const PROGRESS_KEY = 'aye_progress';
@@ -84,6 +85,8 @@ export function parseCharacter(data: unknown): Character | null {
     // A look must match the body; otherwise fall back to the first look for that body
     lookId: look.body === body ? look.id : LOOKS.find((l) => l.body === body)!.id,
     body,
+    // Saves from before character choice (or one naming a character that no longer exists) get that body's default
+    cc5CharacterId: sanitiseCc5CharacterId(body, c.cc5CharacterId),
     heightCm: isNum(c.heightCm, HEIGHT_RANGE.min, HEIGHT_RANGE.max) ? Math.round(c.heightCm) : defaultHeightCm(body),
     // Unknown items (e.g. removed from the catalogue) are dropped; nothing is lost otherwise
     wardrobe: sanitiseWardrobe(c.wardrobe),
