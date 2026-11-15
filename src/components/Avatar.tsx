@@ -19,7 +19,7 @@ import { conversationGesture, type Gesture } from '../lib/bodyLanguage';
 import { AVERAGE_SHAPE, type BodyShape } from '../lib/bodyShape';
 import {
   cc5AlbinismMultiplier, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf, cc5UndertoneMultiplier,
-  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_SKIN_MATERIALS,
+  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_OWN_HAIRSTYLE_MESHES, CC5_SKIN_MATERIALS,
 } from '../lib/cc5Body';
 import { HUG_DURATION_MS, type HugSession } from '../lib/hug';
 import { createReachHugClip } from '../lib/hugAnimation';
@@ -251,6 +251,22 @@ export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, height
       }
     });
   }, [scene]);
+  // A separate modelled hairstyle (cc5Garments.hairstyle) replaces this character's own
+  // baked-in one, so hide it rather than show both at once; restore it if unequipped
+  const ownHairstyleGarment = cc5Garments?.hairstyle?.characterId === characterId ? cc5Garments.hairstyle : null;
+  useEffect(() => {
+    const ownMeshes = CC5_OWN_HAIRSTYLE_MESHES[characterId];
+    if (!ownMeshes) return;
+    const hide = !!ownHairstyleGarment;
+    scene.traverse((o) => {
+      if (ownMeshes.includes(o.name)) o.visible = !hide;
+    });
+    return () => {
+      scene.traverse((o) => {
+        if (ownMeshes.includes(o.name)) o.visible = true;
+      });
+    };
+  }, [scene, characterId, ownHairstyleGarment]);
   // The GLB scene is cached and shared, so the shape is (re)applied whenever it or the scene changes
   const shapeKey = JSON.stringify(shape ?? AVERAGE_SHAPE);
   useEffect(() => {

@@ -171,7 +171,8 @@ const hairstyle = (id: string, name: string, price: number): FashionItem => ({
  */
 const cc5Garment = (
   id: string, slot: Slot, name: string, price: number, colorHex: string, cc5: Cc5GarmentModel,
-): FashionItem => ({ ...item(id, slot, name, price, 'Luxury', 'solid', [colorHex]), cc5Garment: cc5 });
+  collection: FashionItem['collection'] = 'Luxury',
+): FashionItem => ({ ...item(id, slot, name, price, collection, 'solid', [colorHex]), cc5Garment: cc5 });
 
 export const FASHION_ITEMS: readonly FashionItem[] = [
   // Tops
@@ -236,6 +237,11 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   hairstyle('hairstyle-braids', 'Long braids', 850),
   hairstyle('hairstyle-ponytail', 'Ponytail', 600),
   hairstyle('hairstyle-long', 'Long waves', 700),
+  // A real modelled CC5 hairstyle (two meshes: base + bun), replacing Ariana's own
+  // baked-in one instead of attaching to a Rocketbox head bone like the above; see
+  // the Tops section for the pipeline note. Hides her own hair while worn (safe,
+  // unlike a garment slot: every CC5 character's head already reads fine bald).
+  cc5Garment('hairstyle-ariana-bun', 'hairstyle', 'Bun · Modelled', 750, '#1a1310', { path: 'private/characters/cc5/garments/ariana-bun.glb', characterId: 'woman' }, 'Salon'),
   // Collectibles: earned through achievements (lib/life.ts), never sold in shops
   item('top-explorer-kente', 'top', "Explorer's kente", 0, 'Rewards', 'kente', ['#1f6b4f', '#d4a85a', '#13202a'], 10, []),
   item('top-gogetter-silk', 'top', 'Go-getter silk · Emerald', 0, 'Rewards', 'solid', ['#1d6e52'], 18, []),
@@ -317,7 +323,8 @@ export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: P
 export function resolveCc5Garments(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>) {
   const out: Partial<Record<Slot, Cc5GarmentModel>> = {};
   for (const slot of SLOTS) {
-    if (slot === 'hairstyle') continue;
+    // Unlike resolveStyles, 'hairstyle' isn't skipped: a cc5Garment hairstyle has no
+    // Style to recolour with, but it is a real model to resolve here.
     const id = resolveFashionItemId(equipped, tryOn, slot);
     const it = itemById(id);
     if (it?.cc5Garment) out[slot] = it.cc5Garment;

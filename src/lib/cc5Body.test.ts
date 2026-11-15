@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cc5AlbinismMultiplier, cc5GarmentColor, cc5SkinMultiplier, cc5SlotOf, cc5UndertoneMultiplier,
-  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_SKIN_MATERIALS,
+  CC5_BROW_LASH_MATERIALS, CC5_HAS_SPLIT_MATERIALS, CC5_OWN_HAIRSTYLE_MESHES, CC5_SKIN_MATERIALS,
 } from './cc5Body';
 import type { Style } from './fashion';
 
@@ -66,5 +66,11 @@ describe('CC5 player body', () => {
     expect(CC5_BROW_LASH_MATERIALS.test('Std_Skin_Head')).toBe(false);
     expect(CC5_HAS_SPLIT_MATERIALS.masculine).toBe(true);
     expect(CC5_HAS_SPLIT_MATERIALS.feminine).toBe(true);
+  });
+
+  it('names each character\'s own baked-in hairstyle mesh, hidden for a modelled replacement', () => {
+    expect(CC5_OWN_HAIRSTYLE_MESHES.aaron).toEqual(['Classic_Slick_Back']);
+    expect(CC5_OWN_HAIRSTYLE_MESHES.woman).toEqual(['Finger_Wave_Pixie']);
+    expect(CC5_OWN_HAIRSTYLE_MESHES.neutralM).toBeUndefined();
   });
 });

@@ -97,17 +97,26 @@ describe('fashion catalogue', () => {
     const hairstyles = FASHION_ITEMS.filter((item) => item.slot === 'hairstyle');
     expect(SLOT_LABEL.hair).toBe('Hair colour');
     expect(SLOT_LABEL.hairstyle).toBe('Hairstyles');
-    expect(hairstyles.map((item) => item.id)).toEqual([
+    // Rocketbox hairstyles: a static GLB attached to the head bone
+    const rocketbox = hairstyles.filter((item) => !item.cc5Garment);
+    expect(rocketbox.map((item) => item.id)).toEqual([
       'hairstyle-afro',
       'hairstyle-braids',
       'hairstyle-ponytail',
       'hairstyle-long',
     ]);
-    for (const item of hairstyles) {
+    for (const item of rocketbox) {
       const model = getGarmentModel(item.id);
       expect(model?.path, item.id).toMatch(/^hair\/.+\.glb$/);
       expect(model?.thumbnail, item.id).toMatch(/^clothing\/hair\/.+\.png$/);
       expect(model?.attachBones, item.id).toContain('Bip01 Head');
+    }
+    // CC5 hairstyles: a real garment rebound onto the player's own CC5 skeleton
+    const cc5 = hairstyles.filter((item) => item.cc5Garment);
+    expect(cc5.map((item) => item.id)).toEqual(['hairstyle-ariana-bun']);
+    for (const item of cc5) {
+      expect(item.cc5Garment?.path, item.id).toMatch(/^private\/characters\/cc5\/garments\/.+\.glb$/);
+      expect(getGarmentModel(item.id), item.id).toBeUndefined();
     }
     expect(resolveStyles({ hair: 'hair-copper', hairstyle: 'hairstyle-afro' })).toEqual({
       hair: itemById('hair-copper')!.style,

@@ -45,6 +45,17 @@ export const CC5_HAS_SPLIT_MATERIALS: Record<BodyType, boolean> = { masculine: t
 export const cc5SlotOf = (materialName: string): Slot | null =>
   (Object.entries(CC5_SLOT_MATERIALS) as [Slot, RegExp][]).find(([, re]) => re.test(materialName))?.[0] ?? null;
 
+/**
+ * Mesh name(s) making up each CC5 character's own baked-in hairstyle, hidden when a
+ * separate modelled hairstyle (lib/fashion.ts's cc5Garment on the 'hairstyle' slot)
+ * is equipped instead -- safe to hide (unlike a garment slot) since every CC5
+ * character's head reads fine bald (NeutralF/NeutralM already are).
+ */
+export const CC5_OWN_HAIRSTYLE_MESHES: Partial<Record<string, readonly string[]>> = {
+  aaron: ['Classic_Slick_Back'],
+  woman: ['Finger_Wave_Pixie'],
+};
+
 /** Colour multiplier for a garment wearing this style (its main colour), or null to keep the original. */
 export function cc5GarmentColor(style: Style | undefined): string | null {
   return style ? style.colors[0] : null;

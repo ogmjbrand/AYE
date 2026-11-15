@@ -1,16 +1,18 @@
-// Builds one standalone, game-ready garment GLB from a CC5 FBX export: a single
-// skinned mesh bound to the CC_Base rig, with no animation of its own. At runtime
-// (src/components/Cc5Garment.tsx) its skeleton is discarded and its SkinnedMesh is
+// Builds one standalone, game-ready garment GLB from a CC5 FBX export: one or more
+// skinned meshes (e.g. a hairstyle's base mesh plus a separate accessory piece) bound
+// to the CC_Base rig, with no animation of their own. At runtime
+// (src/components/Cc5Garment.tsx) the rig is discarded and each SkinnedMesh is
 // rebound bone-for-bone (by name) onto the player's own avatar skeleton, so it
 // deforms with whichever CC5 body wears it. See scripts/cc5/export_cc5_garment.py
 // for the Blender half of this (duplicates convert_cc5.py's material rebuild --
 // deliberately, to keep the proven player-body pipeline in build.mjs untouched).
 //
-//   node scripts/cc5/build-garment.mjs <name> <sourceDir> <fbxBaseName> <meshName> <rocketboxAnim>
+//   node scripts/cc5/build-garment.mjs <name> <sourceDir> <fbxBaseName> <meshNames> <rocketboxAnim>
 //
 // name: output file stem (public/assets/private/characters/cc5/garments/<name>.glb).
 // sourceDir: folder holding <fbxBaseName>.fbx and .json (e.g. the CC5 export folder).
-// meshName: the exact mesh/object name inside that FBX to extract.
+// meshNames: the exact mesh/object name(s) inside that FBX to extract, comma-separated
+// if more than one (e.g. "Hair_Base,Bun").
 // rocketboxAnim: the same Rocketbox look name build.mjs's CHARACTERS entry for this
 // garment's body uses as `anim` (e.g. female-adult-08) -- needed so this garment's
 // bind pose gets the same forward-facing correction as the body it's rebound onto.

@@ -8,7 +8,10 @@
 # correct joint order and inverse bind matrices, not drive anything itself.
 #
 #   blender --background --factory-startup --python scripts/cc5/export_cc5_garment.py -- \
-#       <in.fbx> <in.json> <mesh_name> <anim.glb> <out.glb> <report.json>
+#       <in.fbx> <in.json> <mesh_names> <anim.glb> <out.glb> <report.json>
+#
+# mesh_names: one mesh/object name, or several comma-separated (e.g. a hairstyle
+# that's modelled as a base mesh plus a separate accessory piece, "Hair_Base,Bun").
 #
 # anim.glb: the same Rocketbox reference GLB build.mjs passes convert_cc5.py for this
 # character's body (e.g. female-adult-08.glb for the feminine body). It's imported only
@@ -28,10 +31,11 @@ import bpy
 from mathutils import Matrix
 
 args = sys.argv[sys.argv.index('--') + 1:]
-fbx_path, json_path, mesh_name, anim_path, out_path, report_path = args[:6]
+fbx_path, json_path, mesh_names_arg, anim_path, out_path, report_path = args[:6]
+mesh_names = [n.strip() for n in mesh_names_arg.split(',') if n.strip()]
 json_dir = os.path.dirname(json_path)
 
-report = {'mesh': mesh_name, 'warnings': []}
+report = {'meshes': mesh_names, 'warnings': []}
 warn = lambda msg: (report['warnings'].append(msg), print('WARN', msg))
 
 
@@ -57,19 +61,23 @@ if math.degrees(rot.angle) > 1:
     rig.matrix_world = Matrix.LocRotScale(loc, None, sca)
     bpy.context.view_layer.update()
 
-garment = bpy.data.objects.get(mesh_name)
-if garment is None or garment.type != 'MESH':
-    raise SystemExit(f'mesh {mesh_name!r} not found in {fbx_path} (or is not a mesh)')
+garments = []
+for mesh_name in mesh_names:
+    g = bpy.data.objects.get(mesh_name)
+    if g is None or g.type != 'MESH':
+        raise SystemExit(f'mesh {mesh_name!r} not found in {fbx_path} (or is not a mesh)')
+    garments.append(g)
 for o in list(bpy.data.objects):
-    if o is not rig and o is not garment:
+    if o is not rig and o not in garments:
         bpy.data.objects.remove(o, do_unlink=True)
 
 # Same -90 deg X import quirk fix as convert_cc5.py: put the mesh back in rig space
 rig_rot = rig.matrix_world.to_quaternion()
-if garment.matrix_world.to_quaternion().rotation_difference(rig_rot).angle > math.radians(1):
-    garment.matrix_world = rig.matrix_world.copy()
-report['vertices'] = len(garment.data.vertices)
-report['vertex_groups'] = [vg.name for vg in garment.vertex_groups]
+for garment in garments:
+    if garment.matrix_world.to_quaternion().rotation_difference(rig_rot).angle > math.radians(1):
+        garment.matrix_world = rig.matrix_world.copy()
+report['vertices'] = sum(len(g.data.vertices) for g in garments)
+report['vertex_groups'] = sorted({vg.name for g in garments for vg in g.vertex_groups})
 
 # --------------------------------------------------------------- materials ---
 cc = json.load(open(json_path, encoding='utf-8-sig'))
@@ -173,26 +181,28 @@ def rebuild_material(mat, spec):
     mat.use_backface_culling = not spec.get('Two Side', False)
 
 
-spec_mats = cc_meshes.get(garment.name, {}).get('Materials', {})
 rebuilt = 0
-for mat in garment.data.materials:
-    if not mat:
-        continue
-    spec = spec_mats.get(mat.name) or spec_mats.get(mat.name.rsplit('.', 1)[0])
-    if spec is None:
-        warn(f'no CC material data for {garment.name}/{mat.name}; left as imported')
-        continue
-    rebuild_material(mat, spec)
-    rebuilt += 1
+for garment in garments:
+    spec_mats = cc_meshes.get(garment.name, {}).get('Materials', {})
+    for mat in garment.data.materials:
+        if not mat:
+            continue
+        spec = spec_mats.get(mat.name) or spec_mats.get(mat.name.rsplit('.', 1)[0])
+        if spec is None:
+            warn(f'no CC material data for {garment.name}/{mat.name}; left as imported')
+            continue
+        rebuild_material(mat, spec)
+        rebuilt += 1
 report['materials_rebuilt'] = rebuilt
 
 # Morphs block nothing here (no decimation), but the game drives no facial animation
 # on garments either, and shape keys would otherwise re-trigger a shape-key export warning
-if garment.data.shape_keys:
-    select_only([garment])
-    bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
-for attr in list(garment.data.color_attributes):
-    garment.data.color_attributes.remove(attr)
+for garment in garments:
+    if garment.data.shape_keys:
+        select_only([garment])
+        bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
+    for attr in list(garment.data.color_attributes):
+        garment.data.color_attributes.remove(attr)
 
 # --------------------------------------- face the Rocketbox way, like the player body ---
 def world_head(arm, name):
@@ -219,13 +229,13 @@ for a in list(bpy.data.actions):
 rig.rotation_mode = 'XYZ'
 rig.matrix_world = Matrix.Rotation(turn, 4, 'Z') @ rig.matrix_world
 bpy.context.view_layer.update()
-select_only([rig, garment], rig)
+select_only([rig] + garments, rig)
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 bpy.context.view_layer.update()
 report['turn_degrees'] = round(math.degrees(turn), 1)
 
 # ----------------------------------------------------------- export ---
-select_only([rig, garment], rig)
+select_only([rig] + garments, rig)
 bpy.ops.export_scene.gltf(
     filepath=out_path,
     export_format='GLB',
