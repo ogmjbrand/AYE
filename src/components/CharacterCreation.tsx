@@ -11,7 +11,7 @@ import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { DIETS, type Diet } from '../lib/food';
 import { GENDERS, HERITAGES, type Gender } from '../lib/identity';
 import { HEIGHT_RANGE, bodyForGender, lookById, looksFor, type BodyType } from '../lib/looks';
-import { FASHION_ITEMS, SLOT_LABEL, resolveStyles, swatchCss, type Slot, type Wardrobe } from '../lib/fashion';
+import { FASHION_ITEMS, SLOT_LABEL, resolveCc5Garments, resolveStyles, swatchCss, type Cc5GarmentModel, type Slot, type Wardrobe } from '../lib/fashion';
 import { presetFor, shapePresets, shapeSliders, type BodyShape } from '../lib/bodyShape';
 import { DEFAULT_COUNTRY, SUBDIVISIONS, countryOptions, formatHome, regionTerm } from '../lib/places';
 import { assetUrl, cc5CharactersFor, CC5_CHARACTERS, isCc5Body, type Cc5CharacterId } from '../lib/assetManifest';
@@ -129,11 +129,13 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
   const canLeaveIdentity = !!draft.name.trim();
   const last = stageIndex === stageIds.length - 1;
 
-  const styles = useMemo(() => {
+  const equippedOutfit = useMemo(() => {
     const equipped: Partial<Record<Slot, string>> = {};
     for (const [slot, id] of Object.entries(draft.outfit) as [Slot, string | null][]) if (id) equipped[slot] = id;
-    return resolveStyles(equipped);
+    return equipped;
   }, [draft.outfit]);
+  const styles = useMemo(() => resolveStyles(equippedOutfit), [equippedOutfit]);
+  const cc5Garments = useMemo(() => resolveCc5Garments(equippedOutfit), [equippedOutfit]);
 
   const finish = () => {
     if (issues.length) return;
@@ -161,7 +163,7 @@ export function CharacterCreation({ onCharacterCreate, onBack, editing }: Charac
 
   return (
     <Shell
-      lookId={draft.lookId} cc5CharacterId={draft.cc5CharacterId} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} pigmentation={draft.pigmentation} styles={styles} focus={focus}
+      lookId={draft.lookId} cc5CharacterId={draft.cc5CharacterId} cc5Garments={cc5Garments} heightCm={draft.heightCm} shape={draft.shape} skinTone={draft.skinTone} pigmentation={draft.pigmentation} styles={styles} focus={focus}
       bodyFigure={stage.id === 'proportions' && draft.body === 'feminine' && !hasPlayerBody(draft.cc5CharacterId)}
       avatarName={draft.name.trim() || 'New avatar'}
       previewSub={hasPlayerBody(draft.cc5CharacterId)
@@ -459,8 +461,8 @@ function ClothesStage({ draft, set, editing }: StageProps & { editing?: Characte
         </div>
       ))}
       <div className="rounded-lg border border-cc-line p-3 text-xs text-cc-muted">
-        <p className="m-0 font-semibold text-cc-ink">Not available yet</p>
-        <p className="m-0 mt-1">Different garment cuts (dresses, skirts, shorts, jackets on/off), accessories (earrings, glasses, hats, bags) and other shoe styles need separate clothing models fitted to a shared skeleton. They arrive with the new character system; nothing here pretends otherwise.</p>
+        <p className="m-0 font-semibold text-cc-ink">Mostly not available yet</p>
+        <p className="m-0 mt-1">A first real modelled piece exists (Ariana's turtleneck sweater, under Tops) — a separate 3D garment fitted to her Character Creator skeleton, not a recolour. Most other garment cuts (dresses, skirts, shorts, jackets on/off), accessories (earrings, glasses, hats, bags) and other shoe styles still need the same treatment; nothing here pretends otherwise.</p>
       </div>
     </>
   );
@@ -602,9 +604,10 @@ interface NavEntry { id: string; label: string; active: boolean; disabled: boole
  * the model. On phones it stacks: categories as a scrolling row, the model,
  * then the controls.
  */
-function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, cc5CharacterId, heightCm, styles, shape, skinTone, pigmentation, focus, onFocus, onRandomise, bodyFigure = false }: {
+function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, lookId, cc5CharacterId, cc5Garments, heightCm, styles, shape, skinTone, pigmentation, focus, onFocus, onRandomise, bodyFigure = false }: {
   bodyFigure?: boolean;
   children: ReactNode; avatarName: string; previewSub: string; lookId: string; cc5CharacterId: Cc5CharacterId; heightCm: number;
+  cc5Garments?: Partial<Record<Slot, Cc5GarmentModel>>;
   nav: readonly NavEntry[]; title: string; kicker: string; footer: ReactNode;
   shape: BodyShape; skinTone: number; pigmentation: SkinPigmentation; focus: PreviewFocus; onFocus: (f: PreviewFocus) => void;
   styles: ReturnType<typeof resolveStyles>;
@@ -633,7 +636,7 @@ function Shell({ children, avatarName, previewSub, nav, title, kicker, footer, l
 
         {/* The model */}
         <section className="relative min-h-[26rem] overflow-hidden lg:min-h-0" aria-label="Character preview">
-          <CharacterPreview lookId={lookId} cc5CharacterId={cc5CharacterId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} pigmentation={pigmentation} focus={focus} interactive figure={bodyFigure} />
+          <CharacterPreview lookId={lookId} cc5CharacterId={cc5CharacterId} cc5Garments={cc5Garments} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone} pigmentation={pigmentation} focus={focus} interactive figure={bodyFigure} />
           <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-cc-muted">Drag to turn · scroll or pinch to zoom</p>
           <div className={`pointer-events-none absolute inset-x-0 bottom-14 text-center ${focus === 'face' ? 'hidden' : ''}`}>
             <p className="m-0 truncate font-display text-xl font-bold text-cc-ink">{avatarName}</p>

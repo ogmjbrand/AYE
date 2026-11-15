@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Character } from './CharacterCreation';
 import { CharacterPreview } from './CharacterPreview';
-import { resolveStyles } from '../lib/fashion';
+import { resolveCc5Garments, resolveStyles } from '../lib/fashion';
 import { genderLabel } from '../lib/identity';
 import { CAREER_LABEL, LIFESTYLE_LABEL } from '../lib/labels';
 import { formatHome } from '../lib/places';
@@ -172,6 +172,7 @@ export function EntryScreen({ saved, quality, onQualityChange, onContinue, onNew
                 outfitColor={`rgb(${saved.colorR}, ${saved.colorG}, ${saved.colorB})`}
                 lookId={saved.lookId}
                 cc5CharacterId={saved.cc5CharacterId}
+                cc5Garments={resolveCc5Garments(saved.wardrobe.equipped)}
                 heightCm={saved.heightCm}
                 styles={resolveStyles(saved.wardrobe.equipped)}
                 shape={saved.shape}

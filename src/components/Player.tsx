@@ -7,7 +7,7 @@ import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
-import { resolveStyles, type Slot } from '../lib/fashion';
+import { resolveCc5Garments, resolveStyles, type Slot } from '../lib/fashion';
 import type { OwnedCar } from '../lib/cars';
 import { residentById, residentPosition } from '../lib/people';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
@@ -63,6 +63,7 @@ export function Player({ controller, character, tryOn, conversing = false, car =
 
   const equipped = character?.wardrobe.equipped;
   const styles = useMemo(() => resolveStyles(equipped ?? {}, tryOn), [equipped, tryOn]);
+  const cc5Garments = useMemo(() => resolveCc5Garments(equipped ?? {}, tryOn), [equipped, tryOn]);
 
   useFrame((_, delta) => {
     // Update controller with frame delta (capped so a background tab can't teleport the player)
@@ -122,7 +123,7 @@ export function Player({ controller, character, tryOn, conversing = false, car =
       {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} cc5CharacterId={character?.cc5CharacterId} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
+          <Avatar controller={controller} lookId={character?.lookId} cc5CharacterId={character?.cc5CharacterId} cc5Garments={cc5Garments} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
         </Suspense>
       </ErrorBoundary>
       )}

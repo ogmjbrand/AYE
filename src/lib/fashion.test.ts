@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FABRICS, FASHION_ITEMS, GARMENT_MODELS, MAX_OUTFITS, PATTERNS, SLOTS, SLOT_LABEL, getGarmentModel, itemById, resolveFashionItemId, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
+import { FABRICS, FASHION_ITEMS, GARMENT_MODELS, MAX_OUTFITS, PATTERNS, SLOTS, SLOT_LABEL, getGarmentModel, itemById, resolveCc5Garments, resolveFashionItemId, resolveStyles, sanitiseWardrobe, stockedIn } from './fashion';
 import { COUNTRY_CODES } from './places';
 
 describe('fashion catalogue', () => {
@@ -14,6 +14,17 @@ describe('fashion catalogue', () => {
       expect(i.id.startsWith(i.slot)).toBe(true);
     }
     for (const slot of SLOTS) expect(FASHION_ITEMS.some((i) => i.slot === slot)).toBe(true);
+  });
+
+  it('resolves the real CC5 garment for an equipped slot, and nothing for a plain recolour', () => {
+    const cc5Item = itemById('top-ariana-turtleneck')!;
+    expect(cc5Item.cc5Garment).toEqual({ path: 'private/characters/cc5/garments/turtleneck-sweater.glb', characterId: 'woman' });
+    expect(resolveCc5Garments({ top: 'top-ariana-turtleneck' })).toEqual({ top: cc5Item.cc5Garment });
+    // A plain recolour item (no cc5Garment) contributes nothing
+    expect(resolveCc5Garments({ top: 'top-linen-ivory' })).toEqual({});
+    // Try-on overrides the same way resolveStyles does
+    expect(resolveCc5Garments({}, { top: 'top-ariana-turtleneck' })).toEqual({ top: cc5Item.cc5Garment });
+    expect(resolveCc5Garments({ top: 'top-ariana-turtleneck' }, { top: null })).toEqual({});
   });
 
   it('try-on overrides equipped items, and null shows the original clothes', () => {

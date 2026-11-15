@@ -8,7 +8,7 @@ import { assetUrl } from '../lib/assetManifest';
 import { Avatar } from './Avatar';
 import { ErrorBoundary } from './ErrorBoundary';
 import { MhFigure } from './mh/MhFigure';
-import type { Slot, Style } from '../lib/fashion';
+import type { Cc5GarmentModel, Slot, Style } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
 import { DEFAULT_PIGMENTATION, type SkinPigmentation } from '../lib/skinPigmentation';
 
@@ -87,7 +87,7 @@ function Placeholder({ color }: { color: string }) {
  * interactive, drag to turn and scroll or pinch to zoom; the camera frames the
  * face for face and hair choices.
  */
-export function CharacterPreview({ outfitColor = '#36527d', lookId, cc5CharacterId, heightCm, styles, shape, skinTone = 0, pigmentation = DEFAULT_PIGMENTATION, focus = 'body', interactive = false, figure = false }: {
+export function CharacterPreview({ outfitColor = '#36527d', lookId, cc5CharacterId, cc5Garments, heightCm, styles, shape, skinTone = 0, pigmentation = DEFAULT_PIGMENTATION, focus = 'body', interactive = false, figure = false }: {
   /** Show the body-type figure (MakeHuman body in a two-piece) instead of the person. */
   figure?: boolean;
   outfitColor?: string;
@@ -98,6 +98,8 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, cc5Character
   lookId?: string;
   /** Which Character Creator 5 person to be (lib/assetManifest.ts); that body's default if omitted. */
   cc5CharacterId?: string;
+  /** Real modelled CC5 garments to wear per slot (lib/fashion.ts resolveCc5Garments). */
+  cc5Garments?: Partial<Record<Slot, Cc5GarmentModel>>;
   heightCm?: number;
   styles?: Partial<Record<Slot, Style>>;
   focus?: PreviewFocus;
@@ -130,7 +132,7 @@ export function CharacterPreview({ outfitColor = '#36527d', lookId, cc5Character
               <group scale={height / 1.67}><MhFigure shape={shape} skinTone={Math.max(0.3, skinTone)} hair="afro" /></group>
             ) : (
               <Avatar
-                key={`${lookId}:${cc5CharacterId}`} controller={still} lookId={lookId} cc5CharacterId={cc5CharacterId} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone}
+                key={`${lookId}:${cc5CharacterId}`} controller={still} lookId={lookId} cc5CharacterId={cc5CharacterId} cc5Garments={cc5Garments} heightCm={heightCm} styles={styles} shape={shape} skinTone={skinTone}
                 undertone={pigmentation.undertone} vitiligo={pigmentation.vitiligo} albinismIntensity={pigmentation.albinismIntensity}
               />
             )}

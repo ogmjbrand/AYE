@@ -86,6 +86,20 @@ export interface GarmentModel {
   thumbnail?: string;
 }
 
+/**
+ * A garment that rebinds its own skinned mesh onto the CC5 player skeleton bone-for-
+ * bone by name (components/Cc5Garment.tsx; built by scripts/cc5/build-garment.mjs),
+ * instead of attaching to one bone like GarmentModel's Rocketbox hairstyles. Only
+ * renders when the player is wearing the exact CC5 character it was modelled on --
+ * it was skinned to that character's proportions, not a generic rig.
+ */
+export interface Cc5GarmentModel {
+  /** Path to the GLB relative to public/assets/. */
+  path: string;
+  /** Which CC5 character id (lib/assetManifest.ts) this was modelled on. */
+  characterId: string;
+}
+
 export interface FashionItem {
   id: string;
   name: string;
@@ -97,6 +111,8 @@ export interface FashionItem {
   stockedIn?: readonly string[];
   /** Real 3D garment model; if present, this overrides material-based styling for this item. */
   model?: GarmentModel;
+  /** A real CC5 garment piece; if present, this overrides material-based styling for this item. */
+  cc5Garment?: Cc5GarmentModel;
 }
 
 const item = (
@@ -148,6 +164,15 @@ const hairstyle = (id: string, name: string, price: number): FashionItem => ({
   model: HAIRSTYLE_MODELS[id],
 });
 
+/**
+ * A real modelled CC5 garment (components/Cc5Garment.tsx), only visible on the CC5
+ * character it fits. Luxury, not a starter piece: it's new, nicer content, and
+ * starterItems()'s price/collection rule would otherwise make it free on day one.
+ */
+const cc5Garment = (
+  id: string, slot: Slot, name: string, price: number, colorHex: string, cc5: Cc5GarmentModel,
+): FashionItem => ({ ...item(id, slot, name, price, 'Luxury', 'solid', [colorHex]), cc5Garment: cc5 });
+
 export const FASHION_ITEMS: readonly FashionItem[] = [
   // Tops
   item('top-ankara-sunset', 'top', 'Ankara print · Sunset', 450, 'African prints', 'ankara', ['#d8622b', '#12707a', '#f1d6a2'], 16),
@@ -168,6 +193,10 @@ export const FASHION_ITEMS: readonly FashionItem[] = [
   item('top-bogolan-earth', 'top', 'Bogolan mud cloth · Earth', 520, 'African prints', 'bogolan', ['#3b2a1e', '#e8dcc4', '#8a5a32'], 16),
   item('top-batik-ocean', 'top', 'Batik · Ocean', 420, 'African prints', 'batik', ['#1d4f73', '#e9e2cf', '#2f7fa3'], 14),
   item('top-houndstooth-mono', 'top', 'Houndstooth · Monochrome', 600, 'Tailored', 'houndstooth', ['#1b1b1d', '#efece6'], 40),
+  // A real modelled piece, not a recolour of the body's own clothes -- so far only
+  // for Ariana (lib/assetManifest.ts "woman"); extracted from one of her own CC5
+  // exports (Avatar13b), so it's correctly weight-painted to her exact proportions
+  cc5Garment('top-ariana-turtleneck', 'top', 'Turtleneck sweater · Modelled', 900, '#3a3d44', { path: 'private/characters/cc5/garments/turtleneck-sweater.glb', characterId: 'woman' }),
   // Bottoms
   item('bottom-denim-classic', 'bottom', 'Denim · Classic blue', 300, 'Everyday', 'solid', ['#3a5883']),
   item('bottom-denim-black', 'bottom', 'Denim · Washed black', 300, 'Everyday', 'solid', ['#2a2b2f']),
@@ -273,6 +302,18 @@ export function resolveStyles(equipped: Partial<Record<Slot, string>>, tryOn?: P
     const id = resolveFashionItemId(equipped, tryOn, slot);
     const it = itemById(id);
     if (it) out[slot] = it.style;
+  }
+  return out;
+}
+
+/** The real CC5 garment pieces (components/Cc5Garment.tsx) equipped per slot, if any. */
+export function resolveCc5Garments(equipped: Partial<Record<Slot, string>>, tryOn?: Partial<Record<Slot, string | null>>) {
+  const out: Partial<Record<Slot, Cc5GarmentModel>> = {};
+  for (const slot of SLOTS) {
+    if (slot === 'hairstyle') continue;
+    const id = resolveFashionItemId(equipped, tryOn, slot);
+    const it = itemById(id);
+    if (it?.cc5Garment) out[slot] = it.cc5Garment;
   }
   return out;
 }

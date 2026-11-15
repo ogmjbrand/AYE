@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Vector3 } from 'three';
-import { swatchCss, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
+import { swatchCss, type Cc5GarmentModel, type FashionItem, type Slot, type Style, type Wardrobe } from '../lib/fashion';
 import type { BodyShape } from '../lib/bodyShape';
 import { Avatar } from './Avatar';
 import { useSnapshot, type SnapshotJob } from './snapshot/store';
@@ -42,6 +42,7 @@ export interface WearerLook {
 function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
   const h = (w.heightCm ?? 170) / 100;
   const styles = Object.fromEntries(items.map((i) => [i.slot, i.style])) as Partial<Record<Slot, Style>>;
+  const cc5Garments = Object.fromEntries(items.filter((i) => i.cc5Garment).map((i) => [i.slot, i.cc5Garment])) as Partial<Record<Slot, Cc5GarmentModel>>;
   const where = items.length > 1 ? 'set' : items[0].slot;
   const camera = {
     top: { position: [0.2, 0.74 * h, 1.05], target: [0, 0.72 * h, 0], fov: 32 },
@@ -53,7 +54,7 @@ function wearJob(items: FashionItem[], w: WearerLook): SnapshotJob {
   }[where] as SnapshotJob['camera'];
   return {
     key: `wear:${w.lookId}:${w.cc5CharacterId ?? ''}:${w.heightCm ?? 0}:${w.skinTone ?? 0}:${JSON.stringify(w.shape ?? null)}:${items.map((i) => i.id).join('+')}`,
-    scene: () => <Avatar controller={STILL} own lookId={w.lookId} cc5CharacterId={w.cc5CharacterId} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
+    scene: () => <Avatar controller={STILL} own lookId={w.lookId} cc5CharacterId={w.cc5CharacterId} cc5Garments={cc5Garments} heightCm={w.heightCm} styles={styles} shape={w.shape} skinTone={w.skinTone} />,
     camera,
     size: 320,
   };

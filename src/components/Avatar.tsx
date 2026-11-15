@@ -8,7 +8,8 @@ import { seatDrop } from '../lib/seating';
 
 import { assetUrl, defaultCc5CharacterId, playerBodyFor, type AvatarFile } from '../lib/assetManifest';
 import { lookById } from '../lib/looks';
-import type { Slot, Style } from '../lib/fashion';
+import type { Cc5GarmentModel, Slot, Style } from '../lib/fashion';
+import { Cc5Garment } from './Cc5Garment';
 import { applySkinPigmentation, applyStyles, installSkinOnlyShader, installStyleShader, type StyleUniforms } from './outfitShader';
 import { DEFAULT_VITILIGO, type VitiligoPattern } from '../lib/skinPigmentation';
 import { applyBodyShape } from './bodyShapeSkin';
@@ -180,10 +181,12 @@ function privateCopy(shared: Object3D): Object3D {
  * lib/assetManifest.ts) or one of the built-in looks in lib/looks.ts. Picks
  * idle / walk / run from the speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, cc5CharacterId, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
+export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
   controller: PlayerHandle;
   /** Which Character Creator 5 person to be (lib/assetManifest.ts); that body's default if omitted. */
   cc5CharacterId?: string;
+  /** Real modelled CC5 garments to wear per slot (lib/fashion.ts resolveCc5Garments); skipped on a different character. */
+  cc5Garments?: Partial<Record<Slot, Cc5GarmentModel>>;
   /** Sharing a hug with a resident: the embrace plays once the two have met (lib/hug.ts). */
   hugSession?: HugSession | null;
   /** Use a private copy of the model (a picture of the character elsewhere), so styling it never touches the player's. */
@@ -327,6 +330,9 @@ export function Avatar({ controller, lookId, cc5CharacterId, heightCm, styles, s
       {playerBody && (
         <Cc5Styler scene={scene} styles={styles ?? NO_STYLES} skinTone={skinTone} undertone={undertone} vitiligo={vitiligo} albinismIntensity={albinismIntensity} splitMaterials={CC5_HAS_SPLIT_MATERIALS[bodyType]} />
       )}
+      {playerBody && cc5Garments && (Object.entries(cc5Garments) as [Slot, Cc5GarmentModel][])
+        .filter(([, g]) => g.characterId === characterId)
+        .map(([slot, g]) => <Cc5Garment key={g.path} url={g.path} avatarScene={scene} color={cc5GarmentColor(styles?.[slot])} />)}
       {body && <Gestures body={body} mixer={mixer} root={group} idle={idleClip} onLoad={setGestures} />}
     </group>
   );
