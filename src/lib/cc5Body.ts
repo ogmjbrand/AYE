@@ -7,12 +7,18 @@
 import type { BodyType } from './looks';
 import type { Slot, Style } from './fashion';
 
-/** Which of the model's materials each wardrobe slot recolours (Character Creator material names). */
+/**
+ * Which of the model's materials each wardrobe slot recolours (Character Creator
+ * material names). Shoes and hair differ between Aaron (Sport_sneakers,
+ * Classic_Slick_Back) and Ariana (High_Heels, Finger_Wave_Pixie); newer CC5-built
+ * exports also add a trailing "_Pbr" and, for Ariana's hairstyle, a numbered
+ * "Hair1_"/"Scalp_" material alongside plain "Hair_".
+ */
 export const CC5_SLOT_MATERIALS: Partial<Record<Slot, RegExp>> = {
   top: /^RS_Regular_Fit_Shirt/,
   bottom: /^Slim_Fit_Trousers/,
-  shoes: /^Sport_sneakers/i,
-  hair: /^Hair_(Transparency|Clap_Transparency)$/,
+  shoes: /^(Sport_sneakers|High_Heels)/i,
+  hair: /^(Hair\d*_(Transparency|Clap_Transparency)|Scalp_Transparency)(_Pbr)?$/,
 };
 /** Trailing "_Pbr" on newer CC5-built exports (Ariana, newer Aaron); older exports have no suffix. */
 export const CC5_SKIN_MATERIALS = /^Std_(Skin_(Head|Body|Arm|Leg)|Nails)(_Pbr)?$/;

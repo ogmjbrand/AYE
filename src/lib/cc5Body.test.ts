@@ -6,13 +6,22 @@ import {
 import type { Style } from './fashion';
 
 describe('CC5 player body', () => {
-  it('maps the modelled garments to wardrobe slots', () => {
+  it('maps the modelled garments to wardrobe slots, for both Aaron and Ariana\'s own materials', () => {
     expect(cc5SlotOf('RS_Regular_Fit_Shirt')).toBe('top');
+    expect(cc5SlotOf('RS_Regular_Fit_Shirt_Pbr')).toBe('top');
     expect(cc5SlotOf('Slim_Fit_Trousers')).toBe('bottom');
     expect(cc5SlotOf('Sport_sneakers')).toBe('shoes');
+    expect(cc5SlotOf('Sport_sneakers_Pbr')).toBe('shoes');
+    expect(cc5SlotOf('High_Heels_Pbr')).toBe('shoes');
     expect(cc5SlotOf('Hair_Transparency')).toBe('hair');
+    expect(cc5SlotOf('Hair_Transparency_Pbr')).toBe('hair');
+    expect(cc5SlotOf('Hair1_Transparency_Pbr')).toBe('hair');
+    expect(cc5SlotOf('Scalp_Transparency_Pbr')).toBe('hair');
     expect(cc5SlotOf('Std_Skin_Head')).toBeNull();
     expect(cc5SlotOf('Brows_Hair_Transparency')).toBeNull();
+    // Not yet mapped to a wardrobe slot: Ariana's skirt and earring, Aaron's stubble
+    expect(cc5SlotOf('HM_with_TR_Skirt_Pbr')).toBeNull();
+    expect(cc5SlotOf('Earring_Flower_Pbr')).toBeNull();
   });
 
   it('recognises the skin materials only, with or without the newer exports\' "_Pbr" suffix', () => {

@@ -33,8 +33,16 @@ const CHARACTERS = {
   // it) / WOMAN.fbx (a one-material ActorScan woman had). Keys stay aaron/woman so
   // CC5_BODIES in assetManifest.ts (masculine -> aaron.json, feminine -> woman.json)
   // doesn't need to change.
-  aaron: { file: 'Aaron', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'Aaron'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
-  woman: { file: 'Ariana', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'Ariana'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
+  //
+  // Using the *_Clothed exports, not the plain-pose ones: Aaron's keeps his shirt,
+  // trousers, sneakers, hair and stubble (same garment/hair material names as the old
+  // HUMAN.fbx, so CC5_SLOT_MATERIALS recolouring keeps working unchanged); Ariana's
+  // adds a skirt, heels, the Finger Wave Pixie hairstyle and an earring. Both are still
+  // real avatars with the skin/garment/brow/lash split (not a one-material scan), so
+  // CC5_HAS_SPLIT_MATERIALS stays true for both. The plain-pose exports remain on disk
+  // at export/Aaron and export/Ariana if a bald/underwear-only variant is ever needed.
+  aaron: { file: 'AaronClothed', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'AaronClothed'), anim: 'male-adult-12', gestures: 'masculine', speeds: { walk: 1.03, run: 2.8 } },
+  woman: { file: 'ArianaClothed', dir: join(homedir(), 'Downloads', 'CHARACTER', 'export', 'ArianaClothed'), anim: 'female-adult-08', gestures: 'feminine', speeds: { walk: 1.21, run: 2.76 } },
 };
 const charAt = process.argv.indexOf('--character');
 const name = charAt >= 0 ? process.argv[charAt + 1] : 'aaron';
@@ -74,9 +82,10 @@ const TEXTURE_RULES = {
     [/./, 128],
   ],
 };
-// Card-based hair sorts badly with blending; alpha-tested cards are stable and cheap
+// Card-based hair sorts badly with blending; alpha-tested cards are stable and cheap.
+// Ariana's Finger_Wave_Pixie hairstyle also has numbered ("Hair1_") and scalp materials.
 const ALPHA_CUTOFF = [
-  [/^Hair_/, 0.35],
+  [/^(Hair\d*_|Scalp_)/, 0.35],
   [/^Beard_/, 0.3],
   [/Eyelash|^Lash_|^Brows_/, 0.2],
   // A ready-dressed ActorScan (WOMAN.fbx) is one material whose opacity only cuts out
