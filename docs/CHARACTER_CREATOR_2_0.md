@@ -1,10 +1,11 @@
 # AYE Character Creator 2.0
 
 Status: Task 1 (feasibility) and Task 2 (wardrobe architecture) done. This
-document covers the deferred-features milestones and the Task 3 preparation
-(Neutral F / Neutral M wardrobe) — the write-up only; no new garment is
-integrated yet. See `CHARACTER_PIPELINE.md` for the superseded MakeHuman
-plan and `ASSET_INVENTORY.md` for the raw asset survey.
+document covers the deferred-features milestones, the Task 3 preparation
+(Neutral F / Neutral M wardrobe), and Phase 1 asset discovery for the
+"Modular Fashion System 2.0" spec — all write-up and inspection, no new
+garment is integrated yet. See `CHARACTER_PIPELINE.md` for the superseded
+MakeHuman plan and `ASSET_INVENTORY.md` for the pre-CC5 raw asset survey.
 
 ## Deferred features (not attempted in this milestone)
 
@@ -224,3 +225,151 @@ placeholder-filled:
    clipping, confirm the underwear-only fallback still shows correctly
    with nothing equipped), then an independent commit — not bundled with
    any other change.
+
+## Phase 1 asset discovery ("Modular Fashion System 2.0")
+
+Real inspection of the machine's actual files (CC5's bundled template
+library and the Downloads folder's external packs), not estimated counts.
+Per the execution order, this is discovery only: **nothing listed here is
+approved for integration** by virtue of appearing in this table, and a
+file being present doesn't mean it's exportable — that's checked
+asset-by-asset during the "validate the pipeline with one real garment"
+step and each category expansion afterwards, never assumed.
+
+### CC5 bundled template library
+
+Verified by listing `C:\Users\Public\Documents\Reallusion\Reallusion
+Templates\` directly. The previously-cited counts (71 hairstyles, 202
+clothing, 141 skins, 57 accessories, 528 animations) are exact — confirmed
+file-by-file, not approximate:
+
+| Category | Real count (by extension) | Structure found | Gender/body signal |
+| --- | --- | --- | --- |
+| **Cloth** | 159 `.ccCloth` + 4 `.ccGloves` + 39 `.ccShoes` = **202** | `Coats/CC3` (1), `Full-body/CC3` (1), `Gloves` (4), `Pants/CC3` (1), `Shirts/CC3` (10), `Shoes/CC3` (8), `Skirts` (5), `Underwear/CC3` (2), `Others/*` (named outfit sets, see below) | Most `CC3`-folder items are generic/gender-neutral by rig (not styling); several `Others` subfolders are complete outfit sets named after a specific avatar |
+| **Hair** | 37 `.rlHair` + 24 `.rlHairElement` + 5 `.rlhair` + 2 `.rlhairelement` + 3 `.rlhairstyle` = **71** | `Element`, `Group`, `Style` | Only the 3 `.rlhairstyle` files are complete ready-to-apply styles; the rest are sub-components (strand groups) used to build one, not 71 independent interchangeable styles |
+| **Accessory** | 19 `.ccAcc` + 38 `.iAcc` = **57** | `Arm` (incl. `Actor Group`/`Samples`), `Head/CC3`, `Leg`, `Torso`, `Others/*` (named sets: Alika, Eddy, Hivewire_Huntress, Light Armor) | Mixed; several tied to the same named costume sets as Cloth/Others |
+| **Skin** | 47 `.ccSkin` + 94 `.ccSkinGenPreset` = **141** | `Acquired`, `Blemish`, `Body Hair`, `Full Skin`, `Head`, `Nails`, `Normal Effects`, `Overall`, `Skin Base`, `Skin Details`, `SkinGen Tools` | Not inspected further this pass — out of scope for Phase 1-4 (clothing), relevant to the existing skin pigmentation system instead |
+| **Animation** | 71 `iHand` + 102 `iMotionPlus` + 17 `iMotionplus` + 35 `iTalk` + 72 `italk` + 109 `rlMotion` + 4 `rlPersona` + 118 `rlPose` = **528** | `Motion/1.Human Male`, `Motion/2.Human Female` (each: Idle/Move/Perform), plus `Motion/Coyote`, `Motion/Horse`, `Motion/TRex` (non-human, irrelevant here) | Explicitly gendered folders for human motion; not needed for this clothing pass |
+
+**Named outfit sets found under `Cloth/Others/` and `Accessory/Others/`**
+(each a pre-built, multi-piece costume, not a single garment):
+
+| Set | Pieces | Notes |
+| --- | --- | --- |
+| `Aaron Outfit Set` | Regular Fit Shirt, Slim Fit Trousers, Sport Sneakers | **Confirms provenance** — this is exactly Aaron's current baked-in outfit (`RS_Regular_Fit_Shirt`/`Slim_Fit_Trousers`/`Sport_sneakers`), already in the game |
+| `Ariana Party Set` | Halter Mini Dress, High Heels | **New candidate, not yet used.** A different outfit from Ariana's current one (which is a skirt, not a dress) — already fitted to a known-compatible avatar. The strongest available real dress candidate found this pass |
+| `Mila Outfit Set` | Jeans, Sweater, Sneaker | Feminine casual set; "Mila" isn't one of AYE's current characters/exports, so this is template content to retarget onto Neutral F via CC5's own skin-weight transfer, not an existing avatar's outfit |
+| `Gibro Work Set` | Apron, Belt, Boots, Glasses, Pants | Masculine work-uniform styling; aesthetic is "uniform," not business wear — lower priority for the Phase 4 categories requested |
+| `Alika` (12 files), `Eddy` (17 files) | Jackets, pants, tops, gloves, boots, tactical gear | Sci-fi/tactical aesthetic. Technically CC_Base-compatible content, but **wrong aesthetic for AYE's target categories** (everyday/African/luxury/business) — flagged as available, not recommended |
+| `Hivewire_Huntress` | Dress, gloves, pants, jacket, shoes | Fantasy aesthetic — same flag as above |
+| `Light Armor` | Helmet, pauldron, tasset, trouser, tunic, vambrace, greave | Fantasy armor — same flag as above |
+
+**Licensing (blanket flag, applies to every item above):** per the
+existing research in `CHARACTER_PIPELINE.md` §2, Reallusion's EULA allows
+embedding exported content in a game/web service but **the content must
+not be publicly downloadable**, and mass distribution needs a **written
+permission letter** from Reallusion after registering the game. The
+current pipeline already respects the "not publicly downloadable" half —
+every built CC5 GLB lives under `public/assets/private/` and
+`assets-src/cc5/`, both git-ignored. The mass-distribution permission
+letter has not been requested and is **not assumed granted** by anything
+in this document; it's a real open item for whoever owns that
+relationship with Reallusion, not a blocker invented for this task.
+
+### External downloaded assets
+
+Spot-checked by listing zip contents directly (not just filenames), since
+a filename guessing the category reliably turned out to mislead at least
+once below (per the instruction not to assume a format from the name):
+
+| Asset | Real contents found | Format | Verdict |
+| --- | --- | --- | --- |
+| `suits02_cc0.zip`, `suits03_cc-by.zip` | Despite the name, these contain **"donitz_monk_robe_hood," "galactic_warrior_uniform," "scifi-armor_guardian," "hero_suit"** — a fantasy/sci-fi costume pack, not business suits | `.mhclo` + `.obj` + `.mhmat` (MakeHuman proxy format) | **Not usable**: wrong format (MakeHuman HM08 topology, not CC_Base/Rocketbox — same conclusion `CHARACTER_PIPELINE.md` already reached for the other MakeHuman clothing packs) *and* wrong aesthetic despite the filename |
+| `system_clothes_materials01_cc0`, `equipment02/03_cc-by.zip`, `underwear03_cc-by.zip`, `underwear04_cc0.zip`, `hats01_cc0.zip`, `hats03_cc-by.zip` | Not individually opened this pass | Same MakeHuman ecosystem as the packs above and the already-confirmed-incompatible ones in `ASSET_INVENTORY.md` | Presumed same `.mhclo` topology issue; needs the same per-pack check before any assumption, not yet done |
+| `Streetwear+Module+01.zip` | Bomber Jacket, Modern Formal Pants, Shoes, Sport Shirt, Bag — each with full base-colour/metallic/normal/roughness PBR textures | `.obj` + `.mtl` + `.jpeg` textures | **Right aesthetic, right texture quality, wrong rig state**: `.obj` carries no skeleton or skin weights at all (the format can't). These are static display meshes, not wearable garments — would need a full manual rigging/weight-painting pass in Blender before they could deform with a character. Real, non-trivial content-prep work, not a drop-in conversion like the proven CC5 pipeline |
+| `SK_SummerGirl.zip` | One file, `SKM_Hair.fbx` | FBX (can carry skin weights, unlike `.obj`) | A single hairstyle mesh, not clothing despite the ambiguous zip name. Skeleton compatibility with `CC_Base` not checked this pass |
+| `CGT_Free_Pack.zip` | Armchairs, barstools, benches, ceiling lights, chairs, coffee tables, artwork — confirmed by filename inspection of all 56 FBX entries | `.max` (112, 3ds Max only) + `.fbx` (56) + textures | **Not a clothing pack at all**, despite being inside the search scope — this is furniture/home-decor content (relevant to the existing Home Decor catalogue, not the wardrobe) |
+| `Elegant Long Black Blazer Dress…`, `Fashion Icon Game Overview`, `Pin on Clothing` | Reference/inspiration JPEGs (Pinterest-style mood boards); `Pin on Clothing` is empty | 2D images only | **Not 3D assets** — design references only, per the rule against substituting images for real garments |
+| `Avatar(12).ccProject` | A `.ccProject` not in the current `export_cc5_projects.py` `JOBS` dict | CC5 native project | Unidentified — same situation `Avatar13`/`Avatar13b`/`HDNeural` were in before being inspected; not opened this pass, no assumption made about what it contains |
+
+### What this means for Phase 4 (production)
+
+Ranked by what's actually ready to attempt next, not by category count:
+
+1. **Best next candidate: `Ariana Party Set`'s Halter Mini Dress.** Already
+   fitted to a known-compatible, already-integrated avatar; would be the
+   first real `dress`-slot content once that Slot is added — per the
+   wardrobe-architecture invariant from Task 2, the new `Slot` value and
+   its real item land in the same commit, never separately.
+2. **Good MVP raw material**: the plain `CC3`-folder items (Camisole, Tank
+   Top, generic Jeans/skirt variants, generic boots, the generic
+   Underwear boxers) — least "costume-y," broadest fit, matches the
+   feminine/masculine MVP lists in the spec reasonably well.
+3. **`Mila Outfit Set`** (sweater/jeans/sneaker) as a second feminine MVP
+   source, pending confirmation it retargets cleanly onto Neutral F (no
+   different in principle from any other CC5 template item, but not yet
+   tried).
+4. **Streetwear Module 01** is a real option for later expansion, but only
+   after someone does the rigging/weight-painting work it needs — not a
+   Phase 4 MVP item.
+5. **Not recommended for AYE's stated aesthetic** (everyday/African
+   fashion/luxury/business/formal): Alika, Eddy, Hivewire_Huntress, Light
+   Armor, and the `suits02/03` MakeHuman packs. Available, catalogued, and
+   explicitly not prioritized rather than silently ignored.
+
+Per the execution order, the next concrete step is still Task 3's
+validation: one real garment each for Neutral F and Neutral M, from your
+manual CC5 export — not a broader sweep of this list — before any category
+expansion begins.
+
+## Phase 2: modular wardrobe architecture (design only)
+
+Design for how the spec's 18 clothing categories map onto AYE's actual
+render slots, **without adding any new `Slot` value yet** — the existing
+invariant (every `Slot` lands with real backing content in the same
+commit, recorded for Task 2) still applies and the spec itself reaffirms
+it ("do not introduce speculative garment slots without actual content
+and tests"). This is the plan to build against once Task 3/4 content
+exists, not a change made now.
+
+### Category → slot mapping
+
+| Spec category | Slot | Status |
+| --- | --- | --- |
+| T-shirts, Shirts, Blouses, Sweaters, Tops | `top` (existing) | Real content exists today (Aaron's/Ariana's own + 2 modelled Ariana tops) |
+| Jeans, Trousers, Skirts, Shorts | `bottom` (existing) | Real content exists today |
+| Shoes | `shoes` (existing) | Real content exists today |
+| Hairstyles | `hairstyle` (existing) | Real content exists today, now sellable (Task 2) |
+| Dresses | **New `dress` slot — not added yet** | No real content yet; `Ariana Party Set`'s Halter Mini Dress (Phase 1) is the best candidate to pair with it |
+| Jackets, Coats, Blazers | **New `outerwear` slot — not added yet.** Layers over `top`, never replaces it | No real content yet |
+| Suits | **No new slot** — modelled as a matching `outerwear` + `bottom` pair, reusing the existing `FashionSet` top+bottom combo mechanic already in the boutique (`setsIn()` in `lib/boutique.ts`), not a body-coverage region of its own | Depends on `outerwear` existing first |
+| African traditional fashion | **No new slot** — a style/collection tag, the same way `'African prints'` already tags Ankara/Adire/Kente items across `top`/`bottom` today (`FashionItem.collection`); applies the same way to `dress`/`outerwear` once those exist | Already-existing mechanism; no architecture change needed |
+| Accessories | **New `accessory` slot — not added yet.** Starting as one slot; whether it needs to split (earring/bag/glasses as independent simultaneous pieces) is a real question to answer once actual accessory content exists, not decided speculatively now | No real content yet |
+
+### Layering and compatibility rules (to implement once the slots above have real content)
+
+- `top` + `bottom` stay independent and always combinable — unchanged, already true today.
+- `outerwear` **coexists** with `top` rather than replacing it, the way a jacket goes over a shirt in life. No runtime change is needed for this: `Avatar.tsx` already renders every equipped slot's `cc5Garment` independently (`Object.entries(cc5Garments)`), so a `top` and an `outerwear` piece would simply both render. Only the new `Slot` value and its content are missing, not any rendering capability.
+- `dress` is **mutually exclusive** with `top` and `bottom` — wearing a dress must clear (or hide the picker for) both, the same way a skirt mesh can't coexist with a separate bottom without clipping. This needs real UI logic in `CharacterCreation`'s `ClothesStage` and `BoutiquePanel`'s try-on (equip a `dress` → set `outfit.top`/`outfit.bottom` to `null`, and vice versa) — not yet written, since there's no dress content to test it against. This is the one new behaviour rule this system needs beyond "add a slot and an item."
+- `accessory` stacks independently of everything else — no exclusivity rule needed, same as `hairstyle` today.
+- `shoes` and `hairstyle` are unchanged.
+
+### What this phase deliberately does not change
+
+- No new `Slot` enum values (`dress`/`outerwear`/`accessory`) are added to `src/lib/fashion.ts` yet.
+- No dress/top/bottom mutual-exclusivity code is written yet.
+- No new `ClothesTab`/`BoutiqueSection` wiring beyond what Task 2 already
+  added (the `suits` tab and `dresses`/`outerwear`/`accessories`
+  placeholders already exist and already show "not in the game yet"
+  honestly).
+
+Each of the above gets implemented together with its first real
+content — e.g. the day `Ariana Party Set`'s dress (or any other dress) is
+actually exported and built, that same change adds the `dress` Slot value,
+the `FASHION_ITEMS` entry, and the top/bottom exclusivity logic, verified
+together, not staged separately.
+
+Per the execution order, the next concrete step is still Task 3's
+validation: one real garment each for Neutral F and Neutral M, from your
+manual CC5 export — not a broader sweep of this list — before any category
+expansion begins.
