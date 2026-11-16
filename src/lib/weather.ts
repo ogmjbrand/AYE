@@ -9,9 +9,14 @@ const RAIN_CHANCE = 0.08;
 /** Cumulative with RAIN_CHANCE: the slice of rolls that land on overcast. */
 const OVERCAST_CHANCE = 0.28;
 
+// sin(x)*k is exactly 0 at x=0, so day 0 -- every new game's first day -- would
+// otherwise always roll rain with no randomness involved at all. The seed moves
+// day 0 off that fixed point.
+const SEED = 47.231;
+
 /** Stable pseudo-random roll in [0, 1) for a given day number. */
 function dayRoll(day: number): number {
-  const s = Math.sin(day * 12.9898) * 43758.5453;
+  const s = Math.sin((day + SEED) * 12.9898) * 43758.5453;
   return s - Math.floor(s);
 }
 

@@ -15,6 +15,12 @@ describe('weather', () => {
     expect(counts.overcast).toBeGreaterThan(counts.rain);
     expect(counts.rain).toBeGreaterThan(0);
   });
+
+  // Regression: sin(x) is exactly 0 at x=0, so an unseeded roll would always put day 0
+  // -- every new game's first day -- in the rain bucket with no randomness at all.
+  it('does not always rain on day 0 (a new game’s first day)', () => {
+    expect(weatherForDay(0)).not.toBe('rain');
+  });
 });
 
 describe('parseWeatherOverride', () => {
