@@ -78,7 +78,7 @@ function Coin({ amount, dark = false }: { amount: number; dark?: boolean }) {
   );
 }
 
-const TITLE: Record<BoutiqueSection, string> = { clothes: 'Clothes', shoes: 'Shoes', hair: 'Hair', accessories: 'Accessories' };
+const TITLE: Record<BoutiqueSection, string> = { clothes: 'Clothes', shoes: 'Shoes', hair: 'Hair colour', hairstyle: 'Hairstyles', accessories: 'Accessories' };
 
 interface Card {
   id: string;
@@ -120,12 +120,14 @@ export function BoutiquePanel({ section, districtId, wearer, wardrobe, balance, 
     if (section === 'clothes' && tab === 'sets') return sets.map((s: FashionSet) => ({ id: s.id, name: s.name, price: s.price, items: [s.top, s.bottom] }));
     return rangeFor(districtId, section, tab).map((i) => ({ id: i.id, name: i.name, price: i.price, items: [i] }));
   }, [section, tab, districtId, sets]);
-  const notYet = section === 'clothes' ? NOT_YET[tab] : NOT_YET[section];
+  // Checked against the actual range, not just tab/section identity, so a cut starts
+  // selling the moment it has real items with nothing to change here.
+  const notYet = cards.length === 0 ? (NOT_YET[section === 'clothes' ? tab : section] ?? 'Nothing here yet.') : null;
   const favourites = wardrobe.favourites ?? [];
   const owned = wardrobe.owned;
   const inCart = (c: Card) => c.items.every((i) => cart.includes(i.id) || owned.includes(i.id));
   // The cart keeps items from other tabs too, so look them up across everything this shop sells
-  const allItems = useMemo(() => [...rangeFor(districtId, 'clothes'), ...rangeFor(districtId, 'shoes'), ...rangeFor(districtId, 'hair')], [districtId]);
+  const allItems = useMemo(() => [...rangeFor(districtId, 'clothes'), ...rangeFor(districtId, 'shoes'), ...rangeFor(districtId, 'hair'), ...rangeFor(districtId, 'hairstyle')], [districtId]);
   const cartFull = cart.map((id) => allItems.find((i) => i.id === id)).filter((i): i is FashionItem => !!i);
   const total = cartTotal(cartFull, owned);
 
@@ -252,7 +254,8 @@ export function AssistantPanel({ name, shop, onSection, onFitting, onDecor, onCl
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => onSection('clothes')} className="rounded-full bg-gradient-to-b from-[#e9c77e] to-[#b8862f] px-4 py-2 text-sm font-semibold text-[#2a1c06] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-gold">Explore new collections</button>
         <button type="button" onClick={() => onSection('shoes')} className={chip}>Shoes</button>
-        <button type="button" onClick={() => onSection('hair')} className={chip}>Hair</button>
+        <button type="button" onClick={() => onSection('hair')} className={chip}>Hair colour</button>
+        <button type="button" onClick={() => onSection('hairstyle')} className={chip}>Hairstyles</button>
         <button type="button" onClick={onDecor} className={chip}>Decor</button>
         <button type="button" onClick={onFitting} className={chip}>Fitting Room</button>
         <button type="button" onClick={onClose} className="rounded-full px-3 py-2 text-sm text-ui-muted hover:text-ui-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-gold">Not now</button>

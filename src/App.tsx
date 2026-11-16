@@ -1287,7 +1287,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const nav: NavItem[] = inBoutique ? [
     { id: 'clothes', label: 'Clothes', icon: 'shirt', onClick: () => openSection('clothes'), active: section === 'clothes' },
     { id: 'shoes', label: 'Shoes', icon: 'shoe', onClick: () => openSection('shoes'), active: section === 'shoes' },
-    { id: 'hair', label: 'Hair', icon: 'hair', onClick: () => openSection('hair'), active: section === 'hair' },
+    { id: 'hair', label: 'Hair colour', icon: 'hair', onClick: () => openSection('hair'), active: section === 'hair' },
+    { id: 'hairstyle', label: 'Hairstyles', icon: 'hair', onClick: () => openSection('hairstyle'), active: section === 'hairstyle' },
     { id: 'accessories', label: 'Accessories', icon: 'bag', onClick: () => openSection('accessories'), active: section === 'accessories' },
     { id: 'decor', label: 'Decor', icon: 'decor', onClick: () => { setSection(null); setStore(null); setCatalogueOpen((o) => !o); }, active: catalogueOpen, title: 'Home Decor: furniture delivered to your home' },
     { id: 'fitting', label: 'Fitting Room', icon: 'hanger', onClick: () => { setSection(null); setCatalogueOpen(false); setStore((s) => (s === 'wardrobe' ? null : 'wardrobe')); }, active: store === 'wardrobe', title: 'Change into clothes you own' },

@@ -13,8 +13,8 @@
 import { buildLayout, type Building, type DistrictLayout } from './world';
 import { stockedIn, type FashionItem } from './fashion';
 
-export type BoutiqueSection = 'clothes' | 'shoes' | 'hair' | 'accessories';
-export type ClothesTab = 'all' | 'tops' | 'dresses' | 'bottoms' | 'outerwear' | 'sets';
+export type BoutiqueSection = 'clothes' | 'shoes' | 'hair' | 'hairstyle' | 'accessories';
+export type ClothesTab = 'all' | 'tops' | 'dresses' | 'bottoms' | 'outerwear' | 'suits' | 'sets';
 
 export const CLOTHES_TABS: readonly { id: ClothesTab; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -22,13 +22,21 @@ export const CLOTHES_TABS: readonly { id: ClothesTab; label: string }[] = [
   { id: 'dresses', label: 'Dresses' },
   { id: 'bottoms', label: 'Bottoms' },
   { id: 'outerwear', label: 'Jackets / Outerwear' },
+  { id: 'suits', label: 'Suits' },
   { id: 'sets', label: 'Sets' },
 ];
 
-/** Cuts the current characters can't wear yet: these tabs explain instead of selling. */
+/**
+ * Reasons shown for a tab/section with nothing for sale, keyed by cuts the current
+ * characters can't wear yet (no matching 3D garment exists). Callers show this only
+ * once the actual range for that tab/section comes back empty -- never merely because
+ * a key exists here -- so a cut starts selling the moment it has real items, with
+ * nothing to update here or at the call site.
+ */
 export const NOT_YET: Partial<Record<ClothesTab | BoutiqueSection, string>> = {
   dresses: 'Dresses are a new cut, and new cuts need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. Tops restyle the fabric of what you wear, abayas and kaftans included.',
   outerwear: 'Jackets and coats need new 3D clothes on your character. They aren’t in the game yet, so none are for sale. A top restyles a jacket you already have on.',
+  suits: 'Suits are a new cut, and new cuts need new 3D clothes on your character. They aren’t in the game yet, so none are for sale.',
   accessories: 'Bags, jewellery and sunglasses need new 3D accessories on your character. They aren’t in the game yet, so nothing here is for sale.',
 };
 
@@ -57,10 +65,12 @@ export function rangeFor(districtId: string, section: BoutiqueSection, tab: Clot
   const range = stockedIn(districtId).filter((i) => i.collection !== 'Rewards');
   if (section === 'shoes') return range.filter((i) => i.slot === 'shoes');
   if (section === 'hair') return range.filter((i) => i.slot === 'hair');
-  if (section === 'accessories') return [];
+  if (section === 'hairstyle') return range.filter((i) => i.slot === 'hairstyle');
+  if (section === 'accessories') return []; // no 'accessory' slot/garments exist yet
   if (tab === 'tops') return range.filter((i) => i.slot === 'top');
   if (tab === 'bottoms') return range.filter((i) => i.slot === 'bottom');
   if (tab === 'all') return range.filter((i) => i.slot === 'top' || i.slot === 'bottom');
+  // 'dresses' / 'outerwear' / 'suits': no matching Slot or garments exist yet (see NOT_YET)
   return [];
 }
 

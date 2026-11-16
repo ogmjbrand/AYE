@@ -405,14 +405,25 @@ function FaceStage({ draft, set }: StageProps) {
 function HairStage({ draft, set, editing }: StageProps & { editing?: Character }) {
   const look = describedLook(draft.lookId, draft.cc5CharacterId);
   const options = editing ? FASHION_ITEMS.filter((i) => i.slot === 'hair' && editing.wardrobe.owned.includes(i.id)) : starterItems(draft.country).filter((i) => i.slot === 'hair');
+  // Modelled hairstyles (a real 3D piece, not a recolour) are bought at the salon, never free starters
+  const hairstyleOptions = editing ? FASHION_ITEMS.filter((i) => i.slot === 'hairstyle' && editing.wardrobe.owned.includes(i.id)) : [];
   return (
     <>
       <div>
         <p className={SECTION_LABEL}>Hairstyle</p>
         <p className="text-sm text-cc-ink">{look.hair}</p>
-        {hasPlayerBody(draft.cc5CharacterId)
-          ? <p className="mt-1 text-xs text-cc-muted">The style you gave your character in Character Creator 5. Pick a colour below.</p>
-          : <p className="mt-1 text-xs text-cc-muted">Hair is part of each person&rsquo;s model, so the style comes with the person (under Person). Separate hair models (afro, braids, locs, twists, fades) need the new character system.</p>}
+        <p className="mt-1 text-xs text-cc-muted">
+          {hasPlayerBody(draft.cc5CharacterId)
+            ? 'The style you gave your character in Character Creator 5.'
+            : 'Hair is part of each person’s model, so this is the style they come with (under Person).'} A modelled hairstyle, bought at the salon, can replace it.
+        </p>
+        {hairstyleOptions.length > 0 ? (
+          <div className="mt-2">
+            <SwatchRow slot="hairstyle" items={hairstyleOptions} value={draft.outfit.hairstyle ?? null} onPick={(id) => set({ outfit: { ...draft.outfit, hairstyle: id } })} originalLabel="Original" />
+          </div>
+        ) : editing ? (
+          <p className="mt-2 text-xs text-cc-muted">Buy a modelled hairstyle at the salon to see it here.</p>
+        ) : null}
       </div>
       <div>
         <p className={SECTION_LABEL}>{look.covered ? 'Headwear colour' : 'Hair colour'}</p>

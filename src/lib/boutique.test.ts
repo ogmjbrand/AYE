@@ -17,21 +17,24 @@ describe('The Fashion House', () => {
   });
 
   it('never sells the rewards you earn, and keeps sections to their slots', () => {
-    for (const section of ['clothes', 'shoes', 'hair'] as const) {
+    for (const section of ['clothes', 'shoes', 'hair', 'hairstyle'] as const) {
       const range = rangeFor('lagos.marina', section);
       expect(range.length).toBeGreaterThan(0);
       expect(range.some((i) => i.collection === 'Rewards')).toBe(false);
     }
     expect(rangeFor('lagos.marina', 'shoes').every((i) => i.slot === 'shoes')).toBe(true);
     expect(rangeFor('lagos.marina', 'clothes', 'tops').every((i) => i.slot === 'top')).toBe(true);
+    expect(rangeFor('lagos.marina', 'hairstyle').every((i) => i.slot === 'hairstyle')).toBe(true);
   });
 
   it('says honestly what it cannot sell yet instead of selling it', () => {
     expect(rangeFor('lagos.marina', 'clothes', 'dresses')).toEqual([]);
     expect(rangeFor('lagos.marina', 'clothes', 'outerwear')).toEqual([]);
+    expect(rangeFor('lagos.marina', 'clothes', 'suits')).toEqual([]);
     expect(rangeFor('lagos.marina', 'accessories')).toEqual([]);
     expect(NOT_YET.dresses).toMatch(/aren’t in the game yet/);
     expect(NOT_YET.outerwear).toMatch(/aren’t in the game yet/);
+    expect(NOT_YET.suits).toMatch(/aren’t in the game yet/);
     expect(NOT_YET.accessories).toMatch(/aren’t in the game yet/);
   });
 
