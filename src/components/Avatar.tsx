@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF, useTexture } from '@react-three/drei';
-import { Box3, Color, LoopOnce, Material as MaterialBase, NoColorSpace, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
+import { Box3, Color, LoopOnce, LoopRepeat, Material as MaterialBase, NoColorSpace, type AnimationAction, type Group, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
 import { seatDrop } from '../lib/seating';
@@ -124,8 +124,13 @@ function updateLocomotion(
   gesture: Gesture | null,
   mixerTime: number,
   sitting = false,
+  movementMode: PlayerHandle['movementMode'] = null,
 ) {
-  const next: State = sitting ? 'Sit' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : speed < 3.2 ? 'Walk' : 'Run';
+  const runThreshold = avatar.clips?.includes('Dance') ? (avatar.walkSpeed + avatar.runSpeed) / 2 : 3.2;
+  const clipState: State | null = avatar.clips?.includes('Dance')
+    ? movementMode === 'walk' ? 'Walk' : movementMode === 'run' ? 'Run' : null
+    : null;
+  const next: State = sitting ? 'Sit' : speed < 0.35 ? (gesture && get(gesture) ? gesture : 'Idle') : clipState ?? (speed < runThreshold ? 'Walk' : 'Run');
   if (next !== current.current) {
     const prev = current.current ? get(current.current) : null;
     const action = get(next);
@@ -181,7 +186,7 @@ function privateCopy(shared: Object3D): Object3D {
  * lib/assetManifest.ts) or one of the built-in looks in lib/looks.ts. Picks
  * idle / walk / run from the speed and cross-fades between them.
  */
-export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, own = false, hugSession = null }: {
+export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, heightCm, styles, shape, skinTone = 0, undertone = 0, vitiligo, albinismIntensity = 0, conversing = false, dancing = false, own = false, hugSession = null }: {
   controller: PlayerHandle;
   /** Which Character Creator 5 person to be (lib/assetManifest.ts); that body's default if omitted. */
   cc5CharacterId?: string;
@@ -193,6 +198,8 @@ export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, height
   own?: boolean;
   /** Talking with a resident: the player talks and listens in turns while standing. */
   conversing?: boolean;
+  /** Plays the body's optional looping Dance clip while on foot and not interacting. */
+  dancing?: boolean;
   /** Build, muscle, curves and belly (lib/bodyShape.ts); average if omitted. */
   shape?: BodyShape;
   /** Deeper (to 1) or lighter (to -1) than the person's own skin; 0 keeps it. */
@@ -224,9 +231,10 @@ export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, height
   const clips = useMemo(() => {
     const names = animations.map((c) => c.name);
     const find = (re: RegExp) => names.find((n) => re.test(n));
-    const idle = find(/idle|stand/i) ?? names[0];
-    const walk = find(/walk/i) ?? idle;
-    const run = find(/run|jog/i) ?? walk;
+    const exact = (name: string) => names.find((n) => n.toLowerCase() === name.toLowerCase());
+    const idle = exact('Idle') ?? find(/idle|stand/i) ?? names[0];
+    const walk = exact('Walk') ?? find(/walk/i) ?? idle;
+    const run = exact('Run') ?? find(/run|jog/i) ?? walk;
     if (!find(/idle/i) || !find(/walk/i) || !find(/run/i)) {
       console.warn('[AYE assets] avatar is missing Idle, Walk or Run animations; found:', names);
     }
@@ -311,6 +319,11 @@ export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, height
   const gestures = ownGestures ?? loadedGestures;
   const idleClip = useMemo(() => clipsWithHands.find((c) => c.name === clips.Idle), [clipsWithHands, clips]);
   const conversationStart = useRef<number | null>(null);
+  const danceActive = useRef(false);
+
+  useEffect(() => {
+    actions.Dance?.setLoop(LoopRepeat, Infinity);
+  }, [actions]);
 
   useFrame((_, delta) => {
     if (conversing && conversationStart.current === null) conversationStart.current = mixer.time;
@@ -328,10 +341,26 @@ export function Avatar({ controller, lookId, cc5CharacterId, cc5Garments, height
       }
       return gestures[state];
     };
+    const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
+    const danceAction = actions.Dance;
+    const danceReady = dancing && !conversing && !hugSession && !getSeated() && speed < 0.35 && !!danceAction;
+    if (danceReady) {
+      if (!danceActive.current) {
+        if (current.current) get(current.current)?.fadeOut(0.3);
+        danceAction.reset().fadeIn(0.3).play();
+        danceActive.current = true;
+      }
+      return;
+    }
+    if (danceActive.current) {
+      danceAction?.fadeOut(0.25);
+      danceActive.current = false;
+      current.current = null;
+    }
     // Seated: play the sitting clip and lower the body onto the seat (only if the clip is here; otherwise stay standing)
     const seat = getSeated();
     const sitting = !!seat && !!gestures.Sit;
-    updateLocomotion(get, current, Math.hypot(controller.velocity.x, controller.velocity.z), avatarFile, gesture, mixer.time, sitting);
+    updateLocomotion(get, current, speed, avatarFile, gesture, mixer.time, sitting, controller.movementMode);
     const g = group.current;
     if (g) {
       const drop = sitting ? seatDrop(seat, targetHeight) : 0;

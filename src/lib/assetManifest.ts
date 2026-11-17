@@ -30,6 +30,8 @@ export interface AvatarFile {
   walkSpeed: number;
   /** Ground speed (m/s) the Run clip was captured at. */
   runSpeed: number;
+  /** Animation names present in the GLB, when supplied by its build metadata. */
+  clips?: string[];
 }
 
 export type VehicleKey = 'danfo';
@@ -93,7 +95,15 @@ export function parseManifest(data: unknown): { manifest: AssetManifest; problem
       const h = typeof a.height === 'number' && a.height >= 1.2 && a.height <= 2.3 ? a.height : 1.75;
       if (h !== a.height) problems.push('avatar.height missing or out of range (1.2–2.3 m); using 1.75');
       const speed = (v: unknown, fallback: number) => (typeof v === 'number' && v > 0.3 && v < 12 ? v : fallback);
-      manifest.avatar = { url: a.url, height: h, walkSpeed: speed(a.walkSpeed, 1.4), runSpeed: speed(a.runSpeed, 3.5) };
+      const validClips = Array.isArray(a.clips)
+        ? a.clips.filter((clip): clip is string => typeof clip === 'string' && clip.length > 0 && clip.length <= 80)
+        : undefined;
+      if (Array.isArray(a.clips) && validClips?.length !== a.clips.length) problems.push('avatar.clips contains invalid names; invalid entries were ignored');
+      const clips = validClips ? Array.from(new Set(validClips)) : undefined;
+      manifest.avatar = {
+        url: a.url, height: h, walkSpeed: speed(a.walkSpeed, 1.4), runSpeed: speed(a.runSpeed, 3.5),
+        ...(clips ? { clips } : {}),
+      };
     }
   }
   const vehicles = (raw.vehicles ?? {}) as Record<string, unknown>;
@@ -129,6 +139,9 @@ let playerBodies: Partial<Record<Cc5CharacterId, AvatarFile>> = {};
  * character, else null (the built-in Rocketbox looks).
  */
 export const playerBodyFor = (characterId: Cc5CharacterId): AvatarFile | null => current.avatar ?? playerBodies[characterId] ?? null;
+/** Whether the selected player body advertises a named clip. */
+export const hasPlayerClip = (characterId: Cc5CharacterId, clip: string): boolean =>
+  playerBodyFor(characterId)?.clips?.includes(clip) ?? false;
 /** True when the body drawn for this character id is a Character Creator 5 one (styled by material, not garment maps). */
 export const isCc5Body = (characterId: Cc5CharacterId) => !current.avatar && !!playerBodies[characterId];
 
@@ -179,10 +192,10 @@ async function dropMissingFiles(m: AssetManifest): Promise<AssetManifest> {
  * ?avatar=default to compare. The saved character is not changed; only the model
  * drawn for it is.
  */
-export const CC5_CHARACTERS: Record<Cc5CharacterId, { body: PlayerBodyType; info: string; label: string; buildArg: string }> = {
-  aaron: { body: 'masculine', info: 'private/characters/cc5/aaron.json', label: 'Aaron', buildArg: 'aaron' },
+export const CC5_CHARACTERS: Record<Cc5CharacterId, { body: PlayerBodyType; info: string; pilotInfo?: string; label: string; buildArg: string }> = {
+  aaron: { body: 'masculine', info: 'private/characters/cc5/aaron.json', pilotInfo: 'private/characters/cc5/pilot/aaron-final.json', label: 'Aaron', buildArg: 'aaron' },
   neutralM: { body: 'masculine', info: 'private/characters/cc5/neutralM.json', label: 'Neutral', buildArg: 'neutralM' },
-  woman: { body: 'feminine', info: 'private/characters/cc5/woman.json', label: 'Ariana', buildArg: 'woman' },
+  woman: { body: 'feminine', info: 'private/characters/cc5/woman.json', pilotInfo: 'private/characters/cc5/pilot/woman-final.json', label: 'Ariana', buildArg: 'woman' },
   neutralF: { body: 'feminine', info: 'private/characters/cc5/neutralF.json', label: 'Neutral', buildArg: 'neutralF' },
 };
 /** The CC5 characters defined for a body type, main look first. */
@@ -205,7 +218,7 @@ async function cc5Avatar(info: string): Promise<AvatarFile | null> {
   try {
     const res = await fetch(assetUrl(info), { cache: 'no-cache' });
     if (!res.ok || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
-    const { manifest, problems } = parseManifest({ avatar: (await res.json()).avatar });
+    const { manifest, problems } = parseManifest(await res.json());
     for (const p of problems) console.warn(`[AYE assets] CC5 avatar: ${p}`);
     return manifest.avatar && (await exists(manifest.avatar.url)) ? manifest.avatar : null;
   } catch {
@@ -228,13 +241,16 @@ export async function loadAssetManifest(): Promise<void> {
   // A model listed in manifest.json stays everyone's body; otherwise each CC5 character that's built becomes available
   if (!current.avatar && wantsCc5Avatar(window.location.search, import.meta.env.DEV)) {
     const ids = Object.keys(CC5_CHARACTERS) as Cc5CharacterId[];
-    const found = await Promise.all(ids.map((id) => cc5Avatar(CC5_CHARACTERS[id].info)));
+    const found = await Promise.all(ids.map(async (id) => {
+      const character = CC5_CHARACTERS[id];
+      return (character.pilotInfo && await cc5Avatar(character.pilotInfo)) ?? cc5Avatar(character.info);
+    }));
     playerBodies = {};
     ids.forEach((id, i) => {
       const avatar = found[i];
       if (avatar) {
         playerBodies[id] = avatar;
-        console.info(`[AYE assets] ${id} player body: ${avatar.url}`);
+        console.info(`[AYE assets] ${id} player body${avatar.clips?.includes('Dance') ? ' (animation pilot)' : ''}: ${avatar.url}`);
       } else {
         console.warn(`[AYE assets] the ${id} CC5 player body is not built (node scripts/cc5/build.mjs --character ${CC5_CHARACTERS[id].buildArg}); using the built-in looks for it.`);
       }

@@ -12,7 +12,13 @@ export interface PlayerHandle {
   position: Vector3;
   direction: number;
   velocity: Vector3;
+  movementMode?: 'walk' | 'run' | null;
   applyMovement: (delta: number) => void;
+}
+
+export interface MovementSpeedProfile {
+  walkSpeed: number;
+  runSpeed: number;
 }
 
 const MOVE_KEYS = ['w', 'a', 's', 'd', ' ', 'shift'];
@@ -25,6 +31,10 @@ export const WALK_SPEED = 1.4;
 /** Mood shows in how you move: a little brisker when happy, slower when low (see App). */
 let pace = 1;
 export function setPace(factor: number) { pace = Math.max(0.8, Math.min(1.1, factor)); }
+let movementSpeedProfile: MovementSpeedProfile | null = null;
+export function setMovementSpeedProfile(profile: MovementSpeedProfile | null) {
+  movementSpeedProfile = profile;
+}
 
 /** Driving your own car (lib/cars.ts): top speed in m/s, or null on foot. */
 let driving: { speed: number } | null = null;
@@ -71,10 +81,12 @@ const playerHandle: PlayerHandle = {
   position: new Vector3(...districtById(DEFAULT_DISTRICT_ID).spawn),
   direction: 0,
   velocity: new Vector3(),
+  movementMode: null,
   applyMovement: (delta: number) => {
     let intent = movementIntent(keysPressed, stick);
     if (seated) {
       // Pressing a direction gets you up; otherwise you stay exactly on the seat (no collision push off the bench)
+      playerHandle.movementMode = null;
       playerHandle.velocity.set(0, 0, 0);
       if (intent.forward !== 0 || intent.turn !== 0) standUp();
       return;
@@ -89,9 +101,12 @@ const playerHandle: PlayerHandle = {
         if (route.length === 0) endTrip('arrived');
       } else intent = s;
     }
+    playerHandle.movementMode = intent.forward === 0 ? null : intent.walk ? 'walk' : 'run';
     // In a car: much faster, slower to pick up speed, reverse at a crawl, and steering that tightens with speed
     const reversing = !!driving && intent.forward < 0;
-    const moveSpeed = driving ? driving.speed * (intent.walk ? 0.45 : 1) * (reversing ? 0.35 : 1) : (intent.walk ? WALK_SPEED : RUN_SPEED) * pace;
+    const moveSpeed = driving
+      ? driving.speed * (intent.walk ? 0.45 : 1) * (reversing ? 0.35 : 1)
+      : (intent.walk ? movementSpeedProfile?.walkSpeed ?? WALK_SPEED : movementSpeedProfile?.runSpeed ?? RUN_SPEED) * pace;
     const currentSpeed = Math.hypot(playerHandle.velocity.x, playerHandle.velocity.z);
     const rotationSpeed = driving ? carTurnRate(currentSpeed) * (reversing ? -1 : 1) : 3; // radians per second
     const acceleration = driving ? 1.8 : 6;

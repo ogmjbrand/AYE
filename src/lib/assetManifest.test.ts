@@ -66,6 +66,14 @@ describe('asset manifest', () => {
     expect(bad.manifest.avatar?.walkSpeed).toBe(1.4);
   });
 
+  it('keeps valid named animation clips and removes duplicates', () => {
+    const { manifest, problems } = parseManifest({
+      avatar: { url: 'a.glb', height: 1.8, clips: ['Idle', 'Walk', 'Dance', 'Dance', 7, ''] },
+    });
+    expect(manifest.avatar?.clips).toEqual(['Idle', 'Walk', 'Dance']);
+    expect(problems).toEqual(['avatar.clips contains invalid names; invalid entries were ignored']);
+  });
+
   it('reads an optional ambient-occlusion map, and ignores a bad one', () => {
     const { manifest } = parseManifest({ surfaces: { pavement: { color: 'textures/pavement/color.jpg', ao: 'textures/pavement/ao.jpg', tileMeters: 2 } } });
     expect(manifest.surfaces.pavement?.ao).toBe('textures/pavement/ao.jpg');

@@ -119,6 +119,8 @@ import { DealershipPanel } from './components/DealershipPanel';
 import { carById, carToDrive, fuelCost, type OwnedCar } from './lib/cars';
 import { dealershipAt } from './lib/geography';
 import { isDriving, setDriving } from './hooks/usePlayerController';
+import { defaultCc5CharacterId, hasPlayerClip } from './lib/assetManifest';
+import { lookById } from './lib/looks';
 import './App.css';
 
 // High tier only; the post-processing libraries are fetched on first use
@@ -143,6 +145,8 @@ interface CityProps {
   parked: readonly OwnedCar[];
   /** A hug in progress with a resident, if any. */
   hugSession: HugSession | null;
+  /** Whether the selected CC5 body should play its optional Dance clip. */
+  dancing: boolean;
   onHugComplete: (residentId: string) => void;
 }
 
@@ -241,7 +245,7 @@ function WorkplaceMarker({ position }: { position: [number, number, number] }) {
   );
 }
 
-function City({ controller, character, gameTime, weatherOverride, incidentHere, tryOn, homeId, district, talkingTo, car, parked, hugSession, onHugComplete }: CityProps) {
+function City({ controller, character, gameTime, weatherOverride, incidentHere, tryOn, homeId, district, talkingTo, car, parked, hugSession, dancing, onHugComplete }: CityProps) {
   const quality = useQuality();
   const night = lightingAt(gameTime.hour, gameTime.minute).night;
   return (
@@ -262,7 +266,7 @@ function City({ controller, character, gameTime, weatherOverride, incidentHere, 
       <Traffic player={controller} />
       <ParkedCars cars={parked} />
       {quality.contactShadows && <FootShadow controller={controller} />}
-      <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} car={car} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} />
+      <Player controller={controller} character={character} tryOn={tryOn} conversing={talkingTo !== null} dancing={dancing} car={car} conversationTarget={talkingTo} hugSession={hugSession} onHugComplete={onHugComplete} />
     </>
   );
 }
@@ -391,6 +395,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // In the Fashion House: which collection is open, and the assistant's welcome
   const [section, setSection] = useState<BoutiqueSection | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [dancing, setDancing] = useState(false);
+  const stopDancing = () => setDancing(false);
   // What you've ordered at your table (cleared when you get up)
   const [served, setServed] = useState<{ seatId: string; dishes: string[] } | null>(null);
   const interior = home ? interiorFor(home) : null;
@@ -415,6 +421,8 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const inHospital = !indoors && venue === HOSPITAL_ID;
   /** Inside anywhere (your home or a venue): not on the street. */
   const offStreet = indoors || inPalms || inBoutique || inCampus || inHospital;
+  const dancerId = character.cc5CharacterId ?? defaultCc5CharacterId(lookById(character.lookId).body);
+  const canDance = hasPlayerClip(dancerId, 'Dance');
   // Collision and ground height follow where you are (set before this frame's movement)
   const layoutNow = indoors ? roomLayout! : inPalms ? PALMS_LAYOUT : inBoutique ? BOUTIQUE_LAYOUT : inCampus ? CAMPUS_LAYOUT : inHospital ? HOSPITAL_LAYOUT : district.layout;
   useEffect(() => { campusRef.current = inCampus; hospitalRef.current = inHospital; }, [inCampus, inHospital]);
@@ -450,6 +458,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const at = residentPosition(resident);
     const plan = findHugPlan(controller.position, at, [...activeLayout().obstacles, ...parkedObstacles]);
     if (!plan) return 'There isn’t a clear spot to share a hug here.';
+    stopDancing();
     setHugging({
       residentId: resident.id,
       playerFrom: { x: controller.position.x, z: controller.position.z, facing: controller.direction },
@@ -514,6 +523,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   const book = (to: District, mode: TravelMode) => {
     const option = travelOption(district.city, to.city, mode);
     if (!option || state.balance < option.fare) return;
+    stopDancing();
     // Your car stays parked where you left it
     if (drivingNow) leaveCar(drivingNow);
     travel(to.id, mode);
@@ -539,12 +549,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   const goInside = () => {
     if (!interior) return;
+    stopDancing();
     setHomePanel(null);
     setInside(true);
     placePlayer([doorSpot(interior)[0], 0, doorSpot(interior)[1]], 0);
     snapCamera();
   };
   const goOutside = () => {
+    stopDancing();
     if (venue === HOSPITAL_ID) {
       const w = district.workplaces.doctor.position;
       if (state.shift.clockedIn) clockOut();
@@ -640,6 +652,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   // Drive only on the street, in a car you still own
   const canDrive = !offStreet && !sit.session;
   const drivingNow = driving && canDrive && state.cars.some((c) => c.id === driving.id) ? driving : null;
+  const dancingNow = dancing && canDance && !offStreet && !drivingNow && !sit.session && !talking && !hugging;
   useEffect(() => {
     setDriving(drivingNow ? carById(drivingNow.id) ?? null : null);
     return () => setDriving(null);
@@ -709,6 +722,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
       setArrival(`Your ${carById(myCar.id)?.name ?? 'car'} is parked ${there}. Walk back to it to drive.`);
       return;
     }
+    stopDancing();
     // Getting in: you're in the driver's seat, facing the way it's parked
     if (car.parked) {
       // Its footprint goes when you're in it (the street re-adds any other parked cars on the next render)
@@ -729,6 +743,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const r = district.restaurant;
     if (!r) return;
     if (!palmsOpen(state.time.hour)) { setArrival(`${r.name} is closed. It opens at ${PALMS_OPEN_HOUR}:00.`); return; }
+    stopDancing();
     setHomePanel(null);
     setVenue(r.id);
     placePlayer([PALMS_DOOR[0], 0, PALMS_DOOR[1]], 0);
@@ -736,6 +751,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   /** In through the Fashion House's front door. */
   const enterBoutique = () => {
+    stopDancing();
     setHomePanel(null);
     setVenue(BOUTIQUE_ID);
     placePlayer([BOUTIQUE_DOOR[0], 0, BOUTIQUE_DOOR[1]], 0);
@@ -750,6 +766,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   /** Through the city's university marker to the street outside the campus gate. */
   const enterCampus = () => {
+    stopDancing();
     setHomePanel(null);
     setVenue(CAMPUS_ID);
     placePlayer([ARRIVE_SPOT[0], 0, ARRIVE_SPOT[1]], 0);
@@ -773,6 +790,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     if (!c || !student) return;
     const seats = room === 'lab' ? LAB_SEATS : HALL_SEATS;
     const seat = seats[(state.school.classesTotal * 3) % seats.length];
+    stopDancing();
     if (!sit.start({ seat, place: c.course, minutes: 0 })) { setArrival('There’s no way to reach a free seat from here.'); return; }
     classSeat.current = seat.id;
     startClass(c.id, room);
@@ -881,6 +899,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     return !offStreet && Math.hypot(controller.position.x - w[0], controller.position.z - w[2]) <= CAMPUS_DOOR_RADIUS;
   };
   const enterHospital = () => {
+    stopDancing();
     setHomePanel(null);
     setVenue(HOSPITAL_ID);
     placePlayer([H_ARRIVE[0], 0, H_ARRIVE[1]], 0);
@@ -963,6 +982,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
   };
   /** Walk to that chair and sit; the menu opens straight away (ordering waits until you're seated). */
   const sitAtTable = (seat: Seat) => {
+    stopDancing();
     setHostOpen(false);
     setMovementBlocked(false);
     sit.start({ seat, place: district.restaurant?.name ?? 'the table', minutes: 0 });
@@ -1099,13 +1119,19 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
     const seat = nearestSeat(benchSeats(district.layout.park), controller.position.x, controller.position.z);
     setParkOpen(false);
     setMovementBlocked(false); // the panel is closing; let the walk start
-    if (seat) sit.start({ seat, place: district.park.name, minutes });
+    if (seat) {
+      stopDancing();
+      sit.start({ seat, place: district.park.name, minutes });
+    }
   };
   const sitOnTerrace = (place: string, holdSeconds?: number) => {
     const seat = nearestSeat(chairSeats(district.layout.terraceChairs), controller.position.x, controller.position.z);
     setNightOpen(false);
     setMovementBlocked(false);
-    if (seat) sit.start({ seat, place, minutes: 0, holdSeconds });
+    if (seat) {
+      stopDancing();
+      sit.start({ seat, place, minutes: 0, holdSeconds });
+    }
   };
   // A night out is charged once, as before; afterwards you sit outside with your friend's name for a moment
   const goOutWith = (residentId: string) => {
@@ -1316,6 +1342,14 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         ? { id: 'career', label: 'School', icon: 'career', onClick: () => setCampusPanel((m) => (m === 'records' ? null : 'records')), active: campusPanel === 'records', title: 'Timetable and your academic record' }
         : { id: 'career', label: 'Career', icon: 'career', onClick: () => toggleOs('career'), active: osOpen && osTab === 'career', title: 'Your job, pay and promotions' },
     { id: 'social', label: 'Social', icon: 'social', onClick: () => toggleOs('people'), active: osOpen && osTab === 'people', title: 'The people you know' },
+    ...(canDance && !offStreet && !drivingNow && !sit.session && !talking && !hugging ? [{
+      id: 'dance', label: dancingNow ? 'Stop' : 'Dance', icon: 'spark' as const,
+      onClick: () => setDancing((active) => {
+        if (!active) setMoveTarget(null);
+        return !active;
+      }),
+      active: dancingNow, title: dancingNow ? 'Stop dancing' : 'Dance to the Motifect pilot clip',
+    }] : []),
   ];
   const whereabouts = {
     place: inHospital ? `${HOSPITAL_NAME}, ${district.city.name}` : inCampus ? `${UNIVERSITY_NAME}, ${district.city.name}` : inBoutique ? `${district.fashionHouse.name}, ${district.city.name}` : inPalms && district.restaurant ? `${district.restaurant.name}, ${district.city.name}` : indoors && home ? `At home, ${home.name}` : `${neighborhood?.name ?? district.name}, ${district.city.name}`,
@@ -1577,7 +1611,7 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
                 <Player controller={controller} character={character} tryOn={tryOn} />
               </RestaurantInterior>
             ) : (
-              <City key={district.id} controller={controller} character={character} gameTime={state.time} weatherOverride={weatherOverride} incidentHere={state.activeIncident && state.activeIncident.districtId === district.id ? state.activeIncident : null} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} onHugComplete={finishHug} />
+              <City key={district.id} controller={controller} character={character} gameTime={state.time} weatherOverride={weatherOverride} incidentHere={state.activeIncident && state.activeIncident.districtId === district.id ? state.activeIncident : null} tryOn={tryOn} homeId={state.home} district={district} talkingTo={talking?.id ?? null} car={drivingNow} parked={parkedHere} hugSession={hugging} dancing={dancingNow} onHugComplete={finishHug} />
             )}
           </DistrictContext.Provider>
           {settings.ambientOcclusion && (
@@ -1743,7 +1777,10 @@ function Game({ character, quality: qualityMode, onQualityChange, showRoute, onS
         onOpenNightlife={() => setNightOpen(true)}
         onOpenPark={() => setParkOpen(true)}
         busy={!!sit.session || !!drivingNow}
-        onTalk={setTalking}
+        onTalk={(resident) => {
+          if (resident) stopDancing();
+          setTalking(resident);
+        }}
         workTask={taskOnOffer() ? { place: getCareerLocation(district, character.career)?.name ?? 'work', onOpen: () => setTask(taskOnOffer()) } : null}
         controller={controller}
         character={character}

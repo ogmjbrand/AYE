@@ -1,7 +1,7 @@
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group } from 'three';
-import { getSeated, type PlayerHandle } from '../hooks/usePlayerController';
+import { getSeated, setMovementSpeedProfile, type PlayerHandle } from '../hooks/usePlayerController';
 import type { Seat } from '../lib/seating';
 import { groundHeightAt } from '../lib/world';
 import type { Character } from './CharacterCreation';
@@ -12,6 +12,8 @@ import type { OwnedCar } from '../lib/cars';
 import { residentById, residentPosition } from '../lib/people';
 import { HUG_DURATION_MS, hugPathPose, hugPositionBlend, hugSessionDurationMs, type HugSession } from '../lib/hug';
 import { CarBody } from '../world/CarBody';
+import { defaultCc5CharacterId, playerBodyFor } from '../lib/assetManifest';
+import { lookById } from '../lib/looks';
 
 interface PlayerProps {
   controller: PlayerHandle;
@@ -20,6 +22,8 @@ interface PlayerProps {
   tryOn?: Partial<Record<Slot, string | null>>;
   /** Talking with a resident (gestures in turns). */
   conversing?: boolean;
+  /** Plays this CC5 body's looping Dance clip and pauses on-foot movement. */
+  dancing?: boolean;
   /** Driving your car: the car is shown instead of you on foot. */
   car?: OwnedCar | null;
   /** The resident you're talking with: you turn to face them. */
@@ -51,11 +55,19 @@ function CapsuleFigure({ color }: { color: string }) {
   );
 }
 
-export function Player({ controller, character, tryOn, conversing = false, car = null, conversationTarget = null, hugSession = null, onHugComplete }: PlayerProps) {
+export function Player({ controller, character, tryOn, conversing = false, dancing = false, car = null, conversationTarget = null, hugSession = null, onHugComplete }: PlayerProps) {
   const groupRef = useRef<Group>(null);
   const lastSeat = useRef<Seat | null>(null);
   const settle = useRef(0);
   const completedHug = useRef<string | null>(null);
+  const bodyId = character?.cc5CharacterId ?? defaultCc5CharacterId(lookById(character?.lookId).body);
+  const bodyFile = character ? playerBodyFor(bodyId) : null;
+  const pilotMotion = bodyFile?.clips?.includes('Dance') ? bodyFile : null;
+
+  useEffect(() => {
+    setMovementSpeedProfile(pilotMotion ? { walkSpeed: pilotMotion.walkSpeed, runSpeed: pilotMotion.runSpeed } : null);
+    return () => setMovementSpeedProfile(null);
+  }, [pilotMotion]);
 
   const bodyColor = character
     ? `rgb(${character.colorR}, ${character.colorG}, ${character.colorB})`
@@ -82,6 +94,8 @@ export function Player({ controller, character, tryOn, conversing = false, car =
         controller.velocity.set(0, 0, 0);
         onHugComplete?.(hugSession.residentId);
       }
+    } else if (dancing && !conversing && !getSeated() && !car) {
+      controller.velocity.set(0, 0, 0);
     } else {
       completedHug.current = null;
       controller.applyMovement(Math.min(delta, 0.1));
@@ -123,7 +137,7 @@ export function Player({ controller, character, tryOn, conversing = false, car =
       {car ? <CarBody model={car.id} color={car.color} lightsOn /> : (
       <ErrorBoundary fallback={fallback}>
         <Suspense fallback={fallback}>
-          <Avatar controller={controller} lookId={character?.lookId} cc5CharacterId={character?.cc5CharacterId} cc5Garments={cc5Garments} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} hugSession={hugSession} />
+          <Avatar controller={controller} lookId={character?.lookId} cc5CharacterId={character?.cc5CharacterId} cc5Garments={cc5Garments} heightCm={character?.heightCm} styles={styles} shape={character?.shape} skinTone={character?.skinTone} conversing={conversing} dancing={dancing} hugSession={hugSession} />
         </Suspense>
       </ErrorBoundary>
       )}
